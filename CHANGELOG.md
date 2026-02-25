@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-02-25
+
+### Added
+
+#### Tiered Hook Installation
+- `clens init` now writes hooks to `.claude/settings.local.json` (gitignored) instead of `.claude/settings.json` — no more polluting the repo
+- `clens init --global` installs hooks to `~/.claude/settings.json` for all projects
+- `clens init plugin` now installs both analysis tools AND capture hooks in one command
+- `clens init --status` shows installation state across all tiers (Local, Global, Plugin, Legacy)
+- `clens init --remove --legacy` removes hooks from `.claude/settings.json` (legacy location)
+- Legacy detection: warns when hooks exist in `.claude/settings.json` and suggests migration
+- Multi-tier deduplication warning when hooks are installed in multiple tiers
+- `agentic/hooks/hooks.json` — plugin hooks file with all 17 hook events
+
+### Changed
+- `init()` refactored with `InitTarget` type (`"local" | "global"`) and `resolveInitPaths` helper
+- `uninit` detects and removes hooks from all active tiers
+- `installPlugin` merges capture hooks into user-level settings with backup
+- `uninstallPlugin` removes capture hooks from user-level settings
+- `validatePluginStructure` now checks for `hooks/hooks.json`
+- `readSettingsFile` handles malformed JSON gracefully (try/catch)
+- Type-safe parsing: replaced `as` casts on untrusted data with type guards
+- 1137 tests across 49 test files (was 1086 across 48)
+
 ## [0.2.0] - 2026-02-25
 
 ### Breaking Changes

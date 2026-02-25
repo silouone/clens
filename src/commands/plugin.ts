@@ -10,6 +10,7 @@ import {
 	statSync,
 	symlinkSync,
 	unlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -21,6 +22,7 @@ export type PluginInstallResult = {
 	readonly installed_to: string;
 	readonly files_copied: number;
 	readonly symlinks_created: number;
+	readonly hooks_installed: number;
 	readonly version: string;
 };
 
@@ -44,6 +46,10 @@ const resolveProjectRoot = (): string => {
 };
 
 const resolvePluginSrcDir = (): string => join(resolveProjectRoot(), "agentic");
+
+const CLAUDE_USER_SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
+const CLENS_SETTINGS_BACKUP_PATH = join(homedir(), ".clens", "settings.backup.json");
+const CLENS_HOOK_MARKER = "clens-hook";
 
 // --- Pure helpers ---
 
@@ -93,6 +99,97 @@ const isSymlinkTo = (linkPath: string, targetPath: string): boolean => {
 	} catch {
 		return false;
 	}
+};
+
+// --- Settings types ---
+
+type HookHandler = { readonly type: string; readonly command: string };
+type MatcherGroup = { readonly matcher?: string; readonly hooks: readonly HookHandler[] };
+type HooksMap = Readonly<Record<string, readonly MatcherGroup[]>>;
+type SettingsJson = Readonly<Record<string, unknown>> & { readonly hooks?: HooksMap };
+
+// --- Settings pure helpers ---
+
+const readJsonFile = (path: string): Record<string, unknown> => {
+	try {
+		const raw = readFileSync(path, "utf-8");
+		const parsed: unknown = JSON.parse(raw);
+		return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+			? (parsed as Record<string, unknown>)
+			: {};
+	} catch {
+		return {};
+	}
+};
+
+const asHooksMap = (value: unknown): HooksMap =>
+	typeof value === "object" && value !== null && !Array.isArray(value)
+		? (value as HooksMap)
+		: {};
+
+const asSettingsJson = (value: Record<string, unknown>): SettingsJson => ({
+	...value,
+	hooks: value.hooks !== undefined ? asHooksMap(value.hooks) : undefined,
+});
+
+const isClensHookHandler = (handler: unknown): boolean =>
+	typeof handler === "object" &&
+	handler !== null &&
+	"command" in handler &&
+	typeof (handler as Record<string, unknown>).command === "string" &&
+	((handler as Record<string, unknown>).command as string).includes(CLENS_HOOK_MARKER);
+
+const isClensMatcherGroup = (group: unknown): boolean =>
+	typeof group === "object" &&
+	group !== null &&
+	"hooks" in group &&
+	Array.isArray((group as Record<string, unknown>).hooks) &&
+	((group as Record<string, unknown>).hooks as readonly unknown[]).some(isClensHookHandler);
+
+const mergePluginHooks = (
+	existingSettings: SettingsJson,
+	pluginHooks: HooksMap,
+): SettingsJson => {
+	const existingHooks: HooksMap = existingSettings.hooks ?? {};
+
+	// For each event, filter out existing clens hooks, then append new plugin hooks
+	const mergedHooks: Record<string, readonly MatcherGroup[]> = Object.fromEntries(
+		Object.keys({ ...existingHooks, ...pluginHooks }).map((event) => {
+			const existing = (existingHooks[event] ?? []).filter(
+				(group) => !isClensMatcherGroup(group),
+			);
+			const incoming = pluginHooks[event] ?? [];
+			return [event, [...existing, ...incoming] as readonly MatcherGroup[]];
+		}),
+	);
+
+	return { ...existingSettings, hooks: mergedHooks };
+};
+
+const removeClensHooks = (settings: SettingsJson): SettingsJson => {
+	const hooks = settings.hooks;
+	if (!hooks) return settings;
+
+	const cleaned: Record<string, readonly MatcherGroup[]> = Object.fromEntries(
+		Object.entries(hooks)
+			.map(
+				([event, groups]) =>
+					[event, groups.filter((group) => !isClensMatcherGroup(group))] as const,
+			)
+			.filter(([, groups]) => groups.length > 0),
+	);
+
+	return Object.keys(cleaned).length > 0
+		? { ...settings, hooks: cleaned }
+		: Object.fromEntries(Object.entries(settings).filter(([key]) => key !== "hooks"));
+};
+
+const countHookEvents = (hooks: HooksMap): number => Object.keys(hooks).length;
+
+const settingsHaveClensHooks = (settings: SettingsJson): boolean => {
+	const hooks = settings.hooks;
+	if (!hooks) return false;
+	return Object.values(hooks).some((groups) => groups.some(isClensMatcherGroup));
 };
 
 // --- I/O functions ---
@@ -146,6 +243,37 @@ const removeSymlinks = (installDir: string): number =>
 		);
 	}, 0);
 
+const installCaptureHooks = (installDir: string): number => {
+	const hooksJsonPath = join(installDir, "hooks", "hooks.json");
+	if (!existsSync(hooksJsonPath)) return 0;
+
+	const pluginHooksFile = readJsonFile(hooksJsonPath);
+	const pluginHooks = asHooksMap(pluginHooksFile.hooks);
+	if (Object.keys(pluginHooks).length === 0) return 0;
+
+	// Backup existing user settings
+	const existingSettings = asSettingsJson(readJsonFile(CLAUDE_USER_SETTINGS_PATH));
+	mkdirSync(dirname(CLENS_SETTINGS_BACKUP_PATH), { recursive: true });
+	writeFileSync(CLENS_SETTINGS_BACKUP_PATH, JSON.stringify(existingSettings, null, "\t"), "utf-8");
+
+	// Merge and write
+	const merged = mergePluginHooks(existingSettings, pluginHooks);
+	mkdirSync(dirname(CLAUDE_USER_SETTINGS_PATH), { recursive: true });
+	writeFileSync(CLAUDE_USER_SETTINGS_PATH, JSON.stringify(merged, null, "\t"), "utf-8");
+
+	return countHookEvents(pluginHooks);
+};
+
+const removeCaptureHooks = (): void => {
+	if (!existsSync(CLAUDE_USER_SETTINGS_PATH)) return;
+
+	const settings = asSettingsJson(readJsonFile(CLAUDE_USER_SETTINGS_PATH));
+	if (!settingsHaveClensHooks(settings)) return;
+
+	const cleaned = removeClensHooks(settings);
+	writeFileSync(CLAUDE_USER_SETTINGS_PATH, JSON.stringify(cleaned, null, "\t"), "utf-8");
+};
+
 export const installPlugin = (installDir?: string): PluginInstallResult => {
 	const srcDir = resolvePluginSrcDir();
 	const targetDir = installDir ?? PLUGIN_INSTALL_DIR;
@@ -165,10 +293,14 @@ export const installPlugin = (installDir?: string): PluginInstallResult => {
 	// Create symlinks from ~/.claude/ to installed plugin
 	const symlinksCreated = createSymlinks(targetDir);
 
+	// Install capture hooks into user-level settings
+	const hooksInstalled = installCaptureHooks(targetDir);
+
 	return {
 		installed_to: targetDir,
 		files_copied: copiedCount,
 		symlinks_created: symlinksCreated,
+		hooks_installed: hooksInstalled,
 		version,
 	};
 };
@@ -179,6 +311,9 @@ export const uninstallPlugin = (installDir?: string): boolean => {
 	if (!existsSync(targetDir)) {
 		return false;
 	}
+
+	// Remove capture hooks from user-level settings
+	removeCaptureHooks();
 
 	// Remove symlinks from ~/.claude/ first
 	removeSymlinks(targetDir);
@@ -193,13 +328,22 @@ export const isPluginInstalled = (installDir?: string): boolean => {
 	if (!existsSync(targetDir)) return false;
 
 	// Check that symlinks exist in ~/.claude/
-	return SYMLINK_DIRS.filter((subdir) => existsSync(join(targetDir, subdir))).every((subdir) => {
-		const srcSubdir = join(targetDir, subdir);
-		const claudeSubdir = join(CLAUDE_USER_DIR, subdir);
-		return collectTopLevelEntries(srcSubdir).every((entry) =>
-			isSymlinkTo(join(claudeSubdir, entry), join(srcSubdir, entry)),
-		);
-	});
+	const symlinksOk = SYMLINK_DIRS.filter((subdir) => existsSync(join(targetDir, subdir))).every(
+		(subdir) => {
+			const srcSubdir = join(targetDir, subdir);
+			const claudeSubdir = join(CLAUDE_USER_DIR, subdir);
+			return collectTopLevelEntries(srcSubdir).every((entry) =>
+				isSymlinkTo(join(claudeSubdir, entry), join(srcSubdir, entry)),
+			);
+		},
+	);
+
+	// Also check if capture hooks are present in user settings
+	const hooksPresent = existsSync(CLAUDE_USER_SETTINGS_PATH)
+		? settingsHaveClensHooks(asSettingsJson(readJsonFile(CLAUDE_USER_SETTINGS_PATH)))
+		: false;
+
+	return symlinksOk && hooksPresent;
 };
 
 export const getPluginDir = (): string => resolvePluginSrcDir();
@@ -210,7 +354,13 @@ export const validatePluginStructure = (): {
 } => {
 	const srcDir = resolvePluginSrcDir();
 
-	const required = [".claude-plugin/plugin.json", "commands", "skills", "agents"] as const;
+	const required = [
+		".claude-plugin/plugin.json",
+		"commands",
+		"skills",
+		"agents",
+		"hooks/hooks.json",
+	] as const;
 
 	const errors = required.flatMap((entry): readonly string[] =>
 		existsSync(join(srcDir, entry)) ? [] : [`Missing required: ${entry}`],

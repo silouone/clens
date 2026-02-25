@@ -84,7 +84,7 @@ describe("cli init --remove", () => {
 		const { exitCode, stdout } = await runCli("init", "--remove");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("removed");
-		expect(stdout).toContain("restored");
+		expect(stdout).toContain("Session data preserved");
 	});
 });
 

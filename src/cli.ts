@@ -195,7 +195,7 @@ const KILLED_COMMANDS: Readonly<Record<string, string>> = {
 const GLOBAL_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
 
 const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
-	init: new Set(["--remove", "--status", "--dev"]),
+	init: new Set(["--remove", "--status", "--dev", "--global", "--legacy"]),
 	list: new Set(["--json"]),
 	distill: new Set(["--last", "--all", "--deep", "--json"]),
 	report: new Set(["--last", "--json", "--detail", "--full", "--intent"]),
@@ -245,9 +245,11 @@ const printHelp = (): void => {
 ${bold("Usage:")} clens <command> [session-id] [options]
 
 ${bold("Setup:")}
-  ${cyan("init")}              Initialize clens hooks
-  ${cyan("init --remove")}     Remove hooks and restore settings
-  ${cyan("init --status")}     Show hook installation status
+  ${cyan("init")}              Initialize clens hooks (local, per-project)
+  ${cyan("init --global")}     Initialize clens hooks (global, all projects)
+  ${cyan("init --remove")}     Remove hooks from all active tiers
+  ${cyan("init --remove --legacy")}  Also remove legacy hooks from .claude/settings.json
+  ${cyan("init --status")}     Show hook installation status across all tiers
   ${cyan("init plugin")}       Install/uninstall analysis plugin
 
 ${bold("Sessions:")}
@@ -277,11 +279,14 @@ ${bold("Options:")}
   ${dim("--intent")}       Filter by reasoning intent type
   ${dim("--all")}          Distill all sessions
   ${dim("--comms")}        Show communication timeline
+  ${dim("--global")}       Install hooks globally (~/.claude/settings.json)
+  ${dim("--legacy")}       Include legacy hooks in --remove
   ${dim("--version")}      Show version
   ${dim("--help")}         Show help
 
 ${bold("Examples:")}
-  clens init                          # Set up hooks
+  clens init                          # Set up hooks (local)
+  clens init --global                 # Set up hooks (global)
   clens list                          # See all sessions
   clens distill --last                # Distill latest session
   clens report --last                 # Summary of latest session
@@ -310,6 +315,8 @@ const flags: Flags = {
 	status: args.includes("--status"),
 	dev: args.includes("--dev"),
 	comms: args.includes("--comms"),
+	global: args.includes("--global"),
+	legacy: args.includes("--legacy"),
 };
 
 const positional = args.filter((a) => !a.startsWith("--") && !a.startsWith("-"));

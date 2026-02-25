@@ -8,6 +8,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { init, uninit } from "../src/commands/init";
 import {
@@ -17,6 +18,7 @@ import {
 	uninstallPlugin,
 	validatePluginStructure,
 } from "../src/commands/plugin";
+import { HOOK_EVENTS } from "../src/types";
 
 const TEST_INSTALL_DIR = "/tmp/clens-test-plugin";
 const AGENTIC_DIR = join(import.meta.dir, "..", "agentic");
@@ -359,5 +361,192 @@ describe("content validation", () => {
 	test("all 8 source files exist", () => {
 		expect(ALL_SOURCE_FILES).toHaveLength(8);
 		ALL_SOURCE_FILES.map((relPath) => expect(existsSync(join(AGENTIC_DIR, relPath))).toBe(true));
+	});
+});
+
+// =============================================================================
+// Plugin Hooks Tests (hooks.json structure and content)
+// =============================================================================
+
+describe("plugin hooks", () => {
+	const HOOKS_JSON_PATH = join(AGENTIC_DIR, "hooks", "hooks.json");
+
+	test("hooks.json exists and is valid JSON", () => {
+		expect(existsSync(HOOKS_JSON_PATH)).toBe(true);
+		const content = readFileSync(HOOKS_JSON_PATH, "utf-8");
+		expect(() => JSON.parse(content)).not.toThrow();
+	});
+
+	test("hooks.json contains all 17 events", () => {
+		const hooksFile = JSON.parse(readFileSync(HOOKS_JSON_PATH, "utf-8"));
+		expect(hooksFile.hooks).toBeDefined();
+		expect(Object.keys(hooksFile.hooks).length).toBe(17);
+	});
+
+	test("hooks.json events match HOOK_EVENTS constant", () => {
+		const hooksFile = JSON.parse(readFileSync(HOOKS_JSON_PATH, "utf-8"));
+		const hooksEvents = Object.keys(hooksFile.hooks).sort();
+		const expectedEvents = [...HOOK_EVENTS].sort();
+		expect(hooksEvents).toEqual(expectedEvents);
+	});
+
+	test("hooks use clens-hook command format", () => {
+		const hooksFile = JSON.parse(readFileSync(HOOKS_JSON_PATH, "utf-8"));
+		Object.entries(hooksFile.hooks).forEach(([event, matcherGroups]) => {
+			const groups = matcherGroups as Array<{ hooks: Array<{ type: string; command: string }> }>;
+			expect(groups.length).toBeGreaterThan(0);
+			groups.forEach((group) => {
+				group.hooks.forEach((hook) => {
+					expect(hook.type).toBe("command");
+					expect(hook.command).toBe(`clens-hook ${event}`);
+				});
+			});
+		});
+	});
+
+	test("hooks.json has description field", () => {
+		const hooksFile = JSON.parse(readFileSync(HOOKS_JSON_PATH, "utf-8"));
+		expect(hooksFile.description).toBeString();
+		expect(hooksFile.description.length).toBeGreaterThan(0);
+	});
+
+	test("each hook event has exactly one matcher group with one hook", () => {
+		const hooksFile = JSON.parse(readFileSync(HOOKS_JSON_PATH, "utf-8"));
+		Object.entries(hooksFile.hooks).forEach(([_event, matcherGroups]) => {
+			const groups = matcherGroups as Array<{ hooks: Array<{ type: string; command: string }> }>;
+			expect(groups).toHaveLength(1);
+			expect(groups[0].hooks).toHaveLength(1);
+		});
+	});
+});
+
+// =============================================================================
+// Plugin Hook Installation Tests
+// =============================================================================
+
+describe("plugin hook installation", () => {
+	const CLAUDE_USER_SETTINGS = join(homedir(), ".claude", "settings.json");
+	const CLENS_SETTINGS_BACKUP = join(homedir(), ".clens", "settings.backup.json");
+
+	// Save and restore user settings to avoid test side effects
+	const savedSettings = existsSync(CLAUDE_USER_SETTINGS)
+		? readFileSync(CLAUDE_USER_SETTINGS, "utf-8")
+		: undefined;
+
+	beforeEach(() => {
+		rmSync(TEST_INSTALL_DIR, { recursive: true, force: true });
+	});
+
+	afterEach(() => {
+		// Clean up installed plugin (also removes hooks from user settings)
+		uninstallPlugin(TEST_INSTALL_DIR);
+		rmSync(TEST_INSTALL_DIR, { recursive: true, force: true });
+		// Restore original user settings if they existed
+		if (savedSettings !== undefined) {
+			mkdirSync(join(homedir(), ".claude"), { recursive: true });
+			writeFileSync(CLAUDE_USER_SETTINGS, savedSettings, "utf-8");
+		} else if (existsSync(CLAUDE_USER_SETTINGS)) {
+			// If settings didn't exist before but do now, read to check if empty-ish
+			const current = JSON.parse(readFileSync(CLAUDE_USER_SETTINGS, "utf-8"));
+			if (Object.keys(current).length === 0) {
+				rmSync(CLAUDE_USER_SETTINGS, { force: true });
+			}
+		}
+	});
+
+	test("installPlugin returns correct hooks_installed count", () => {
+		const result = installPlugin(TEST_INSTALL_DIR);
+		expect(result.hooks_installed).toBe(17);
+	});
+
+	test("installPlugin copies hooks/hooks.json to install dir", () => {
+		installPlugin(TEST_INSTALL_DIR);
+		const hooksJsonPath = join(TEST_INSTALL_DIR, "hooks", "hooks.json");
+		expect(existsSync(hooksJsonPath)).toBe(true);
+		const hooksFile = JSON.parse(readFileSync(hooksJsonPath, "utf-8"));
+		expect(Object.keys(hooksFile.hooks).length).toBe(17);
+	});
+
+	test("installPlugin installs capture hooks in user settings", () => {
+		installPlugin(TEST_INSTALL_DIR);
+		expect(existsSync(CLAUDE_USER_SETTINGS)).toBe(true);
+		const settings = JSON.parse(readFileSync(CLAUDE_USER_SETTINGS, "utf-8"));
+		expect(settings.hooks).toBeDefined();
+		// Should have clens-hook entries
+		const hasClensHook = Object.values(settings.hooks).some((groups) =>
+			(groups as Array<{ hooks: Array<{ command: string }> }>).some((g) =>
+				g.hooks.some((h) => h.command.includes("clens-hook")),
+			),
+		);
+		expect(hasClensHook).toBe(true);
+	});
+
+	test("uninstallPlugin removes capture hooks from user settings", () => {
+		installPlugin(TEST_INSTALL_DIR);
+		// Verify hooks are present
+		const before = JSON.parse(readFileSync(CLAUDE_USER_SETTINGS, "utf-8"));
+		expect(before.hooks).toBeDefined();
+
+		uninstallPlugin(TEST_INSTALL_DIR);
+		// After uninstall, clens hooks should be gone
+		if (existsSync(CLAUDE_USER_SETTINGS)) {
+			const after = JSON.parse(readFileSync(CLAUDE_USER_SETTINGS, "utf-8"));
+			const hasClensHook = after.hooks
+				? Object.values(after.hooks).some((groups) =>
+						(groups as Array<{ hooks: Array<{ command: string }> }>).some((g) =>
+							g.hooks.some((h) => h.command.includes("clens-hook")),
+						),
+					)
+				: false;
+			expect(hasClensHook).toBe(false);
+		}
+	});
+
+	test("installPlugin preserves existing user hooks", () => {
+		// Write a non-clens hook to user settings first
+		mkdirSync(join(homedir(), ".claude"), { recursive: true });
+		const existingSettings = {
+			permissions: { allow: ["Bash"] },
+			hooks: {
+				PreToolUse: [{ hooks: [{ type: "command", command: "my-other-hook PreToolUse" }] }],
+			},
+		};
+		writeFileSync(CLAUDE_USER_SETTINGS, JSON.stringify(existingSettings, null, "\t"), "utf-8");
+
+		installPlugin(TEST_INSTALL_DIR);
+
+		const settings = JSON.parse(readFileSync(CLAUDE_USER_SETTINGS, "utf-8"));
+		// Non-clens hooks should be preserved
+		const preToolUseGroups = settings.hooks.PreToolUse as Array<{
+			hooks: Array<{ command: string }>;
+		}>;
+		const hasUserHook = preToolUseGroups.some((g) =>
+			g.hooks.some((h) => h.command === "my-other-hook PreToolUse"),
+		);
+		expect(hasUserHook).toBe(true);
+		// Clens hooks should also be present
+		const hasClensHook = preToolUseGroups.some((g) =>
+			g.hooks.some((h) => h.command.includes("clens-hook")),
+		);
+		expect(hasClensHook).toBe(true);
+		// Non-hooks settings should be preserved
+		expect(settings.permissions).toBeDefined();
+		expect(settings.permissions.allow).toContain("Bash");
+	});
+
+	test("installPlugin creates backup of user settings", () => {
+		mkdirSync(join(homedir(), ".claude"), { recursive: true });
+		writeFileSync(
+			CLAUDE_USER_SETTINGS,
+			JSON.stringify({ permissions: { allow: ["Read"] } }),
+			"utf-8",
+		);
+
+		installPlugin(TEST_INSTALL_DIR);
+
+		expect(existsSync(CLENS_SETTINGS_BACKUP)).toBe(true);
+		const backup = JSON.parse(readFileSync(CLENS_SETTINGS_BACKUP, "utf-8"));
+		expect(backup.permissions).toBeDefined();
+		expect(backup.permissions.allow).toContain("Read");
 	});
 });

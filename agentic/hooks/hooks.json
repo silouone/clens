@@ -1,0 +1,22 @@
+{
+	"description": "cLens session capture — records all hook events to .clens/sessions/",
+	"hooks": {
+		"SessionStart": [{ "hooks": [{ "type": "command", "command": "clens-hook SessionStart" }] }],
+		"SessionEnd": [{ "hooks": [{ "type": "command", "command": "clens-hook SessionEnd" }] }],
+		"UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "clens-hook UserPromptSubmit" }] }],
+		"PreToolUse": [{ "hooks": [{ "type": "command", "command": "clens-hook PreToolUse" }] }],
+		"PostToolUse": [{ "hooks": [{ "type": "command", "command": "clens-hook PostToolUse" }] }],
+		"PostToolUseFailure": [{ "hooks": [{ "type": "command", "command": "clens-hook PostToolUseFailure" }] }],
+		"PermissionRequest": [{ "hooks": [{ "type": "command", "command": "clens-hook PermissionRequest" }] }],
+		"Notification": [{ "hooks": [{ "type": "command", "command": "clens-hook Notification" }] }],
+		"SubagentStart": [{ "hooks": [{ "type": "command", "command": "clens-hook SubagentStart" }] }],
+		"SubagentStop": [{ "hooks": [{ "type": "command", "command": "clens-hook SubagentStop" }] }],
+		"Stop": [{ "hooks": [{ "type": "command", "command": "clens-hook Stop" }] }],
+		"TeammateIdle": [{ "hooks": [{ "type": "command", "command": "clens-hook TeammateIdle" }] }],
+		"TaskCompleted": [{ "hooks": [{ "type": "command", "command": "clens-hook TaskCompleted" }] }],
+		"PreCompact": [{ "hooks": [{ "type": "command", "command": "clens-hook PreCompact" }] }],
+		"ConfigChange": [{ "hooks": [{ "type": "command", "command": "clens-hook ConfigChange" }] }],
+		"WorktreeCreate": [{ "hooks": [{ "type": "command", "command": "clens-hook WorktreeCreate" }] }],
+		"WorktreeRemove": [{ "hooks": [{ "type": "command", "command": "clens-hook WorktreeRemove" }] }]
+	}
+}

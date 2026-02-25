@@ -15,6 +15,8 @@ export type Flags = {
 	readonly status: boolean;
 	readonly dev: boolean;
 	readonly comms: boolean;
+	readonly global: boolean;
+	readonly legacy: boolean;
 };
 
 // ANSI color helpers
