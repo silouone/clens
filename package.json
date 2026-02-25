@@ -1,0 +1,74 @@
+{
+  "name": "@silou/clens",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "cLens — Claude Lens. Capture and analyze AI agent sessions. Local-first, zero-dependency observability for Claude Code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silouone/clens.git"
+  },
+  "homepage": "https://github.com/silouone/clens",
+  "bugs": {
+    "url": "https://github.com/silouone/clens/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "claude-code-hooks",
+    "claude-session",
+    "ai-agent",
+    "ai-agent-observability",
+    "agent-tracing",
+    "observability",
+    "session-capture",
+    "session-analysis",
+    "session-replay",
+    "backtrack-detection",
+    "decision-analysis",
+    "tool-call-tracing",
+    "transcript-analysis",
+    "edit-chains",
+    "plan-drift",
+    "hooks",
+    "jsonl",
+    "local-first",
+    "developer-tools",
+    "debugging",
+    "cli",
+    "opentelemetry",
+    "otlp"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "author": "Silouane Galinou",
+  "main": "./dist/cli.js",
+  "files": [
+    "dist/",
+    "agentic/"
+  ],
+  "bin": {
+    "clens": "dist/cli.js",
+    "clens-hook": "dist/hook.js"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target bun --entry-naming [name].js && bun build src/hook.ts --outdir dist --target bun --entry-naming [name].js",
+    "build:bin": "bun build --compile src/hook.ts --outfile bin/clens-hook && bun build --compile src/cli.ts --outfile bin/clens",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "bench": "bun run test/bench.ts",
+    "lint": "bunx biome check src/ test/",
+    "lint:fix": "bunx biome check --write src/ test/",
+    "format": "bunx biome format --write src/ test/",
+    "prepublishOnly": "bun run typecheck && bun test && bun run build",
+    "plugin:dev": "echo 'claude --plugin-dir ./agentic'"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.3",
+    "@types/bun": "latest",
+    "bun-types": "^1.3.9",
+    "typescript": "^5.7.0",
+    "undici-types": "^7.18.2"
+  }
+}

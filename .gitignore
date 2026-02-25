@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+bin/
+*.tsbuildinfo
+
+# Bun
+bun.lockb
+*.bun-build
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test / Coverage
+coverage/
+
+# Logs (hook output from dev sessions)
+logs/
+
+# Claude Code (dev tooling, not part of the open source project)
+.claude/
+CLAUDE.md
+
+# AI docs
+ai_docs/
+
+# Private strategy docs
+docs/
+cli-review/
+
+# cLens local capture data
+.clens/
+
+specs/
+
+# Internal analytics
+scripts/
+report_kpi_33_sessions.md

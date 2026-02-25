@@ -1,0 +1,9 @@
+{
+  "name": "clens",
+  "version": "0.2.0",
+  "description": "Session analysis tools for cLens — analyze distilled agent sessions, compare performance, and deep-dive into backtracking patterns",
+  "author": {
+    "name": "Silouane Galinou"
+  },
+  "homepage": "https://clens.dev"
+}
