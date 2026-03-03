@@ -47,7 +47,7 @@ describe("cli --version", () => {
 	test("prints VERSION string", async () => {
 		const { exitCode, stdout } = await runCli("--version");
 		expect(exitCode).toBe(0);
-		expect(stdout.trim()).toBe("0.2.0");
+		expect(stdout.trim()).toBe("0.2.1");
 	});
 });
 
