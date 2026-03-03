@@ -1,6 +1,6 @@
 {
   "name": "@silou/clens",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "cLens — Claude Lens. Capture and analyze AI agent sessions. Local-first, zero-dependency observability for Claude Code.",
   "license": "MIT",

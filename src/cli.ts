@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import type { Flags } from "./commands/shared";
 
-const VERSION = "0.2.0";
+const VERSION = "0.2.1";
 
 type CommandContext = {
 	readonly positional: readonly string[];
