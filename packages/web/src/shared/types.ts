@@ -40,4 +40,13 @@ export type {
 	// Risk
 	FileRiskScore,
 	RiskLevel,
+
+	// Transcript
+	TranscriptReasoning,
+	TranscriptUserMessage,
+
+	// Distill extras
+	DistilledSummary,
+	TeamMetrics,
+	DecisionPoint,
 } from "@clens/cli";

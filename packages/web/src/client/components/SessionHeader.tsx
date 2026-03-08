@@ -1,24 +1,8 @@
 import { Show, createSignal, type Component } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { TimelineBar } from "./TimelineBar";
+import { StatusBadge } from "./StatusBadge";
 import { formatDuration, formatCost } from "../lib/format";
-
-// ── Status badge ─────────────────────────────────────────────────────
-
-const StatusBadge: Component<{ readonly complete: boolean }> = (props) => {
-	const cls = () =>
-		props.complete
-			? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-700/50"
-			: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50";
-
-	return (
-		<span
-			class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls()}`}
-		>
-			{props.complete ? "complete" : "in progress"}
-		</span>
-	);
-};
 
 // ── Stat pill ────────────────────────────────────────────────────────
 
@@ -50,18 +34,6 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 	const model = () => session().stats.model ?? "unknown";
 	const cost = () => session().cost_estimate?.estimated_cost_usd;
 	const [distilling, setDistilling] = createSignal(false);
-
-	// First user prompt as request preview (skip commands, system, teammate messages)
-	const requestPreview = () => {
-		const msg = session().user_messages.find(
-			(m) => !m.message_type || m.message_type === "prompt",
-		);
-		if (!msg) return undefined;
-		const clean = msg.content.replace(/<[^>]+>/g, "").trim();
-		return clean.length > 0
-			? clean.slice(0, 120) + (clean.length > 120 ? "..." : "")
-			: undefined;
-	};
 
 	return (
 		<div class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/50">
@@ -102,15 +74,6 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 					</div>
 				</Show>
 			</div>
-
-			{/* Request preview */}
-			<Show when={requestPreview()}>
-				{(text) => (
-					<p class="mt-1.5 text-xs text-gray-500 truncate max-w-2xl">
-						{text()}
-					</p>
-				)}
-			</Show>
 
 			{/* Timeline bar */}
 			<Show when={phases().length > 0}>

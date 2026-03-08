@@ -1,12 +1,14 @@
 import { useParams, useNavigate } from "@solidjs/router";
-import { createMemo, createSignal, For, Show, type Component, type JSX } from "solid-js";
+import { createMemo, For, Show, type Component } from "solid-js";
 import { createSessionDetail, globalError, clearError } from "../lib/stores";
-import { formatDuration, formatCost } from "../lib/format";
+import { formatDuration, formatCost, formatRelTime } from "../lib/format";
 import { SessionHeader } from "../components/SessionHeader";
 import { AgentListPanel } from "../components/AgentListPanel";
 import { TimelineBar } from "../components/TimelineBar";
 import { CommunicationTimeline } from "../components/CommunicationTimeline";
-import type { AgentNode, FileDiffAttribution } from "../../shared/types";
+import { CollapsibleCard } from "../components/CollapsibleCard";
+import type { FileDiffAttribution } from "../../shared/types";
+import { flattenAgents } from "../lib/agent-utils";
 
 // ── Loading skeleton ────────────────────────────────────────────────
 
@@ -33,58 +35,13 @@ const ErrorBanner: Component<{
 	</div>
 );
 
-// ── Collapsible card ────────────────────────────────────────────────
-
-const CollapsibleCard: Component<{
-	readonly title: string;
-	readonly defaultOpen?: boolean;
-	readonly children: JSX.Element;
-}> = (props) => {
-	const [open, setOpen] = createSignal(props.defaultOpen ?? true);
-
-	return (
-		<div class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900/50">
-			<button
-				onClick={() => setOpen((o) => !o)}
-				class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/30"
-			>
-				<span
-					class="text-gray-400 transition-transform dark:text-gray-600"
-					classList={{ "rotate-90": open() }}
-				>
-					&#9654;
-				</span>
-				{props.title}
-			</button>
-			<Show when={open()}>
-				<div class="border-t border-gray-200 dark:border-gray-800">
-					{props.children}
-				</div>
-			</Show>
-		</div>
-	);
-};
-
 // ── Helpers ──────────────────────────────────────────────────────────
-
-const formatRelTime = (t: number, start: number): string => {
-	const delta = Math.max(0, t - start);
-	const s = Math.floor(delta / 1000);
-	if (s < 60) return `+${s}s`;
-	const m = Math.floor(s / 60);
-	if (m < 60) return `+${m}m ${s % 60}s`;
-	const h = Math.floor(m / 60);
-	return `+${h}h ${m % 60}m`;
-};
 
 const sumDiffAttribution = (attrs: readonly FileDiffAttribution[]): { readonly additions: number; readonly deletions: number; readonly fileCount: number } => ({
 	additions: attrs.reduce((sum, a) => sum + a.total_additions, 0),
 	deletions: attrs.reduce((sum, a) => sum + a.total_deletions, 0),
 	fileCount: attrs.length,
 });
-
-const flattenAgents = (agents: readonly AgentNode[]): readonly AgentNode[] =>
-	agents.flatMap((a) => [a, ...flattenAgents(a.children)]);
 
 // ── Main component ──────────────────────────────────────────────────
 

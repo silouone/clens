@@ -1,10 +1,14 @@
 import { html } from "diff2html";
 import { createMemo, createSignal, For, Show, type Component } from "solid-js";
-import { useNavigate } from "@solidjs/router";
 import type { DiffLine, DistilledSession, FileDiffAttribution } from "../../shared/types";
 import { isFilePath } from "../../shared/paths";
-import { formatDuration, formatCost } from "../lib/format";
 import { diffLinesToUnified } from "../lib/diff-utils";
+import { SessionSnapshot } from "./SessionSnapshot";
+import { NarrativeSection } from "./NarrativeSection";
+import { AgentWorkloadTable } from "./AgentWorkloadTable";
+import { IssuesPanel } from "./IssuesPanel";
+import { ThinkingBreakdown } from "./ThinkingBreakdown";
+import { PlanDriftSection } from "./PlanDriftSection";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -62,16 +66,6 @@ const truncatePath = (path: string, maxLen = 60): string =>
 // ── Component ────────────────────────────────────────────────────────
 
 export const SessionOverview: Component<SessionOverviewProps> = (props) => {
-	const navigate = useNavigate();
-	const agents = () => props.session.agents ?? [];
-	const agentCount = () => agents().length;
-	const subAgentCount = () =>
-		agents().reduce((sum, a) => sum + a.children.length, 0);
-	const leadAgent = () => agents()[0];
-
-	const totalCost = () => props.session.cost_estimate?.estimated_cost_usd ?? 0;
-	const totalDuration = () => props.session.stats.duration_ms;
-
 	const fileRows = createMemo(() => buildFileRows(props.session));
 	const totalAdditions = createMemo(() =>
 		fileRows().reduce((sum, f) => sum + f.additions, 0),
@@ -99,57 +93,33 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 		else setExpandedFiles(new Set<string>(fileRows().map((r) => r.filePath)));
 	};
 
-	const handleViewDetails = () => {
-		if (props.isMultiAgent) {
-			navigate(`/session/${props.sessionId}/team`);
-		} else {
-			const first = agents()[0];
-			if (first) {
-				navigate(`/session/${props.sessionId}/agent/${first.session_id}`);
-			}
-		}
-	};
-
 	return (
 		<div class="space-y-4">
-			{/* Agent Team Overview */}
-			<div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/50">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-							Agent Team
-						</h3>
-						<span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/60 dark:text-blue-400">
-							{agentCount() + subAgentCount()} agents
-						</span>
-					</div>
-					<button
-						onClick={handleViewDetails}
-						class="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
-					>
-						View Details
-					</button>
-				</div>
+			{/* 1. Session Snapshot (always visible hero) */}
+			<SessionSnapshot session={props.session} />
 
-				<div class="mt-3 flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-					<Show when={leadAgent()}>
-						{(lead) => (
-							<span>
-								Lead: <span class="font-medium text-gray-700 dark:text-gray-300">{lead().agent_name || lead().agent_type}</span>
-								{subAgentCount() > 0 && ` + ${subAgentCount()} sub-agents`}
-							</span>
-						)}
-					</Show>
-					<span>
-						Cost: <span class="font-medium text-gray-700 dark:text-gray-300">{formatCost(totalCost())}</span>
-					</span>
-					<span>
-						Duration: <span class="font-medium text-gray-700 dark:text-gray-300">{formatDuration(totalDuration())}</span>
-					</span>
-				</div>
-			</div>
+			{/* 2. Narrative (conditional) */}
+			<Show when={props.session.summary?.narrative}>
+				<NarrativeSection session={props.session} />
+			</Show>
 
-			{/* Modified Files List */}
+			{/* 3. Agent Workload (conditional: multi-agent) */}
+			<Show when={props.isMultiAgent}>
+				<AgentWorkloadTable
+					session={props.session}
+					sessionId={props.sessionId}
+				/>
+			</Show>
+
+			{/* 4. Issues & Errors (always visible — handles own empty state) */}
+			<IssuesPanel session={props.session} />
+
+			{/* 5. Thinking Breakdown (conditional) */}
+			<Show when={props.session.reasoning.length > 0}>
+				<ThinkingBreakdown session={props.session} />
+			</Show>
+
+			{/* 6. Modified Files List (EXISTING — kept as-is) */}
 			<div class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900/50">
 				<div class="flex items-center justify-between border-b border-gray-200 px-4 py-2.5 dark:border-gray-800">
 					<div class="flex items-center gap-3">
@@ -243,6 +213,11 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 					</div>
 				</Show>
 			</div>
+
+			{/* 7. Plan Drift (conditional) */}
+			<Show when={props.session.plan_drift}>
+				<PlanDriftSection session={props.session} />
+			</Show>
 		</div>
 	);
 };
