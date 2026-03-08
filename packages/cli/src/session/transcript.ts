@@ -36,7 +36,7 @@ export const readTranscript = (transcriptPath: string): TranscriptEntry[] => {
 	}
 };
 
-export const resolveTranscriptPath = (events: StoredEvent[]): string | null => {
+export const resolveTranscriptPath = (events: readonly StoredEvent[]): string | null => {
 	const match = events.find((e) => e.data?.transcript_path);
 	return (match?.data?.transcript_path as string) ?? null;
 };

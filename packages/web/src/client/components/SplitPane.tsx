@@ -192,7 +192,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 				{props.left}
 				<button
 					onClick={toggleCollapseLeft}
-					class="absolute left-1 top-1 z-10 rounded bg-gray-800/80 px-1.5 py-0.5 text-xs text-gray-400 opacity-0 transition-opacity duration-150 hover:bg-gray-700 hover:text-gray-200 group-hover:opacity-100"
+					class="absolute left-1 top-1 z-10 rounded bg-gray-200/80 px-1.5 py-0.5 text-xs text-gray-500 opacity-0 transition-opacity duration-150 hover:bg-gray-300 hover:text-gray-700 group-hover:opacity-100 dark:bg-gray-800/80 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 					classList={{ "opacity-100": collapsed() === "left" }}
 					title={collapsed() === "left" ? "Expand pane" : "Collapse pane"}
 					aria-label={collapsed() === "left" ? "Expand pane" : "Collapse pane"}
@@ -240,7 +240,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 				{props.right}
 				<button
 					onClick={toggleCollapseRight}
-					class="absolute right-1 top-1 z-10 rounded bg-gray-800/80 px-1.5 py-0.5 text-xs text-gray-400 opacity-0 transition-opacity duration-150 hover:bg-gray-700 hover:text-gray-200 group-hover:opacity-100"
+					class="absolute right-1 top-1 z-10 rounded bg-gray-200/80 px-1.5 py-0.5 text-xs text-gray-500 opacity-0 transition-opacity duration-150 hover:bg-gray-300 hover:text-gray-700 group-hover:opacity-100 dark:bg-gray-800/80 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 					classList={{ "opacity-100": collapsed() === "right" }}
 					title={collapsed() === "right" ? "Expand pane" : "Collapse pane"}
 					aria-label={collapsed() === "right" ? "Expand pane" : "Collapse pane"}

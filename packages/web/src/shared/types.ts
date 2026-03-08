@@ -34,6 +34,7 @@ export type {
 	StoredEvent,
 
 	// Conversation
+	AgentMessageEntry,
 	ConversationEntry,
 
 	// Risk

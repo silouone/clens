@@ -115,12 +115,14 @@ describe("extractTeamMetrics", () => {
 			task_id: "t1",
 			agent: "builder-1",
 			subject: "Task A",
+			status: "completed",
 			t: 3000,
 		});
 		expect(result.tasks[1]).toEqual({
 			task_id: "t2",
 			agent: "builder-2",
 			subject: "Task B",
+			status: "completed",
 			t: 4000,
 		});
 		expect(result.idle_transitions).toHaveLength(2);

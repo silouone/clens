@@ -1,20 +1,7 @@
 import { createSignal, For, Show, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import type { AgentNode } from "../../shared/types";
-
-// ── Formatting helpers ──────────────────────────────────────────────
-
-const formatDuration = (ms: number): string => {
-	const s = Math.floor(ms / 1000);
-	if (s < 60) return `${s}s`;
-	const m = Math.floor(s / 60);
-	if (m < 60) return `${m}m ${s % 60}s`;
-	const h = Math.floor(m / 60);
-	return `${h}h ${m % 60}m`;
-};
-
-const formatCost = (usd: number): string =>
-	usd < 0.01 ? "<$0.01" : `$${usd.toFixed(2)}`;
+import { formatDuration, formatCost } from "../lib/format";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -22,21 +9,38 @@ type AgentTreeProps = {
 	readonly agents: readonly AgentNode[];
 	readonly sessionId: string;
 	readonly selectedAgentId?: string;
+	readonly compact?: boolean;
 };
 
 // ── Agent type badge colors ─────────────────────────────────────────
 
 const TYPE_COLORS: Readonly<Record<string, string>> = {
-	"general-purpose": "bg-blue-900/60 text-blue-400",
-	builder: "bg-emerald-900/60 text-emerald-400",
-	validator: "bg-violet-900/60 text-violet-400",
-	Explore: "bg-sky-900/60 text-sky-400",
-	Plan: "bg-amber-900/60 text-amber-400",
-	leader: "bg-red-900/60 text-red-400",
+	"general-purpose": "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-400",
+	builder: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-400",
+	validator: "bg-violet-100 text-violet-700 dark:bg-violet-900/60 dark:text-violet-400",
+	Explore: "bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-400",
+	Plan: "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-400",
+	leader: "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-400",
 };
 
 const getTypeBadgeClass = (agentType: string): string =>
-	TYPE_COLORS[agentType] ?? "bg-gray-800/60 text-gray-400";
+	TYPE_COLORS[agentType] ?? "bg-gray-100 text-gray-600 dark:bg-gray-800/60 dark:text-gray-400";
+
+// ── Pure helpers ─────────────────────────────────────────────────────
+
+const sumDiffStats = (
+	agent: AgentNode,
+): { readonly additions: number; readonly deletions: number } | undefined => {
+	const attrs = agent.edit_chains?.diff_attribution;
+	if (!attrs || attrs.length === 0) return undefined;
+	return attrs.reduce(
+		(acc, f) => ({
+			additions: acc.additions + f.total_additions,
+			deletions: acc.deletions + f.total_deletions,
+		}),
+		{ additions: 0, deletions: 0 } as { readonly additions: number; readonly deletions: number },
+	);
+};
 
 // ── Collapsible agent row ───────────────────────────────────────────
 
@@ -52,6 +56,7 @@ const AgentRow: Component<{
 	const isSelected = () => props.selectedAgentId === props.agent.session_id;
 
 	const handleClick = () => {
+		if (!props.agent.session_id) return;
 		navigate(`/session/${props.sessionId}/agent/${props.agent.session_id}`);
 	};
 
@@ -64,9 +69,9 @@ const AgentRow: Component<{
 		<div>
 			<button
 				onClick={handleClick}
-				class="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs transition hover:bg-gray-800/50"
+				class="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs transition hover:bg-gray-100 dark:hover:bg-gray-800/50"
 				classList={{
-					"bg-blue-900/20 border-l-2 border-blue-500": isSelected(),
+					"bg-blue-50 border-l-2 border-blue-500 dark:bg-blue-900/20": isSelected(),
 				}}
 				style={{ "padding-left": `${8 + props.depth * 14}px` }}
 			>
@@ -76,7 +81,7 @@ const AgentRow: Component<{
 					fallback={<span class="w-3" />}
 				>
 					<span
-						class="w-3 cursor-pointer text-gray-500 hover:text-gray-300 transition-transform"
+						class="w-3 cursor-pointer text-gray-400 hover:text-gray-700 transition-transform dark:text-gray-500 dark:hover:text-gray-300"
 						classList={{ "rotate-90": expanded() }}
 						onClick={handleToggle}
 					>
@@ -92,30 +97,36 @@ const AgentRow: Component<{
 				</span>
 
 				{/* Name */}
-				<span class="truncate font-medium text-gray-300 flex-1">
-					{props.agent.agent_name ?? props.agent.session_id.slice(0, 8)}
+				<span class="truncate font-medium text-gray-700 flex-1 dark:text-gray-300">
+					{props.agent.agent_name || props.agent.agent_type}
 				</span>
 
-				{/* Stats */}
-				<span class="text-[10px] text-gray-600 tabular-nums flex-shrink-0">
-					{props.agent.tool_call_count}t
-				</span>
-				<span class="text-[10px] text-gray-600 tabular-nums flex-shrink-0">
-					{formatDuration(props.agent.duration_ms)}
+				{/* Stats: diff +/-, cost, tools, duration */}
+				<span class="text-[10px] text-gray-400 tabular-nums flex-shrink-0 flex items-center gap-1 dark:text-gray-600">
+					{(() => {
+						const diff = sumDiffStats(props.agent);
+						return diff ? (
+							<span>
+								<span class="text-emerald-400">+{diff.additions}</span>
+								<span class="mx-px">/</span>
+								<span class="text-red-400">-{diff.deletions}</span>
+							</span>
+						) : null;
+					})()}
+					<Show when={props.agent.cost_estimate}>
+						{(cost) => (
+							<span class="text-gray-500 dark:text-gray-500">
+								{formatCost(cost().estimated_cost_usd)}
+							</span>
+						)}
+					</Show>
+					<span>
+						{props.agent.tool_call_count > 0
+							? `${props.agent.tool_call_count}t · ${formatDuration(props.agent.duration_ms)}`
+							: formatDuration(props.agent.duration_ms)}
+					</span>
 				</span>
 			</button>
-
-			{/* Cost line (compact) */}
-			<Show when={isSelected() && props.agent.cost_estimate}>
-				{(cost) => (
-					<div
-						class="text-[9px] text-gray-500 pb-1"
-						style={{ "padding-left": `${22 + props.depth * 14}px` }}
-					>
-						{formatCost(cost().estimated_cost_usd)} &middot; {props.agent.model ?? "unknown"}
-					</div>
-				)}
-			</Show>
 
 			{/* Children */}
 			<Show when={expanded() && hasChildren()}>
@@ -136,13 +147,18 @@ const AgentRow: Component<{
 
 // ── Main component ──────────────────────────────────────────────────
 
+const countAllAgents = (agents: readonly AgentNode[]): number =>
+	agents.reduce((sum, a) => sum + 1 + countAllAgents(a.children), 0);
+
 export const AgentTree: Component<AgentTreeProps> = (props) => (
-	<div class="border-r border-gray-800 bg-gray-900/30 w-56 flex-shrink-0 overflow-y-auto">
-		<div class="px-3 py-2 border-b border-gray-800">
-			<h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
-				Agents ({props.agents.length})
-			</h3>
-		</div>
+	<div class="border-r border-gray-200 bg-gray-50 w-56 flex-shrink-0 overflow-y-auto dark:border-gray-800 dark:bg-gray-900/30">
+		<Show when={!props.compact}>
+			<div class="px-3 py-2 border-b border-gray-200 dark:border-gray-800">
+				<h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+					Agents ({countAllAgents(props.agents)})
+				</h3>
+			</div>
+		</Show>
 		<div class="py-1">
 			<For each={props.agents}>
 				{(agent) => (

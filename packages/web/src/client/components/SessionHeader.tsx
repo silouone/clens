@@ -1,28 +1,15 @@
-import { Show, type Component } from "solid-js";
+import { Show, createSignal, type Component } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { TimelineBar } from "./TimelineBar";
-
-// ── Formatting helpers ───────────────────────────────────────────────
-
-const formatDuration = (ms: number): string => {
-	const s = Math.floor(ms / 1000);
-	if (s < 60) return `${s}s`;
-	const m = Math.floor(s / 60);
-	if (m < 60) return `${m}m ${s % 60}s`;
-	const h = Math.floor(m / 60);
-	return `${h}h ${m % 60}m`;
-};
-
-const formatCost = (usd: number): string =>
-	usd < 0.01 ? `<$0.01` : `$${usd.toFixed(2)}`;
+import { formatDuration, formatCost } from "../lib/format";
 
 // ── Status badge ─────────────────────────────────────────────────────
 
 const StatusBadge: Component<{ readonly complete: boolean }> = (props) => {
 	const cls = () =>
 		props.complete
-			? "bg-emerald-900/50 text-emerald-400 border-emerald-700/50"
-			: "bg-amber-900/50 text-amber-400 border-amber-700/50";
+			? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-700/50"
+			: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50";
 
 	return (
 		<span
@@ -39,9 +26,9 @@ const StatPill: Component<{
 	readonly label: string;
 	readonly value: string;
 }> = (props) => (
-	<div class="flex items-center gap-1.5 rounded-md bg-gray-800/60 px-2.5 py-1 text-xs">
+	<div class="flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs dark:bg-gray-800/60">
 		<span class="text-gray-500">{props.label}</span>
-		<span class="font-medium text-gray-300">{props.value}</span>
+		<span class="font-medium text-gray-700 dark:text-gray-300">{props.value}</span>
 	</div>
 );
 
@@ -50,6 +37,7 @@ const StatPill: Component<{
 type SessionHeaderProps = {
 	readonly session: DistilledSession;
 	readonly onPhaseClick?: (phaseIndex: number) => void;
+	readonly onRedistill?: () => Promise<void>;
 };
 
 // ── Component ────────────────────────────────────────────────────────
@@ -61,20 +49,25 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 	const duration = () => session().stats.duration_ms;
 	const model = () => session().stats.model ?? "unknown";
 	const cost = () => session().cost_estimate?.estimated_cost_usd;
+	const [distilling, setDistilling] = createSignal(false);
 
-	// First user message as request preview
+	// First user prompt as request preview (skip commands, system, teammate messages)
 	const requestPreview = () => {
-		const msgs = session().user_messages;
-		return msgs.length > 0
-			? msgs[0].content.slice(0, 120) + (msgs[0].content.length > 120 ? "..." : "")
+		const msg = session().user_messages.find(
+			(m) => !m.message_type || m.message_type === "prompt",
+		);
+		if (!msg) return undefined;
+		const clean = msg.content.replace(/<[^>]+>/g, "").trim();
+		return clean.length > 0
+			? clean.slice(0, 120) + (clean.length > 120 ? "..." : "")
 			: undefined;
 	};
 
 	return (
-		<div class="border-b border-gray-800 bg-gray-900/50 px-4 py-3">
-			{/* Top row: name + status + stats */}
+		<div class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/50">
+			{/* Top row: name + status + stats + re-distill */}
 			<div class="flex flex-wrap items-center gap-3">
-				<h2 class="text-lg font-semibold text-gray-100 truncate max-w-md">
+				<h2 class="text-lg font-semibold text-gray-900 truncate max-w-md dark:text-gray-100">
 					{session().session_name ?? session().session_id.slice(0, 12)}
 				</h2>
 				<StatusBadge complete={session().complete} />
@@ -93,6 +86,21 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 						value={String(summary()?.key_metrics.failures ?? session().stats.failure_count)}
 					/>
 				</div>
+				<Show when={props.onRedistill}>
+					<div class="ml-auto">
+						<button
+							onClick={async () => {
+								setDistilling(true);
+								try { await props.onRedistill?.(); }
+								finally { setDistilling(false); }
+							}}
+							disabled={distilling()}
+							class="rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+						>
+							{distilling() ? "Re-analyzing..." : "Re-analyze"}
+						</button>
+					</div>
+				</Show>
 			</div>
 
 			{/* Request preview */}

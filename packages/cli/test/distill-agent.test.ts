@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	type DiffContext,
 	distillAgent,
 	extractAgentModel,
 	extractTaskPrompt,
@@ -8,7 +9,7 @@ import {
 } from "../src/distill/agent-distill";
 import { extractFileMap } from "../src/distill/file-map";
 import { readTranscript } from "../src/session/transcript";
-import type { TranscriptEntry } from "../src/types";
+import type { StoredEvent, TranscriptEntry } from "../src/types";
 
 const makeAssistantEntry = (overrides: Partial<TranscriptEntry> = {}): TranscriptEntry => ({
 	uuid: "uuid-1",
@@ -901,5 +902,100 @@ describe("extractTaskPrompt", () => {
 		];
 
 		expect(extractTaskPrompt(entries)).toBeUndefined();
+	});
+});
+
+describe("distillAgent with diffContext", () => {
+	const makeEditEntries = (): readonly TranscriptEntry[] => [
+		makeUserEntry({
+			message: { role: "user", content: "Fix the bug in foo.ts" },
+		}),
+		makeAssistantEntry({
+			message: {
+				role: "assistant",
+				content: [
+					{
+						type: "tool_use",
+						id: "t1",
+						name: "Edit",
+						input: { file_path: "/src/foo.ts", old_string: "const a = 1", new_string: "const a = 2" },
+					},
+				],
+				model: "claude-sonnet-4-20250514",
+				usage: { input_tokens: 100, output_tokens: 50 },
+			},
+		}),
+	];
+
+	const makeParentSessionStart = (): StoredEvent => ({
+		t: 1000,
+		event: "SessionStart",
+		sid: "root-session",
+		data: {},
+		context: {
+			project_dir: "/tmp/fake-project",
+			cwd: "/tmp/fake-project",
+			git_branch: "main",
+			git_remote: null,
+			git_commit: "abc123def",
+			git_worktree: null,
+			team_name: null,
+			task_list_dir: null,
+			claude_entrypoint: null,
+			model: null,
+			agent_type: null,
+		},
+	});
+
+	test("returns edit_chains when diffContext is provided (does not crash)", () => {
+		const entries = makeEditEntries();
+		const diffContext: DiffContext = {
+			projectDir: "/tmp/fake-project",
+			parentEvents: [makeParentSessionStart()],
+		};
+
+		const result = distillAgent(entries, diffContext);
+		expect(result).toBeDefined();
+		// edit_chains should exist because we have an Edit tool_use
+		expect(result?.edit_chains).toBeDefined();
+		expect(result?.edit_chains?.chains.length).toBeGreaterThan(0);
+	});
+
+	test("edit_chains have no diff_attribution without diffContext", () => {
+		const entries = makeEditEntries();
+
+		const result = distillAgent(entries);
+		expect(result).toBeDefined();
+		expect(result?.edit_chains).toBeDefined();
+		// Without diffContext, diff_attribution should be absent
+		expect(result?.edit_chains?.diff_attribution).toBeUndefined();
+	});
+
+	test("diff_attribution is empty when no real git repo exists", () => {
+		const entries = makeEditEntries();
+		const diffContext: DiffContext = {
+			projectDir: "/tmp/nonexistent-project-dir",
+			parentEvents: [makeParentSessionStart()],
+		};
+
+		const result = distillAgent(entries, diffContext);
+		expect(result).toBeDefined();
+		expect(result?.edit_chains).toBeDefined();
+		// extractDiffAttribution calls captureUnifiedDiff which spawns git — no repo = empty result
+		// diff_attribution is omitted when empty
+		expect(result?.edit_chains?.diff_attribution).toBeUndefined();
+	});
+
+	test("diff_attribution is absent when parentEvents lack SessionStart with git_commit", () => {
+		const entries = makeEditEntries();
+		const diffContext: DiffContext = {
+			projectDir: "/tmp/fake-project",
+			parentEvents: [], // No SessionStart → getStartCommit returns undefined → early return
+		};
+
+		const result = distillAgent(entries, diffContext);
+		expect(result).toBeDefined();
+		expect(result?.edit_chains).toBeDefined();
+		expect(result?.edit_chains?.diff_attribution).toBeUndefined();
 	});
 });

@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, Show, type Component } fro
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, globalError, clearError } from "../lib/stores";
 import type { SessionSummary } from "../../shared/types";
+import { formatDuration } from "../lib/format";
 
 // ── Live indicator ──────────────────────────────────────────────────
 
@@ -12,17 +13,6 @@ const LiveDot: Component = () => (
 		<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
 	</span>
 );
-
-// ── Formatting helpers ──────────────────────────────────────────────
-
-const formatDuration = (ms: number): string => {
-	const s = Math.floor(ms / 1000);
-	if (s < 60) return `${s}s`;
-	const m = Math.floor(s / 60);
-	if (m < 60) return `${m}m ${s % 60}s`;
-	const h = Math.floor(m / 60);
-	return `${h}h ${m % 60}m`;
-};
 
 const formatDate = (ts: number): string => {
 	const d = new Date(ts);
@@ -109,9 +99,107 @@ const EmptyState: Component = () => (
 // ── Filter types ────────────────────────────────────────────────────
 
 type StatusFilter = "all" | "complete" | "incomplete";
+type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
+type AgentsFilter = "all" | "multi" | "solo";
 
 const isValidStatus = (s: string | undefined): s is StatusFilter =>
 	s === "all" || s === "complete" || s === "incomplete";
+
+const isValidAnalyzed = (s: string | undefined): s is AnalyzedFilter =>
+	s === "all" || s === "analyzed" || s === "not_analyzed";
+
+const isValidAgents = (s: string | undefined): s is AgentsFilter =>
+	s === "all" || s === "multi" || s === "solo";
+
+// ── Sort types ──────────────────────────────────────────────────────
+
+type SortField = "session_name" | "duration_ms" | "event_count" | "agent_count" | "file_size_bytes" | "start_time";
+type SortDir = "asc" | "desc";
+type SortState = { readonly field: SortField; readonly dir: SortDir } | null;
+
+const SORTABLE_FIELDS = ["session_name", "duration_ms", "event_count", "agent_count", "file_size_bytes", "start_time"] as const;
+
+const isValidSortField = (s: string): s is SortField =>
+	SORTABLE_FIELDS.includes(s as SortField);
+
+const parseSortParam = (raw: string | undefined): SortState => {
+	if (!raw) return null;
+	const isDesc = raw.startsWith("-");
+	const field = isDesc ? raw.slice(1) : raw;
+	if (!isValidSortField(field)) return null;
+	return { field, dir: isDesc ? "desc" : "asc" };
+};
+
+const serializeSortParam = (sort: SortState): string | undefined => {
+	if (!sort) return undefined;
+	return sort.dir === "desc" ? `-${sort.field}` : sort.field;
+};
+
+const NUMERIC_SORT_FIELDS = new Set<SortField>(["duration_ms", "event_count", "agent_count", "file_size_bytes", "start_time"]);
+
+const buildSortComparator = (sort: { readonly field: SortField; readonly dir: SortDir }) =>
+	(a: SessionSummary, b: SessionSummary): number => {
+		const multiplier = sort.dir === "asc" ? 1 : -1;
+
+		if (NUMERIC_SORT_FIELDS.has(sort.field)) {
+			const aVal = getNumericValue(a, sort.field);
+			const bVal = getNumericValue(b, sort.field);
+			return (aVal - bVal) * multiplier;
+		}
+
+		// String sort (session_name)
+		const aName = a.session_name ?? a.session_id;
+		const bName = b.session_name ?? b.session_id;
+		return aName.localeCompare(bName) * multiplier;
+	};
+
+const getNumericValue = (s: SessionSummary, field: SortField): number => {
+	switch (field) {
+		case "duration_ms": return s.duration_ms;
+		case "event_count": return s.event_count;
+		case "agent_count": return s.agent_count ?? 0;
+		case "file_size_bytes": return s.file_size_bytes;
+		case "start_time": return s.start_time;
+		default: return 0;
+	}
+};
+
+// ── Sort cycle helper ───────────────────────────────────────────────
+
+const cycleSortState = (current: SortState, field: SortField): SortState => {
+	if (!current || current.field !== field) return { field, dir: "asc" };
+	if (current.dir === "asc") return { field, dir: "desc" };
+	return null;
+};
+
+// ── Sortable header component ───────────────────────────────────────
+
+const SortableHeader: Component<{
+	readonly label: string;
+	readonly field: SortField;
+	readonly sort: SortState;
+	readonly onSort: (field: SortField) => void;
+}> = (props) => {
+	const isActive = () => props.sort?.field === props.field;
+	const arrow = () => {
+		if (!isActive()) return "";
+		return props.sort?.dir === "asc" ? " \u2191" : " \u2193";
+	};
+
+	return (
+		<th
+			class={`px-4 py-3 font-medium cursor-pointer select-none transition hover:text-gray-700 dark:hover:text-gray-300 ${
+				isActive() ? "text-gray-800 dark:text-gray-200" : ""
+			}`}
+			onClick={() => props.onSort(props.field)}
+		>
+			{props.label}
+			<Show when={isActive()}>
+				<span class="ml-0.5 text-blue-500 dark:text-blue-400">{arrow()}</span>
+			</Show>
+		</th>
+	);
+};
 
 // ── Main component ──────────────────────────────────────────────────
 
@@ -120,6 +208,9 @@ export const SessionList: Component = () => {
 	const [searchParams, setSearchParams] = useSearchParams<{
 		q?: string;
 		status?: string;
+		analyzed?: string;
+		agents?: string;
+		sort?: string;
 		page?: string;
 	}>();
 
@@ -128,20 +219,35 @@ export const SessionList: Component = () => {
 	const [statusFilter, setStatusFilter] = createSignal<StatusFilter>(
 		isValidStatus(searchParams.status) ? searchParams.status : "all",
 	);
+	const [analyzedFilter, setAnalyzedFilter] = createSignal<AnalyzedFilter>(
+		isValidAnalyzed(searchParams.analyzed) ? searchParams.analyzed : "all",
+	);
+	const [agentsFilter, setAgentsFilter] = createSignal<AgentsFilter>(
+		isValidAgents(searchParams.agents) ? searchParams.agents : "all",
+	);
+	const [sortState, setSortState] = createSignal<SortState>(
+		parseSortParam(searchParams.sort),
+	);
 	const [page, setPage] = createSignal(
 		Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1),
 	);
 	const [selectedRow, setSelectedRow] = createSignal(-1);
 	const PAGE_SIZE = 20;
 
-	// Sync state → URL params
+	// Sync state -> URL params
 	createEffect(() => {
 		const params: Record<string, string | undefined> = {};
 		const q = search();
-		const s = statusFilter();
+		const status = statusFilter();
+		const analyzed = analyzedFilter();
+		const agents = agentsFilter();
+		const sort = sortState();
 		const p = page();
 		params.q = q || undefined;
-		params.status = s !== "all" ? s : undefined;
+		params.status = status !== "all" ? status : undefined;
+		params.analyzed = analyzed !== "all" ? analyzed : undefined;
+		params.agents = agents !== "all" ? agents : undefined;
+		params.sort = serializeSortParam(sort);
 		params.page = p > 1 ? String(p) : undefined;
 		setSearchParams(params);
 	});
@@ -151,9 +257,15 @@ export const SessionList: Component = () => {
 		const sessions = sessionList() ?? [];
 		const q = search().toLowerCase();
 		const status = statusFilter();
+		const analyzed = analyzedFilter();
+		const agents = agentsFilter();
 
 		return sessions.filter((s) => {
 			if (status !== "all" && s.status !== status) return false;
+			if (analyzed === "analyzed" && !s.is_distilled) return false;
+			if (analyzed === "not_analyzed" && s.is_distilled) return false;
+			if (agents === "multi" && (s.agent_count ?? 0) <= 1) return false;
+			if (agents === "solo" && (s.agent_count ?? 0) > 1) return false;
 			if (q) {
 				const name = (s.session_name ?? s.session_id).toLowerCase();
 				const branch = (s.git_branch ?? "").toLowerCase();
@@ -163,17 +275,31 @@ export const SessionList: Component = () => {
 		});
 	});
 
+	// Sorted sessions
+	const sorted = createMemo(() => {
+		const items = filtered();
+		const sort = sortState();
+		if (!sort) return items;
+		return [...items].sort(buildSortComparator(sort));
+	});
+
 	// Paginated slice
 	const paginated = createMemo(() => {
-		const all = filtered();
+		const all = sorted();
 		const offset = (page() - 1) * PAGE_SIZE;
 		return all.slice(offset, offset + PAGE_SIZE);
 	});
 
-	const totalPages = createMemo(() => Math.max(1, Math.ceil(filtered().length / PAGE_SIZE)));
+	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / PAGE_SIZE)));
 
 	const handleRowClick = (session: SessionSummary) => {
 		navigate(`/session/${session.session_id}`);
+	};
+
+	const handleSort = (field: SortField) => {
+		setSortState((current) => cycleSortState(current, field));
+		setPage(1);
+		setSelectedRow(-1);
 	};
 
 	// ── Keyboard navigation ─────────────────────────────────────
@@ -238,7 +364,7 @@ export const SessionList: Component = () => {
 			</Show>
 
 			{/* Filters */}
-			<div class="mt-4 flex items-center gap-4">
+			<div class="mt-4 flex flex-wrap items-center gap-4">
 				<input
 					type="text"
 					placeholder="Search sessions..."
@@ -250,6 +376,7 @@ export const SessionList: Component = () => {
 					}}
 					class="w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-600"
 				/>
+				{/* Status filter */}
 				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
 					{(["all", "complete", "incomplete"] as const).map((s) => (
 						<button
@@ -268,6 +395,44 @@ export const SessionList: Component = () => {
 						</button>
 					))}
 				</div>
+				{/* Analyzed filter */}
+				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
+					{(["all", "analyzed", "not_analyzed"] as const).map((v) => (
+						<button
+							onClick={() => {
+								setAnalyzedFilter(v);
+								setPage(1);
+								setSelectedRow(-1);
+							}}
+							class={`px-3 py-1.5 text-xs font-medium transition ${
+								analyzedFilter() === v
+									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+							}`}
+						>
+							{v === "all" ? "All" : v === "analyzed" ? "Analyzed" : "Not analyzed"}
+						</button>
+					))}
+				</div>
+				{/* Agents filter */}
+				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
+					{(["all", "multi", "solo"] as const).map((v) => (
+						<button
+							onClick={() => {
+								setAgentsFilter(v);
+								setPage(1);
+								setSelectedRow(-1);
+							}}
+							class={`px-3 py-1.5 text-xs font-medium transition ${
+								agentsFilter() === v
+									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+							}`}
+						>
+							{v === "all" ? "All" : v === "multi" ? "Multi-agent" : "Solo"}
+						</button>
+					))}
+				</div>
 				<span class="text-sm text-gray-500">
 					{filtered().length} session{filtered().length !== 1 ? "s" : ""}
 				</span>
@@ -278,18 +443,18 @@ export const SessionList: Component = () => {
 				<table class="w-full text-left text-sm">
 					<thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-800 dark:bg-gray-900/50">
 						<tr>
-							<th class="px-4 py-3 font-medium">Name</th>
+							<SortableHeader label="Name" field="session_name" sort={sortState()} onSort={handleSort} />
 							<th class="px-4 py-3 font-medium">Status</th>
-							<th class="px-4 py-3 font-medium">Duration</th>
-							<th class="px-4 py-3 font-medium">Events</th>
-							<th class="px-4 py-3 font-medium">Agents</th>
-							<th class="px-4 py-3 font-medium">Size</th>
+							<SortableHeader label="Duration" field="duration_ms" sort={sortState()} onSort={handleSort} />
+							<SortableHeader label="Events" field="event_count" sort={sortState()} onSort={handleSort} />
+							<SortableHeader label="Agents" field="agent_count" sort={sortState()} onSort={handleSort} />
+							<SortableHeader label="Size" field="file_size_bytes" sort={sortState()} onSort={handleSort} />
 							<th class="px-4 py-3 font-medium">Branch</th>
-							<th class="px-4 py-3 font-medium">When</th>
+							<SortableHeader label="When" field="start_time" sort={sortState()} onSort={handleSort} />
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-gray-100 dark:divide-gray-800/50">
-						<Show when={!sessionList.loading} fallback={<LoadingSkeleton />}>
+						<Show when={sessionList.state !== "pending"} fallback={<LoadingSkeleton />}>
 							<Show when={paginated().length > 0} fallback={<EmptyState />}>
 								<For each={paginated()}>
 									{(session, idx) => (
@@ -302,7 +467,14 @@ export const SessionList: Component = () => {
 											}`}
 										>
 											<td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
-												{session.session_name ?? session.session_id.slice(0, 8)}
+												<div class="flex items-center gap-2">
+													{session.session_name ?? session.session_id.slice(0, 8)}
+													<Show when={session.is_distilled}>
+														<span class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" title="Distilled">
+															analyzed
+														</span>
+													</Show>
+												</div>
 											</td>
 											<td class="px-4 py-3">
 												<StatusBadge status={session.status} />

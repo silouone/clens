@@ -51,3 +51,8 @@ specs/
 # Internal analytics
 scripts/
 report_kpi_33_sessions.md
+
+# Test artifacts
+.playwright-cli/
+screenshots/
+ai_review/

@@ -235,7 +235,33 @@ describe("extractLinkEvent", () => {
 		}
 	});
 
-	test("TeammateIdle falls back to agent_id when agent_name is missing", () => {
+	test("TeammateIdle prefers teammate_name over agent_name", () => {
+		const link = extractLinkEvent("TeammateIdle", {
+			session_id: "s1",
+			teammate_name: "builder-alpha",
+			agent_name: "some-agent",
+			team_name: "my-team",
+		});
+		expect(link.type).toBe("teammate_idle");
+		if (link.type === "teammate_idle") {
+			expect(link.teammate).toBe("builder-alpha");
+			expect(link.team).toBe("my-team");
+		}
+	});
+
+	test("TeammateIdle falls back to agent_name when teammate_name is absent", () => {
+		const link = extractLinkEvent("TeammateIdle", {
+			session_id: "sess-idle-fallback",
+			agent_name: "builder-1",
+			team_name: "my-team",
+		});
+		expect(link.type).toBe("teammate_idle");
+		if (link.type === "teammate_idle") {
+			expect(link.teammate).toBe("builder-1");
+		}
+	});
+
+	test("TeammateIdle falls back to agent_id when both teammate_name and agent_name are missing", () => {
 		const link = extractLinkEvent("TeammateIdle", {
 			session_id: "sess-idle2",
 			agent_id: "agent-fallback",

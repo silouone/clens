@@ -2,6 +2,9 @@ import { watch, existsSync, mkdirSync, openSync, readSync, fstatSync, closeSync,
 import type { FSWatcher } from "node:fs"
 import { broadcastSSE } from "./routes/events"
 import { invalidateCache } from "./cache"
+import { createLogger } from "./logger"
+
+const log = createLogger("live")
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -75,6 +78,38 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 	ensureDir(sessionsDir)
 	ensureDir(distilledDir)
 
+	// ── Seed offsets so only NEW data triggers events (skip existing content) ──
+	try {
+		const sessionEntries = readdirSync(sessionsDir)
+			.filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
+			.map((file) => {
+				const filePath = `${sessionsDir}/${file}`
+				const fd = openSync(filePath, "r")
+				const size = fstatSync(fd).size
+				closeSync(fd)
+				return [filePath, { offset: size }] as const
+			})
+		for (const [k, v] of sessionEntries) offsets.set(k, v)
+		log.info(`Seeded offsets for ${offsets.size} session files`)
+	} catch (err) {
+		log.warn("Failed to seed session offsets:", err instanceof Error ? err.message : String(err))
+	}
+
+	try {
+		const distillEntries = readdirSync(distilledDir)
+			.filter((f) => f.endsWith(".json"))
+			.map((file) => {
+				const filePath = `${distilledDir}/${file}`
+				const fd = openSync(filePath, "r")
+				const size = fstatSync(fd).size
+				closeSync(fd)
+				return [filePath, { offset: size }] as const
+			})
+		for (const [k, v] of distillEntries) offsets.set(k, v)
+	} catch {
+		// distilled dir may be empty — that's fine
+	}
+
 	// ── Sessions watcher: new/changed JSONL files ──
 
 	const handleSessionChange = debounce(() => {
@@ -83,7 +118,7 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 			const files = readdirSync(sessionsDir)
 			files
 				.filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
-				.forEach((file) => {
+				.map((file) => {
 					const filePath = `${sessionsDir}/${file}`
 					const newLines = readNewLines(filePath)
 					if (newLines.length === 0) return
@@ -92,15 +127,16 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 					invalidateCache(sessionId)
 
 					// Parse and broadcast each new event
-					newLines.forEach((line) => {
+					log.debug(`New lines: ${newLines.length} for ${sessionId.slice(0, 8)}`)
+					newLines.map((line) => {
 						try {
 							const event = JSON.parse(line)
 							broadcastSSE({
 								type: "live_event",
 								data: { session_id: sessionId, event },
 							})
-						} catch {
-							// Skip malformed lines
+						} catch (err) {
+							log.warn(`Malformed JSONL line in ${sessionId.slice(0, 8)}:`, err instanceof Error ? err.message : String(err))
 						}
 					})
 
@@ -110,8 +146,8 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 						data: { session_id: sessionId, new_events: newLines.length },
 					})
 				})
-		} catch {
-			// Directory may not exist yet
+		} catch (err) {
+			log.warn("Session scan error:", err instanceof Error ? err.message : String(err))
 		}
 	}, DEBOUNCE_MS)
 
@@ -122,7 +158,7 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 			const files = readdirSync(distilledDir)
 			files
 				.filter((f) => f.endsWith(".json"))
-				.forEach((file) => {
+				.map((file) => {
 					const filePath = `${distilledDir}/${file}`
 					const entry = offsets.get(filePath)
 					// Only broadcast if we haven't seen this file before or it changed
@@ -139,28 +175,31 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 						})
 					}
 				})
-		} catch {
-			// Directory may not exist yet
+		} catch (err) {
+			log.warn("Distilled scan error:", err instanceof Error ? err.message : String(err))
 		}
 	}, DEBOUNCE_MS)
 
 	// ── Start watching ──
 
 	if (usePoll) {
-		// Polling fallback for cross-OS compatibility
+		log.info("Using polling mode (CLENS_POLL=1)")
 		const POLL_MS = 1000
 		refs.pollTimers = [...refs.pollTimers, setInterval(handleSessionChange, POLL_MS)]
 		refs.pollTimers = [...refs.pollTimers, setInterval(handleDistillChange, POLL_MS)]
 	} else {
 		try {
 			refs.watchers = [...refs.watchers, watch(sessionsDir, { recursive: false }, handleSessionChange)]
-		} catch {
-			// Fallback to polling if watch fails
+			log.info(`Watching sessions: ${sessionsDir}`)
+		} catch (err) {
+			log.warn(`fs.watch failed for sessions, falling back to polling:`, err instanceof Error ? err.message : String(err))
 			refs.pollTimers = [...refs.pollTimers, setInterval(handleSessionChange, 1000)]
 		}
 		try {
 			refs.watchers = [...refs.watchers, watch(distilledDir, { recursive: false }, handleDistillChange)]
-		} catch {
+			log.info(`Watching distilled: ${distilledDir}`)
+		} catch (err) {
+			log.warn(`fs.watch failed for distilled, falling back to polling:`, err instanceof Error ? err.message : String(err))
 			refs.pollTimers = [...refs.pollTimers, setInterval(handleDistillChange, 1000)]
 		}
 	}

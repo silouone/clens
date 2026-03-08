@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { readLinks, readSessionEvents } from "../session/read";
 import { readSessionName, readTranscript, resolveTranscriptPath } from "../session/transcript";
 import type {
+	AgentNode,
 	DistilledSession,
 	EditChainsResult,
 	LinkEvent,
@@ -14,17 +15,17 @@ import type {
 	TranscriptReasoning,
 	TranscriptUserMessage,
 } from "../types";
-import { buildNameMap, filterLinksForSession } from "../utils";
+import { buildNameMap, buildTeamMemberSessionMap, filterLinksForSession, isUuidLike } from "../utils";
 import { computeActiveDuration } from "./active-duration";
-import { extractAgentModel, extractTokenUsage } from "./agent-distill";
+import { type DiffContext, extractAgentModel, extractTokenUsage } from "./agent-distill";
 import { enrichNodeWithLinks } from "./agent-enrich";
-import { buildAgentTree, inferAgentsFromComms } from "./agent-tree";
+import { buildAgentTree, enrichNodeFromSessionEvents, enrichNodeWithTranscript, inferAgentsFromComms } from "./agent-tree";
 import { aggregateTeamData } from "./aggregate";
 import { extractBacktracks } from "./backtracks";
 import { buildCommGraph } from "./comm-graph";
 import { extractAgentLifetimes, extractCommSequence } from "./comm-sequence";
 import { extractDecisions, extractPhases, extractRawTimingGaps } from "./decisions";
-import { extractDiffAttribution } from "./diff-attribution";
+import { captureMissingDiffs, extractDiffAttribution } from "./diff-attribution";
 import { extractEditChains } from "./edit-chains";
 import { extractFileMap } from "./file-map";
 import { extractGitDiff, extractNetChanges } from "./git-diff";
@@ -37,6 +38,92 @@ import { extractTimeline } from "./timeline";
 import { extractUserMessages } from "./user-messages";
 
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
+
+/** Collect all names and session_ids from an agent tree (recursive). */
+const collectTreeIdentifiers = (nodes: readonly AgentNode[]): readonly string[] =>
+	nodes.flatMap((n) => [
+		...(n.agent_name ? [n.agent_name] : []),
+		...(n.session_id ? [n.session_id] : []),
+		...collectTreeIdentifiers(n.children),
+	]);
+
+interface MergeAgentsParams {
+	readonly sessionId: string;
+	readonly rawAgents: readonly AgentNode[] | undefined;
+	readonly sessionLinks: readonly LinkEvent[];
+	readonly nameMap: ReadonlyMap<string, string> | undefined;
+	readonly readAgentEvents: (agentId: string) => readonly StoredEvent[];
+	readonly readTranscriptFn: (path: string) => readonly import("../types").TranscriptEntry[];
+	readonly diffContext: DiffContext;
+}
+
+/**
+ * Merge spawn-based agent tree with comm-inferred agents.
+ * Enriches inferred agents from session events + transcripts, then attaches
+ * them as children of the spawned agent with the most communication partners.
+ */
+const mergeSpawnAndInferredAgents = ({
+	sessionId,
+	rawAgents,
+	sessionLinks,
+	nameMap,
+	readAgentEvents,
+	readTranscriptFn,
+	diffContext,
+}: MergeAgentsParams): readonly AgentNode[] | undefined => {
+	const fromTree = rawAgents?.map((node) => enrichNodeWithLinks(node, sessionLinks, nameMap));
+
+	const teamMemberSessions = sessionLinks.length > 0 ? buildTeamMemberSessionMap(sessionLinks) : undefined;
+	const inferred = sessionLinks.length > 0
+		? inferAgentsFromComms(sessionId, sessionLinks, teamMemberSessions)
+		: [];
+
+	const enrichInferredAgent = (node: AgentNode): AgentNode => {
+		if (!isUuidLike(node.session_id)) return node;
+
+		const agentEvents = readAgentEvents(node.session_id);
+		const fromEvents = agentEvents.length > 0
+			? enrichNodeFromSessionEvents(node, agentEvents)
+			: node;
+
+		const transcriptPath = resolveTranscriptPath(agentEvents);
+		if (transcriptPath) {
+			return enrichNodeWithTranscript(fromEvents, transcriptPath, readTranscriptFn, diffContext);
+		}
+		return fromEvents;
+	};
+
+	const enrichAndLink = (agents: readonly AgentNode[]): readonly AgentNode[] => {
+		const enriched = agents.map(enrichInferredAgent);
+		const inferredNameMap = new Map(enriched.map((a) => [a.session_id, a.agent_name ?? a.agent_type]));
+		const mergedNameMap = nameMap ? new Map([...nameMap, ...inferredNameMap]) : inferredNameMap;
+		return enriched.map((node) => enrichNodeWithLinks(node, sessionLinks, mergedNameMap));
+	};
+
+	if (fromTree && fromTree.length > 0) {
+		if (inferred.length === 0) return fromTree;
+
+		const existingNames = new Set(collectTreeIdentifiers(fromTree));
+		const newAgents = inferred.filter(
+			(a) => !existingNames.has(a.agent_name ?? "") && !existingNames.has(a.session_id),
+		);
+		if (newAgents.length === 0) return fromTree;
+
+		const enrichedNew = enrichAndLink(newAgents);
+
+		const withMostComms = fromTree.reduce((best, node) =>
+			(node.communication_partners?.length ?? 0) > (best.communication_partners?.length ?? 0) ? node : best,
+		);
+		return fromTree.map((node) =>
+			node.session_id === withMostComms.session_id
+				? { ...node, children: [...node.children, ...enrichedNew] }
+				: node,
+		);
+	}
+
+	if (inferred.length === 0) return undefined;
+	return enrichAndLink(inferred);
+};
 
 export interface DistillOptions {
 	readonly deep?: boolean;
@@ -130,7 +217,13 @@ export const distill = async (
 	// Edit chains: thinking-to-code binding
 	const edit_chains_raw = extractEditChains(events, reasoning, backtracks);
 	const net_changes = extractNetChanges(projectDir, events);
-	const diff_attribution = extractDiffAttribution(projectDir, events, edit_chains_raw);
+	const diff_attribution_from_chains = extractDiffAttribution(projectDir, events, edit_chains_raw);
+
+	// Also capture diffs for working tree / staged changes not covered by edit chains
+	const allChangedFiles = [...(git_diff.working_tree_changes ?? []), ...(git_diff.staged_changes ?? []), ...net_changes];
+	const extraDiffs = captureMissingDiffs(projectDir, events, diff_attribution_from_chains, allChangedFiles);
+	const diff_attribution = [...diff_attribution_from_chains, ...extraDiffs];
+
 	const edit_chains: EditChainsResult = {
 		...edit_chains_raw,
 		...(net_changes.length > 0 ? { net_changes } : {}),
@@ -145,24 +238,22 @@ export const distill = async (
 			return [];
 		}
 	};
+	const diffContext: DiffContext = { projectDir, parentEvents: events };
 	const rawAgents =
 		sessionLinks.length > 0
-			? buildAgentTree(sessionId, sessionLinks, events, readTranscript, readAgentEvents)
+			? buildAgentTree(sessionId, sessionLinks, events, readTranscript, readAgentEvents, diffContext)
 			: undefined;
 
-	// Fallback: infer agents from communication when no spawn links exist
-	const agents = (() => {
-		const fromTree = rawAgents?.map((node) => enrichNodeWithLinks(node, sessionLinks, nameMap));
-		if (fromTree && fromTree.length > 0) return fromTree;
-		if (sessionLinks.length === 0) return undefined;
-		const inferred = inferAgentsFromComms(sessionId, sessionLinks);
-		if (inferred.length === 0) return undefined;
-		const inferredNameMap = new Map(
-			inferred.map((a) => [a.session_id, a.agent_name ?? a.agent_type]),
-		);
-		const mergedNameMap = nameMap ? new Map([...nameMap, ...inferredNameMap]) : inferredNameMap;
-		return inferred.map((node) => enrichNodeWithLinks(node, sessionLinks, mergedNameMap));
-	})();
+	// Merge spawn-based tree with comm-inferred agents (team teammates not captured by spawn links)
+	const agents = mergeSpawnAndInferredAgents({
+		sessionId,
+		rawAgents,
+		sessionLinks,
+		nameMap,
+		readAgentEvents,
+		readTranscriptFn: readTranscript,
+		diffContext,
+	});
 
 	// Build effective nameMap that includes inferred agent names for downstream extractors
 	const effectiveNameMap = (() => {

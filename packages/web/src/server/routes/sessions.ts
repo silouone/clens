@@ -1,10 +1,14 @@
 import { Hono } from "hono"
 import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
-import { readDistilled, readSessionEvents, readLinks } from "@clens/cli/src/session"
-import { buildConversation } from "@clens/cli/src/session/conversation"
+import { readDistilled, readSessionEvents, readLinks, readTranscript } from "@clens/cli/src/session"
+import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified } from "@clens/cli/src/utils"
-import type { SessionSummary, StoredEvent, LinkEvent, SpawnLink } from "@clens/cli"
+import type { AgentNode, SessionSummary, StoredEvent, LinkEvent, SpawnLink } from "@clens/cli"
 import { getCachedEvents, setCachedEvents } from "../cache"
+import { createLogger } from "../logger"
+import { pathsMatch } from "../../shared/paths"
+
+const log = createLogger("sessions")
 
 // ── Query param validation ─────────────────────────────────────────
 
@@ -39,21 +43,37 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 		const stat = fstatSync(fd)
 		if (stat.size === 0) return undefined
 
-		// Read first line (up to 8KB should be enough)
-		const headBuf = Buffer.alloc(Math.min(8192, stat.size))
-		readSync(fd, headBuf, 0, headBuf.length, 0)
+		const CHUNK = 16384
+
+		// For small files (fits in one chunk), read exactly
+		if (stat.size <= CHUNK) {
+			const buf = Buffer.alloc(stat.size)
+			readSync(fd, buf, 0, stat.size, 0)
+			const text = buf.toString("utf-8")
+			const lines = text.split("\n").filter(Boolean)
+			if (lines.length === 0) return undefined
+			return { first: lines[0], last: lines[lines.length - 1], lineCount: lines.length }
+		}
+
+		// Large file: read head + tail chunks only
+		const headBuf = Buffer.alloc(CHUNK)
+		readSync(fd, headBuf, 0, CHUNK, 0)
 		const headStr = headBuf.toString("utf-8")
 		const firstNewline = headStr.indexOf("\n")
 		if (firstNewline === -1) return { first: headStr.trim(), last: headStr.trim(), lineCount: 1 }
 		const first = headStr.slice(0, firstNewline)
 
-		// Count newlines by scanning whole file (fast — no JSON parsing)
-		const fullBuf = Buffer.alloc(stat.size)
-		readSync(fd, fullBuf, 0, stat.size, 0)
-		const fullStr = fullBuf.toString("utf-8")
-		const lines = fullStr.split("\n").filter(Boolean)
-		const lineCount = lines.length
-		const last = lines[lines.length - 1]
+		// Read last line from tail
+		const tailBuf = Buffer.alloc(CHUNK)
+		readSync(fd, tailBuf, 0, CHUNK, stat.size - CHUNK)
+		const tailStr = tailBuf.toString("utf-8")
+		const tailLines = tailStr.split("\n").filter(Boolean)
+		const last = tailLines.length > 0 ? tailLines[tailLines.length - 1] : first
+
+		// Count newlines in head chunk to estimate average line length
+		const headLines = headStr.split("\n").filter(Boolean)
+		const avgLineLen = headLines.length > 0 ? CHUNK / headLines.length : first.length + 1
+		const lineCount = Math.max(1, Math.round(stat.size / avgLineLen))
 
 		return { first, last, lineCount }
 	} finally {
@@ -62,6 +82,29 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 }
 
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn"
+
+/** Recursively search agent tree for a node with the given session_id. */
+const findAgentById = (agents: readonly AgentNode[], agentId: string): AgentNode | undefined =>
+	agents.reduce<AgentNode | undefined>(
+		(found, node) => found ?? (node.session_id === agentId ? node : findAgentById(node.children ?? [], agentId)),
+		undefined,
+	)
+
+/** Count all agents recursively (includes children at every depth). */
+const countAgentsRecursive = (agents: readonly { children?: readonly unknown[] }[]): number =>
+	agents.reduce((sum, a) => sum + 1 + countAgentsRecursive((a.children ?? []) as readonly { children?: readonly unknown[] }[]), 0)
+
+/** Count all agents in a distilled JSON file (recursive through children). */
+const countDistilledAgents = (distilledPath: string): number => {
+	try {
+		const content = readFileSync(distilledPath, "utf-8")
+		const parsed = JSON.parse(content)
+		const agents = parsed?.agents
+		return Array.isArray(agents) ? countAgentsRecursive(agents) : 0
+	} catch {
+		return 0
+	}
+}
 
 /**
  * Lightweight session listing — reads only first+last lines per JSONL file.
@@ -74,7 +117,8 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 	const files = (() => {
 		try {
 			return readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
-		} catch {
+		} catch (err) {
+			log.warn(`Cannot read sessions dir ${sessionsDir}:`, err instanceof Error ? err.message : String(err))
 			return []
 		}
 	})()
@@ -84,10 +128,24 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 	// Read links once for agent counts
 	const links = readLinks(projectDir)
 	const spawns = links.filter(isSpawnLink)
-	const spawnCountByParent = new Map<string, number>()
-	spawns.forEach((s) => {
-		spawnCountByParent.set(s.parent_session, (spawnCountByParent.get(s.parent_session) ?? 0) + 1)
-	})
+	const spawnCountByParent = spawns.reduce(
+		(acc, s) => {
+			const prev = acc.get(s.parent_session) ?? 0
+			return new Map([...acc, [s.parent_session, prev + 1]])
+		},
+		new Map<string, number>(),
+	)
+
+	// Fallback: count unique msg_send recipients per session when no spawns exist
+	const msgSendEvents = links.filter((l): l is Extract<LinkEvent, { type: "msg_send" }> => l.type === "msg_send")
+	const msgRecipientsBySession = msgSendEvents.reduce(
+		(acc, msg) => {
+			const sid = msg.session_id ?? msg.from
+			const existing = acc.get(sid)
+			return new Map([...acc, [sid, existing ? new Set([...existing, msg.to]) : new Set([msg.to])]])
+		},
+		new Map<string, Set<string>>(),
+	)
 
 	return files
 		.flatMap((file): readonly SessionSummary[] => {
@@ -105,6 +163,17 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 				const lastEvent = tryParseJson(result.last) ?? firstEvent
 				const isComplete = lastEvent.event === "SessionEnd" || lastEvent.event === "Stop"
 				const distilledPath = `${distilledDir}/${sessionId}.json`
+				const isDistilled = existsSync(distilledPath)
+
+				// Agent count: distilled (recursive, authoritative) > spawn links > msg_send > 0
+				const distilledCount = isDistilled ? countDistilledAgents(distilledPath) : 0
+				const spawnCount = spawnCountByParent.get(sessionId) ?? 0
+				const msgCount = msgRecipientsBySession.get(sessionId)?.size ?? 0
+				const agentCount = distilledCount > 0
+					? distilledCount
+					: spawnCount > 0
+						? spawnCount
+						: msgCount
 
 				return [{
 					session_id: sessionId,
@@ -117,10 +186,11 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 					end_reason: typeof lastEvent.data.reason === "string" ? lastEvent.data.reason : undefined,
 					status: isComplete ? "complete" : "incomplete",
 					file_size_bytes: stat.size,
-					agent_count: spawnCountByParent.get(sessionId) ?? 0,
-					is_distilled: existsSync(distilledPath),
+					agent_count: agentCount,
+					is_distilled: isDistilled,
 				}]
-			} catch {
+			} catch (err) {
+				log.warn(`Failed to parse session file ${file}:`, err instanceof Error ? err.message : String(err))
 				return []
 			}
 		})
@@ -146,12 +216,17 @@ const buildComparator = (sort: SortField) => (a: SessionSummary, b: SessionSumma
 
 const loadEvents = (sessionId: string, projectDir: string): readonly StoredEvent[] | undefined => {
 	const cached = getCachedEvents(sessionId)
-	if (cached) return cached
+	if (cached) {
+		log.debug(`Cache hit for ${sessionId.slice(0, 8)}`)
+		return cached
+	}
 	try {
 		const loaded = readSessionEvents(sessionId, projectDir)
+		log.debug(`Loaded ${loaded.length} events for ${sessionId.slice(0, 8)}`)
 		setCachedEvents(sessionId, loaded)
 		return loaded
-	} catch {
+	} catch (err) {
+		log.error(`Failed to load events for ${sessionId.slice(0, 8)}:`, err instanceof Error ? err.message : String(err))
 		return undefined
 	}
 }
@@ -162,6 +237,7 @@ const createSessionsRoute = (projectDir: string) =>
 	new Hono()
 		// GET /api/sessions — list sessions with pagination
 		.get("/", (c) => {
+			log.debug("GET /api/sessions", c.req.query())
 			const page = parseIntParam(c.req.query("page"), 1, 1, 1000)
 			const limit = parseIntParam(c.req.query("limit"), 20, 1, 100)
 			const sort = (c.req.query("sort") ?? "-start_time") as SortField
@@ -210,6 +286,7 @@ const createSessionsRoute = (projectDir: string) =>
 		// GET /api/sessions/:sessionId — session detail (distilled)
 		.get("/:sessionId", (c) => {
 			const sessionId = c.req.param("sessionId")
+			log.info(`Session detail: ${sessionId.slice(0, 8)}`)
 
 			const distilled = readDistilled(sessionId, projectDir)
 			if (!distilled) {
@@ -262,6 +339,7 @@ const createSessionsRoute = (projectDir: string) =>
 		// GET /api/sessions/:sessionId/conversation — paginated conversation timeline
 		.get("/:sessionId/conversation", (c) => {
 			const sessionId = c.req.param("sessionId")
+			log.info(`Conversation: ${sessionId.slice(0, 8)}`)
 			const offset = parseIntParam(c.req.query("offset"), 0, 0, 1_000_000)
 			const limit = parseIntParam(c.req.query("limit"), 100, 1, 1000)
 
@@ -300,6 +378,7 @@ const createSessionsRoute = (projectDir: string) =>
 		.get("/:sessionId/agents/:agentId/conversation", (c) => {
 			const sessionId = c.req.param("sessionId")
 			const agentId = c.req.param("agentId")
+			log.info(`Agent conversation: session=${sessionId.slice(0, 8)} agent=${agentId.slice(0, 8)}`)
 			const offset = parseIntParam(c.req.query("offset"), 0, 0, 1_000_000)
 			const limit = parseIntParam(c.req.query("limit"), 100, 1, 1000)
 
@@ -316,26 +395,44 @@ const createSessionsRoute = (projectDir: string) =>
 				return c.json({ error: "Session not distilled", code: "NOT_DISTILLED" }, 202)
 			}
 
-			// Verify agent exists in distilled data
-			const agent = distilled.agents?.find((a) => a.session_id === agentId)
+			// Verify agent exists in distilled data (search recursively through agent tree)
+			const agent = findAgentById(distilled.agents ?? [], agentId)
 			if (!agent) {
 				return c.json({ error: "Agent not found", code: "NOT_FOUND" }, 404)
 			}
 
-			// Load agent's events
+			// Try loading hook events first, then fall back to transcript
 			const agentEvents = loadEvents(agentId, projectDir)
-			if (!agentEvents) {
-				return c.json({ error: "Agent events not found", code: "NOT_FOUND" }, 404)
-			}
 
-			// Build conversation from agent's distill data if available, else minimal from events
-			const agentDistilled = readDistilled(agentId, projectDir)
-			const conversation = agentDistilled
-				? buildConversation(agentDistilled, agentEvents)
-				: buildConversation(
-					{ ...distilled, reasoning: [], user_messages: [], backtracks: [], summary: distilled.summary },
-					agentEvents,
-				)
+			const conversation = (() => {
+				if (agentEvents) {
+					// Hook events available — use full conversation builder
+					const agentDistilled = readDistilled(agentId, projectDir)
+					return agentDistilled
+						? buildConversation(agentDistilled, agentEvents)
+						: buildConversation(
+							{
+								...distilled,
+								reasoning: agent.reasoning ?? [],
+								user_messages: [],
+								backtracks: agent.backtracks ?? [],
+								summary: distilled.summary,
+							},
+							agentEvents,
+						)
+				}
+
+				// No hook events — fall back to Claude Code transcript
+				const transcriptPath = agent.transcript_path
+				if (transcriptPath && existsSync(transcriptPath)) {
+					const transcript = readTranscript(transcriptPath)
+					return buildConversationFromTranscript(transcript, agent)
+				}
+
+				// No transcript either — build conversation from agent node enrichment data
+				// (includes task_prompt, messages, reasoning, backtracks from link enrichment)
+				return buildConversationFromTranscript([], agent)
+			})()
 
 			const total = conversation.length
 			const data = conversation.slice(offset, offset + limit)
@@ -349,6 +446,7 @@ const createSessionsRoute = (projectDir: string) =>
 		// GET /api/sessions/:sessionId/diff/:filePath — unified diff for a file
 		.get("/:sessionId/diff/*", (c) => {
 			const sessionId = c.req.param("sessionId")
+			log.info(`Diff: session=${sessionId.slice(0, 8)} path=${c.req.path}`)
 			// Extract file path from wildcard (everything after /diff/)
 			const filePath = c.req.path.replace(/^\/api\/sessions\/[^/]+\/diff\//, "")
 
@@ -361,8 +459,9 @@ const createSessionsRoute = (projectDir: string) =>
 				return c.json({ error: "Session not distilled", code: "NOT_DISTILLED" }, 202)
 			}
 
+			// diff_attribution uses relative paths; filePath from URL may be relative or absolute
 			const attribution = distilled.edit_chains?.diff_attribution?.find(
-				(da) => da.file_path === filePath,
+				(da) => pathsMatch(da.file_path, filePath),
 			)
 
 			if (!attribution) {

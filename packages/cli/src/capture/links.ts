@@ -71,7 +71,7 @@ export const extractLinkEvent = (event: string, input: Record<string, unknown>):
 			return {
 				t,
 				type: "teammate_idle",
-				teammate: (input.agent_name as string) || (input.agent_id as string) || "",
+				teammate: (input.teammate_name as string) || (input.agent_name as string) || (input.agent_id as string) || "",
 				session_id: sid,
 				team: input.team_name as string | undefined,
 			} satisfies TeammateIdleLink;

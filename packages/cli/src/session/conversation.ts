@@ -1,5 +1,5 @@
 import type { ConversationEntry } from "../types/conversation";
-import type { DistilledSession, StoredEvent } from "../types";
+import type { AgentNode, DistilledSession, StoredEvent, TranscriptContentBlock, TranscriptEntry } from "../types";
 
 /** Truncate a value to a JSON preview of ~maxLen chars. */
 const truncatePreview = (value: unknown, maxLen: number = 100): string => {
@@ -113,6 +113,176 @@ export const buildConversation = (
 		...mapToolResults(events),
 		...mapBacktracks(distilled),
 		...mapPhaseBoundaries(distilled),
+	];
+
+	return [...all].sort((a, b) => a.t - b.t);
+};
+
+// ── Transcript-based conversation builder (for agents without hook events) ──
+
+/** Type guard for content block arrays. */
+const isContentBlockArray = (
+	content: string | readonly TranscriptContentBlock[],
+): content is readonly TranscriptContentBlock[] => Array.isArray(content);
+
+/** Extract user prompt entries from transcript entries. */
+const mapTranscriptUserPrompts = (entries: readonly TranscriptEntry[]): readonly ConversationEntry[] =>
+	entries
+		.filter((e) => e.type === "user" && e.message?.role === "user")
+		.flatMap((e, i): readonly ConversationEntry[] => {
+			const content = e.message?.content;
+			if (!content) return [];
+			const text = typeof content === "string"
+				? content
+				: content
+						.filter((b): b is Extract<TranscriptContentBlock, { type: "text" }> => b.type === "text")
+						.map((b) => b.text)
+						.join("\n");
+			return text ? [{
+				type: "user_prompt" as const,
+				t: new Date(e.timestamp).getTime(),
+				text,
+				index: i,
+			}] : [];
+		});
+
+/** Extract tool call entries from assistant transcript content blocks. */
+const mapTranscriptToolCalls = (entries: readonly TranscriptEntry[]): readonly ConversationEntry[] =>
+	entries
+		.filter((e) => e.type === "assistant" && e.message?.content)
+		.flatMap((e): readonly ConversationEntry[] => {
+			const content = e.message?.content;
+			if (!content || !isContentBlockArray(content)) return [];
+			const t = new Date(e.timestamp).getTime();
+			return content
+				.filter((b): b is Extract<TranscriptContentBlock, { type: "tool_use" }> => b.type === "tool_use")
+				.map((b) => {
+					// b.input is Record<string, unknown> — bracket access is required
+					const filePath = typeof b.input["file_path"] === "string"
+						? b.input["file_path"]
+						: typeof b.input["path"] === "string"
+							? b.input["path"]
+							: undefined;
+					return {
+						type: "tool_call" as const,
+						t,
+						tool_name: b.name,
+						tool_use_id: b.id,
+						file_path: filePath,
+						args_preview: truncatePreview(b.input),
+					};
+				});
+		});
+
+/** Extract tool result entries from user transcript content blocks (tool results come back as user messages). */
+const mapTranscriptToolResults = (entries: readonly TranscriptEntry[]): readonly ConversationEntry[] =>
+	entries
+		.filter((e) => e.type === "user" && e.message?.content)
+		.flatMap((e): readonly ConversationEntry[] => {
+			const content = e.message?.content;
+			if (!content || !isContentBlockArray(content)) return [];
+			const t = new Date(e.timestamp).getTime();
+			return content
+				.filter((b): b is Extract<TranscriptContentBlock, { type: "tool_result" }> => b.type === "tool_result")
+				.map((b) => ({
+					type: "tool_result" as const,
+					t,
+					tool_use_id: b.tool_use_id,
+					tool_name: "unknown",
+					outcome: (b.is_error ? "failure" : "success") as "success" | "failure",
+					...(b.is_error && typeof b.content === "string" ? { error: b.content } : {}),
+				}));
+		});
+
+/** Extract thinking entries from assistant transcript content blocks. */
+const mapTranscriptThinking = (entries: readonly TranscriptEntry[]): readonly ConversationEntry[] =>
+	entries
+		.filter((e) => e.type === "assistant" && e.message?.content)
+		.flatMap((e): readonly ConversationEntry[] => {
+			const content = e.message?.content;
+			if (!content || !isContentBlockArray(content)) return [];
+			const t = new Date(e.timestamp).getTime();
+			return content
+				.filter((b): b is Extract<TranscriptContentBlock, { type: "thinking" }> => b.type === "thinking")
+				.map((b) => ({
+					type: "thinking" as const,
+					t,
+					text: b.thinking,
+					intent: "general",
+				}));
+		});
+
+/** Map agent messages (from link enrichment) to AgentMessageEntry[]. */
+const mapAgentMessages = (agent?: AgentNode): readonly ConversationEntry[] =>
+	(agent?.messages ?? []).map((m) => ({
+		type: "agent_message" as const,
+		t: m.t,
+		direction: m.direction,
+		partner: m.partner,
+		msg_type: m.msg_type,
+		...(m.summary ? { summary: m.summary } : {}),
+	}));
+
+/** Derive earliest timestamp from agent data (messages, task_events, reasoning). */
+const getAgentStartTime = (agent?: AgentNode): number | undefined => {
+	const timestamps = [
+		...(agent?.messages ?? []).map((m) => m.t),
+		...(agent?.task_events ?? []).map((te) => te.t),
+		...(agent?.reasoning ?? []).map((r) => r.t),
+	];
+	return timestamps.length > 0 ? Math.min(...timestamps) : undefined;
+};
+
+/**
+ * Build conversation from transcript entries and optional agent node data.
+ * Used as fallback when hook events are unavailable (sub-agents).
+ * Pure function — no I/O, no mutation.
+ */
+export const buildConversationFromTranscript = (
+	transcript: readonly TranscriptEntry[],
+	agent?: AgentNode,
+): readonly ConversationEntry[] => {
+	const agentReasoning: readonly ConversationEntry[] = (agent?.reasoning ?? []).map((r) => ({
+		type: "thinking" as const,
+		t: r.t,
+		text: r.thinking,
+		intent: r.intent_hint ?? "general",
+	}));
+
+	const agentBacktracks: readonly ConversationEntry[] = (agent?.backtracks ?? []).map((b) => ({
+		type: "backtrack" as const,
+		t: b.start_t,
+		backtrack_type: b.type,
+		attempt: b.attempts,
+		reverted_tool_ids: b.tool_use_ids,
+	}));
+
+	// Use agent-level reasoning if available (richer with intent_hint), else extract from transcript
+	const thinking = agentReasoning.length > 0 ? agentReasoning : mapTranscriptThinking(transcript);
+
+	// Task prompt as first user message (when transcript is empty and agent has one)
+	const taskPrompt: readonly ConversationEntry[] = (() => {
+		if (!agent?.task_prompt) return [];
+		const startT = getAgentStartTime(agent) ?? 0;
+		return [{
+			type: "user_prompt" as const,
+			t: startT - 1, // before any other entries
+			text: agent.task_prompt,
+			index: 0,
+		}];
+	})();
+
+	// Agent messages from link enrichment (inter-agent communication)
+	const messages = mapAgentMessages(agent);
+
+	const all: readonly ConversationEntry[] = [
+		...taskPrompt,
+		...mapTranscriptUserPrompts(transcript),
+		...thinking,
+		...mapTranscriptToolCalls(transcript),
+		...mapTranscriptToolResults(transcript),
+		...agentBacktracks,
+		...messages,
 	];
 
 	return [...all].sort((a, b) => a.t - b.t);

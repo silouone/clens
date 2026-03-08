@@ -272,6 +272,7 @@ export interface TeamMetrics {
 		readonly task_id: string;
 		readonly agent: string;
 		readonly subject?: string;
+		readonly status?: "completed";
 		readonly t: number;
 	}>;
 	readonly idle_transitions: ReadonlyArray<{

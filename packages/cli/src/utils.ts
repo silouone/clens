@@ -1,5 +1,5 @@
 import { appendFileSync, mkdirSync } from "node:fs";
-import type { AgentNode, DiffLine, LinkEvent, SpawnLink, StoredEvent } from "./types";
+import type { AgentNode, DiffLine, LinkEvent, MessageLink, SpawnLink, StoredEvent, TeammateIdleLink } from "./types";
 import { BROADCAST_EVENTS } from "./types";
 
 export const IDLE_THRESHOLD_MS = 300_000;
@@ -155,12 +155,32 @@ export const resolveParentSession = (
 	return { id: "leader", name: "leader" };
 };
 
+const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink => link.type === "teammate_idle";
+
+/**
+ * Build a map from team member name to session_id using teammate_idle links.
+ * Only includes entries where both teammate name and session_id are non-empty.
+ */
+export const buildTeamMemberSessionMap = (
+	links: readonly LinkEvent[],
+): ReadonlyMap<string, string> =>
+	new Map(
+		links
+			.filter(isTeammateIdleLink)
+			.filter((link): link is TeammateIdleLink & { readonly session_id: string } =>
+				link.teammate !== "" && link.session_id !== undefined && link.session_id !== "",
+			)
+			.map((link) => [link.teammate, link.session_id] as const),
+	);
+
 /**
  * Filter link events to only those belonging to a specific session and its descendants.
  *
  * Step 1: Build agent ID set by recursively walking SpawnLink.parent_session chains.
  * Step 2: Build agent name set from spawn links matching the agent ID set.
- * Step 3: Filter each link type by matching against ID set or name set.
+ * Step 3: Expand agent IDs with team member session IDs (from teammate_idle links)
+ *         where the teammate name appears in agentNames or has msg_send from this session.
+ * Step 4: Filter each link type by matching against ID set or name set.
  *
  * Known limitation: `task_complete` and `teammate_idle` use agent names not UUIDs,
  * so name collisions across sessions cannot be fully resolved.
@@ -182,16 +202,38 @@ export const filterLinksForSession = (
 		return nextIds.size === ids.size ? ids : expandAgentIds(nextIds);
 	};
 
-	const agentIds = expandAgentIds(new Set([sessionId]));
+	const spawnAgentIds = expandAgentIds(new Set([sessionId]));
 
 	// Step 2: Build agent name set from spawn links whose agent_id is in the ID set
 	const agentNames: ReadonlySet<string> = new Set(
 		spawns
-			.filter((s): s is SpawnLink & { agent_name: string } => agentIds.has(s.agent_id) && s.agent_name !== undefined)
+			.filter((s): s is SpawnLink & { agent_name: string } => spawnAgentIds.has(s.agent_id) && s.agent_name !== undefined)
 			.map((s) => s.agent_name),
 	);
 
-	// Step 3: Filter each link type
+	// Step 3: Expand with team member session IDs from teammate_idle links
+	// Only include team members whose name appears in agentNames (spawned by this session)
+	// or who received a msg_send from any agent in this session tree
+	const teamMemberMap = buildTeamMemberSessionMap(links);
+
+	const isMessageLink = (l: LinkEvent): l is MessageLink => l.type === "msg_send";
+
+	const msgRecipientNames: ReadonlySet<string> = new Set(
+		links
+			.filter(isMessageLink)
+			.filter((l) => spawnAgentIds.has(l.from) || spawnAgentIds.has(l.session_id))
+			.map((l) => l.to),
+	);
+
+	const teamMemberSessionIds: ReadonlySet<string> = new Set(
+		[...teamMemberMap.entries()]
+			.filter(([name]) => agentNames.has(name) || msgRecipientNames.has(name))
+			.map(([, sid]) => sid),
+	);
+
+	const agentIds: ReadonlySet<string> = new Set([...spawnAgentIds, ...teamMemberSessionIds]);
+
+	// Step 4: Filter each link type
 	const matchesLink = (link: LinkEvent): boolean => {
 		switch (link.type) {
 			case "spawn":

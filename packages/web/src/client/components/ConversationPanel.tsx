@@ -10,6 +10,7 @@ import {
 	type JSX,
 } from "solid-js";
 import type {
+	AgentMessageEntry,
 	ConversationEntry,
 	BacktrackEntry,
 	PhaseBoundaryEntry,
@@ -78,11 +79,11 @@ const groupEntries = (entries: readonly ConversationEntry[]): readonly GroupedEn
 // ── Intent badge colors ──────────────────────────────────────────────
 
 const INTENT_COLORS: Readonly<Record<string, string>> = {
-	planning: "bg-violet-900/60 text-violet-300 border-violet-700/50",
-	debugging: "bg-red-900/60 text-red-300 border-red-700/50",
-	deciding: "bg-amber-900/60 text-amber-300 border-amber-700/50",
-	research: "bg-sky-900/60 text-sky-300 border-sky-700/50",
-	general: "bg-gray-800/60 text-gray-400 border-gray-700/50",
+	planning: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/60 dark:text-violet-300 dark:border-violet-700/50",
+	debugging: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700/50",
+	deciding: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/60 dark:text-amber-300 dark:border-amber-700/50",
+	research: "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/60 dark:text-sky-300 dark:border-sky-700/50",
+	general: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800/60 dark:text-gray-400 dark:border-gray-700/50",
 };
 
 const getIntentStyle = (intent: string): string =>
@@ -91,12 +92,12 @@ const getIntentStyle = (intent: string): string =>
 // ── Card Components ──────────────────────────────────────────────────
 
 const UserPromptCard: Component<{ readonly entry: UserPromptEntry }> = (props) => (
-	<div class="rounded-lg border border-blue-800/40 bg-blue-950/30 px-4 py-3">
+	<div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800/40 dark:bg-blue-950/30">
 		<div class="mb-1 flex items-center gap-2">
-			<span class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-800/50 text-[10px] text-blue-300">U</span>
-			<span class="text-xs font-medium text-blue-400">User</span>
+			<span class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] text-blue-600 dark:bg-blue-800/50 dark:text-blue-300">U</span>
+			<span class="text-xs font-medium text-blue-600 dark:text-blue-400">User</span>
 		</div>
-		<p class="whitespace-pre-wrap text-sm text-gray-200">{props.entry.text}</p>
+		<p class="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">{props.entry.text}</p>
 	</div>
 );
 
@@ -104,13 +105,13 @@ const ThinkingCard: Component<{ readonly entry: ThinkingEntry }> = (props) => {
 	const [expanded, setExpanded] = createSignal(false);
 
 	return (
-		<div class="rounded-lg border border-gray-700/40 bg-gray-800/30 px-4 py-2">
+		<div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700/40 dark:bg-gray-800/30">
 			<button
 				class="flex w-full items-center gap-2 text-left"
 				onClick={() => setExpanded((e) => !e)}
 			>
-				<span class="text-xs text-gray-500">{expanded() ? "\u25BC" : "\u25B6"}</span>
-				<span class="text-xs font-medium text-gray-400">Thinking</span>
+				<span class="text-xs text-gray-400 dark:text-gray-500">{expanded() ? "\u25BC" : "\u25B6"}</span>
+				<span class="text-xs font-medium text-gray-500 dark:text-gray-400">Thinking</span>
 				<span
 					class={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${getIntentStyle(props.entry.intent)}`}
 				>
@@ -118,14 +119,14 @@ const ThinkingCard: Component<{ readonly entry: ThinkingEntry }> = (props) => {
 				</span>
 				<Show when={props.entry.duration_ms}>
 					{(d) => (
-						<span class="ml-auto text-[10px] text-gray-600">
+						<span class="ml-auto text-[10px] text-gray-400 dark:text-gray-600">
 							{d() < 1000 ? `${d()}ms` : `${(d() / 1000).toFixed(1)}s`}
 						</span>
 					)}
 				</Show>
 			</button>
 			<Show when={expanded()}>
-				<p class="mt-2 whitespace-pre-wrap text-xs text-gray-400 max-h-60 overflow-y-auto">
+				<p class="mt-2 whitespace-pre-wrap text-xs text-gray-500 max-h-60 overflow-y-auto dark:text-gray-400">
 					{props.entry.text}
 				</p>
 			</Show>
@@ -138,17 +139,17 @@ const ToolCallCard: Component<{
 	readonly onToolClick?: (id: string) => void;
 }> = (props) => (
 	<div
-		class="flex items-center gap-2 rounded-md border border-gray-700/30 bg-gray-800/20 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-800/40 transition"
+		class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-100 transition dark:border-gray-700/30 dark:bg-gray-800/20 dark:hover:bg-gray-800/40"
 		data-tool-use-id={props.entry.tool_use_id}
 		onClick={() => props.onToolClick?.(props.entry.tool_use_id)}
 	>
-		<span class="font-mono font-medium text-gray-300">{props.entry.tool_name}</span>
+		<span class="font-mono font-medium text-gray-700 dark:text-gray-300">{props.entry.tool_name}</span>
 		<Show when={props.entry.file_path}>
 			{(fp) => (
 				<span class="truncate font-mono text-gray-500">{fp()}</span>
 			)}
 		</Show>
-		<span class="ml-auto truncate text-gray-600 max-w-[200px]">{props.entry.args_preview}</span>
+		<span class="ml-auto truncate text-gray-400 max-w-[200px] dark:text-gray-600">{props.entry.args_preview}</span>
 	</div>
 );
 
@@ -160,21 +161,21 @@ const ToolResultCard: Component<{
 
 	return (
 		<div
-			class="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-800/40 transition"
+			class="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-100 transition dark:hover:bg-gray-800/40"
 			classList={{
-				"border-emerald-800/30 bg-emerald-950/10": isSuccess(),
-				"border-red-800/30 bg-red-950/10": !isSuccess(),
+				"border-emerald-200 bg-emerald-50 dark:border-emerald-800/30 dark:bg-emerald-950/10": isSuccess(),
+				"border-red-200 bg-red-50 dark:border-red-800/30 dark:bg-red-950/10": !isSuccess(),
 			}}
 			data-tool-use-id={props.entry.tool_use_id}
 			onClick={() => props.onToolClick?.(props.entry.tool_use_id)}
 		>
-			<span class={isSuccess() ? "text-emerald-400" : "text-red-400"}>
+			<span class={isSuccess() ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
 				{isSuccess() ? "\u2713" : "\u2717"}
 			</span>
-			<span class="font-mono text-gray-400">{props.entry.tool_name}</span>
+			<span class="font-mono text-gray-500 dark:text-gray-400">{props.entry.tool_name}</span>
 			<Show when={!isSuccess() && props.entry.error}>
 				{(err) => (
-					<span class="ml-2 truncate text-red-400/80 max-w-xs">{err()}</span>
+					<span class="ml-2 truncate text-red-500/80 max-w-xs dark:text-red-400/80">{err()}</span>
 				)}
 			</Show>
 		</div>
@@ -182,14 +183,14 @@ const ToolResultCard: Component<{
 };
 
 const BacktrackCard: Component<{ readonly entry: BacktrackEntry }> = (props) => (
-	<div class="rounded-lg border border-amber-700/40 bg-amber-950/20 px-4 py-2">
+	<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 dark:border-amber-700/40 dark:bg-amber-950/20">
 		<div class="flex items-center gap-2">
-			<span class="text-amber-500">!</span>
-			<span class="text-xs font-medium text-amber-400">Backtrack</span>
-			<span class="rounded-full border border-amber-700/50 bg-amber-900/40 px-1.5 py-0.5 text-[10px] text-amber-300">
+			<span class="text-amber-600 dark:text-amber-500">!</span>
+			<span class="text-xs font-medium text-amber-600 dark:text-amber-400">Backtrack</span>
+			<span class="rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/40 dark:text-amber-300">
 				{props.entry.backtrack_type.replaceAll("_", " ")}
 			</span>
-			<span class="text-[10px] text-amber-500/70">
+			<span class="text-[10px] text-amber-600/70 dark:text-amber-500/70">
 				attempt {props.entry.attempt}
 			</span>
 		</div>
@@ -197,14 +198,57 @@ const BacktrackCard: Component<{ readonly entry: BacktrackEntry }> = (props) => 
 );
 
 const PhaseBoundaryCard: Component<{ readonly entry: PhaseBoundaryEntry }> = (props) => (
-	<div class="sticky top-0 z-10 -mx-2 flex items-center gap-3 border-b border-gray-700/50 bg-gray-900/90 px-2 py-1.5 backdrop-blur-sm">
-		<div class="h-px flex-1 bg-gray-700/50" />
+	<div class="sticky top-0 z-10 -mx-2 flex items-center gap-3 border-b border-gray-200 bg-white/90 px-2 py-1.5 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/90">
+		<div class="h-px flex-1 bg-gray-300 dark:bg-gray-700/50" />
 		<span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
 			{props.entry.phase_name}
 		</span>
-		<div class="h-px flex-1 bg-gray-700/50" />
+		<div class="h-px flex-1 bg-gray-300 dark:bg-gray-700/50" />
 	</div>
 );
+
+const AgentMessageCard: Component<{ readonly entry: AgentMessageEntry }> = (props) => {
+	const isSent = () => props.entry.direction === "sent";
+
+	return (
+		<div
+			class="rounded-lg border px-4 py-2"
+			classList={{
+				"border-teal-200 bg-teal-50 dark:border-teal-800/40 dark:bg-teal-950/30": isSent(),
+				"border-indigo-200 bg-indigo-50 dark:border-indigo-800/40 dark:bg-indigo-950/30": !isSent(),
+			}}
+		>
+			<div class="flex items-center gap-2">
+				<span
+					class="flex h-5 w-5 items-center justify-center rounded-full text-[10px]"
+					classList={{
+						"bg-teal-100 text-teal-600 dark:bg-teal-800/50 dark:text-teal-300": isSent(),
+						"bg-indigo-100 text-indigo-600 dark:bg-indigo-800/50 dark:text-indigo-300": !isSent(),
+					}}
+				>
+					{isSent() ? "\u2192" : "\u2190"}
+				</span>
+				<span
+					class="text-xs font-medium"
+					classList={{
+						"text-teal-600 dark:text-teal-400": isSent(),
+						"text-indigo-600 dark:text-indigo-400": !isSent(),
+					}}
+				>
+					{isSent() ? `To ${props.entry.partner}` : `From ${props.entry.partner}`}
+				</span>
+				<span class="rounded-full border border-gray-200 bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-400">
+					{props.entry.msg_type}
+				</span>
+			</div>
+			<Show when={props.entry.summary}>
+				{(s) => (
+					<p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{s()}</p>
+				)}
+			</Show>
+		</div>
+	);
+};
 
 // ── Collapsed tool group ─────────────────────────────────────────────
 
@@ -219,14 +263,14 @@ const CollapsedToolGroup: Component<{
 		<div class="space-y-0.5">
 			<Show when={!expanded() && props.group.count > 3}>
 				<button
-					class="flex items-center gap-2 rounded-md border border-gray-700/30 bg-gray-800/20 px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-800/40 transition w-full text-left"
+					class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 transition w-full text-left dark:border-gray-700/30 dark:bg-gray-800/20 dark:text-gray-400 dark:hover:bg-gray-800/40"
 					onClick={() => setExpanded(true)}
 				>
 					<span class="font-mono font-medium">{props.group.tool_name}</span>
-					<span class="rounded-full bg-gray-700/50 px-1.5 py-0.5 text-[10px]">
+					<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] dark:bg-gray-700/50">
 						x{props.group.count}
 					</span>
-					<span class="ml-auto text-gray-600">\u25B6 expand</span>
+					<span class="ml-auto text-gray-400 dark:text-gray-600">\u25B6 expand</span>
 				</button>
 			</Show>
 			<Show when={expanded()}>
@@ -243,7 +287,7 @@ const CollapsedToolGroup: Component<{
 				</For>
 				<Show when={props.group.count > 3}>
 					<button
-						class="text-[10px] text-gray-600 hover:text-gray-400 transition px-3"
+						class="text-[10px] text-gray-400 hover:text-gray-600 transition px-3 dark:text-gray-600 dark:hover:text-gray-400"
 						onClick={() => setExpanded(false)}
 					>
 						\u25B2 collapse {props.group.tool_name} x{props.group.count}
@@ -263,9 +307,9 @@ const JUMP_CONFIG: ReadonlyArray<{
 	readonly label: string;
 	readonly cls: string;
 }> = [
-	{ target: "backtrack", label: "Next backtrack", cls: "border-amber-700/50 text-amber-400 hover:bg-amber-900/20" },
-	{ target: "failure", label: "Next failure", cls: "border-red-700/50 text-red-400 hover:bg-red-900/20" },
-	{ target: "thinking", label: "Next thinking", cls: "border-gray-700/50 text-gray-400 hover:bg-gray-800/30" },
+	{ target: "backtrack", label: "Next backtrack", cls: "border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700/50 dark:text-amber-400 dark:hover:bg-amber-900/20" },
+	{ target: "failure", label: "Next failure", cls: "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700/50 dark:text-red-400 dark:hover:bg-red-900/20" },
+	{ target: "thinking", label: "Next thinking", cls: "border-gray-300 text-gray-500 hover:bg-gray-100 dark:border-gray-700/50 dark:text-gray-400 dark:hover:bg-gray-800/30" },
 ] as const;
 
 const matchesJumpTarget = (entry: ConversationEntry, target: JumpTarget): boolean => {
@@ -284,6 +328,7 @@ const MINIMAP_COLORS: Readonly<Record<string, string>> = {
 	tool_result: "bg-gray-600",
 	backtrack: "bg-amber-500",
 	phase_boundary: "bg-violet-500",
+	agent_message: "bg-teal-500",
 };
 
 const getMinimapColor = (entry: ConversationEntry): string => {
@@ -309,7 +354,7 @@ const Minimap: Component<{
 	};
 
 	return (
-		<div class="absolute right-0 top-0 bottom-0 w-2 bg-gray-900/50">
+		<div class="absolute right-0 top-0 bottom-0 w-2 bg-gray-100/50 dark:bg-gray-900/50">
 			<For each={markers()}>
 				{(m) => (
 					<button
@@ -450,14 +495,16 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 				return <BacktrackCard entry={entry} />;
 			case "phase_boundary":
 				return <PhaseBoundaryCard entry={entry} />;
+			case "agent_message":
+				return <AgentMessageCard entry={entry} />;
 		}
 	};
 
 	return (
 		<div class="relative flex h-full flex-col">
 			{/* Jump-to bar */}
-			<div class="flex items-center gap-2 border-b border-gray-800 bg-gray-900/80 px-3 py-1.5">
-				<span class="text-[10px] text-gray-600">Jump to:</span>
+			<div class="flex items-center gap-2 border-b border-gray-200 bg-gray-50/80 px-3 py-1.5 dark:border-gray-800 dark:bg-gray-900/80">
+				<span class="text-[10px] text-gray-400 dark:text-gray-600">Jump to:</span>
 				{JUMP_CONFIG.map((cfg) => (
 					<button
 						class={`rounded-md border px-2 py-0.5 text-[10px] font-medium transition ${cfg.cls}`}
@@ -466,7 +513,7 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 						{cfg.label}
 					</button>
 				))}
-				<span class="ml-auto text-[10px] text-gray-600">
+				<span class="ml-auto text-[10px] text-gray-400 dark:text-gray-600">
 					{props.entries.length} entries
 				</span>
 			</div>
@@ -546,7 +593,7 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 				{/* Loading indicator */}
 				<Show when={props.loading}>
 					<div class="flex items-center justify-center py-4">
-						<div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-700 border-t-blue-500" />
+						<div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500 dark:border-gray-700" />
 						<span class="ml-2 text-xs text-gray-500">Loading more...</span>
 					</div>
 				</Show>

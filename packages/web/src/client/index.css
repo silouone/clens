@@ -6,21 +6,60 @@ body {
 	@apply bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
 }
 
-/* diff2html overrides for dark theme */
-.dark .diff-panel-content .d2h-wrapper {
+/* ── diff2html overrides ───────────────────────────────────────── */
+
+/* Map diff2html dark vars when Tailwind dark mode is active */
+.dark .diff-panel-content {
+	--d2h-bg-color: var(--d2h-dark-bg-color);
+	--d2h-border-color: var(--d2h-dark-border-color);
+	--d2h-dim-color: var(--d2h-dark-dim-color);
+	--d2h-line-border-color: var(--d2h-dark-line-border-color);
+	--d2h-file-header-bg-color: var(--d2h-dark-file-header-bg-color);
+	--d2h-file-header-border-color: var(--d2h-dark-file-header-border-color);
+	--d2h-empty-placeholder-bg-color: var(--d2h-dark-empty-placeholder-bg-color);
+	--d2h-empty-placeholder-border-color: var(--d2h-dark-empty-placeholder-border-color);
+	--d2h-selected-color: var(--d2h-dark-selected-color);
+	--d2h-ins-bg-color: var(--d2h-dark-ins-bg-color);
+	--d2h-ins-border-color: var(--d2h-dark-ins-border-color);
+	--d2h-ins-highlight-bg-color: var(--d2h-dark-ins-highlight-bg-color);
+	--d2h-ins-label-color: var(--d2h-dark-ins-label-color);
+	--d2h-del-bg-color: var(--d2h-dark-del-bg-color);
+	--d2h-del-border-color: var(--d2h-dark-del-border-color);
+	--d2h-del-highlight-bg-color: var(--d2h-dark-del-highlight-bg-color);
+	--d2h-del-label-color: var(--d2h-dark-del-label-color);
+	--d2h-change-del-color: var(--d2h-dark-change-del-color);
+	--d2h-change-ins-color: var(--d2h-dark-change-ins-color);
+	--d2h-info-bg-color: var(--d2h-dark-info-bg-color);
+	--d2h-info-border-color: var(--d2h-dark-info-border-color);
+}
+
+/* Contain diff tables so they don't leak outside panels.
+   Use layout+paint (not full `content`) to avoid clipping scroll regions. */
+.diff-panel-content {
+	contain: layout paint;
+	isolation: isolate;
+}
+
+/* Transparent wrapper background to blend with our panels */
+.diff-panel-content .d2h-wrapper {
 	background: transparent;
 }
+.diff-panel-content .d2h-file-wrapper {
+	border: none;
+	margin-bottom: 0;
+}
+
+/* Hide file header & file list — our parent UI already shows the file name */
 .diff-panel-content .d2h-file-header,
 .diff-panel-content .d2h-file-list-wrapper {
 	display: none;
 }
+
+/* Compact font size for inline diffs */
 .diff-panel-content .d2h-code-linenumber,
 .diff-panel-content .d2h-code-line-ctn {
 	font-size: 0.75rem;
 	line-height: 1.25rem;
-}
-.diff-panel-content .d2h-code-line {
-	padding: 0 0.5rem;
 }
 
 /* ── Bidirectional link flash animation ─────────────────────────── */

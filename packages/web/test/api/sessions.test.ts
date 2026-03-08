@@ -6,6 +6,7 @@ const TEST_TOKEN = "test-token-api"
 const TEST_DIR = "/tmp/clens-api-test"
 const SESSION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 const DISTILLED_SESSION_ID = "11111111-2222-3333-4444-555555555555"
+const DISTILL_CMD_SESSION_ID = "cccccccc-dddd-eeee-ffff-000000000000"
 const AGENT_ID = "22222222-3333-4444-5555-666666666666"
 
 const makeEvent = (event: string, t: number, data: Record<string, unknown> = {}, sid: string = SESSION_ID) =>
@@ -71,6 +72,17 @@ describe("Session API endpoints", () => {
 				summary: { phases: [{ name: "build", start_t: 5000, end_t: 6000 }] },
 				complete: true,
 			}),
+		)
+
+		// Write a third session for distill command testing (isolated from SESSION_ID)
+		const distillCmdEvents = [
+			makeEvent("SessionStart", 7000, { source: "cli" }, DISTILL_CMD_SESSION_ID),
+			makeEvent("ToolUse", 7500, { tool: "Read" }, DISTILL_CMD_SESSION_ID),
+			makeEvent("Stop", 8000, { reason: "user" }, DISTILL_CMD_SESSION_ID),
+		]
+		writeFileSync(
+			`${TEST_DIR}/.clens/sessions/${DISTILL_CMD_SESSION_ID}.jsonl`,
+			distillCmdEvents.join("\n") + "\n",
 		)
 
 		// Write agent session events
@@ -142,7 +154,7 @@ describe("Session API endpoints", () => {
 		expect(res.status).toBe(200)
 		const body = await res.json()
 		expect(body.pagination.limit).toBe(1)
-		// We have 2 sessions, so page 1 with limit 1 should have has_next=true
+		// We have multiple sessions, so page 1 with limit 1 should have has_next=true
 		expect(body.pagination.has_next).toBe(true)
 	})
 
@@ -221,7 +233,7 @@ describe("Session API endpoints", () => {
 	// ── POST /api/commands/sessions/:id/distill ────────────────────
 
 	test("POST /api/commands/sessions/:id/distill returns started", async () => {
-		const res = await req(`/api/commands/sessions/${SESSION_ID}/distill`, { method: "POST" })
+		const res = await req(`/api/commands/sessions/${DISTILL_CMD_SESSION_ID}/distill`, { method: "POST" })
 		expect(res.status).toBe(200)
 		const body = await res.json()
 		expect(body.status).toBe("started")

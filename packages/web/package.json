@@ -8,7 +8,7 @@
     "./server": "./src/server/index.ts"
   },
   "scripts": {
-    "dev:api": "bun run src/server/index.ts",
+    "dev:api": "bun --watch run src/server/index.ts",
     "dev:web": "vite dev",
     "build": "vite build",
     "test": "bun test test/ && vitest run",

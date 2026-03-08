@@ -94,12 +94,41 @@ export const extractTeamMetrics = (
 	const idleTeammateNames = idles.map((idle) => idle.teammate);
 	const teammateNames = uniqueStrings([...spawnNames, ...inferredNames, ...taskAgentNames, ...idleTeammateNames]);
 
-	const tasks = taskCompletes.map((tc) => ({
-		task_id: tc.task_id,
-		agent: tc.agent,
-		subject: tc.subject,
-		t: tc.t,
-	}));
+	// Build comprehensive task list by merging task create/assign/complete links
+	const taskLinks = links.filter(isTaskLink);
+
+	// TaskCreate fires at PreToolUse — task_id is empty, but subject is present.
+	// Assign ordinal IDs (1-indexed) by creation order for correlation.
+	const creates = taskLinks
+		.filter((tl) => tl.action === "create" && tl.subject)
+		.sort((a, b) => a.t - b.t);
+	const subjectMap = new Map(
+		creates.map((tl, i) => [tl.task_id || String(i + 1), tl.subject ?? ""] as const),
+	);
+
+	const ownerMap = new Map(
+		taskLinks
+			.filter((tl) => tl.owner)
+			.map((tl) => [tl.task_id, tl.owner ?? ""] as const),
+	);
+	const completedSet = new Set(taskCompletes.map((tc) => tc.task_id));
+
+	// Collect all unique task_ids from update/complete links (skip empty create IDs)
+	const allTaskIds = [...new Set([
+		...taskLinks.filter((tl) => tl.task_id.length > 0).map((tl) => tl.task_id),
+		...taskCompletes.map((tc) => tc.task_id),
+	])].filter((id) => id.length > 0);
+
+	const tasks = allTaskIds.map((id) => {
+		const complete = taskCompletes.find((tc) => tc.task_id === id);
+		return {
+			task_id: id,
+			agent: ownerMap.get(id) ?? complete?.agent ?? "",
+			subject: subjectMap.get(id) ?? complete?.subject,
+			status: completedSet.has(id) ? "completed" as const : undefined,
+			t: creates[Number(id) - 1]?.t ?? complete?.t ?? 0,
+		};
+	});
 
 	const idleTransitions = idles.map((idle) => ({
 		teammate: idle.teammate,

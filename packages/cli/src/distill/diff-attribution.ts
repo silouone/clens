@@ -1,4 +1,4 @@
-import type { DiffLine, EditChainsResult, FileDiffAttribution, StoredEvent } from "../types";
+import type { DiffLine, EditChainsResult, FileDiffAttribution, StoredEvent, WorkingTreeChange } from "../types";
 
 // --- Helper types ---
 
@@ -339,6 +339,54 @@ export const extractDiffAttribution = (
 				{
 					file_path: relativePath,
 					lines: attributedLines,
+					total_additions: totalAdditions,
+					total_deletions: totalDeletions,
+				},
+			];
+		},
+	);
+};
+
+/**
+ * Capture raw unified diffs for working tree / staged changes not already in diff_attribution.
+ * Returns additional FileDiffAttribution entries (without agent attribution).
+ */
+export const captureMissingDiffs = (
+	projectDir: string,
+	events: readonly StoredEvent[],
+	existingAttrs: readonly FileDiffAttribution[],
+	workingTreeChanges: readonly WorkingTreeChange[],
+): readonly FileDiffAttribution[] => {
+	const startCommit = getStartCommit(events);
+	if (startCommit === undefined) return [];
+
+	if (workingTreeChanges.length === 0) return [];
+
+	const coveredPaths = new Set(existingAttrs.map((a) => a.file_path));
+
+	// Working tree changes already use relative paths
+	const missingPaths = workingTreeChanges
+		.map((c) => c.file_path)
+		.filter((p) => !coveredPaths.has(p));
+
+	if (missingPaths.length === 0) return [];
+
+	// captureUnifiedDiff expects absolute paths, but also handles relative ones
+	// Working tree changes use relative paths — pass them directly
+	const diffMap = captureUnifiedDiff(projectDir, startCommit, missingPaths);
+
+	return Array.from(diffMap.entries()).flatMap(
+		([relativePath, rawDiff]): readonly FileDiffAttribution[] => {
+			const parsedLines = parseUnifiedDiff(rawDiff);
+			if (parsedLines.length === 0) return [];
+
+			const totalAdditions = parsedLines.filter((l) => l.type === "add").length;
+			const totalDeletions = parsedLines.filter((l) => l.type === "remove").length;
+
+			return [
+				{
+					file_path: relativePath,
+					lines: parsedLines,
 					total_additions: totalAdditions,
 					total_deletions: totalDeletions,
 				},

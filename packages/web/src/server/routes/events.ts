@@ -1,5 +1,8 @@
 import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
+import { createLogger } from "../logger"
+
+const log = createLogger("sse")
 
 // ── SSE Event Types ────────────────────────────────────────────────
 
@@ -90,11 +93,12 @@ const broadcastSSE = (event: SSEEvent): void => {
 	// Store in ring buffer for replay
 	addToRingBuffer({ id, type: event.type, data })
 
-	activeConnections.forEach((conn) => {
+	log.debug(`Broadcast ${event.type} to ${activeConnections.size} connections (id=${id})`)
+	Array.from(activeConnections).map((conn) => {
 		try {
 			conn.send(event.type, data, idStr)
-		} catch {
-			// Connection may be closed — remove on next cleanup
+		} catch (err) {
+			log.warn(`Failed to send to ${conn.id}, removing:`, err instanceof Error ? err.message : String(err))
 			activeConnections.delete(conn)
 		}
 	})
@@ -120,6 +124,7 @@ const eventsRoute = new Hono().get("/stream", (c) => {
 		}
 
 		activeConnections.add(connection)
+		log.info(`SSE connected: ${connId} (total=${activeConnections.size})`)
 
 		// Replay missed events from ring buffer on reconnect
 		if (startFrom > 0) {
@@ -172,6 +177,7 @@ const eventsRoute = new Hono().get("/stream", (c) => {
 		stream.onAbort(() => {
 			clearInterval(heartbeat)
 			activeConnections.delete(connection)
+			log.info(`SSE disconnected: ${connId} (remaining=${activeConnections.size})`)
 		})
 
 		// Hold the connection open — events arrive via broadcastSSE

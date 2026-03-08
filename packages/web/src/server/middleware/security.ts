@@ -1,5 +1,8 @@
 import { createMiddleware } from "hono/factory"
 import type { Context } from "hono"
+import { createLogger } from "../logger"
+
+const log = createLogger("auth")
 
 // ── Error response format ──────────────────────────────────────────
 
@@ -34,6 +37,7 @@ const authToken = (serverToken: string) =>
 	createMiddleware(async (c, next) => {
 		const token = extractToken(c)
 		if (!token || token !== serverToken) {
+			log.warn(`Auth rejected: ${c.req.method} ${c.req.path}`)
 			return errorJson(c, 401, {
 				error: "Unauthorized",
 				code: "AUTH_REQUIRED",
@@ -52,6 +56,7 @@ const validateSessionId = () =>
 	createMiddleware(async (c, next) => {
 		const sessionId = c.req.param("sessionId")
 		if (sessionId && !UUID_RE.test(sessionId)) {
+			log.warn(`Invalid session ID: ${sessionId}`)
 			return errorJson(c, 400, {
 				error: "Invalid session ID",
 				code: "INVALID_SESSION_ID",

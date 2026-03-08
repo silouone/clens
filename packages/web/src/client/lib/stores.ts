@@ -2,6 +2,8 @@ import { createResource, createSignal } from "solid-js";
 import type { ConversationEntry, DistilledSession, SessionSummary } from "../../shared/types";
 import { api } from "./api";
 
+const LOG_PREFIX = "[cLens:api]";
+
 // ── Error state ─────────────────────────────────────────────────────
 
 type ApiError = {
@@ -16,18 +18,21 @@ const clearError = () => setGlobalError(undefined);
 // ── Session list ────────────────────────────────────────────────────
 
 const fetchSessionList = async (): Promise<readonly SessionSummary[]> => {
+	console.debug(LOG_PREFIX, "Fetching session list");
 	const res = await api.api.sessions.$get({
 		query: { sort: "-start_time", limit: "50" },
 	});
 	if (!res.ok) {
 		const body = await res.json().catch(() => ({ error: "Unknown error" }));
 		const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
+		console.error(LOG_PREFIX, "Session list error:", msg);
 		setGlobalError({ message: msg, code: String(res.status) });
 		return [];
 	}
 	const body = await res.json();
 	const data = body.data;
 	if (!Array.isArray(data)) return [];
+	console.debug(LOG_PREFIX, `Session list: ${data.length} sessions`);
 	return data as readonly SessionSummary[];
 };
 
@@ -53,24 +58,29 @@ const createSessionDetail = (sessionId: () => string | undefined) => {
 	const fetcher = async (
 		id: string,
 	): Promise<SessionDetailResult | undefined> => {
+		console.debug(LOG_PREFIX, `Fetching session detail: ${id.slice(0, 8)}`);
 		const res = await api.api.sessions[":sessionId"].$get({
 			param: { sessionId: id },
 		});
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({ error: "Unknown error" }));
 			const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
+			console.error(LOG_PREFIX, `Session detail error (${id.slice(0, 8)}):`, msg);
 			setGlobalError({ message: msg, code: String(res.status) });
 			return undefined;
 		}
 		const body = await res.json();
 		if ("status" in body) {
+			console.debug(LOG_PREFIX, `Session ${id.slice(0, 8)}: not distilled`);
 			return { status: "not_distilled" };
 		}
 		const data = body.data;
 		if (!data || typeof data !== "object" || !("stats" in data)) {
+			console.error(LOG_PREFIX, `Session ${id.slice(0, 8)}: invalid data format`, data);
 			setGlobalError({ message: "Invalid session data format", code: "PARSE_ERROR" });
 			return undefined;
 		}
+		console.debug(LOG_PREFIX, `Session ${id.slice(0, 8)}: loaded`);
 		return {
 			status: "ready",
 			data: data as DistilledSession,
@@ -105,6 +115,7 @@ const createConversationStore = (sessionId: () => string | undefined): Conversat
 	const [total, setTotal] = createSignal(0);
 
 	const fetchPage = async (id: string, pageOffset: number): Promise<void> => {
+		console.debug(LOG_PREFIX, `Fetching conversation: ${id.slice(0, 8)} offset=${pageOffset}`);
 		setLoading(true);
 		try {
 			const res = await api.api.sessions[":sessionId"].conversation.$get({
@@ -113,11 +124,13 @@ const createConversationStore = (sessionId: () => string | undefined): Conversat
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({ error: "Unknown error" }));
 				const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
+				console.error(LOG_PREFIX, `Conversation error (${id.slice(0, 8)}):`, msg);
 				setGlobalError({ message: msg, code: String(res.status) });
 				return;
 			}
 			const body = await res.json();
 			if ("error" in body) {
+				console.error(LOG_PREFIX, `Conversation error (${id.slice(0, 8)}):`, body.error);
 				setGlobalError({ message: String(body.error), code: String(body.code) });
 				return;
 			}
@@ -176,21 +189,26 @@ const createAgentConversationResource = (
 		compositeKey: string,
 	): Promise<readonly ConversationEntry[]> => {
 		const [sid, aid] = compositeKey.split(":");
+		console.debug(LOG_PREFIX, `Fetching agent conversation: session=${sid.slice(0, 8)} agent=${aid.slice(0, 8)}`);
 		const res = await api.api.sessions[":sessionId"].agents[":agentId"].conversation.$get({
 			param: { sessionId: sid, agentId: aid },
 		});
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({ error: "Unknown error" }));
 			const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
+			console.error(LOG_PREFIX, `Agent conversation error (${sid.slice(0, 8)}/${aid.slice(0, 8)}):`, msg);
 			setGlobalError({ message: msg, code: String(res.status) });
 			return [];
 		}
 		const body = await res.json();
 		if ("error" in body) {
+			console.error(LOG_PREFIX, `Agent conversation error:`, body.error);
 			setGlobalError({ message: String(body.error), code: String(body.code) });
 			return [];
 		}
-		return Array.isArray(body.data) ? (body.data as readonly ConversationEntry[]) : [];
+		const entries = Array.isArray(body.data) ? (body.data as readonly ConversationEntry[]) : [];
+		console.debug(LOG_PREFIX, `Agent conversation: ${entries.length} entries`);
+		return entries;
 	};
 
 	return createResource(key, fetcher);

@@ -4,14 +4,16 @@ import type { PhaseInfo } from "../../shared/types";
 // ── Phase color palette ──────────────────────────────────────────────
 
 const PHASE_COLORS: Readonly<Record<string, string>> = {
-	exploration: "bg-sky-600",
-	planning: "bg-violet-600",
-	building: "bg-emerald-600",
-	testing: "bg-amber-600",
+	// Single-agent phases (from phaseNameFromTool)
+	"file exploration": "bg-sky-600",
+	"code modification": "bg-emerald-600",
+	research: "bg-indigo-600",
 	debugging: "bg-red-600",
-	review: "bg-indigo-600",
-	commit: "bg-teal-600",
-	refactoring: "bg-orange-600",
+	general: "bg-gray-500",
+	// Team phases (from buildTeamPhases)
+	planning: "bg-violet-600",
+	build: "bg-emerald-600",
+	validation: "bg-amber-600",
 };
 
 const DEFAULT_COLOR = "bg-gray-600";
@@ -38,7 +40,7 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 
 	return (
 		<Show when={props.phases.length > 0}>
-			<div class="flex h-6 w-full overflow-hidden rounded-md border border-gray-700">
+			<div class="flex h-6 w-full overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
 				<For each={props.phases}>
 					{(phase, i) => (
 						<button

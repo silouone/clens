@@ -71,9 +71,9 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 	return (
 		<div class="flex h-full flex-col">
 			{/* Header */}
-			<div class="flex items-center gap-3 border-b border-gray-800 px-4 py-2">
-				<h3 class="text-sm font-semibold text-gray-300">Communication</h3>
-				<span class="rounded-full bg-gray-800 px-2 py-0.5 text-xs text-gray-400">
+			<div class="flex items-center gap-3 border-b border-gray-200 px-4 py-2 dark:border-gray-800">
+				<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Communication</h3>
+				<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
 					{props.sequence.length} messages
 				</span>
 			</div>
@@ -87,14 +87,14 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 				}
 			>
 				{/* Swim lane headers */}
-				<div class="flex border-b border-gray-800 bg-gray-900/50">
-					<div class="w-16 flex-shrink-0 px-2 py-1.5 text-[10px] text-gray-600">
+				<div class="flex border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50">
+					<div class="w-16 flex-shrink-0 px-2 py-1.5 text-[10px] text-gray-400 dark:text-gray-600">
 						Time
 					</div>
 					<For each={agents()}>
 						{(name) => (
 							<div
-								class="flex-1 truncate px-2 py-1.5 text-center text-[10px] font-medium text-gray-400"
+								class="flex-1 truncate px-2 py-1.5 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400"
 								title={name}
 							>
 								{name}
@@ -115,9 +115,9 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 							const isLeftToRight = fromLane < toLane;
 
 							return (
-								<div class="group flex items-center border-b border-gray-800/30 hover:bg-gray-800/20 transition">
+								<div class="group flex items-center border-b border-gray-100 hover:bg-gray-50 transition dark:border-gray-800/30 dark:hover:bg-gray-800/20">
 									{/* Timestamp */}
-									<div class="w-16 flex-shrink-0 px-2 py-1 text-[10px] text-gray-600">
+									<div class="w-16 flex-shrink-0 px-2 py-1 text-[10px] text-gray-400 dark:text-gray-600">
 										{formatRelativeTime(msg.t, startTime())}
 									</div>
 
@@ -160,7 +160,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 
 														{/* Vertical lane marker */}
 														<Show when={!isFrom && !isTo && !isBetween}>
-															<div class="h-full w-px bg-gray-800/50 absolute" />
+															<div class="h-full w-px bg-gray-200 absolute dark:bg-gray-800/50" />
 														</Show>
 													</div>
 												);

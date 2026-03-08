@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { createApp } from "./app"
 import { startLiveWatcher } from "./live"
+import { log, currentLevel } from "./logger"
 
 // ── Server options ─────────────────────────────────────────────────
 
@@ -37,16 +38,21 @@ const startServer = (options: StartServerOptions): ServerHandle => {
 	const token = options.token ?? generateToken()
 	const mode = process.env.NODE_ENV === "production" ? "production" as const : "development" as const
 
+	log.info(`Starting server mode=${mode} logLevel=${currentLevel}`)
 	const app = createApp({ token, mode, projectDir: options.projectDir })
 
 	const server = Bun.serve({
 		port,
 		hostname: "127.0.0.1",
+		idleTimeout: 255, // max value (seconds) — prevents SSE connections from being killed
 		fetch: app.fetch,
 	})
 
 	const actualPort = server.port ?? port
 	const url = `http://127.0.0.1:${actualPort}`
+
+	log.info(`Server bound to ${url}`)
+	log.info(`Project dir: ${options.projectDir}`)
 
 	// Start file watcher for live SSE push
 	const watcher = startLiveWatcher(options.projectDir)

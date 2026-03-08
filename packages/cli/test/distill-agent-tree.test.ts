@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { attributeEventsToAgents, buildAgentTree, computeLinkBasedDuration, enrichNodeWithTranscript } from "../src/distill/agent-tree";
-import type { AgentNode, LinkEvent, SpawnLink, StopLink, StoredEvent, TranscriptEntry } from "../src/types";
+import type { DiffContext } from "../src/distill/agent-distill";
+import { attributeEventsToAgents, buildAgentTree, computeLinkBasedDuration, enrichNodeFromSessionEvents, enrichNodeWithTranscript, inferAgentsFromComms } from "../src/distill/agent-tree";
+import type { AgentNode, LinkEvent, SessionStartContext, SpawnLink, StopLink, StoredEvent, TranscriptEntry } from "../src/types";
 
 // -- Helpers --
 
@@ -586,5 +587,409 @@ describe("buildAgentTree", () => {
 		// enrichNodeWithTranscript sets tool_call_count = stats.tool_call_count = 1
 		// Then the outer logic checks: enriched.tool_call_count === 0? No (it's 1), so uses enriched as-is
 		expect(result[0].tool_call_count).toBe(1);
+	});
+});
+
+// -- inferAgentsFromComms --
+
+describe("inferAgentsFromComms", () => {
+	test("returns empty array when no msg_send links exist", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn(),
+			makeStop(),
+		];
+		const result = inferAgentsFromComms("root-session", links);
+		expect(result).toEqual([]);
+	});
+
+	test("infers agents from msg_send recipients", () => {
+		const links: readonly LinkEvent[] = [
+			{
+				t: 1000,
+				type: "msg_send",
+				msg_id: "m1",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+			{
+				t: 2000,
+				type: "msg_send",
+				msg_id: "m2",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-api",
+				msg_type: "text",
+			},
+		];
+		const result = inferAgentsFromComms("root-session", links);
+		expect(result).toHaveLength(2);
+		expect(result[0].agent_name).toBe("builder-web");
+		expect(result[1].agent_name).toBe("builder-api");
+	});
+
+	test("resolves session_id from task links when no teamMemberSessions provided", () => {
+		const links: readonly LinkEvent[] = [
+			{
+				t: 1000,
+				type: "msg_send",
+				msg_id: "m1",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+			{
+				t: 1500,
+				type: "task",
+				action: "create",
+				task_id: "t1",
+				session_id: "uuid-for-web",
+				owner: "builder-web",
+				subject: "build web",
+			},
+		];
+		const result = inferAgentsFromComms("root-session", links);
+		expect(result).toHaveLength(1);
+		expect(result[0].session_id).toBe("uuid-for-web");
+		expect(result[0].agent_name).toBe("builder-web");
+	});
+
+	test("uses teamMemberSessions for session_id resolution with highest priority", () => {
+		const links: readonly LinkEvent[] = [
+			{
+				t: 1000,
+				type: "msg_send",
+				msg_id: "m1",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+			{
+				t: 1500,
+				type: "task",
+				action: "create",
+				task_id: "t1",
+				session_id: "uuid-from-task",
+				owner: "builder-web",
+				subject: "build web",
+			},
+		];
+		const teamMemberSessions = new Map([
+			["builder-web", "real-session-id-abc123"],
+		]);
+		const result = inferAgentsFromComms("root-session", links, teamMemberSessions);
+		expect(result).toHaveLength(1);
+		// teamMemberSessions should take priority over task-link UUID
+		expect(result[0].session_id).toBe("real-session-id-abc123");
+		expect(result[0].agent_name).toBe("builder-web");
+	});
+
+	test("falls back to task-link UUID when agent not in teamMemberSessions", () => {
+		const links: readonly LinkEvent[] = [
+			{
+				t: 1000,
+				type: "msg_send",
+				msg_id: "m1",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+			{
+				t: 1500,
+				type: "task",
+				action: "create",
+				task_id: "t1",
+				session_id: "uuid-from-task",
+				owner: "builder-web",
+				subject: "build web",
+			},
+		];
+		const teamMemberSessions = new Map([
+			["builder-api", "session-for-api"],
+		]);
+		const result = inferAgentsFromComms("root-session", links, teamMemberSessions);
+		expect(result).toHaveLength(1);
+		// builder-web not in teamMemberSessions, falls back to task-link UUID
+		expect(result[0].session_id).toBe("uuid-from-task");
+	});
+
+	test("falls back to agent name when no session_id sources available", () => {
+		const links: readonly LinkEvent[] = [
+			{
+				t: 1000,
+				type: "msg_send",
+				msg_id: "m1",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+		];
+		const result = inferAgentsFromComms("root-session", links, new Map());
+		expect(result).toHaveLength(1);
+		expect(result[0].session_id).toBe("builder-web");
+	});
+
+	test("computes duration from activity timestamps", () => {
+		const links: readonly LinkEvent[] = [
+			{
+				t: 1000,
+				type: "msg_send",
+				msg_id: "m1",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+			{
+				t: 5000,
+				type: "task_complete",
+				task_id: "t1",
+				agent: "builder-web",
+			},
+		];
+		const result = inferAgentsFromComms("root-session", links);
+		expect(result[0].duration_ms).toBe(4000); // 5000 - 1000
+	});
+
+	test("deduplicates recipient names", () => {
+		const links: readonly LinkEvent[] = [
+			{
+				t: 1000,
+				type: "msg_send",
+				msg_id: "m1",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+			{
+				t: 2000,
+				type: "msg_send",
+				msg_id: "m2",
+				session_id: "root-session",
+				from: "root-session",
+				to: "builder-web",
+				msg_type: "text",
+			},
+		];
+		const result = inferAgentsFromComms("root-session", links);
+		expect(result).toHaveLength(1);
+	});
+});
+
+// -- enrichNodeFromSessionEvents --
+
+describe("enrichNodeFromSessionEvents", () => {
+	test("returns unchanged node when events are empty", () => {
+		const baseNode: AgentNode = {
+			session_id: "agent-1",
+			agent_type: "builder",
+			agent_name: "builder-1",
+			duration_ms: 5000,
+			tool_call_count: 0,
+			children: [],
+		};
+		const result = enrichNodeFromSessionEvents(baseNode, []);
+		expect(result).toEqual(baseNode);
+	});
+
+	test("enriches node with stats from session events", () => {
+		const baseNode: AgentNode = {
+			session_id: "agent-1",
+			agent_type: "builder",
+			agent_name: "builder-1",
+			duration_ms: 5000,
+			tool_call_count: 0,
+			children: [],
+		};
+		const events: readonly StoredEvent[] = [
+			makeStoredEvent({
+				t: 1000,
+				event: "PreToolUse",
+				data: { tool_name: "Read", file_path: "/src/foo.ts" },
+			}),
+			makeStoredEvent({
+				t: 2000,
+				event: "PostToolUse",
+				data: { tool_name: "Read", file_path: "/src/foo.ts" },
+			}),
+			makeStoredEvent({
+				t: 3000,
+				event: "PreToolUse",
+				data: { tool_name: "Edit", file_path: "/src/bar.ts" },
+			}),
+		];
+		const result = enrichNodeFromSessionEvents(baseNode, events);
+		expect(result.tool_call_count).toBeGreaterThan(0);
+		expect(result.stats).toBeDefined();
+	});
+
+	test("returns unchanged node when events produce no stats", () => {
+		const baseNode: AgentNode = {
+			session_id: "agent-1",
+			agent_type: "builder",
+			agent_name: "builder-1",
+			duration_ms: 5000,
+			tool_call_count: 0,
+			children: [],
+		};
+		// SessionStart alone won't produce tool_call_count > 0 or file_map
+		const events: readonly StoredEvent[] = [
+			makeStoredEvent({
+				t: 1000,
+				event: "SessionStart",
+				data: {},
+			}),
+		];
+		const result = enrichNodeFromSessionEvents(baseNode, events);
+		expect(result.tool_call_count).toBe(0);
+	});
+});
+
+// -- Diff context helpers --
+
+const makeSessionStartContext = (): SessionStartContext => ({
+	project_dir: "/tmp/fake-project",
+	cwd: "/tmp/fake-project",
+	git_branch: "main",
+	git_remote: null,
+	git_commit: "abc123def",
+	git_worktree: null,
+	team_name: null,
+	task_list_dir: null,
+	claude_entrypoint: null,
+	model: null,
+	agent_type: null,
+});
+
+const makeParentSessionStartEvent = (): StoredEvent => ({
+	t: 1000,
+	event: "SessionStart",
+	sid: "root-session",
+	data: {},
+	context: makeSessionStartContext(),
+});
+
+const makeDiffContext = (): DiffContext => ({
+	projectDir: "/tmp/fake-project",
+	parentEvents: [makeParentSessionStartEvent()],
+});
+
+const makeEditTranscriptReader = (): ((path: string) => readonly TranscriptEntry[]) =>
+	(_path: string): readonly TranscriptEntry[] => [
+		{
+			uuid: "uuid-u1",
+			parentUuid: null,
+			sessionId: "agent-1",
+			type: "user",
+			timestamp: "2024-01-01T00:00:00.000Z",
+			message: { role: "user", content: "Fix the bug" },
+		},
+		{
+			uuid: "uuid-1",
+			parentUuid: null,
+			sessionId: "agent-1",
+			type: "assistant",
+			timestamp: "2024-01-01T00:00:01.000Z",
+			message: {
+				role: "assistant",
+				content: [
+					{
+						type: "tool_use",
+						id: "t1",
+						name: "Edit",
+						input: { file_path: "/src/foo.ts", old_string: "const a = 1", new_string: "const a = 2" },
+					},
+				],
+				model: "claude-sonnet-4-20250514",
+				usage: { input_tokens: 100, output_tokens: 50 },
+			},
+		},
+	];
+
+// -- enrichNodeWithTranscript + diffContext --
+
+describe("enrichNodeWithTranscript with diffContext", () => {
+	test("passes diffContext to distillAgent and produces edit_chains", () => {
+		const baseNode: AgentNode = {
+			session_id: "agent-1",
+			agent_type: "builder",
+			duration_ms: 5000,
+			tool_call_count: 0,
+			children: [],
+		};
+
+		const result = enrichNodeWithTranscript(
+			baseNode,
+			"/path/to/transcript.jsonl",
+			makeEditTranscriptReader(),
+			makeDiffContext(),
+		);
+		expect(result.transcript_path).toBe("/path/to/transcript.jsonl");
+		expect(result.edit_chains).toBeDefined();
+		expect(result.edit_chains?.chains.length).toBeGreaterThan(0);
+	});
+
+	test("edit_chains lack diff_attribution without diffContext", () => {
+		const baseNode: AgentNode = {
+			session_id: "agent-1",
+			agent_type: "builder",
+			duration_ms: 5000,
+			tool_call_count: 0,
+			children: [],
+		};
+
+		const result = enrichNodeWithTranscript(
+			baseNode,
+			"/path/to/transcript.jsonl",
+			makeEditTranscriptReader(),
+		);
+		expect(result.edit_chains).toBeDefined();
+		expect(result.edit_chains?.diff_attribution).toBeUndefined();
+	});
+});
+
+// -- buildAgentTree + diffContext --
+
+describe("buildAgentTree with diffContext", () => {
+	test("passes diffContext through to enriched nodes with edit_chains", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
+			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
+		];
+
+		const result = buildAgentTree(
+			"root-session",
+			links,
+			[],
+			makeEditTranscriptReader(),
+			undefined,
+			makeDiffContext(),
+		);
+		expect(result).toHaveLength(1);
+		expect(result[0].edit_chains).toBeDefined();
+		expect(result[0].edit_chains?.chains.length).toBeGreaterThan(0);
+	});
+
+	test("does not add diff_attribution without diffContext", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
+			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
+		];
+
+		const result = buildAgentTree(
+			"root-session",
+			links,
+			[],
+			makeEditTranscriptReader(),
+		);
+		expect(result).toHaveLength(1);
+		expect(result[0].edit_chains).toBeDefined();
+		expect(result[0].edit_chains?.diff_attribution).toBeUndefined();
 	});
 });

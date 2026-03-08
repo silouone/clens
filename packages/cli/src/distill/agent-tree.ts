@@ -1,6 +1,6 @@
 import type { AgentNode, LinkEvent, MessageLink, SpawnLink, StopLink, StoredEvent, TaskLink, TranscriptEntry } from "../types";
 import { computeEffectiveDuration, deduplicateSpawns, IDLE_THRESHOLD_MS } from "../utils";
-import { distillAgent } from "./agent-distill";
+import { type DiffContext, distillAgent } from "./agent-distill";
 import { extractFileMap } from "./file-map";
 import { extractStats } from "./stats";
 
@@ -96,9 +96,10 @@ export const enrichNodeWithTranscript = (
 	node: AgentNode,
 	transcriptPath: string,
 	readTranscriptFn: ReadTranscriptFn,
+	diffContext?: DiffContext,
 ): AgentNode => {
 	const entries = readTranscriptFn(transcriptPath);
-	const result = distillAgent(entries);
+	const result = distillAgent(entries, diffContext);
 	if (!result) {
 		// Fallback: record that enrichment was attempted
 		return { ...node, transcript_path: transcriptPath };
@@ -123,7 +124,7 @@ export const enrichNodeWithTranscript = (
  * Enrich an AgentNode from its own session events (hook JSONL file).
  * Fallback for when transcript enrichment is unavailable.
  */
-const enrichNodeFromSessionEvents = (
+export const enrichNodeFromSessionEvents = (
 	node: AgentNode,
 	agentEvents: readonly StoredEvent[],
 ): AgentNode => {
@@ -160,6 +161,7 @@ export const buildAgentTree = (
 	events: readonly { t: number; event: string; data: Record<string, unknown> }[],
 	readTranscriptFn: ReadTranscriptFn,
 	readAgentEventsFn?: ReadAgentEventsFn,
+	diffContext?: DiffContext,
 ): AgentNode[] => {
 	const spawns = deduplicateSpawns(links.filter(isSpawnLink));
 	const stops = links.filter(isStopLink);
@@ -207,7 +209,7 @@ export const buildAgentTree = (
 		// Auto-enrich when transcript path exists
 		const transcriptPath = matchingStop?.transcript_path;
 		if (transcriptPath) {
-			const enriched = enrichNodeWithTranscript(baseNode, transcriptPath, readTranscriptFn);
+			const enriched = enrichNodeWithTranscript(baseNode, transcriptPath, readTranscriptFn, diffContext);
 			// When hook-based toolCallCount is 0 but transcript enrichment produced stats, prefer transcript stats
 			const finalEnriched = enriched.tool_call_count === 0 && enriched.stats && enriched.stats.tool_call_count > 0
 				? { ...enriched, tool_call_count: enriched.stats.tool_call_count }
@@ -240,17 +242,21 @@ const isTaskLinkGuard = (link: LinkEvent): link is TaskLink => link.type === "ta
  * Infer agent nodes from communication links when no spawn links exist.
  * Extracts agent names from msg_send recipients, maps names to UUIDs via task links,
  * and computes duration from first-to-last activity timestamps.
+ *
+ * When `teamMemberSessions` is provided, agent names found in the map get their
+ * real session_id (enabling event/transcript reading for enrichment).
  */
 export const inferAgentsFromComms = (
 	sessionId: string,
 	links: readonly LinkEvent[],
+	teamMemberSessions?: ReadonlyMap<string, string>,
 ): AgentNode[] => {
 	// Collect unique agent names from msg_send where the session is the sender
 	const msgRecipients = links
 		.filter(isMessageLink)
 		.filter((msg) => msg.from === sessionId || msg.session_id === sessionId)
 		.map((msg) => msg.to);
-	const uniqueNames = [...new Set(msgRecipients)];
+	const uniqueNames = [...new Set(msgRecipients)].filter((name) => name.length > 0);
 
 	if (uniqueNames.length === 0) return [];
 
@@ -273,14 +279,17 @@ export const inferAgentsFromComms = (
 			return [];
 		});
 
+	// Resolution priority: teamMemberSessions (real session_id) > task-link UUID > agent name
+	const resolveSessionId = (agentName: string): string =>
+		teamMemberSessions?.get(agentName) ?? nameToUuid.get(agentName) ?? agentName;
+
 	return uniqueNames.map((agentName): AgentNode => {
-		const uuid = nameToUuid.get(agentName);
 		const timestamps = activityTimestamps(agentName);
 		const firstT = timestamps.length > 0 ? Math.min(...timestamps) : 0;
 		const lastT = timestamps.length > 0 ? Math.max(...timestamps) : 0;
 
 		return {
-			session_id: uuid ?? agentName,
+			session_id: resolveSessionId(agentName),
 			agent_type: "builder",
 			agent_name: agentName,
 			duration_ms: lastT - firstT,

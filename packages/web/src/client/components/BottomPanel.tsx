@@ -51,13 +51,13 @@ const formatRelTime = (t: number, start: number): string => {
 // ── Backtrack severity ───────────────────────────────────────────────
 
 const SEVERITY_STYLES: Readonly<Record<string, string>> = {
-	failure_retry: "bg-amber-900/50 text-amber-400 border-amber-700/50",
-	iteration_struggle: "bg-orange-900/50 text-orange-400 border-orange-700/50",
-	debugging_loop: "bg-red-900/50 text-red-400 border-red-700/50",
+	failure_retry: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50",
+	iteration_struggle: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/50 dark:text-orange-400 dark:border-orange-700/50",
+	debugging_loop: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-400 dark:border-red-700/50",
 };
 
 const getSeverityStyle = (type: string): string =>
-	SEVERITY_STYLES[type] ?? "bg-gray-800/50 text-gray-400 border-gray-700/50";
+	SEVERITY_STYLES[type] ?? "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-700/50";
 
 // ── Backtracks tab ───────────────────────────────────────────────────
 
@@ -70,14 +70,14 @@ const BacktracksTab: Component<{
 		when={props.backtracks.length > 0}
 		fallback={<EmptyTab message="No backtracks detected" />}
 	>
-		<div class="divide-y divide-gray-800/50">
+		<div class="divide-y divide-gray-100 dark:divide-gray-800/50">
 			<For each={props.backtracks}>
 				{(bt) => (
 					<button
 						onClick={() => props.onBacktrackClick?.(bt.start_t)}
-						class="flex w-full items-center gap-3 px-4 py-2 text-left text-xs transition hover:bg-gray-800/30"
+						class="flex w-full items-center gap-3 px-4 py-2 text-left text-xs transition hover:bg-gray-50 dark:hover:bg-gray-800/30"
 					>
-						<span class="text-[10px] text-gray-600 tabular-nums w-12">
+						<span class="text-[10px] text-gray-400 tabular-nums w-12 dark:text-gray-600">
 							{formatRelTime(bt.start_t, props.startTime)}
 						</span>
 						<span
@@ -85,13 +85,13 @@ const BacktracksTab: Component<{
 						>
 							{bt.type.replaceAll("_", " ")}
 						</span>
-						<span class="font-mono text-gray-400">{bt.tool_name}</span>
+						<span class="font-mono text-gray-500 dark:text-gray-400">{bt.tool_name}</span>
 						<Show when={bt.file_path}>
 							{(fp) => (
-								<span class="truncate font-mono text-gray-600 max-w-xs">{fp()}</span>
+								<span class="truncate font-mono text-gray-400 max-w-xs dark:text-gray-600">{fp()}</span>
 							)}
 						</Show>
-						<span class="ml-auto text-gray-600">
+						<span class="ml-auto text-gray-400 dark:text-gray-600">
 							{bt.attempts} attempt{bt.attempts !== 1 ? "s" : ""}
 						</span>
 					</button>
@@ -157,30 +157,30 @@ const TimelineTab: Component<{
 		>
 			<div class="flex flex-col h-full">
 				{/* Filters */}
-				<div class="flex flex-wrap gap-1 px-3 py-1.5 border-b border-gray-800/50">
+				<div class="flex flex-wrap gap-1 px-3 py-1.5 border-b border-gray-200 dark:border-gray-800/50">
 					<For each={[...TIMELINE_TYPES]}>
 						{(type) => (
 							<button
 								onClick={() => toggleFilter(type)}
 								class="rounded px-1.5 py-0.5 text-[9px] font-medium transition border"
 								classList={{
-									"border-gray-700 bg-gray-800/50": activeFilters().has(type),
-									"border-transparent text-gray-600 hover:text-gray-400": !activeFilters().has(type),
+									"border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800/50": activeFilters().has(type),
+									"border-transparent text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400": !activeFilters().has(type),
 								}}
 							>
 								{type.replaceAll("_", " ")}
 							</button>
 						)}
 					</For>
-					<span class="ml-auto text-[9px] text-gray-600">{filtered().length} events</span>
+					<span class="ml-auto text-[9px] text-gray-400 dark:text-gray-600">{filtered().length} events</span>
 				</div>
 
 				{/* Event list */}
 				<div class="flex-1 overflow-y-auto">
 					<For each={filtered()}>
 						{(entry) => (
-							<div class="flex items-center gap-3 px-4 py-1 text-xs border-b border-gray-800/20">
-								<span class="text-[10px] text-gray-600 tabular-nums w-12">
+							<div class="flex items-center gap-3 px-4 py-1 text-xs border-b border-gray-100 dark:border-gray-800/20">
+								<span class="text-[10px] text-gray-400 tabular-nums w-12 dark:text-gray-600">
 									{formatRelTime(entry.t, props.startTime)}
 								</span>
 								<span class={`font-medium ${TIMELINE_TYPE_COLORS[entry.type] ?? "text-gray-500"}`}>
@@ -215,23 +215,23 @@ const EditsTab: Component<{
 			when={chains().length > 0}
 			fallback={<EmptyTab message="No edit chains" />}
 		>
-			<div class="divide-y divide-gray-800/50">
+			<div class="divide-y divide-gray-100 dark:divide-gray-800/50">
 				<For each={chains()}>
 					{(chain) => (
 						<div class="px-4 py-2">
 							{/* File header */}
 							<div class="flex items-center gap-2">
-								<span class="font-mono text-xs text-gray-300 truncate flex-1">
+								<span class="font-mono text-xs text-gray-700 truncate flex-1 dark:text-gray-300">
 									{chain.file_path}
 								</span>
-								<span class="text-[10px] text-gray-600">
+								<span class="text-[10px] text-gray-400 dark:text-gray-600">
 									{chain.total_edits} edit{chain.total_edits !== 1 ? "s" : ""}
 								</span>
-								<span class="text-[10px] text-gray-600">
+								<span class="text-[10px] text-gray-400 dark:text-gray-600">
 									{chain.total_reads} read{chain.total_reads !== 1 ? "s" : ""}
 								</span>
 								<Show when={chain.has_backtrack}>
-									<span class="rounded border border-amber-700/50 bg-amber-900/30 px-1 py-0.5 text-[9px] text-amber-400">
+									<span class="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] text-amber-600 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-400">
 										backtrack
 									</span>
 								</Show>
@@ -262,7 +262,7 @@ const EditsTab: Component<{
 
 							{/* Abandoned count */}
 							<Show when={chain.abandoned_edit_ids.length > 0}>
-								<div class="mt-1 text-[9px] text-amber-500/70">
+								<div class="mt-1 text-[9px] text-amber-600/70 dark:text-amber-500/70">
 									{chain.abandoned_edit_ids.length} abandoned edit{chain.abandoned_edit_ids.length !== 1 ? "s" : ""}
 								</div>
 							</Show>
@@ -389,24 +389,24 @@ export const BottomPanel: Component<BottomPanelProps> = (props) => {
 
 	return (
 		<div
-			class="flex-shrink-0 border-t border-gray-800 bg-gray-900/50"
+			class="flex-shrink-0 border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50"
 			style={{ height: collapsed() ? "auto" : `${panelHeight()}px` }}
 		>
 			{/* Resize handle */}
 			<Show when={!collapsed()}>
 				<div
-					class="h-1 cursor-row-resize bg-gray-800 hover:bg-blue-600/30 transition-colors"
+					class="h-1 cursor-row-resize bg-gray-200 hover:bg-blue-600/30 transition-colors dark:bg-gray-800"
 					classList={{ "bg-blue-600/40": dragging() }}
 					onMouseDown={onResizeStart}
 				/>
 			</Show>
 
 			{/* Tab bar */}
-			<div class="flex items-center border-b border-gray-800/50 px-2">
+			<div class="flex items-center border-b border-gray-200 px-2 dark:border-gray-800/50">
 				{/* Toggle button */}
 				<button
 					onClick={() => setCollapsed((c) => !c)}
-					class="rounded px-1.5 py-1 text-[10px] text-gray-500 transition hover:bg-gray-800 hover:text-gray-300"
+					class="rounded px-1.5 py-1 text-[10px] text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 					title={collapsed() ? "Expand panel" : "Collapse panel"}
 				>
 					{collapsed() ? "\u25B2" : "\u25BC"}
@@ -428,7 +428,7 @@ export const BottomPanel: Component<BottomPanelProps> = (props) => {
 						>
 							{tab.label}
 							<Show when={tab.count() > 0}>
-								<span class="rounded-full bg-gray-800 px-1.5 py-0.5 text-[9px] text-gray-400">
+								<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[9px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
 									{tab.count()}
 								</span>
 							</Show>

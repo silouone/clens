@@ -1,16 +1,23 @@
 import type {
 	AgentDistillResult,
 	AgentStats,
+	EditChainsResult,
 	StoredEvent,
 	TokenUsage,
 	TranscriptContentBlock,
 	TranscriptEntry,
 } from "../types";
 import { extractBacktracks } from "./backtracks";
+import { extractDiffAttribution } from "./diff-attribution";
 import { extractEditChains } from "./edit-chains";
 import { extractFileMap } from "./file-map";
 import { extractReasoning } from "./reasoning";
 import { estimateCostFromTokens, extractStats } from "./stats";
+
+export interface DiffContext {
+	readonly projectDir: string;
+	readonly parentEvents: readonly StoredEvent[];
+}
 
 const isAssistantEntry = (entry: TranscriptEntry): boolean => entry.type === "assistant";
 
@@ -133,7 +140,7 @@ export const extractAgentModel = (entries: readonly TranscriptEntry[]): string |
 	return firstAssistant?.message?.model;
 };
 
-export const distillAgent = (entries: readonly TranscriptEntry[]): AgentDistillResult | undefined => {
+export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: DiffContext): AgentDistillResult | undefined => {
 	if (entries.length === 0) return undefined;
 
 	const events = transcriptToEvents(entries);
@@ -155,6 +162,18 @@ export const distillAgent = (entries: readonly TranscriptEntry[]): AgentDistillR
 	// Extract edit chains binding reasoning + backtracks to file edits
 	const edit_chains = extractEditChains(events, reasoning, backtracks);
 
+	// Compute diff attribution when project context is available
+	const diff_attribution = diffContext && edit_chains.chains.length > 0
+		? extractDiffAttribution(diffContext.projectDir, diffContext.parentEvents, edit_chains)
+		: undefined;
+
+	const fullEditChains: EditChainsResult | undefined = edit_chains.chains.length > 0
+		? {
+				...edit_chains,
+				...(diff_attribution && diff_attribution.length > 0 ? { diff_attribution } : {}),
+			}
+		: undefined;
+
 	const stats: AgentStats = {
 		tool_call_count: statsResult.tool_call_count,
 		failure_count: statsResult.failure_count,
@@ -172,6 +191,6 @@ export const distillAgent = (entries: readonly TranscriptEntry[]): AgentDistillR
 		...(task_prompt !== undefined ? { task_prompt } : {}),
 		...(reasoning.length > 0 ? { reasoning } : {}),
 		...(backtracks.length > 0 ? { backtracks } : {}),
-		...(edit_chains.chains.length > 0 ? { edit_chains } : {}),
+		...(fullEditChains ? { edit_chains: fullEditChains } : {}),
 	};
 };

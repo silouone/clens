@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { filterLinksForSession } from "../src/utils";
+import { buildTeamMemberSessionMap, filterLinksForSession } from "../src/utils";
 import type {
 	ConfigChangeLink,
 	LinkEvent,
@@ -418,5 +418,242 @@ describe("filterLinksForSession", () => {
 		expect(result).toContain(spawnChild);
 		expect(result).toContain(taskByName);
 		expect(result).not.toContain(foreignTaskByName);
+	});
+
+	test("includes team member session links when teammate name matches an agent in the session", () => {
+		const rootId = "session-leader";
+		const childId = "agent-builder-1";
+		const childName = "builder-alpha";
+		const teamMemberSessionId = "sess-tm-alpha";
+
+		// Leader spawns child agent
+		const spawnChild = makeSpawn({
+			t: 1000,
+			parent_session: rootId,
+			agent_id: childId,
+			agent_name: childName,
+		});
+
+		// teammate_idle link from the team member session (has same agent name)
+		const idleLink = makeTeammateIdle({
+			t: 2000,
+			teammate: childName,
+			session_id: teamMemberSessionId,
+		});
+
+		// Links from the team member's session that should now be included
+		const tmSessionEnd = makeSessionEnd({ t: 5000, session: teamMemberSessionId });
+		const tmTask = makeTask({ t: 3000, session_id: teamMemberSessionId, task_id: "t-tm" });
+		const tmMsg = makeMessage({
+			t: 3500,
+			from: teamMemberSessionId,
+			to: "leader",
+			session_id: teamMemberSessionId,
+		});
+
+		// Foreign session links that should NOT be included
+		const foreignEnd = makeSessionEnd({ t: 6000, session: "foreign-sess" });
+
+		const links: readonly LinkEvent[] = [
+			spawnChild, idleLink, tmSessionEnd, tmTask, tmMsg, foreignEnd,
+		];
+
+		const result = filterLinksForSession(rootId, links);
+		expect(result).toContain(spawnChild);
+		expect(result).toContain(idleLink);
+		expect(result).toContain(tmSessionEnd);
+		expect(result).toContain(tmTask);
+		expect(result).toContain(tmMsg);
+		expect(result).not.toContain(foreignEnd);
+	});
+
+	test("includes team member session links when parent sends msg_send to teammate", () => {
+		const rootId = "session-leader";
+		const teammateName = "builder-beta";
+		const teammateSessionId = "sess-tm-beta";
+
+		// Leader sends a message to the teammate by name
+		const msgToTeammate = makeMessage({
+			t: 1000,
+			from: rootId,
+			to: teammateName,
+			session_id: rootId,
+		});
+
+		// teammate_idle link maps teammate name to their session
+		const idleLink = makeTeammateIdle({
+			t: 1500,
+			teammate: teammateName,
+			session_id: teammateSessionId,
+		});
+
+		// Links from the teammate's session
+		const tmEnd = makeSessionEnd({ t: 5000, session: teammateSessionId });
+		const tmTaskComplete = makeTaskComplete({
+			t: 3000,
+			agent: teammateName,
+			task_id: "t-beta",
+			session_id: teammateSessionId,
+		});
+
+		const links: readonly LinkEvent[] = [
+			msgToTeammate, idleLink, tmEnd, tmTaskComplete,
+		];
+
+		const result = filterLinksForSession(rootId, links);
+		expect(result).toContain(msgToTeammate);
+		expect(result).toContain(idleLink);
+		expect(result).toContain(tmEnd);
+		expect(result).toContain(tmTaskComplete);
+	});
+
+	test("does NOT include team member sessions that do not belong to this parent session", () => {
+		const rootId = "session-a";
+		const otherRootId = "session-b";
+		const otherChildId = "agent-other-child";
+		const otherChildName = "builder-gamma";
+		const otherTeammateSessionId = "sess-tm-gamma";
+
+		// session B spawns a child
+		const spawnOtherChild = makeSpawn({
+			t: 1000,
+			parent_session: otherRootId,
+			agent_id: otherChildId,
+			agent_name: otherChildName,
+		});
+
+		// teammate_idle for session B's child
+		const otherIdleLink = makeTeammateIdle({
+			t: 2000,
+			teammate: otherChildName,
+			session_id: otherTeammateSessionId,
+		});
+
+		// Links from the other team member's session
+		const otherTmEnd = makeSessionEnd({ t: 5000, session: otherTeammateSessionId });
+
+		const links: readonly LinkEvent[] = [
+			spawnOtherChild, otherIdleLink, otherTmEnd,
+		];
+
+		const result = filterLinksForSession(rootId, links);
+		expect(result).not.toContain(spawnOtherChild);
+		expect(result).not.toContain(otherIdleLink);
+		expect(result).not.toContain(otherTmEnd);
+	});
+
+	test("team member session expansion works alongside spawn chain expansion", () => {
+		const rootId = "session-root";
+		const childId = "agent-child-1";
+		const childName = "builder-worker";
+		const grandchildId = "agent-grandchild-1";
+		const grandchildName = "builder-sub";
+		const teammateSessionId = "sess-tm-worker";
+
+		// Root spawns child, child spawns grandchild
+		const spawnChild = makeSpawn({
+			t: 1000,
+			parent_session: rootId,
+			agent_id: childId,
+			agent_name: childName,
+		});
+		const spawnGrandchild = makeSpawn({
+			t: 2000,
+			parent_session: childId,
+			agent_id: grandchildId,
+			agent_name: grandchildName,
+		});
+
+		// teammate_idle maps childName to a different session
+		const idleLink = makeTeammateIdle({
+			t: 2500,
+			teammate: childName,
+			session_id: teammateSessionId,
+		});
+
+		// Links from both the grandchild and the teammate's session
+		const gcEnd = makeSessionEnd({ t: 4000, session: grandchildId });
+		const tmEnd = makeSessionEnd({ t: 5000, session: teammateSessionId });
+		const rootEnd = makeSessionEnd({ t: 6000, session: rootId });
+
+		const links: readonly LinkEvent[] = [
+			spawnChild, spawnGrandchild, idleLink, gcEnd, tmEnd, rootEnd,
+		];
+
+		const result = filterLinksForSession(rootId, links);
+		expect(result).toContain(spawnChild);
+		expect(result).toContain(spawnGrandchild);
+		expect(result).toContain(idleLink);
+		expect(result).toContain(gcEnd);
+		expect(result).toContain(tmEnd);
+		expect(result).toContain(rootEnd);
+		expect(result.length).toBe(6);
+	});
+});
+
+describe("buildTeamMemberSessionMap", () => {
+	test("returns empty map for empty links", () => {
+		const result = buildTeamMemberSessionMap([]);
+		expect(result.size).toBe(0);
+	});
+
+	test("returns empty map when no teammate_idle links exist", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn({ parent_session: "root", agent_id: "child-1" }),
+			makeSessionEnd({ session: "root" }),
+		];
+		const result = buildTeamMemberSessionMap(links);
+		expect(result.size).toBe(0);
+	});
+
+	test("maps teammate name to session_id from teammate_idle links", () => {
+		const links: readonly LinkEvent[] = [
+			makeTeammateIdle({ teammate: "builder-alpha", session_id: "sess-alpha" }),
+			makeTeammateIdle({ teammate: "builder-beta", session_id: "sess-beta" }),
+		];
+		const result = buildTeamMemberSessionMap(links);
+		expect(result.size).toBe(2);
+		expect(result.get("builder-alpha")).toBe("sess-alpha");
+		expect(result.get("builder-beta")).toBe("sess-beta");
+	});
+
+	test("excludes entries with empty teammate name", () => {
+		const links: readonly LinkEvent[] = [
+			makeTeammateIdle({ teammate: "", session_id: "sess-empty" }),
+			makeTeammateIdle({ teammate: "builder-valid", session_id: "sess-valid" }),
+		];
+		const result = buildTeamMemberSessionMap(links);
+		expect(result.size).toBe(1);
+		expect(result.get("builder-valid")).toBe("sess-valid");
+	});
+
+	test("excludes entries with undefined session_id", () => {
+		const links: readonly LinkEvent[] = [
+			makeTeammateIdle({ teammate: "builder-no-session" }),
+			makeTeammateIdle({ teammate: "builder-valid", session_id: "sess-valid" }),
+		];
+		const result = buildTeamMemberSessionMap(links);
+		expect(result.size).toBe(1);
+		expect(result.get("builder-valid")).toBe("sess-valid");
+	});
+
+	test("excludes entries with empty session_id", () => {
+		const links: readonly LinkEvent[] = [
+			makeTeammateIdle({ teammate: "builder-empty-sid", session_id: "" }),
+			makeTeammateIdle({ teammate: "builder-ok", session_id: "sess-ok" }),
+		];
+		const result = buildTeamMemberSessionMap(links);
+		expect(result.size).toBe(1);
+		expect(result.get("builder-ok")).toBe("sess-ok");
+	});
+
+	test("later entries overwrite earlier ones for same teammate name", () => {
+		const links: readonly LinkEvent[] = [
+			makeTeammateIdle({ teammate: "builder-dup", session_id: "sess-old" }),
+			makeTeammateIdle({ teammate: "builder-dup", session_id: "sess-new" }),
+		];
+		const result = buildTeamMemberSessionMap(links);
+		expect(result.size).toBe(1);
+		expect(result.get("builder-dup")).toBe("sess-new");
 	});
 });

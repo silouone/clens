@@ -90,6 +90,7 @@ export type {
 	TranscriptUserMessage,
 } from "./transcript";
 export type {
+	AgentMessageEntry,
 	BacktrackEntry,
 	ConversationEntry,
 	PhaseBoundaryEntry,

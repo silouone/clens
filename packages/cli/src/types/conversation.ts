@@ -48,10 +48,20 @@ export interface PhaseBoundaryEntry {
 	readonly phase_index: number;
 }
 
+export interface AgentMessageEntry {
+	readonly type: "agent_message";
+	readonly t: number;
+	readonly direction: "sent" | "received";
+	readonly partner: string;
+	readonly msg_type: string;
+	readonly summary?: string;
+}
+
 export type ConversationEntry =
 	| UserPromptEntry
 	| ThinkingEntry
 	| ToolCallEntry
 	| ToolResultEntry
 	| BacktrackEntry
-	| PhaseBoundaryEntry;
+	| PhaseBoundaryEntry
+	| AgentMessageEntry;

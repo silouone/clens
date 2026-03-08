@@ -12,13 +12,14 @@ import type {
 	DiffLine,
 	EditChain,
 	EditChainsResult,
-	FileMapEntry,
 	FileMapResult,
 	FileRiskScore,
 	GitDiffResult,
 	RiskLevel,
 	WorkingTreeChange,
 } from "../../shared/types";
+import { isFilePath, pathsMatch } from "../../shared/paths";
+import { diffLinesToUnified } from "../lib/diff-utils";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -50,32 +51,10 @@ type FileEntry = {
 // ── Pure helpers ────────────────────────────────────────────────────
 
 const statusBadge: Record<string, { label: string; cls: string }> = {
-	added: { label: "A", cls: "bg-emerald-900/60 text-emerald-400 border-emerald-700/50" },
-	modified: { label: "M", cls: "bg-blue-900/60 text-blue-400 border-blue-700/50" },
-	deleted: { label: "D", cls: "bg-red-900/60 text-red-400 border-red-700/50" },
-	renamed: { label: "R", cls: "bg-purple-900/60 text-purple-400 border-purple-700/50" },
-};
-
-/**
- * Convert DiffLine[] to unified diff string for diff2html.
- * Pure client-side equivalent of @clens/cli diffLinesToUnified.
- */
-const diffLinesToUnified = (
-	filePath: string,
-	lines: readonly DiffLine[],
-): string => {
-	if (lines.length === 0) return "";
-	const header = `--- a/${filePath}\n+++ b/${filePath}`;
-	const oldCount = lines.filter((l) => l.type === "remove" || l.type === "context").length;
-	const newCount = lines.filter((l) => l.type === "add" || l.type === "context").length;
-	const hunkHeader = `@@ -1,${oldCount} +1,${newCount} @@`;
-	const body = lines
-		.map((l) => {
-			const prefix = l.type === "add" ? "+" : l.type === "remove" ? "-" : " ";
-			return `${prefix}${l.content}`;
-		})
-		.join("\n");
-	return `${header}\n${hunkHeader}\n${body}`;
+	added: { label: "A", cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-400 dark:border-emerald-700/50" },
+	modified: { label: "M", cls: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/60 dark:text-blue-400 dark:border-blue-700/50" },
+	deleted: { label: "D", cls: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/60 dark:text-red-400 dark:border-red-700/50" },
+	renamed: { label: "R", cls: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/60 dark:text-purple-400 dark:border-purple-700/50" },
 };
 
 /** Merge file_map entries, working_tree_changes, and edit_chains into a unified list. */
@@ -84,24 +63,34 @@ const mergeFileEntries = (
 	gitDiff: GitDiffResult,
 	editChains?: EditChainsResult,
 ): readonly FileEntry[] => {
-	const wtcMap = new Map<string, WorkingTreeChange>();
-	[...(gitDiff.working_tree_changes ?? []), ...(gitDiff.staged_changes ?? [])].forEach((c) => {
-		wtcMap.set(c.file_path, c);
-	});
+	const wtcMap = new Map<string, WorkingTreeChange>(
+		[...(gitDiff.working_tree_changes ?? []), ...(gitDiff.staged_changes ?? [])].map(
+			(c) => [c.file_path, c] as const,
+		),
+	);
 
-	const chainMap = new Map<string, EditChain>();
-	(editChains?.chains ?? []).forEach((c) => {
-		chainMap.set(c.file_path, c);
-	});
+	const chainMap = new Map<string, EditChain>(
+		(editChains?.chains ?? []).map((c) => [c.file_path, c] as const),
+	);
 
-	const attrMap = new Map<string, readonly DiffLine[]>();
-	(editChains?.diff_attribution ?? []).forEach((a) => {
-		attrMap.set(a.file_path, a.lines);
-	});
+	const attrMap = new Map<string, readonly DiffLine[]>(
+		(editChains?.diff_attribution ?? []).map((a) => [a.file_path, a.lines] as const),
+	);
+
+	// diff_attribution uses relative paths while file_map uses absolute — try suffix match as fallback
+	const findDiffLines = (filePath: string): readonly DiffLine[] => {
+		const exact = attrMap.get(filePath);
+		if (exact) return exact;
+		const match = [...attrMap.entries()].find(
+			([key]) => pathsMatch(filePath, key),
+		);
+		return match?.[1] ?? [];
+	};
 
 	// Build from file_map entries (primary source)
-	const seenPaths = new Set(fileMap.files.map((f) => f.file_path));
-	const fileMapEntries: readonly FileEntry[] = fileMap.files.map((f) => {
+	const validFiles = fileMap.files.filter((f) => isFilePath(f.file_path));
+	const seenPaths = new Set(validFiles.map((f) => f.file_path));
+	const fileMapEntries: readonly FileEntry[] = validFiles.map((f) => {
 		const wtc = wtcMap.get(f.file_path);
 		const chain = chainMap.get(f.file_path);
 		return {
@@ -112,13 +101,14 @@ const mergeFileEntries = (
 			reads: f.reads,
 			edits: f.edits,
 			hasAbandonedEdits: (chain?.abandoned_edit_ids.length ?? 0) > 0,
-			diffLines: attrMap.get(f.file_path) ?? [],
+			diffLines: findDiffLines(f.file_path),
 		};
 	});
 
 	// Add working tree changes not in file_map
 	const extraEntries: readonly FileEntry[] = [...wtcMap.entries()]
 		.filter(([path]) => !seenPaths.has(path))
+		.filter(([path]) => isFilePath(path))
 		.map(([path, wtc]) => ({
 			filePath: path,
 			status: wtc.status,
@@ -127,7 +117,7 @@ const mergeFileEntries = (
 			reads: 0,
 			edits: 0,
 			hasAbandonedEdits: false,
-			diffLines: attrMap.get(path) ?? [],
+			diffLines: findDiffLines(path),
 		}));
 
 	// Sort: files with diffs first, then alphabetically
@@ -149,13 +139,13 @@ const riskDotCls: Record<RiskLevel, string> = {
 	high: "bg-red-500",
 };
 
-const formatRiskTooltip = (score: FileRiskScore): string => {
-	const parts: string[] = [`Risk: ${score.risk_level}`];
-	if (score.backtrack_count > 0) parts.push(`${score.backtrack_count} backtrack(s)`);
-	if (score.abandoned_edit_count > 0) parts.push(`${score.abandoned_edit_count} abandoned edit(s)`);
-	if (score.failure_rate > 0) parts.push(`${(score.failure_rate * 100).toFixed(0)}% failure rate`);
-	return parts.join(" \u2022 ");
-};
+const formatRiskTooltip = (score: FileRiskScore): string =>
+	[
+		`Risk: ${score.risk_level}`,
+		...(score.backtrack_count > 0 ? [`${score.backtrack_count} backtrack(s)`] : []),
+		...(score.abandoned_edit_count > 0 ? [`${score.abandoned_edit_count} abandoned edit(s)`] : []),
+		...(score.failure_rate > 0 ? [`${(score.failure_rate * 100).toFixed(0)}% failure rate`] : []),
+	].join(" \u2022 ");
 
 const FileCard: Component<{
 	readonly entry: FileEntry;
@@ -176,7 +166,7 @@ const FileCard: Component<{
 
 	return (
 		<div
-			class={`rounded-lg overflow-hidden border transition-all ${props.highlighted ? "border-blue-600 ring-1 ring-blue-600/30" : "border-gray-800"}`}
+			class={`rounded-lg overflow-hidden border transition-all ${props.highlighted ? "border-blue-600 ring-1 ring-blue-600/30" : "border-gray-200 dark:border-gray-800"}`}
 			classList={{ "clens-flash": props.flashing }}
 			data-file-path={props.entry.filePath}
 		>
@@ -186,7 +176,7 @@ const FileCard: Component<{
 					props.onToggle();
 					props.onFileClick?.(props.entry.filePath);
 				}}
-				class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition hover:bg-gray-800/50"
+				class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition hover:bg-gray-100 dark:hover:bg-gray-800/50"
 			>
 				{/* Expand arrow */}
 				<span
@@ -203,7 +193,7 @@ const FileCard: Component<{
 				</span>
 
 				{/* File path */}
-				<span class="flex-1 truncate font-mono text-gray-200">
+				<span class="flex-1 truncate font-mono text-gray-800 dark:text-gray-200">
 					{props.entry.filePath}
 				</span>
 
@@ -219,7 +209,7 @@ const FileCard: Component<{
 
 				{/* Abandoned marker */}
 				<Show when={props.entry.hasAbandonedEdits}>
-					<span class="rounded border border-amber-700/50 bg-amber-900/30 px-1.5 py-0.5 text-xs text-amber-400">
+					<span class="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-600 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-400">
 						abandoned edits
 					</span>
 				</Show>
@@ -235,12 +225,14 @@ const FileCard: Component<{
 
 			{/* Diff content */}
 			<Show when={props.expanded}>
-				<div class="border-t border-gray-800">
+				<div class="border-t border-gray-200 dark:border-gray-800">
 					<Show
 						when={props.entry.diffLines.length > 0}
 						fallback={
 							<div class="px-4 py-6 text-center text-sm text-gray-500">
-								Diff not available for this file
+								{props.entry.edits > 0
+									? "Diff not captured \u2014 re-distill to generate"
+									: "Read only \u2014 no changes"}
 							</div>
 						}
 					>
@@ -257,6 +249,7 @@ const FileCard: Component<{
 const SCROLL_DELAY_MS = 100;
 
 export const DiffPanel: Component<DiffPanelProps> = (props) => {
+	// SolidJS ref binding requires `let` — the framework assigns to it via the `ref` JSX attribute
 	let containerRef: HTMLDivElement | undefined;
 
 	const [expandedFiles, setExpandedFiles] = createSignal<ReadonlySet<string>>(
@@ -267,11 +260,11 @@ export const DiffPanel: Component<DiffPanelProps> = (props) => {
 		mergeFileEntries(props.fileMap, props.gitDiff, props.editChains),
 	);
 
-	const riskMap = createMemo(() => {
-		const map = new Map<string, FileRiskScore>();
-		(props.riskScores ?? []).forEach((s) => map.set(s.file_path, s));
-		return map;
-	});
+	const riskMap = createMemo(() =>
+		new Map<string, FileRiskScore>(
+			(props.riskScores ?? []).map((s) => [s.file_path, s] as const),
+		),
+	);
 
 	const isExpanded = (path: string) => expandedFiles().has(path);
 
@@ -337,12 +330,12 @@ export const DiffPanel: Component<DiffPanelProps> = (props) => {
 	return (
 		<div ref={containerRef} class="flex h-full flex-col">
 			{/* Header */}
-			<div class="flex items-center justify-between border-b border-gray-800 px-4 py-2">
+			<div class="flex items-center justify-between border-b border-gray-200 px-4 py-2 dark:border-gray-800">
 				<div class="flex items-center gap-3">
-					<h2 class="text-sm font-semibold text-gray-300">
+					<h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
 						Files Changed
 					</h2>
-					<span class="rounded-full bg-gray-800 px-2 py-0.5 text-xs text-gray-400">
+					<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
 						{entries().length}
 					</span>
 					<Show when={totalAdditions() > 0}>
@@ -359,13 +352,13 @@ export const DiffPanel: Component<DiffPanelProps> = (props) => {
 				<div class="flex gap-2">
 					<button
 						onClick={expandAll}
-						class="rounded px-2 py-1 text-xs text-gray-400 transition hover:bg-gray-800 hover:text-gray-200"
+						class="rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
 					>
 						Expand all
 					</button>
 					<button
 						onClick={collapseAll}
-						class="rounded px-2 py-1 text-xs text-gray-400 transition hover:bg-gray-800 hover:text-gray-200"
+						class="rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
 					>
 						Collapse all
 					</button>

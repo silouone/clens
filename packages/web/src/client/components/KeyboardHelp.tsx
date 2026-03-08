@@ -8,14 +8,14 @@ export const KeyboardHelp: Component = () => (
 			onClick={() => setShowHelp(false)}
 		>
 			<div
-				class="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-2xl dark:border-gray-600 dark:bg-gray-800"
+				class="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
 				onClick={(e) => e.stopPropagation()}
 			>
 				<div class="flex items-center justify-between">
-					<h2 class="text-lg font-semibold text-gray-100">Keyboard Shortcuts</h2>
+					<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Keyboard Shortcuts</h2>
 					<button
 						onClick={() => setShowHelp(false)}
-						class="rounded p-1 text-gray-400 transition hover:bg-gray-800 hover:text-gray-200 dark:hover:bg-gray-700"
+						class="rounded p-1 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
 					>
 						Esc
 					</button>
@@ -24,10 +24,10 @@ export const KeyboardHelp: Component = () => (
 					<For each={SHORTCUTS}>
 						{(shortcut) => (
 							<div class="flex items-center justify-between py-1.5">
-								<span class="text-sm text-gray-300">{shortcut.label}</span>
+								<span class="text-sm text-gray-700 dark:text-gray-300">{shortcut.label}</span>
 								<div class="flex items-center gap-2">
 									<span class="text-xs text-gray-500">{shortcut.context}</span>
-									<kbd class="rounded border border-gray-600 bg-gray-800 px-2 py-0.5 font-mono text-xs text-gray-300 dark:border-gray-500 dark:bg-gray-700">
+									<kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
 										{shortcut.key}
 									</kbd>
 								</div>
