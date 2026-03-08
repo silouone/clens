@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+	@apply bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
+}
+
+/* diff2html overrides for dark theme */
+.dark .diff-panel-content .d2h-wrapper {
+	background: transparent;
+}
+.diff-panel-content .d2h-file-header,
+.diff-panel-content .d2h-file-list-wrapper {
+	display: none;
+}
+.diff-panel-content .d2h-code-linenumber,
+.diff-panel-content .d2h-code-line-ctn {
+	font-size: 0.75rem;
+	line-height: 1.25rem;
+}
+.diff-panel-content .d2h-code-line {
+	padding: 0 0.5rem;
+}
+
+/* ── Bidirectional link flash animation ─────────────────────────── */
+@keyframes clens-glow {
+	0% {
+		box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+		background-color: transparent;
+	}
+	15% {
+		box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.4);
+		background-color: rgba(59, 130, 246, 0.08);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+		background-color: transparent;
+	}
+}
+
+.clens-flash {
+	animation: clens-glow 1.2s ease-out;
+	border-radius: 0.5rem;
+}

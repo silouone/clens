@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["bun-types"],
+    "composite": true
+  },
+  "include": ["src/**/*"]
+}

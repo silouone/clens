@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" class="dark">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>cLens</title>
+		<script>
+			// Prevent flash: apply stored theme before render
+			(function() {
+				var t = localStorage.getItem('clens-theme');
+				if (t === 'light') document.documentElement.classList.remove('dark');
+				else if (!t && !window.matchMedia('(prefers-color-scheme: dark)').matches)
+					document.documentElement.classList.remove('dark');
+			})();
+		</script>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="./index.tsx"></script>
+	</body>
+</html>

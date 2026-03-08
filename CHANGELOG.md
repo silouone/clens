@@ -2,6 +2,111 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-08
+
+### Breaking Changes
+
+#### Monorepo Migration
+- Project restructured into Bun workspaces: `packages/cli` + `packages/web`
+- All existing source moved to `packages/cli/src/`, tests to `packages/cli/test/`
+- CLI package remains **zero runtime dependencies**
+- Web package is a new `@clens/web` workspace with its own dependency tree
+
+### Added
+
+#### `clens web` — Browser-Based Session Explorer
+- New CLI command: `clens web [--port <n>] [--no-open]`
+- Opens a full-featured browser UI at `http://127.0.0.1:3700`
+- Dynamic import of `@clens/web/server` avoids circular workspace dependency
+
+#### Hono API Server (9 endpoints)
+- `GET /api/sessions` — paginated session list with filtering and sorting
+- `GET /api/sessions/:id` — distilled session detail (404/202 for missing/undistilled)
+- `GET /api/sessions/:id/events` — raw events with LRU cache (10 sessions, ~17MB max)
+- `GET /api/sessions/:id/conversation` — merged ConversationEntry timeline (paginated)
+- `GET /api/sessions/:id/agents/:agentId/conversation` — agent-scoped conversation
+- `GET /api/sessions/:id/diff/:filePath` — unified diff via diffLinesToUnified()
+- `POST /api/sessions/:id/distill` — async distill trigger with SSE notification
+- `GET /api/events/stream` — SSE with ring buffer replay (1000 events), 30s heartbeat
+- `GET /` — SPA static assets with immutable cache headers (production mode)
+
+#### Security
+- Random 256-bit auth token per server session (query param or Bearer header)
+- Bound to `127.0.0.1` only — no network exposure
+- UUID regex validation on session IDs (path traversal protection)
+- CORS: `localhost:5173` in dev, same-origin in production
+
+#### SolidJS SPA
+- **Session list**: table with status badges, duration, cost, branch; search, filters, pagination
+- **Split-screen hero view**: ConversationPanel (left) + DiffPanel (right) with resizable SplitPane
+- **ConversationPanel**: 6 entry types (user prompts, thinking blocks, tool calls, tool results, backtracks, phase boundaries); collapsible thinking with intent badges; consecutive tool call collapse; jump-to navigation; minimap scrollbar; virtual scrolling for 500+ entries
+- **DiffPanel**: diff2html rendering, A/M/D/R badges, +N/-M line counts, expandable file cards, per-file lazy loading, abandoned edit markers
+- **Bidirectional linking**: click tool call → scroll to diff, click file → scroll to tool call (flash highlight animation)
+- **SessionHeader**: metadata bar with phase timeline visualization (click phase → scroll to boundary)
+- **Bottom panel tabs**: Backtracks (click to scroll), Timeline (13 type filters), Edits (chain visualization), Communication (multi-agent)
+
+#### Multi-Agent Views
+- Agent tree sidebar for team sessions (collapsible, color-coded by agent type)
+- Agent-scoped conversation view with stats sidebar (tools, cost, duration, files)
+- Communication timeline: swim-lane visualization of inter-agent messages
+- Solo session detection — no agent UI clutter
+
+#### Risk Scoring
+- `computeFileRiskScores()` — per-file risk based on backtracks, abandoned edits, failure rate
+- Risk badges (green/amber/red) on DiffPanel file list with tooltips
+- Risk levels: low (clean), medium (1-2 backtracks), high (3+ backtracks or >50% abandoned)
+
+#### Plan Drift View
+- Expected vs actual files side-by-side with match/missing/unexpected badges
+- Drift score percentage with color coding
+
+#### Live Updates
+- `fs.watch` on `.clens/sessions/` and `.clens/distilled/` with 100ms debounce
+- Per-file byte offset tracking for incremental JSONL reads
+- SSE ring buffer (1000 events) with `Last-Event-ID` reconnect replay
+- Polling fallback via `CLENS_POLL=1` env var
+- Session list auto-updates with connection status indicator
+
+#### Dark/Light Theme
+- System preference detection as default, toggle in header
+- Persisted in localStorage, flash-of-wrong-theme prevention
+- All components support `dark:` variants
+
+#### Keyboard Navigation
+- `j`/`k` — scroll entries / session rows
+- `Enter` — drill into session or agent
+- `Escape` — go back
+- `[`/`]` — switch panel focus
+- `?` — keyboard shortcut help overlay
+
+#### Responsive Layout
+- Below 1024px: stacked layout (conversation above diffs)
+- Above 1024px: side-by-side split (default)
+- Error boundaries on every major panel with retry fallback
+
+#### New CLI Modules
+- `ConversationEntry` discriminated union type (6 variants)
+- `buildConversation(distilled, events)` — pure function merging distilled data + raw events into sorted timeline
+- `diffLinesToUnified(filePath, lines)` — converts DiffLine[] to standard unified diff format
+- `computeFileRiskScores(distilled)` — per-file risk scoring (pure function, no I/O)
+- `FileRiskScore` and `RiskLevel` types
+
+#### Production Build
+- Vite with SolidJS plugin, Tailwind CSS purging
+- Asset fingerprinting with immutable cache headers (1 year)
+- Output: 150KB JS (47KB gzip), 31KB CSS (6KB gzip)
+
+### Changed
+- `package.json` now uses Bun workspaces (`"workspaces": ["packages/*"]`)
+- Root scripts: `build:cli`, `build:web`, `build`, `test:cli`, `test:web`, `test`, `dev:api`, `dev:web`
+- `tsconfig.json` uses project references with shared `tsconfig.base.json`
+- Hook tests updated with absolute paths for monorepo compatibility
+- 1,373 CLI tests + 72 web tests = 1,445 total (0 regressions)
+
+### Dependencies (web package only)
+- Runtime: hono, solid-js, @solidjs/router, @kobalte/core, diff2html
+- Dev: vite, vite-plugin-solid, tailwindcss, postcss, autoprefixer, vitest, @solidjs/testing-library
+
 ## [0.2.1] - 2026-02-25
 
 ### Added
