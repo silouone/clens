@@ -1,8 +1,9 @@
 import { Hono } from "hono"
-import { listSessions, enrichSessionSummaries, readDistilled, readSessionEvents } from "@clens/cli/src/session/read"
+import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
+import { readDistilled, readSessionEvents, readLinks } from "@clens/cli/src/session"
 import { buildConversation } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified } from "@clens/cli/src/utils"
-import type { SessionSummary, StoredEvent } from "@clens/cli/src/types"
+import type { SessionSummary, StoredEvent, LinkEvent, SpawnLink } from "@clens/cli"
 import { getCachedEvents, setCachedEvents } from "../cache"
 
 // ── Query param validation ─────────────────────────────────────────
@@ -11,6 +12,119 @@ const parseIntParam = (value: string | undefined, fallback: number, min: number,
 	if (!value) return fallback
 	const n = parseInt(value, 10)
 	return Number.isNaN(n) || n < min || n > max ? -1 : n
+}
+
+// ── Lightweight session listing (reads only first+last lines) ──────
+
+type ParsedEvent = {
+	readonly event: string
+	readonly t: number
+	readonly data: Record<string, unknown>
+	readonly context?: Record<string, unknown>
+}
+
+const tryParseJson = (line: string): ParsedEvent | undefined => {
+	try {
+		const parsed = JSON.parse(line)
+		return parsed && typeof parsed === "object" && "event" in parsed ? parsed : undefined
+	} catch {
+		return undefined
+	}
+}
+
+/** Read only the first and last lines of a file without loading the entire content. */
+const readFirstLastLines = (filePath: string): { first: string; last: string; lineCount: number } | undefined => {
+	const fd = openSync(filePath, "r")
+	try {
+		const stat = fstatSync(fd)
+		if (stat.size === 0) return undefined
+
+		// Read first line (up to 8KB should be enough)
+		const headBuf = Buffer.alloc(Math.min(8192, stat.size))
+		readSync(fd, headBuf, 0, headBuf.length, 0)
+		const headStr = headBuf.toString("utf-8")
+		const firstNewline = headStr.indexOf("\n")
+		if (firstNewline === -1) return { first: headStr.trim(), last: headStr.trim(), lineCount: 1 }
+		const first = headStr.slice(0, firstNewline)
+
+		// Count newlines by scanning whole file (fast — no JSON parsing)
+		const fullBuf = Buffer.alloc(stat.size)
+		readSync(fd, fullBuf, 0, stat.size, 0)
+		const fullStr = fullBuf.toString("utf-8")
+		const lines = fullStr.split("\n").filter(Boolean)
+		const lineCount = lines.length
+		const last = lines[lines.length - 1]
+
+		return { first, last, lineCount }
+	} finally {
+		closeSync(fd)
+	}
+}
+
+const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn"
+
+/**
+ * Lightweight session listing — reads only first+last lines per JSONL file.
+ * No full file parsing, no enrichment. Returns metadata sufficient for the table.
+ */
+const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] => {
+	const sessionsDir = `${projectDir}/.clens/sessions`
+	const distilledDir = `${projectDir}/.clens/distilled`
+
+	const files = (() => {
+		try {
+			return readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
+		} catch {
+			return []
+		}
+	})()
+
+	if (files.length === 0) return []
+
+	// Read links once for agent counts
+	const links = readLinks(projectDir)
+	const spawns = links.filter(isSpawnLink)
+	const spawnCountByParent = new Map<string, number>()
+	spawns.forEach((s) => {
+		spawnCountByParent.set(s.parent_session, (spawnCountByParent.get(s.parent_session) ?? 0) + 1)
+	})
+
+	return files
+		.flatMap((file): readonly SessionSummary[] => {
+			const filePath = `${sessionsDir}/${file}`
+			const sessionId = file.replace(".jsonl", "")
+
+			try {
+				const stat = statSync(filePath)
+				const result = readFirstLastLines(filePath)
+				if (!result) return []
+
+				const firstEvent = tryParseJson(result.first)
+				if (!firstEvent) return []
+
+				const lastEvent = tryParseJson(result.last) ?? firstEvent
+				const isComplete = lastEvent.event === "SessionEnd" || lastEvent.event === "Stop"
+				const distilledPath = `${distilledDir}/${sessionId}.json`
+
+				return [{
+					session_id: sessionId,
+					start_time: firstEvent.t,
+					end_time: isComplete ? lastEvent.t : undefined,
+					duration_ms: lastEvent.t - firstEvent.t,
+					event_count: result.lineCount,
+					git_branch: (firstEvent.context?.git_branch as string) || undefined,
+					source: typeof firstEvent.data.source === "string" ? firstEvent.data.source : undefined,
+					end_reason: typeof lastEvent.data.reason === "string" ? lastEvent.data.reason : undefined,
+					status: isComplete ? "complete" : "incomplete",
+					file_size_bytes: stat.size,
+					agent_count: spawnCountByParent.get(sessionId) ?? 0,
+					is_distilled: existsSync(distilledPath),
+				}]
+			} catch {
+				return []
+			}
+		})
+		.sort((a, b) => b.start_time - a.start_time)
 }
 
 type SortField = "start_time" | "-start_time" | "duration_ms" | "-duration_ms" | "event_count" | "-event_count"
@@ -67,8 +181,7 @@ const createSessionsRoute = (projectDir: string) =>
 				return c.json({ error: "Invalid status", code: "INVALID_PARAM", detail: "status must be 'complete' or 'incomplete'" }, 400)
 			}
 
-			const raw = listSessions(projectDir)
-			const enriched = enrichSessionSummaries(raw, projectDir)
+			const enriched = listSessionsLightweight(projectDir)
 
 			// Filter by status
 			const filtered = statusFilter
@@ -100,9 +213,8 @@ const createSessionsRoute = (projectDir: string) =>
 
 			const distilled = readDistilled(sessionId, projectDir)
 			if (!distilled) {
-				// Check if session exists at all
-				const sessions = listSessions(projectDir)
-				const exists = sessions.some((s) => s.session_id === sessionId)
+				// Check if session file exists
+				const exists = existsSync(`${projectDir}/.clens/sessions/${sessionId}.jsonl`)
 
 				if (!exists) {
 					return c.json({ error: "Session not found", code: "NOT_FOUND" }, 404)
@@ -162,8 +274,7 @@ const createSessionsRoute = (projectDir: string) =>
 
 			const distilled = readDistilled(sessionId, projectDir)
 			if (!distilled) {
-				const sessions = listSessions(projectDir)
-				const exists = sessions.some((s) => s.session_id === sessionId)
+				const exists = existsSync(`${projectDir}/.clens/sessions/${sessionId}.jsonl`)
 				if (!exists) {
 					return c.json({ error: "Session not found", code: "NOT_FOUND" }, 404)
 				}
