@@ -7,7 +7,7 @@ import { extractFileMap } from "../src/distill/file-map";
 import { parseNumstatOutput } from "../src/distill/git-diff";
 import { distill } from "../src/distill/index";
 import { estimateCostFromTokens, extractStats } from "../src/distill/stats";
-import type { LinkEvent, StoredEvent, TranscriptReasoning } from "../src/types";
+import type { LinkEvent, StoredEvent, TokenUsage, TranscriptReasoning } from "../src/types";
 
 const makeEvent = (
 	overrides: Partial<StoredEvent> & { event: StoredEvent["event"] },
@@ -791,6 +791,40 @@ describe("extractStats - real token usage", () => {
 		expect(stats.cost_estimate?.is_estimated).toBe(true);
 	});
 
+	test("token_usage is returned on StatsResult when usage data is present", () => {
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
+			makeEvent({
+				t: 2000,
+				event: "PostToolUse",
+				data: {
+					tool_name: "Read",
+					tool_use_id: "t1",
+					usage: { input_tokens: 1000, output_tokens: 500, cache_read_tokens: 200, cache_creation_tokens: 100 },
+				},
+			}),
+			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
+		];
+
+		const stats = extractStats(events);
+		expect(stats.token_usage).toBeDefined();
+		expect(stats.token_usage?.input_tokens).toBe(1000);
+		expect(stats.token_usage?.output_tokens).toBe(500);
+		expect(stats.token_usage?.cache_read_tokens).toBe(200);
+		expect(stats.token_usage?.cache_creation_tokens).toBe(100);
+	});
+
+	test("token_usage is undefined when no usage data", () => {
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
+			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Read", tool_use_id: "t1" } }),
+			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
+		];
+
+		const stats = extractStats(events);
+		expect(stats.token_usage).toBeUndefined();
+	});
+
 	test("reads token_usage field as alternative to usage", () => {
 		const events: StoredEvent[] = [
 			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
@@ -806,6 +840,208 @@ describe("extractStats - real token usage", () => {
 		expect(stats.cost_estimate?.estimated_input_tokens).toBe(750);
 		expect(stats.cost_estimate?.estimated_output_tokens).toBe(250);
 		expect(stats.cost_estimate?.is_estimated).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// 3-tier cost resolution: transcript tokens > hook event tokens > heuristic
+// ---------------------------------------------------------------------------
+
+describe("extractStats - 3-tier cost resolution", () => {
+	const sessionContext = {
+		project_dir: "/test",
+		cwd: "/test",
+		git_branch: null,
+		git_remote: null,
+		git_commit: null,
+		git_worktree: null,
+		team_name: null,
+		task_list_dir: null,
+		claude_entrypoint: null,
+		model: "claude-sonnet-4-20250514",
+		agent_type: null,
+	} as const;
+
+	test("Tier 1: transcriptTokenUsage takes priority over hook event tokens", () => {
+		const transcriptTokenUsage: TokenUsage = {
+			input_tokens: 5000,
+			output_tokens: 2000,
+			cache_read_tokens: 1000,
+			cache_creation_tokens: 500,
+		};
+
+		// Events with hook-level usage data (should be overridden by transcript)
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
+			makeEvent({
+				t: 2000,
+				event: "PostToolUse",
+				data: {
+					tool_name: "Read",
+					tool_use_id: "t1",
+					usage: { input_tokens: 100, output_tokens: 50, cache_read_tokens: 10 },
+				},
+			}),
+			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
+		];
+
+		const stats = extractStats(events, [], transcriptTokenUsage);
+		expect(stats.cost_estimate).toBeDefined();
+		expect(stats.cost_estimate?.is_estimated).toBe(false);
+		// Should use transcript tokens, not hook tokens
+		expect(stats.cost_estimate?.estimated_input_tokens).toBe(5000);
+		expect(stats.cost_estimate?.estimated_output_tokens).toBe(2000);
+		expect(stats.cost_estimate?.cache_read_tokens).toBe(1000);
+		expect(stats.cost_estimate?.cache_creation_tokens).toBe(500);
+		// token_usage on StatsResult should be transcript's usage (resolved)
+		expect(stats.token_usage).toEqual(transcriptTokenUsage);
+	});
+
+	test("Tier 2: hook event tokens used when no transcriptTokenUsage", () => {
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
+			makeEvent({
+				t: 2000,
+				event: "PostToolUse",
+				data: {
+					tool_name: "Read",
+					tool_use_id: "t1",
+					usage: { input_tokens: 800, output_tokens: 400, cache_read_tokens: 50, cache_creation_tokens: 25 },
+				},
+			}),
+			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
+		];
+
+		const stats = extractStats(events, []);
+		expect(stats.cost_estimate).toBeDefined();
+		expect(stats.cost_estimate?.is_estimated).toBe(false);
+		expect(stats.cost_estimate?.estimated_input_tokens).toBe(800);
+		expect(stats.cost_estimate?.estimated_output_tokens).toBe(400);
+		expect(stats.cost_estimate?.cache_read_tokens).toBe(50);
+		expect(stats.cost_estimate?.cache_creation_tokens).toBe(25);
+		// token_usage should reflect hook event tokens
+		expect(stats.token_usage?.input_tokens).toBe(800);
+		expect(stats.token_usage?.output_tokens).toBe(400);
+	});
+
+	test("Tier 3: heuristic used when no usage data at all, is_estimated: true", () => {
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
+			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Read", tool_use_id: "t1" } }),
+			makeEvent({ t: 3000, event: "PostToolUse", data: { tool_name: "Read", tool_use_id: "t1" } }),
+			makeEvent({ t: 4000, event: "SessionEnd", data: {} }),
+		];
+
+		const stats = extractStats(events, []);
+		expect(stats.cost_estimate).toBeDefined();
+		expect(stats.cost_estimate?.is_estimated).toBe(true);
+		// Heuristic: totalEvents * 500 input, toolCallCount * 200 output
+		expect(stats.cost_estimate?.estimated_input_tokens).toBe(4 * 500);
+		expect(stats.cost_estimate?.estimated_output_tokens).toBe(1 * 200);
+		// No token_usage when heuristic is used
+		expect(stats.token_usage).toBeUndefined();
+	});
+
+	test("transcriptTokenUsage with zero tokens still uses transcript tier", () => {
+		const transcriptTokenUsage: TokenUsage = {
+			input_tokens: 0,
+			output_tokens: 0,
+			cache_read_tokens: 0,
+			cache_creation_tokens: 0,
+		};
+
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
+			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Read", tool_use_id: "t1" } }),
+			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
+		];
+
+		// transcriptTokenUsage is defined (not undefined), so tier 1 applies
+		const stats = extractStats(events, [], transcriptTokenUsage);
+		expect(stats.cost_estimate).toBeDefined();
+		expect(stats.cost_estimate?.is_estimated).toBe(false);
+		expect(stats.cost_estimate?.estimated_input_tokens).toBe(0);
+		expect(stats.cost_estimate?.estimated_output_tokens).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Model prefix matching for new model variants
+// ---------------------------------------------------------------------------
+
+describe("extractStats - model prefix matching", () => {
+	const makeSessionContext = (model: string) => ({
+		project_dir: "/test",
+		cwd: "/test",
+		git_branch: null,
+		git_remote: null,
+		git_commit: null,
+		git_worktree: null,
+		team_name: null,
+		task_list_dir: null,
+		claude_entrypoint: null,
+		model,
+		agent_type: null,
+	}) as const;
+
+	test("claude-opus-4-6 matches claude-opus-4 pricing", () => {
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: makeSessionContext("claude-opus-4-6") }),
+			makeEvent({ t: 2000, event: "SessionEnd", data: {} }),
+		];
+
+		const transcriptTokenUsage: TokenUsage = {
+			input_tokens: 1_000_000,
+			output_tokens: 1_000_000,
+			cache_read_tokens: 0,
+			cache_creation_tokens: 0,
+		};
+
+		const stats = extractStats(events, [], transcriptTokenUsage);
+		expect(stats.cost_estimate).toBeDefined();
+		expect(stats.cost_estimate?.model).toBe("claude-opus-4-6");
+		// Opus pricing: $15/M input + $75/M output = $90 for 1M each
+		expect(stats.cost_estimate?.estimated_cost_usd).toBe(90);
+		expect(stats.cost_estimate?.is_estimated).toBe(false);
+	});
+
+	test("claude-sonnet-4-6 matches claude-sonnet-4 pricing", () => {
+		const events: StoredEvent[] = [
+			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: makeSessionContext("claude-sonnet-4-6") }),
+			makeEvent({ t: 2000, event: "SessionEnd", data: {} }),
+		];
+
+		const transcriptTokenUsage: TokenUsage = {
+			input_tokens: 1_000_000,
+			output_tokens: 1_000_000,
+			cache_read_tokens: 0,
+			cache_creation_tokens: 0,
+		};
+
+		const stats = extractStats(events, [], transcriptTokenUsage);
+		expect(stats.cost_estimate).toBeDefined();
+		expect(stats.cost_estimate?.model).toBe("claude-sonnet-4-6");
+		// Sonnet pricing: $3/M input + $15/M output = $18 for 1M each
+		expect(stats.cost_estimate?.estimated_cost_usd).toBe(18);
+		expect(stats.cost_estimate?.is_estimated).toBe(false);
+	});
+
+	test("estimateCostFromTokens with claude-opus-4-6 uses opus pricing", () => {
+		const result = estimateCostFromTokens("claude-opus-4-6", 1_000_000, 1_000_000);
+		expect(result).toBeDefined();
+		expect(result?.model).toBe("claude-opus-4-6");
+		// $15/M input + $75/M output = $90
+		expect(result?.estimated_cost_usd).toBe(90);
+		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("estimateCostFromTokens with claude-sonnet-4-6 uses sonnet pricing", () => {
+		const result = estimateCostFromTokens("claude-sonnet-4-6", 1_000_000, 1_000_000);
+		expect(result).toBeDefined();
+		expect(result?.model).toBe("claude-sonnet-4-6");
+		// $3/M input + $15/M output = $18
+		expect(result?.estimated_cost_usd).toBe(18);
+		expect(result?.is_estimated).toBe(false);
 	});
 });
 

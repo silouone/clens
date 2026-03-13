@@ -43,10 +43,20 @@ const clampSyspromptWidth = (width: number): number =>
 const StatRow: Component<{
 	readonly label: string;
 	readonly value: string;
+	readonly muted?: boolean;
+	readonly title?: string;
 }> = (props) => (
-	<div class="flex items-center justify-between py-1">
+	<div class="flex items-center justify-between py-1" title={props.title}>
 		<span class="text-xs text-gray-500">{props.label}</span>
-		<span class="text-xs font-medium text-gray-700 dark:text-gray-300">{props.value}</span>
+		<span
+			class="text-xs font-medium"
+			classList={{
+				"text-gray-400 dark:text-gray-500": props.muted === true,
+				"text-gray-700 dark:text-gray-300": props.muted !== true,
+			}}
+		>
+			{props.value}
+		</span>
 	</div>
 );
 
@@ -282,7 +292,7 @@ export const AgentView: Component = () => {
 											{(m) => <StatRow label="Model" value={m()} />}
 										</Show>
 										<Show when={a().cost_estimate}>
-											{(c) => <StatRow label="Cost" value={formatCost(c().estimated_cost_usd)} />}
+											{(c) => <StatRow label="Cost" value={formatCost(c().estimated_cost_usd, c().is_estimated)} muted={c().is_estimated} title={c().is_estimated ? "Estimated cost (real token data unavailable)" : undefined} />}
 										</Show>
 										<Show when={a().tasks_completed !== undefined}>
 											<StatRow label="Tasks done" value={String(a().tasks_completed)} />

@@ -961,17 +961,18 @@ describe("distillAgent with diffContext", () => {
 		expect(result?.edit_chains?.chains.length).toBeGreaterThan(0);
 	});
 
-	test("edit_chains have no diff_attribution without diffContext", () => {
+	test("diff_attribution is computed from tool events even without diffContext", () => {
 		const entries = makeEditEntries();
 
 		const result = distillAgent(entries);
 		expect(result).toBeDefined();
 		expect(result?.edit_chains).toBeDefined();
-		// Without diffContext, diff_attribution should be absent
-		expect(result?.edit_chains?.diff_attribution).toBeUndefined();
+		// Tool-sourced diff attribution works without diffContext (uses events, not git)
+		expect(result?.edit_chains?.diff_attribution).toBeDefined();
+		expect(result?.edit_chains?.diff_attribution?.length).toBeGreaterThan(0);
 	});
 
-	test("diff_attribution is empty when no real git repo exists", () => {
+	test("diff_attribution is computed from tool events without git repo", () => {
 		const entries = makeEditEntries();
 		const diffContext: DiffContext = {
 			projectDir: "/tmp/nonexistent-project-dir",
@@ -981,21 +982,23 @@ describe("distillAgent with diffContext", () => {
 		const result = distillAgent(entries, diffContext);
 		expect(result).toBeDefined();
 		expect(result?.edit_chains).toBeDefined();
-		// extractDiffAttribution calls captureUnifiedDiff which spawns git — no repo = empty result
-		// diff_attribution is omitted when empty
-		expect(result?.edit_chains?.diff_attribution).toBeUndefined();
+		// Tool-sourced diff attribution is git-independent
+		expect(result?.edit_chains?.diff_attribution).toBeDefined();
+		expect(result?.edit_chains?.diff_attribution?.length).toBeGreaterThan(0);
 	});
 
-	test("diff_attribution is absent when parentEvents lack SessionStart with git_commit", () => {
+	test("diff_attribution is computed even without SessionStart in parentEvents", () => {
 		const entries = makeEditEntries();
 		const diffContext: DiffContext = {
 			projectDir: "/tmp/fake-project",
-			parentEvents: [], // No SessionStart → getStartCommit returns undefined → early return
+			parentEvents: [], // No SessionStart — tool-sourced diffs don't need it
 		};
 
 		const result = distillAgent(entries, diffContext);
 		expect(result).toBeDefined();
 		expect(result?.edit_chains).toBeDefined();
-		expect(result?.edit_chains?.diff_attribution).toBeUndefined();
+		// Tool-sourced diff attribution works without git_commit
+		expect(result?.edit_chains?.diff_attribution).toBeDefined();
+		expect(result?.edit_chains?.diff_attribution?.length).toBeGreaterThan(0);
 	});
 });

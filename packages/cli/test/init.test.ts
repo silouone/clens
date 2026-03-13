@@ -61,7 +61,7 @@ describe("init", () => {
 		expect(existsSync(`${TEST_DIR}/.claude/settings.local.json`)).toBe(true);
 		const settings = JSON.parse(readFileSync(`${TEST_DIR}/.claude/settings.local.json`, "utf-8"));
 		expect(settings.hooks).toBeDefined();
-		expect(Object.keys(settings.hooks).length).toBe(17);
+		expect(Object.keys(settings.hooks).length).toBe(18);
 	});
 
 	test("does not modify settings.json", () => {
@@ -82,10 +82,10 @@ describe("init", () => {
 		expect(backup.permissions).toBeDefined();
 	});
 
-	test("writes hooks for all 17 event types", () => {
+	test("writes hooks for all 18 event types", () => {
 		init(TEST_DIR);
 		const settings = JSON.parse(readFileSync(`${TEST_DIR}/.claude/settings.local.json`, "utf-8"));
-		expect(Object.keys(settings.hooks).length).toBe(17);
+		expect(Object.keys(settings.hooks).length).toBe(18);
 		expect(settings.hooks.PreToolUse).toBeDefined();
 		expect(settings.hooks.PostToolUse).toBeDefined();
 		expect(settings.hooks.SessionStart).toBeDefined();

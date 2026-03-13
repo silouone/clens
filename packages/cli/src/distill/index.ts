@@ -6,18 +6,21 @@ import { readLinks, readSessionEvents } from "../session/read";
 import { readSessionName, readTranscript, resolveTranscriptPath } from "../session/transcript";
 import type {
 	AgentNode,
+	ClensConfig,
 	DistilledSession,
 	EditChainsResult,
 	LinkEvent,
+	PricingTier,
 	SpawnLink,
 	StoredEvent,
 	TokenUsage,
 	TranscriptReasoning,
 	TranscriptUserMessage,
+	WorkingTreeChange,
 } from "../types";
 import { buildNameMap, buildTeamMemberSessionMap, filterLinksForSession, isUuidLike } from "../utils";
 import { computeActiveDuration } from "./active-duration";
-import { type DiffContext, extractAgentModel, extractTokenUsage } from "./agent-distill";
+import { type DiffContext, extractAgentModel, extractTokenUsage, extractUserType } from "./agent-distill";
 import { enrichNodeWithLinks } from "./agent-enrich";
 import { buildAgentTree, enrichNodeFromSessionEvents, enrichNodeWithTranscript, inferAgentsFromComms } from "./agent-tree";
 import { aggregateTeamData } from "./aggregate";
@@ -25,7 +28,7 @@ import { extractBacktracks } from "./backtracks";
 import { buildCommGraph } from "./comm-graph";
 import { extractAgentLifetimes, extractCommSequence } from "./comm-sequence";
 import { extractDecisions, extractPhases, extractRawTimingGaps } from "./decisions";
-import { captureMissingDiffs, extractDiffAttribution } from "./diff-attribution";
+import { captureMissingDiffs, computeToolSourcedDiff, extractGitDiffAttribution } from "./diff-attribution";
 import { extractEditChains } from "./edit-chains";
 import { extractFileMap } from "./file-map";
 import { extractGitDiff, extractNetChanges } from "./git-diff";
@@ -38,6 +41,34 @@ import { extractTimeline } from "./timeline";
 import { extractUserMessages } from "./user-messages";
 
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
+
+const VALID_TIERS: readonly string[] = ["api", "max", "auto"];
+const isValidPricingTier = (value: string): value is PricingTier => VALID_TIERS.includes(value);
+
+/** Read .clens/config.json from project dir. Returns undefined if file missing or malformed. */
+const readClensConfig = (projectDir: string): ClensConfig | undefined => {
+	const configPath = `${projectDir}/.clens/config.json`;
+	if (!existsSync(configPath)) return undefined;
+	try {
+		const raw: unknown = JSON.parse(readFileSync(configPath, "utf-8"));
+		if (typeof raw !== "object" || raw === null) return undefined;
+		const obj = raw as Record<string, unknown>;
+		if (typeof obj.capture !== "boolean") return undefined;
+		const pricing = typeof obj.pricing === "string" && isValidPricingTier(obj.pricing)
+			? obj.pricing
+			: undefined;
+		return { capture: obj.capture, ...(pricing ? { pricing } : {}) };
+	} catch {
+		return undefined;
+	}
+};
+
+/** Resolve pricing tier: explicit "api"/"max" pass through; "auto" uses userType heuristic. */
+const resolvePricingTier = (configTier: PricingTier, userType?: string): "api" | "max" => {
+	if (configTier === "api" || configTier === "max") return configTier;
+	// "auto": external = subscription = max rates
+	return userType === "external" ? "max" : "api";
+};
 
 /** Collect all names and session_ids from an agent tree (recursive). */
 const collectTreeIdentifiers = (nodes: readonly AgentNode[]): readonly string[] =>
@@ -55,6 +86,7 @@ interface MergeAgentsParams {
 	readonly readAgentEvents: (agentId: string) => readonly StoredEvent[];
 	readonly readTranscriptFn: (path: string) => readonly import("../types").TranscriptEntry[];
 	readonly diffContext: DiffContext;
+	readonly tier: "api" | "max";
 }
 
 /**
@@ -70,6 +102,7 @@ const mergeSpawnAndInferredAgents = ({
 	readAgentEvents,
 	readTranscriptFn,
 	diffContext,
+	tier,
 }: MergeAgentsParams): readonly AgentNode[] | undefined => {
 	const fromTree = rawAgents?.map((node) => enrichNodeWithLinks(node, sessionLinks, nameMap));
 
@@ -88,7 +121,7 @@ const mergeSpawnAndInferredAgents = ({
 
 		const transcriptPath = resolveTranscriptPath(agentEvents);
 		if (transcriptPath) {
-			return enrichNodeWithTranscript(fromEvents, transcriptPath, readTranscriptFn, diffContext);
+			return enrichNodeWithTranscript(fromEvents, transcriptPath, readTranscriptFn, diffContext, tier);
 		}
 		return fromEvents;
 	};
@@ -127,6 +160,7 @@ const mergeSpawnAndInferredAgents = ({
 
 export interface DistillOptions {
 	readonly deep?: boolean;
+	readonly pricingTier?: PricingTier;
 }
 
 export const distill = async (
@@ -144,6 +178,7 @@ export const distill = async (
 		token_usage: TokenUsage | undefined;
 		transcript_model: string | undefined;
 		session_name: string | undefined;
+		user_type: string | undefined;
 	} = (() => {
 		const tPath = resolveTranscriptPath(events);
 		if (!tPath)
@@ -154,6 +189,7 @@ export const distill = async (
 				token_usage: undefined,
 				transcript_model: undefined,
 				session_name: undefined,
+				user_type: undefined,
 			};
 
 		const sessionName = readSessionName(tPath) ?? undefined;
@@ -166,6 +202,7 @@ export const distill = async (
 				token_usage: undefined,
 				transcript_model: undefined,
 				session_name: sessionName,
+				user_type: undefined,
 			};
 
 		const usage = extractTokenUsage(entries);
@@ -176,19 +213,24 @@ export const distill = async (
 			token_usage: usage.input_tokens > 0 ? usage : undefined,
 			transcript_model: extractAgentModel(entries),
 			session_name: sessionName,
+			user_type: extractUserType(entries),
 		};
 	})();
 
 	const { reasoning, user_messages, transcript_path, token_usage, transcript_model } =
 		transcriptData;
 
+	// Resolve pricing tier: CLI override > config file > default "api"
+	const configTier = options?.pricingTier ?? readClensConfig(projectDir)?.pricing ?? "api";
+	const resolvedTier = resolvePricingTier(configTier, transcriptData.user_type);
+
 	// Layer 0: Link reading (needed early for decisions enrichment)
 	const links = readLinks(projectDir);
 	const sessionLinks = filterLinksForSession(sessionId, links);
 	const nameMap = sessionLinks.length > 0 ? buildNameMap(sessionLinks) : undefined;
 
-	// Layer 1: Hook-based extractors (stats now receives reasoning for cost estimation)
-	const stats = extractStats(events, reasoning);
+	// Layer 1: Hook-based extractors (stats receives reasoning + transcript token usage for cost)
+	const stats = extractStats(events, reasoning, token_usage, resolvedTier);
 	const backtracks = extractBacktracks(events);
 	const decisions = extractDecisions(events, sessionLinks.length > 0 ? sessionLinks : undefined);
 	const file_map = extractFileMap(events);
@@ -216,18 +258,46 @@ export const distill = async (
 
 	// Edit chains: thinking-to-code binding
 	const edit_chains_raw = extractEditChains(events, reasoning, backtracks);
-	const net_changes = extractNetChanges(projectDir, events);
-	const diff_attribution_from_chains = extractDiffAttribution(projectDir, events, edit_chains_raw);
+
+	// PRIMARY: event-sourced diff attribution (git-independent, always accurate)
+	const tool_sourced_diffs = computeToolSourcedDiff(events, edit_chains_raw, projectDir);
+
+	// OPTIONAL ENRICHMENT: git-based unified diffs (for display, may be stale)
+	// Provides line numbers and context lines that tool-sourced diffs don't have
+	const git_diffs = (() => {
+		try {
+			return extractGitDiffAttribution(projectDir, events, edit_chains_raw);
+		} catch {
+			return [];
+		}
+	})();
 
 	// Also capture diffs for working tree / staged changes not covered by edit chains
-	const allChangedFiles = [...(git_diff.working_tree_changes ?? []), ...(git_diff.staged_changes ?? []), ...net_changes];
-	const extraDiffs = captureMissingDiffs(projectDir, events, diff_attribution_from_chains, allChangedFiles);
-	const diff_attribution = [...diff_attribution_from_chains, ...extraDiffs];
+	const git_net_changes = extractNetChanges(projectDir, events);
+	const allChangedFiles = [...(git_diff.working_tree_changes ?? []), ...(git_diff.staged_changes ?? []), ...git_net_changes];
+	const extraDiffs = captureMissingDiffs(projectDir, events, git_diffs, allChangedFiles);
+	const all_git_diffs = [...git_diffs, ...extraDiffs];
+
+	// Tool-sourced is the source of truth for stats and attribution.
+	// Git diffs are attached separately for display purposes.
+	const diff_attribution = tool_sourced_diffs;
+
+	// Net changes: compute from tool-sourced diffs instead of git
+	const net_changes: readonly WorkingTreeChange[] = tool_sourced_diffs.map((attr) => ({
+		file_path: attr.file_path,
+		status: attr.total_deletions > 0 && attr.total_additions > 0 ? "modified" as const
+			: attr.total_additions > 0 ? "added" as const
+			: "deleted" as const,
+		additions: attr.total_additions,
+		deletions: attr.total_deletions,
+	}));
 
 	const edit_chains: EditChainsResult = {
 		...edit_chains_raw,
 		...(net_changes.length > 0 ? { net_changes } : {}),
 		...(diff_attribution.length > 0 ? { diff_attribution } : {}),
+		// NEW: attach git enrichment separately if available
+		...(all_git_diffs.length > 0 ? { git_enriched_diffs: all_git_diffs } : {}),
 	};
 
 	// Layer 4: Sub-agent hierarchy (graceful -- no error if links file missing)
@@ -241,7 +311,7 @@ export const distill = async (
 	const diffContext: DiffContext = { projectDir, parentEvents: events };
 	const rawAgents =
 		sessionLinks.length > 0
-			? buildAgentTree(sessionId, sessionLinks, events, readTranscript, readAgentEvents, diffContext)
+			? buildAgentTree(sessionId, sessionLinks, events, readTranscript, readAgentEvents, diffContext, resolvedTier)
 			: undefined;
 
 	// Merge spawn-based tree with comm-inferred agents (team teammates not captured by spawn links)
@@ -253,6 +323,7 @@ export const distill = async (
 		readAgentEvents,
 		readTranscriptFn: readTranscript,
 		diffContext,
+		tier: resolvedTier,
 	});
 
 	// Build effective nameMap that includes inferred agent names for downstream extractors
@@ -293,36 +364,28 @@ export const distill = async (
 	// Model inference: stats.model → transcript model → first agent model
 	const inferredModel = stats.model ?? transcript_model ?? agents?.find((a) => a.model)?.model;
 
-	// Cost estimation: prefer real token counts from transcript over heuristic
-	const resolvedModel = inferredModel ?? stats.model;
-	const parentCostEstimate = (() => {
-		if (!resolvedModel) return stats.cost_estimate;
-		// When real token counts are available from transcript, use them
-		if (token_usage) {
-			return (
-				estimateCostFromTokens(
-					resolvedModel,
-					token_usage.input_tokens,
-					token_usage.output_tokens,
-					token_usage.cache_read_tokens,
-					token_usage.cache_creation_tokens,
-				) ?? stats.cost_estimate
-			);
-		}
-		// Otherwise fall back to heuristic (already computed in stats)
-		return stats.cost_estimate;
-	})();
-
+	// If model was inferred from transcript/agents but not from events, enrich stats
 	const finalStats =
 		inferredModel && !stats.model
-			? {
-					...stats,
-					model: inferredModel,
-					cost_estimate: parentCostEstimate,
-				}
-			: parentCostEstimate !== stats.cost_estimate
-				? { ...stats, cost_estimate: parentCostEstimate }
-				: stats;
+			? (() => {
+					// Recompute cost with inferred model if stats had no model
+					const enrichedCost = token_usage
+						? estimateCostFromTokens(
+								inferredModel,
+								token_usage.input_tokens,
+								token_usage.output_tokens,
+								token_usage.cache_read_tokens,
+								token_usage.cache_creation_tokens,
+								resolvedTier,
+							)
+						: stats.cost_estimate;
+					return {
+						...stats,
+						model: inferredModel,
+						cost_estimate: enrichedCost,
+					};
+				})()
+			: stats;
 
 	// Aggregate agent data into parent-level stats when agents are present
 	const aggregated =

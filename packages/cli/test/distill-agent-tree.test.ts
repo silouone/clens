@@ -935,7 +935,7 @@ describe("enrichNodeWithTranscript with diffContext", () => {
 		expect(result.edit_chains?.chains.length).toBeGreaterThan(0);
 	});
 
-	test("edit_chains lack diff_attribution without diffContext", () => {
+	test("diff_attribution computed from tool events even without diffContext", () => {
 		const baseNode: AgentNode = {
 			session_id: "agent-1",
 			agent_type: "builder",
@@ -950,7 +950,8 @@ describe("enrichNodeWithTranscript with diffContext", () => {
 			makeEditTranscriptReader(),
 		);
 		expect(result.edit_chains).toBeDefined();
-		expect(result.edit_chains?.diff_attribution).toBeUndefined();
+		// Tool-sourced diff attribution is git-independent
+		expect(result.edit_chains?.diff_attribution).toBeDefined();
 	});
 });
 
@@ -976,7 +977,7 @@ describe("buildAgentTree with diffContext", () => {
 		expect(result[0].edit_chains?.chains.length).toBeGreaterThan(0);
 	});
 
-	test("does not add diff_attribution without diffContext", () => {
+	test("diff_attribution computed from tool events without diffContext", () => {
 		const links: readonly LinkEvent[] = [
 			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
 			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
@@ -990,6 +991,7 @@ describe("buildAgentTree with diffContext", () => {
 		);
 		expect(result).toHaveLength(1);
 		expect(result[0].edit_chains).toBeDefined();
-		expect(result[0].edit_chains?.diff_attribution).toBeUndefined();
+		// Tool-sourced diff attribution is git-independent
+		expect(result[0].edit_chains?.diff_attribution).toBeDefined();
 	});
 });

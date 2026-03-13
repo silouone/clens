@@ -20,10 +20,11 @@ const backtrackBreakdown = (backtracks: readonly BacktrackResult[]): string => {
 		.join(", ");
 };
 
-/** Format cost line: "$0.43 (claude-sonnet-4-6)" or "~$0.43 (rough estimate)" */
+/** Format cost line: "$0.43 (claude-sonnet-4-6, api tier)" or "~$0.43 (rough estimate)" */
 const formatCost = (ce: CostEstimate): string => {
 	const prefix = ce.is_estimated ? "~" : "";
-	const suffix = ce.is_estimated ? " (rough estimate)" : ` (${ce.model})`;
+	const tierSuffix = ce.pricing_tier ? `, ${ce.pricing_tier} tier` : "";
+	const suffix = ce.is_estimated ? " (rough estimate)" : ` (${ce.model}${tierSuffix})`;
 	return `${prefix}$${ce.estimated_cost_usd.toFixed(2)}${suffix}`;
 };
 
@@ -118,9 +119,13 @@ export const distillCommand = async (args: {
 	readonly projectDir: string;
 	readonly deep: boolean;
 	readonly json: boolean;
+	readonly pricingTier?: import("../types").PricingTier;
 }): Promise<void> => {
 	const { distill } = await import("../distill/index");
-	const result = await distill(args.sessionId, args.projectDir, { deep: args.deep });
+	const result = await distill(args.sessionId, args.projectDir, {
+		deep: args.deep,
+		pricingTier: args.pricingTier,
+	});
 
 	// Save distilled result to disk
 	const distilledDir = `${args.projectDir}/.clens/distilled`;

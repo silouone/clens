@@ -19,18 +19,20 @@ type FlatAgent = {
 	readonly durationMs: number;
 	readonly filesModified: number;
 	readonly costUsd: number;
+	readonly isEstimated: boolean;
 };
 
 // ── Pure helpers ─────────────────────────────────────────────────────
 
 /** Convert an AgentNode to a flat row for the table. */
-const toFlatAgent = (agent: { readonly agent_name?: string; readonly agent_type: string; readonly tool_call_count: number; readonly duration_ms: number; readonly file_map?: { readonly files: readonly { readonly edits: number }[] }; readonly cost_estimate?: { readonly estimated_cost_usd: number } }): FlatAgent => ({
+const toFlatAgent = (agent: { readonly agent_name?: string; readonly agent_type: string; readonly tool_call_count: number; readonly duration_ms: number; readonly file_map?: { readonly files: readonly { readonly edits: number }[] }; readonly cost_estimate?: { readonly estimated_cost_usd: number; readonly is_estimated: boolean } }): FlatAgent => ({
 	name: agent.agent_name ?? agent.agent_type,
 	agentType: agent.agent_type,
 	toolCalls: agent.tool_call_count,
 	durationMs: agent.duration_ms,
 	filesModified: agent.file_map?.files.filter((f) => f.edits > 0).length ?? 0,
 	costUsd: agent.cost_estimate?.estimated_cost_usd ?? 0,
+	isEstimated: agent.cost_estimate?.is_estimated ?? true,
 });
 
 /** Sort agents by cost descending, falling back to tool call count. */
@@ -123,8 +125,14 @@ export const AgentWorkloadTable: Component<AgentWorkloadTableProps> = (props) =>
 												<span class="text-gray-400 dark:text-gray-600">--</span>
 											}
 										>
-											<span class="text-gray-700 dark:text-gray-300">
-												{formatCost(row.costUsd)}
+											<span
+												classList={{
+													"text-gray-400 dark:text-gray-500": row.isEstimated,
+													"text-gray-700 dark:text-gray-300": !row.isEstimated,
+												}}
+												title={row.isEstimated ? "Estimated" : undefined}
+											>
+												{formatCost(row.costUsd, row.isEstimated)}
 											</span>
 											<Show when={totalCost() > 0}>
 												<span class="ml-1 text-gray-400 dark:text-gray-500">

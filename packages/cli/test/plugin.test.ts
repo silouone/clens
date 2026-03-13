@@ -377,10 +377,10 @@ describe("plugin hooks", () => {
 		expect(() => JSON.parse(content)).not.toThrow();
 	});
 
-	test("hooks.json contains all 17 events", () => {
+	test("hooks.json contains all 18 events", () => {
 		const hooksFile = JSON.parse(readFileSync(HOOKS_JSON_PATH, "utf-8"));
 		expect(hooksFile.hooks).toBeDefined();
-		expect(Object.keys(hooksFile.hooks).length).toBe(17);
+		expect(Object.keys(hooksFile.hooks).length).toBe(18);
 	});
 
 	test("hooks.json events match HOOK_EVENTS constant", () => {
@@ -456,7 +456,7 @@ describe("plugin hook installation", () => {
 
 	test("installPlugin returns correct hooks_installed count", () => {
 		const result = installPlugin(TEST_INSTALL_DIR);
-		expect(result.hooks_installed).toBe(17);
+		expect(result.hooks_installed).toBe(18);
 	});
 
 	test("installPlugin copies hooks/hooks.json to install dir", () => {
@@ -464,7 +464,7 @@ describe("plugin hook installation", () => {
 		const hooksJsonPath = join(TEST_INSTALL_DIR, "hooks", "hooks.json");
 		expect(existsSync(hooksJsonPath)).toBe(true);
 		const hooksFile = JSON.parse(readFileSync(hooksJsonPath, "utf-8"));
-		expect(Object.keys(hooksFile.hooks).length).toBe(17);
+		expect(Object.keys(hooksFile.hooks).length).toBe(18);
 	});
 
 	test("installPlugin installs capture hooks in user settings", () => {

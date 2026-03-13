@@ -71,6 +71,13 @@
       {
         "hooks": [{ "type": "command", "command": "clens-hook WorktreeRemove" }]
       }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          { "type": "command", "command": "clens-hook InstructionsLoaded" }
+        ]
+      }
     ]
   }
 }

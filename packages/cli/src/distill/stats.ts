@@ -1,20 +1,40 @@
-import type { CostEstimate, StatsResult, StoredEvent, TokenUsage, TranscriptReasoning } from "../types";
+import type { CostEstimate, PricingTier, StatsResult, StoredEvent, TokenUsage, TranscriptReasoning } from "../types";
 import { computeEffectiveDuration, findLastMeaningfulEvent } from "../utils";
 
-const MODEL_PRICING = {
+const API_PRICING = {
 	"claude-opus-4": { input: 15, output: 75, cache_read: 1.5, cache_write: 18.75 },
 	"claude-sonnet-4": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
 	"claude-haiku-4": { input: 0.8, output: 4, cache_read: 0.08, cache_write: 1.0 },
 } as const;
 
-type ModelPrefix = keyof typeof MODEL_PRICING;
+/** Max subscription effective rate is ~1/3 of API pricing. */
+const SUBSCRIPTION_MULTIPLIER = 1 / 3;
 
-const MODEL_PREFIXES = Object.keys(MODEL_PRICING) as ModelPrefix[];
+type ModelPrefix = keyof typeof API_PRICING;
 
-const findModelPricing = (model: string): (typeof MODEL_PRICING)[ModelPrefix] | undefined => {
+const MODEL_PREFIXES = Object.keys(API_PRICING) as ModelPrefix[];
+
+interface ModelRates {
+	readonly input: number;
+	readonly output: number;
+	readonly cache_read: number;
+	readonly cache_write: number;
+}
+
+/** Get pricing rates for a model+tier combination. "auto" treated same as "api". */
+export const getPricing = (model: string, tier: PricingTier = "api"): ModelRates | undefined => {
 	const matchedPrefix = MODEL_PREFIXES.find((prefix) => model.startsWith(prefix));
-	return matchedPrefix ? MODEL_PRICING[matchedPrefix] : undefined;
+	if (!matchedPrefix) return undefined;
+	const base = API_PRICING[matchedPrefix];
+	const multiplier = tier === "max" ? SUBSCRIPTION_MULTIPLIER : 1;
+	return {
+		input: base.input * multiplier,
+		output: base.output * multiplier,
+		cache_read: base.cache_read * multiplier,
+		cache_write: base.cache_write * multiplier,
+	};
 };
+
 
 /** Safely extract a model string from an unknown config value (type guard, no unsafe cast). */
 const extractModelFromConfig = (cfg: unknown): string | undefined => {
@@ -56,8 +76,9 @@ export const estimateCostFromTokens = (
 	outputTokens: number,
 	cacheReadTokens?: number,
 	cacheCreationTokens?: number,
+	tier: PricingTier = "api",
 ): CostEstimate | undefined => {
-	const pricing = findModelPricing(model);
+	const pricing = getPricing(model, tier);
 	if (!pricing) return undefined;
 
 	const estimatedCostUsd =
@@ -74,6 +95,7 @@ export const estimateCostFromTokens = (
 		...(cacheReadTokens ? { cache_read_tokens: cacheReadTokens } : {}),
 		...(cacheCreationTokens ? { cache_creation_tokens: cacheCreationTokens } : {}),
 		is_estimated: false,
+		pricing_tier: tier,
 	};
 };
 
@@ -114,10 +136,11 @@ const estimateCost = (
 	totalEvents: number,
 	toolCallCount: number,
 	reasoning: readonly TranscriptReasoning[],
+	tier: PricingTier = "api",
 ): CostEstimate | undefined => {
 	if (!model) return undefined;
 
-	const pricing = findModelPricing(model);
+	const pricing = getPricing(model, tier);
 	if (!pricing) return undefined;
 
 	const reasoningCharCount = reasoning.reduce((acc, r) => acc + r.thinking.length, 0);
@@ -135,12 +158,15 @@ const estimateCost = (
 		estimated_output_tokens: estimatedOutputTokens,
 		estimated_cost_usd: Math.round(estimatedCostUsd * 10000) / 10000,
 		is_estimated: true,
+		pricing_tier: tier,
 	};
 };
 
 export const extractStats = (
 	events: readonly StoredEvent[],
 	reasoning: readonly TranscriptReasoning[] = [],
+	transcriptTokenUsage?: TokenUsage,
+	tier: PricingTier = "api",
 ): StatsResult => {
 	if (events.length === 0) {
 		return {
@@ -212,17 +238,36 @@ export const extractStats = (
 	const lastMeaningful = findLastMeaningfulEvent(events);
 	const endTime = lastMeaningful?.t ?? events[events.length - 1].t;
 
-	// Prefer real token counts from events; fall back to magic-number heuristic
-	const tokenUsage = extractTokenUsage(events);
-	const cost_estimate = tokenUsage && model
-		? estimateCostFromTokens(
+	// 3-tier cost resolution: transcript tokens > hook event tokens > heuristic
+	const hookTokenUsage = extractTokenUsage(events);
+	const resolvedTokenUsage = transcriptTokenUsage ?? hookTokenUsage;
+
+	const cost_estimate = (() => {
+		// Tier 1: Transcript token usage (most accurate)
+		if (transcriptTokenUsage && model) {
+			return estimateCostFromTokens(
 				model,
-				tokenUsage.input_tokens,
-				tokenUsage.output_tokens,
-				tokenUsage.cache_read_tokens,
-				tokenUsage.cache_creation_tokens,
-			)
-		: estimateCost(model, events.length, toolCallCount, reasoning);
+				transcriptTokenUsage.input_tokens,
+				transcriptTokenUsage.output_tokens,
+				transcriptTokenUsage.cache_read_tokens,
+				transcriptTokenUsage.cache_creation_tokens,
+				tier,
+			);
+		}
+		// Tier 2: Hook event token usage
+		if (hookTokenUsage && model) {
+			return estimateCostFromTokens(
+				model,
+				hookTokenUsage.input_tokens,
+				hookTokenUsage.output_tokens,
+				hookTokenUsage.cache_read_tokens,
+				hookTokenUsage.cache_creation_tokens,
+				tier,
+			);
+		}
+		// Tier 3: Heuristic (magic numbers)
+		return estimateCost(model, events.length, toolCallCount, reasoning, tier);
+	})();
 
 	const timestamps = events.map((e) => e.t);
 	const effectiveDuration = computeEffectiveDuration(timestamps);
@@ -238,6 +283,7 @@ export const extractStats = (
 		unique_files: Array.from(filesSet),
 		model,
 		cost_estimate,
+		...(resolvedTokenUsage ? { token_usage: resolvedTokenUsage } : {}),
 		failures_by_tool: Object.keys(failuresByTool).length > 0 ? failuresByTool : undefined,
 	};
 };

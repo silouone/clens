@@ -55,6 +55,7 @@ export {
 	type FailureEvent,
 	HOOK_EVENTS,
 	type HookEventType,
+	type InstructionsLoadedEvent,
 	type PostToolEvent,
 	type SessionStartContext,
 	type StoredEvent,
@@ -81,6 +82,7 @@ export type {
 	ClensConfig,
 	DelegatedHooks,
 	ExportManifest,
+	PricingTier,
 	SessionSummary,
 } from "./session";
 export type {

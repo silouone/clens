@@ -389,6 +389,7 @@ const makeDistilledSession = (sessionId: string): DistilledSession => {
 								estimated_input_tokens: 25000,
 								estimated_output_tokens: 8000,
 								estimated_cost_usd: 0.15,
+							is_estimated: false,
 							},
 						},
 					],
@@ -400,6 +401,7 @@ const makeDistilledSession = (sessionId: string): DistilledSession => {
 						estimated_input_tokens: 80000,
 						estimated_output_tokens: 20000,
 						estimated_cost_usd: 0.42,
+						is_estimated: false,
 					},
 				},
 			]
@@ -466,6 +468,7 @@ const makeDistilledSession = (sessionId: string): DistilledSession => {
 				estimated_input_tokens: sessionId === SESSION_1_ID ? 80000 : 20000,
 				estimated_output_tokens: sessionId === SESSION_1_ID ? 20000 : 5000,
 				estimated_cost_usd: sessionId === SESSION_1_ID ? 0.42 : 0.1,
+				is_estimated: false,
 			},
 		},
 		backtracks:
@@ -585,6 +588,7 @@ const makeDistilledSession = (sessionId: string): DistilledSession => {
 			estimated_input_tokens: sessionId === SESSION_1_ID ? 80000 : 20000,
 			estimated_output_tokens: sessionId === SESSION_1_ID ? 20000 : 5000,
 			estimated_cost_usd: sessionId === SESSION_1_ID ? 0.42 : 0.1,
+			is_estimated: false,
 		},
 		team_metrics: teamMetrics,
 		communication_graph: commGraph,

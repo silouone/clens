@@ -2,13 +2,14 @@ import type {
 	AgentDistillResult,
 	AgentStats,
 	EditChainsResult,
+	PricingTier,
 	StoredEvent,
 	TokenUsage,
 	TranscriptContentBlock,
 	TranscriptEntry,
 } from "../types";
 import { extractBacktracks } from "./backtracks";
-import { extractDiffAttribution } from "./diff-attribution";
+import { computeToolSourcedDiff } from "./diff-attribution";
 import { extractEditChains } from "./edit-chains";
 import { extractFileMap } from "./file-map";
 import { extractReasoning } from "./reasoning";
@@ -97,14 +98,25 @@ export const transcriptToEvents = (entries: readonly TranscriptEntry[]): readonl
 const safeNumber = (value: unknown): number => (typeof value === "number" ? value : 0);
 
 /**
- * Sum per-turn token usage across all assistant entries.
+ * Sum per-turn token usage across all assistant entries, deduplicating by requestId.
+ * Claude Code writes 2-4 assistant messages per API call with identical usage data
+ * (streaming chunks). Group by requestId and take the last entry per group to avoid
+ * 2-3x overcounting. Falls back to uuid when requestId is absent.
+ *
  * Claude API semantics: `input_tokens` excludes cached tokens (only new/uncached input),
  * `cache_read_input_tokens` = tokens served from prompt cache,
  * `cache_creation_input_tokens` = tokens written to cache.
  * Total billable input = input_tokens + cache_read + cache_creation.
  */
-export const extractTokenUsage = (entries: readonly TranscriptEntry[]): TokenUsage =>
-	entries.filter(isAssistantEntry).reduce<TokenUsage>(
+export const extractTokenUsage = (entries: readonly TranscriptEntry[]): TokenUsage => {
+	const assistantEntries = entries.filter(isAssistantEntry);
+
+	// Group by requestId, take last per group (streaming dedup — last write wins)
+	const byRequest = new Map<string, TranscriptEntry>(
+		assistantEntries.map((entry) => [entry.requestId ?? entry.uuid, entry] as const),
+	);
+
+	return [...byRequest.values()].reduce<TokenUsage>(
 		(acc, entry) => {
 			const usage = entry.message?.usage;
 			if (!usage) return acc;
@@ -118,6 +130,10 @@ export const extractTokenUsage = (entries: readonly TranscriptEntry[]): TokenUsa
 		},
 		{ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
 	);
+};
+
+export const extractUserType = (entries: readonly TranscriptEntry[]): string | undefined =>
+	entries.find((e) => e.userType)?.userType;
 
 export const extractTaskPrompt = (entries: readonly TranscriptEntry[]): string | undefined => {
 	const first = entries.find(
@@ -140,7 +156,7 @@ export const extractAgentModel = (entries: readonly TranscriptEntry[]): string |
 	return firstAssistant?.message?.model;
 };
 
-export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: DiffContext): AgentDistillResult | undefined => {
+export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: DiffContext, tier: PricingTier = "api"): AgentDistillResult | undefined => {
 	if (entries.length === 0) return undefined;
 
 	const events = transcriptToEvents(entries);
@@ -149,7 +165,7 @@ export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: 
 	const token_usage = extractTokenUsage(entries);
 	const model = extractAgentModel(entries);
 	const realCost = model && token_usage.input_tokens > 0
-		? estimateCostFromTokens(model, token_usage.input_tokens, token_usage.output_tokens, token_usage.cache_read_tokens, token_usage.cache_creation_tokens)
+		? estimateCostFromTokens(model, token_usage.input_tokens, token_usage.output_tokens, token_usage.cache_read_tokens, token_usage.cache_creation_tokens, tier)
 		: statsResult.cost_estimate;
 	const task_prompt = extractTaskPrompt(entries);
 
@@ -162,9 +178,9 @@ export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: 
 	// Extract edit chains binding reasoning + backtracks to file edits
 	const edit_chains = extractEditChains(events, reasoning, backtracks);
 
-	// Compute diff attribution when project context is available
-	const diff_attribution = diffContext && edit_chains.chains.length > 0
-		? extractDiffAttribution(diffContext.projectDir, diffContext.parentEvents, edit_chains)
+	// Compute diff attribution from tool events (git-independent, works for sub-agents)
+	const diff_attribution = edit_chains.chains.length > 0
+		? computeToolSourcedDiff(events, edit_chains, diffContext?.projectDir ?? "")
 		: undefined;
 
 	const fullEditChains: EditChainsResult | undefined = edit_chains.chains.length > 0

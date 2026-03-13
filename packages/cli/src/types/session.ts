@@ -29,9 +29,12 @@ export interface DelegatedHooks {
 	readonly [eventType: string]: readonly string[];
 }
 
+export type PricingTier = "api" | "max" | "auto";
+
 export interface ClensConfig {
 	readonly capture: boolean;
 	readonly events?: readonly HookEventType[];
+	readonly pricing?: PricingTier;
 }
 
 // Session summary for list command

@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { HOOK_EVENTS, type HookEventType, type LinkEvent, type StoredEvent } from "../src/types";
 
 describe("format types", () => {
-	test("HOOK_EVENTS has 17 entries", () => {
-		expect(HOOK_EVENTS.length).toBe(17);
+	test("HOOK_EVENTS has 18 entries", () => {
+		expect(HOOK_EVENTS.length).toBe(18);
 	});
 
 	test("HOOK_EVENTS contains expected event types", () => {

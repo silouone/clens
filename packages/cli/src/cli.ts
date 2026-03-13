@@ -36,6 +36,8 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		handler: async (ctx) => {
 			const { distillCommand } = await import("./commands/distill");
 
+			const pricingTier = ctx.flags.pricing as import("./types").PricingTier | undefined;
+
 			if (ctx.flags.all) {
 				const { listSessions } = await import("./session/read");
 				const sessions = listSessions(ctx.projectDir);
@@ -55,6 +57,7 @@ const commands: Readonly<Record<string, CommandDef>> = {
 								projectDir: ctx.projectDir,
 								deep: ctx.flags.deep,
 								json: false,
+								pricingTier,
 							});
 							return [...acc, session.session_id];
 						} catch (err) {
@@ -75,6 +78,7 @@ const commands: Readonly<Record<string, CommandDef>> = {
 				projectDir: ctx.projectDir,
 				deep: ctx.flags.deep,
 				json: ctx.flags.json,
+				pricingTier,
 			});
 		},
 	},
@@ -174,6 +178,18 @@ const commands: Readonly<Record<string, CommandDef>> = {
 				sessionId: resolveSessionId(ctx.positional[1], ctx.flags.last, ctx.projectDir),
 				projectDir: ctx.projectDir,
 				json: ctx.flags.json,
+				pricingTier: ctx.flags.pricing as import("./types").PricingTier | undefined,
+			});
+		},
+	},
+	config: {
+		description: "View or update clens configuration",
+		handler: async (ctx) => {
+			const { configCommand } = await import("./commands/config");
+			configCommand({
+				projectDir: ctx.projectDir,
+				pricing: ctx.flags.pricing,
+				json: ctx.flags.json,
 			});
 		},
 	},
@@ -224,13 +240,14 @@ const GLOBAL_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
 const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	init: new Set(["--remove", "--status", "--dev", "--global", "--legacy"]),
 	list: new Set(["--json"]),
-	distill: new Set(["--last", "--all", "--deep", "--json"]),
+	distill: new Set(["--last", "--all", "--deep", "--json", "--pricing"]),
 	report: new Set(["--last", "--json", "--detail", "--full", "--intent"]),
 	agents: new Set(["--last", "--json", "--comms"]),
+	config: new Set(["--pricing", "--json"]),
 	explore: new Set([]),
 	clean: new Set(["--last", "--all", "--force"]),
 	export: new Set(["--last", "--otel"]),
-	what: new Set(["--last", "--json"]),
+	what: new Set(["--last", "--json", "--pricing"]),
 	web: new Set(["--port", "--no-open"]),
 };
 
@@ -247,7 +264,7 @@ const validateFlags = (cmd: string, rawArgs: readonly string[]): string | undefi
 
 	const flagArgs = rawArgs.filter((a) => a.startsWith("--") || (a.startsWith("-") && a.length === 2));
 	// Skip values after --intent and --port (they're not flags)
-	const VALUE_FLAGS = new Set(["--intent", "--port"]);
+	const VALUE_FLAGS = new Set(["--intent", "--port", "--pricing"]);
 	const actualFlags = flagArgs.reduce<readonly string[]>((acc, arg, i) => {
 		if (i > 0 && VALUE_FLAGS.has(rawArgs[rawArgs.indexOf(arg) - 1])) return acc;
 		return [...acc, arg];
@@ -287,6 +304,7 @@ ${bold("Sessions:")}
   ${cyan("distill")}           Extract insights from session data
   ${cyan("clean")}             Remove session data
   ${cyan("export")}            Export session as archive
+  ${cyan("config")}            View or update configuration
 
 ${bold("Analysis:")}
   ${cyan("what")}              Quick summary: request, outcome, cost, issues
@@ -315,6 +333,7 @@ ${bold("Options:")}
   ${dim("--legacy")}       Include legacy hooks in --remove
   ${dim("--port <n>")}     Web dashboard port (default 3700)
   ${dim("--no-open")}      Don't open browser automatically
+  ${dim("--pricing <t>")} Pricing tier: api, max, or auto
   ${dim("--version")}      Show version
   ${dim("--help")}         Show help
 
@@ -329,12 +348,18 @@ ${bold("Examples:")}
   clens agents --last                 # Agent tree
   clens explore                       # Interactive explorer
   clens web                           # Launch web dashboard
-  clens web --port 8080 --no-open     # Custom port, no browser`);
+  clens web --port 8080 --no-open     # Custom port, no browser
+  clens config                        # View current config
+  clens config --pricing max          # Set pricing tier to max
+  clens distill --last --pricing max  # Distill with max tier pricing`);
 };
 
 // --- Main ---
 
 const args = Bun.argv.slice(2);
+
+const pricingIdx = args.indexOf("--pricing");
+const pricingValue = pricingIdx >= 0 && pricingIdx + 1 < args.length ? args[pricingIdx + 1] : undefined;
 
 const flags: Flags = {
 	last: args.includes("--last"),
@@ -353,9 +378,16 @@ const flags: Flags = {
 	comms: args.includes("--comms"),
 	global: args.includes("--global"),
 	legacy: args.includes("--legacy"),
+	...(pricingValue ? { pricing: pricingValue } : {}),
 };
 
-const positional = args.filter((a) => !a.startsWith("--") && !a.startsWith("-"));
+// Exclude values that follow value-bearing flags (--intent, --port, --pricing)
+const VALUE_FLAG_SET = new Set(["--intent", "--port", "--pricing"]);
+const positional = args.filter((a, i) => {
+	if (a.startsWith("--") || a.startsWith("-")) return false;
+	if (i > 0 && VALUE_FLAG_SET.has(args[i - 1])) return false;
+	return true;
+});
 const command = positional[0];
 
 const main = async () => {

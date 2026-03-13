@@ -14,10 +14,12 @@ export interface AgentEditEntry {
 
 /**
  * Find the git commit hash from the first SessionStart event.
+ * Falls back to InstructionsLoaded with load_reason "session_start" (sub-agents).
  */
 export const getStartCommit = (events: readonly StoredEvent[]): string | undefined =>
-	events.find((e) => e.event === "SessionStart" && e.context?.git_commit)?.context?.git_commit ??
-	undefined;
+	events.find((e) => e.event === "SessionStart" && e.context?.git_commit)?.context?.git_commit
+	?? events.find((e) => e.event === "InstructionsLoaded" && e.context?.git_commit)?.context?.git_commit
+	?? undefined;
 
 /**
  * Convert an absolute file path to a relative path by stripping the projectDir prefix.
@@ -294,8 +296,12 @@ export const attributeDiffLines = (
 /**
  * Orchestrator: extract diff attribution for all files in edit chains.
  * Combines git diff capture, unified diff parsing, and agent attribution.
+ *
+ * @deprecated Use `computeToolSourcedDiff` for git-independent attribution.
+ * This function queries git at distill-time, so diffs may be stale if the user
+ * committed or changed branches after the session.
  */
-export const extractDiffAttribution = (
+export const extractGitDiffAttribution = (
 	projectDir: string,
 	events: readonly StoredEvent[],
 	editChains: EditChainsResult,
@@ -393,4 +399,146 @@ export const captureMissingDiffs = (
 			];
 		},
 	);
+};
+
+// --- Tool-sourced diff attribution (git-independent) ---
+
+/** Multiset from string array — preserves duplicate counts. */
+export const toBag = (lines: readonly string[]): ReadonlyMap<string, number> =>
+	lines.reduce<ReadonlyMap<string, number>>((acc, line) => {
+		const next = new Map(acc);
+		next.set(line, (acc.get(line) ?? 0) + 1);
+		return next;
+	}, new Map());
+
+/** Multiset difference: lines in `a` that exceed their count in `b`. */
+export const bagDiff = (a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): readonly string[] =>
+	Array.from(a.entries()).flatMap(([line, count]) => {
+		const bCount = b.get(line) ?? 0;
+		const excess = count - bCount;
+		return excess > 0 ? Array.from({ length: excess }, () => line) : [];
+	});
+
+/**
+ * For an Edit call: compute diff lines from old_string -> new_string.
+ * Lines unique to old_string are deletions. Lines unique to new_string are additions.
+ * Lines present in both are unchanged (not emitted -- they're context).
+ */
+export const computeEditDiffLines = (
+	toolInput: Readonly<Record<string, unknown>>,
+	agentName: string,
+): readonly DiffLine[] => {
+	const oldString = typeof toolInput.old_string === "string" ? toolInput.old_string : "";
+	const newString = typeof toolInput.new_string === "string" ? toolInput.new_string : "";
+
+	if (oldString === "" && newString === "") return [];
+
+	const oldLines = oldString.split("\n");
+	const newLines = newString.split("\n");
+
+	// Build multiset (bag) counts to handle duplicate lines correctly
+	const oldBag = toBag(oldLines);
+	const newBag = toBag(newLines);
+
+	const deletions: readonly DiffLine[] = bagDiff(oldBag, newBag)
+		.filter((l) => l.trim().length > 0)
+		.map((content) => ({ type: "remove" as const, content, agent_name: agentName }));
+
+	const additions: readonly DiffLine[] = bagDiff(newBag, oldBag)
+		.filter((l) => l.trim().length > 0)
+		.map((content) => ({ type: "add" as const, content, agent_name: agentName }));
+
+	return [...deletions, ...additions];
+};
+
+/**
+ * For a Write call: all non-empty content lines are additions.
+ * We don't have the previous file content, so deletions = 0.
+ *
+ * This is correct for new files. For overwrites of existing files,
+ * it over-counts additions (shows total written lines, not delta).
+ * This is a known trade-off: accuracy for new files, over-estimate
+ * for overwrites -- but always git-independent and always attributed.
+ */
+export const computeWriteDiffLines = (
+	toolInput: Readonly<Record<string, unknown>>,
+	agentName: string,
+): readonly DiffLine[] => {
+	const content = typeof toolInput.content === "string" ? toolInput.content : "";
+	if (content === "") return [];
+
+	return content.split("\n")
+		.filter((l) => l.trim().length > 0)
+		.map((line) => ({ type: "add" as const, content: line, agent_name: agentName }));
+};
+
+/**
+ * Compute diff attribution from Edit/Write tool_input payloads.
+ * Git-independent: works regardless of user commits, works for sub-agents.
+ *
+ * For Edit: old_string -> new_string is the exact change.
+ *   - Lines in old_string but not new_string -> deletions
+ *   - Lines in new_string but not old_string -> additions
+ *   - Lines in both -> unchanged (not counted)
+ *
+ * For Write: content is the written output.
+ *   - All content lines counted as additions
+ *   - Deletions unknown without prior file state (counted as 0)
+ *
+ * Every line is attributed to the agent + tool_use_id that produced it.
+ */
+export const computeToolSourcedDiff = (
+	events: readonly StoredEvent[],
+	editChains: EditChainsResult,
+	projectDir: string,
+): readonly FileDiffAttribution[] => {
+	// Build failure set to exclude failed tool calls
+	const failureIds = new Set(
+		events
+			.filter((e) => e.event === "PostToolUseFailure")
+			.map((e) => typeof e.data.tool_use_id === "string" ? e.data.tool_use_id : undefined)
+			.filter((id): id is string => id !== undefined),
+	);
+
+	// Build lookup: tool_use_id -> PreToolUse event (for full tool_input)
+	const preToolUseMap = new Map(
+		events
+			.filter((e) => e.event === "PreToolUse")
+			.flatMap((e): readonly [string, StoredEvent][] => {
+				const id = typeof e.data.tool_use_id === "string" ? e.data.tool_use_id : undefined;
+				return id !== undefined ? [[id, e]] : [];
+			}),
+	);
+
+	return editChains.chains.flatMap((chain): readonly FileDiffAttribution[] => {
+		const relativePath = toRelativePath(chain.file_path, projectDir);
+		const agentName = chain.agent_name ?? "session";
+
+		// Process each successful Edit/Write step
+		const lines: readonly DiffLine[] = chain.steps
+			.filter((step) => step.tool_name === "Edit" || step.tool_name === "Write")
+			.filter((step) => !failureIds.has(step.tool_use_id))
+			.flatMap((step): readonly DiffLine[] => {
+				const event = preToolUseMap.get(step.tool_use_id);
+				if (event === undefined) return [];
+
+				const toolInput = event.data.tool_input as Readonly<Record<string, unknown>> | undefined;
+				if (toolInput === undefined) return [];
+
+				if (step.tool_name === "Edit") {
+					return computeEditDiffLines(toolInput, agentName);
+				}
+				// Write: content lines are additions
+				return computeWriteDiffLines(toolInput, agentName);
+			});
+
+		if (lines.length === 0) return [];
+
+		return [{
+			file_path: relativePath,
+			lines,
+			total_additions: lines.filter((l) => l.type === "add").length,
+			total_deletions: lines.filter((l) => l.type === "remove").length,
+		}];
+	});
 };

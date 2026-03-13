@@ -9,6 +9,7 @@ import type {
 	FileMapEntry,
 	FileMapResult,
 	StatsResult,
+	TokenUsage,
 	TranscriptReasoning,
 } from "../types";
 import { flattenAgents, sanitizeAgentName } from "../utils";
@@ -88,6 +89,25 @@ export const mergeStats = (
 		{ ...parentStats.tools_by_name },
 	);
 
+	// Sum token_usage from parent + agents
+	const allTokenUsages = [
+		parentStats.token_usage,
+		...agentStats.map((s) => s.token_usage),
+	].filter((u): u is TokenUsage => u !== undefined);
+
+	const mergedTokenUsage: TokenUsage | undefined =
+		allTokenUsages.length > 0
+			? allTokenUsages.reduce<TokenUsage>(
+					(acc, u) => ({
+						input_tokens: acc.input_tokens + u.input_tokens,
+						output_tokens: acc.output_tokens + u.output_tokens,
+						cache_read_tokens: acc.cache_read_tokens + u.cache_read_tokens,
+						cache_creation_tokens: acc.cache_creation_tokens + u.cache_creation_tokens,
+					}),
+					{ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_creation_tokens: 0 },
+				)
+			: undefined;
+
 	return {
 		...parentStats,
 		tool_call_count: totalToolCallCount,
@@ -95,6 +115,7 @@ export const mergeStats = (
 		failure_rate: totalToolCallCount > 0 ? totalFailureCount / totalToolCallCount : 0,
 		unique_files: Array.from(uniqueFilesSet),
 		tools_by_name: mergedToolsByName,
+		...(mergedTokenUsage ? { token_usage: mergedTokenUsage } : {}),
 	};
 };
 
@@ -194,6 +215,7 @@ export const mergeCostEstimates = (
 	const totalCostUsd = allCosts.reduce((acc, c) => acc + c.estimated_cost_usd, 0);
 	const totalCacheRead = allCosts.reduce((acc, c) => acc + (c.cache_read_tokens ?? 0), 0);
 	const totalCacheCreation = allCosts.reduce((acc, c) => acc + (c.cache_creation_tokens ?? 0), 0);
+	const isEstimated = allCosts.some((c) => c.is_estimated);
 
 	return {
 		model,
@@ -202,6 +224,7 @@ export const mergeCostEstimates = (
 		estimated_cost_usd: Math.round(totalCostUsd * 10000) / 10000,
 		...(totalCacheRead > 0 ? { cache_read_tokens: totalCacheRead } : {}),
 		...(totalCacheCreation > 0 ? { cache_creation_tokens: totalCacheCreation } : {}),
+		is_estimated: isEstimated,
 	};
 };
 

@@ -756,6 +756,7 @@ describe("formatAgentRow", () => {
 				estimated_input_tokens: 10000,
 				estimated_output_tokens: 5000,
 				estimated_cost_usd: 0.45,
+				is_estimated: false,
 			},
 		});
 		const row = formatAgentRow(agent, false, 80);

@@ -5,6 +5,8 @@ export interface TranscriptEntry {
 	readonly sessionId: string;
 	readonly type: "user" | "assistant" | "progress" | "file-history-snapshot";
 	readonly timestamp: string;
+	readonly requestId?: string;
+	readonly userType?: string;
 	readonly message?: {
 		readonly role: "user" | "assistant";
 		readonly content: string | readonly TranscriptContentBlock[];

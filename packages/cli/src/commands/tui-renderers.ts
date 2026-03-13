@@ -78,7 +78,9 @@ export const formatAgentRow = (
 		? agent.file_map.files.filter((f) => f.edits > 0 || f.writes > 0).length
 		: 0;
 	const files = String(filesCount).padEnd(8);
-	const cost = agent.cost_estimate ? `$${agent.cost_estimate.estimated_cost_usd.toFixed(2)}` : "-";
+	const cost = agent.cost_estimate
+		? `${agent.cost_estimate.is_estimated ? "~" : ""}$${agent.cost_estimate.estimated_cost_usd.toFixed(2)}`
+		: "-";
 	const row = `${truncLabel.padEnd(maxLabelLen + 2)}${dur}${tools}${files}${cost}`;
 	const trimmed = row.slice(0, width);
 	return selected ? ansi.inverse(trimmed.padEnd(width)) : trimmed;
@@ -210,7 +212,11 @@ export const formatAgentDetail = (agent: AgentNode): readonly string[] => {
 			: [];
 
 	const costSection = agent.cost_estimate
-		? [ansi.bold("Cost:"), `  Total: $${agent.cost_estimate.estimated_cost_usd.toFixed(2)}`]
+		? (() => {
+				const prefix = agent.cost_estimate.is_estimated ? "~" : "";
+				const label = agent.cost_estimate.is_estimated ? " (rough estimate)" : "";
+				return [ansi.bold(`Cost:${label}`), `  Total: ${prefix}$${agent.cost_estimate.estimated_cost_usd.toFixed(2)}`];
+			})()
 		: [];
 
 	return [

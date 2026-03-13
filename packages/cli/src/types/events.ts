@@ -1,4 +1,4 @@
-// All 17 hook event types
+// All 18 hook event types
 export const HOOK_EVENTS = [
 	"SessionStart",
 	"SessionEnd",
@@ -17,6 +17,7 @@ export const HOOK_EVENTS = [
 	"ConfigChange",
 	"WorktreeCreate",
 	"WorktreeRemove",
+	"InstructionsLoaded",
 ] as const;
 export type HookEventType = (typeof HOOK_EVENTS)[number];
 
@@ -79,4 +80,13 @@ export interface StoredEvent {
 	readonly sid: string; // session_id
 	readonly context?: SessionStartContext;
 	readonly data: Readonly<Record<string, unknown>>;
+}
+
+export interface InstructionsLoadedEvent extends BaseHookInput {
+	readonly file_path: string;
+	readonly memory_type: "User" | "Project" | "Local" | "Managed";
+	readonly load_reason: "session_start" | "nested_traversal" | "path_glob_match" | "include";
+	readonly globs?: readonly string[];
+	readonly trigger_file_path?: string;
+	readonly parent_file_path?: string;
 }

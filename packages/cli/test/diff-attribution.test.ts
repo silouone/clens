@@ -541,3 +541,483 @@ describe("buildAgentEditIndex", () => {
 		expect(entries.length).toBe(0);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Tests: computeEditDiffLines
+// ---------------------------------------------------------------------------
+
+describe("computeEditDiffLines", () => {
+	const importModule = () => import("../src/distill/diff-attribution");
+
+	test("edit with no shared lines — all old lines are deletions, all new lines are additions", async () => {
+		const { computeEditDiffLines } = await importModule();
+
+		const result = computeEditDiffLines(
+			{ old_string: "const x = 1;\nconst y = 2;", new_string: "const a = 10;\nconst b = 20;" },
+			"builder",
+		);
+
+		const deletions = result.filter((l) => l.type === "remove");
+		const additions = result.filter((l) => l.type === "add");
+		expect(deletions).toHaveLength(2);
+		expect(additions).toHaveLength(2);
+		expect(deletions.map((d) => d.content)).toContain("const x = 1;");
+		expect(deletions.map((d) => d.content)).toContain("const y = 2;");
+		expect(additions.map((a) => a.content)).toContain("const a = 10;");
+		expect(additions.map((a) => a.content)).toContain("const b = 20;");
+		expect(result.every((l) => l.agent_name === "builder")).toBe(true);
+	});
+
+	test("edit with some shared lines — only unique lines counted", async () => {
+		const { computeEditDiffLines } = await importModule();
+
+		const result = computeEditDiffLines(
+			{
+				old_string: "line1\nline2\nline3",
+				new_string: "line1\nline2_modified\nline3",
+			},
+			"editor",
+		);
+
+		const deletions = result.filter((l) => l.type === "remove");
+		const additions = result.filter((l) => l.type === "add");
+		expect(deletions).toHaveLength(1);
+		expect(deletions[0].content).toBe("line2");
+		expect(additions).toHaveLength(1);
+		expect(additions[0].content).toBe("line2_modified");
+	});
+
+	test("edit with duplicate lines — multiset correctly counts excess", async () => {
+		const { computeEditDiffLines } = await importModule();
+
+		// old_string has "}" 3 times, new_string has "}" 2 times -> 1 deletion
+		const result = computeEditDiffLines(
+			{
+				old_string: "}\n}\n}",
+				new_string: "}\n}",
+			},
+			"builder",
+		);
+
+		const deletions = result.filter((l) => l.type === "remove");
+		const additions = result.filter((l) => l.type === "add");
+		expect(deletions).toHaveLength(1);
+		expect(deletions[0].content).toBe("}");
+		expect(additions).toHaveLength(0);
+	});
+
+	test("edit with empty old_string (pure insertion) — only additions", async () => {
+		const { computeEditDiffLines } = await importModule();
+
+		const result = computeEditDiffLines(
+			{ old_string: "", new_string: "const x = 1;\nconst y = 2;" },
+			"inserter",
+		);
+
+		const deletions = result.filter((l) => l.type === "remove");
+		const additions = result.filter((l) => l.type === "add");
+		expect(deletions).toHaveLength(0);
+		expect(additions).toHaveLength(2);
+		expect(additions.every((l) => l.agent_name === "inserter")).toBe(true);
+	});
+
+	test("edit with empty new_string (pure deletion) — only deletions", async () => {
+		const { computeEditDiffLines } = await importModule();
+
+		const result = computeEditDiffLines(
+			{ old_string: "const x = 1;\nconst y = 2;", new_string: "" },
+			"remover",
+		);
+
+		const deletions = result.filter((l) => l.type === "remove");
+		const additions = result.filter((l) => l.type === "add");
+		expect(deletions).toHaveLength(2);
+		expect(additions).toHaveLength(0);
+		expect(deletions.every((l) => l.agent_name === "remover")).toBe(true);
+	});
+
+	test("edit where old_string === new_string — no diff lines", async () => {
+		const { computeEditDiffLines } = await importModule();
+
+		const result = computeEditDiffLines(
+			{ old_string: "const x = 1;\nconst y = 2;", new_string: "const x = 1;\nconst y = 2;" },
+			"noop",
+		);
+
+		expect(result).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Tests: computeWriteDiffLines
+// ---------------------------------------------------------------------------
+
+describe("computeWriteDiffLines", () => {
+	const importModule = () => import("../src/distill/diff-attribution");
+
+	test("write with content — all non-empty lines are additions", async () => {
+		const { computeWriteDiffLines } = await importModule();
+
+		const result = computeWriteDiffLines(
+			{ content: "line1\n\nline3\nline4" },
+			"writer",
+		);
+
+		// Empty lines are filtered out
+		expect(result).toHaveLength(3);
+		expect(result.every((l) => l.type === "add")).toBe(true);
+		expect(result.every((l) => l.agent_name === "writer")).toBe(true);
+		expect(result.map((l) => l.content)).toEqual(["line1", "line3", "line4"]);
+	});
+
+	test("write with empty content — no diff lines", async () => {
+		const { computeWriteDiffLines } = await importModule();
+
+		const result = computeWriteDiffLines({ content: "" }, "writer");
+		expect(result).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Tests: computeToolSourcedDiff
+// ---------------------------------------------------------------------------
+
+describe("computeToolSourcedDiff", () => {
+	const importModule = () => import("../src/distill/diff-attribution");
+
+	test("single file, one Edit — correct attribution and stats", async () => {
+		const { computeToolSourcedDiff } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makePreToolUseEvent({
+				t: 2000,
+				tool_name: "Edit",
+				tool_use_id: "tu-1",
+				tool_input: {
+					file_path: "/project/src/foo.ts",
+					old_string: "const x = 1;",
+					new_string: "const x = 2;\nconst y = 3;",
+				},
+			}),
+			makePostToolUseEvent({ t: 2500, tool_use_id: "tu-1" }),
+		];
+
+		const editChains = makeEditChainsResult({
+			chains: [
+				makeEditChain({
+					file_path: "/project/src/foo.ts",
+					agent_name: "builder",
+					steps: [makeEditStep({ tool_use_id: "tu-1", tool_name: "Edit" })],
+				}),
+			],
+		});
+
+		const result = computeToolSourcedDiff(events, editChains, "/project");
+
+		expect(result).toHaveLength(1);
+		expect(result[0].file_path).toBe("src/foo.ts");
+		expect(result[0].total_deletions).toBe(1);
+		expect(result[0].total_additions).toBe(2);
+		expect(result[0].lines.every((l) => l.agent_name === "builder")).toBe(true);
+	});
+
+	test("single file, multiple Edits — accumulated correctly", async () => {
+		const { computeToolSourcedDiff } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makePreToolUseEvent({
+				t: 2000,
+				tool_name: "Edit",
+				tool_use_id: "tu-1",
+				tool_input: { old_string: "const x = 1;", new_string: "const x = 2;" },
+			}),
+			makePostToolUseEvent({ t: 2500, tool_use_id: "tu-1" }),
+			makePreToolUseEvent({
+				t: 3000,
+				tool_name: "Edit",
+				tool_use_id: "tu-2",
+				tool_input: { old_string: "const y = 1;", new_string: "const y = 2;" },
+			}),
+			makePostToolUseEvent({ t: 3500, tool_use_id: "tu-2" }),
+		];
+
+		const editChains = makeEditChainsResult({
+			chains: [
+				makeEditChain({
+					file_path: "/project/src/foo.ts",
+					agent_name: "builder",
+					steps: [
+						makeEditStep({ tool_use_id: "tu-1", t: 2000, tool_name: "Edit" }),
+						makeEditStep({ tool_use_id: "tu-2", t: 3000, tool_name: "Edit" }),
+					],
+				}),
+			],
+		});
+
+		const result = computeToolSourcedDiff(events, editChains, "/project");
+
+		expect(result).toHaveLength(1);
+		expect(result[0].total_additions).toBe(2);
+		expect(result[0].total_deletions).toBe(2);
+	});
+
+	test("multiple files — separate FileDiffAttribution entries", async () => {
+		const { computeToolSourcedDiff } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makePreToolUseEvent({
+				t: 2000,
+				tool_name: "Edit",
+				tool_use_id: "tu-1",
+				tool_input: { old_string: "a", new_string: "b" },
+			}),
+			makePreToolUseEvent({
+				t: 3000,
+				tool_name: "Write",
+				tool_use_id: "tu-2",
+				tool_input: { content: "new file content\nline 2" },
+			}),
+		];
+
+		const editChains = makeEditChainsResult({
+			chains: [
+				makeEditChain({
+					file_path: "/project/src/foo.ts",
+					agent_name: "builder",
+					steps: [makeEditStep({ tool_use_id: "tu-1", tool_name: "Edit" })],
+				}),
+				makeEditChain({
+					file_path: "/project/src/bar.ts",
+					agent_name: "builder",
+					steps: [makeEditStep({ tool_use_id: "tu-2", tool_name: "Write" })],
+				}),
+			],
+		});
+
+		const result = computeToolSourcedDiff(events, editChains, "/project");
+
+		expect(result).toHaveLength(2);
+		const paths = result.map((r) => r.file_path);
+		expect(paths).toContain("src/foo.ts");
+		expect(paths).toContain("src/bar.ts");
+	});
+
+	test("failed tool calls excluded (PostToolUseFailure)", async () => {
+		const { computeToolSourcedDiff } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makePreToolUseEvent({
+				t: 2000,
+				tool_name: "Edit",
+				tool_use_id: "tu-fail",
+				tool_input: { old_string: "old", new_string: "new" },
+			}),
+			{
+				t: 2500,
+				event: "PostToolUseFailure",
+				sid: "test-session",
+				data: { tool_name: "Edit", tool_use_id: "tu-fail", error: "old_string not found" },
+			},
+		];
+
+		const editChains = makeEditChainsResult({
+			chains: [
+				makeEditChain({
+					file_path: "/project/src/foo.ts",
+					steps: [makeEditStep({ tool_use_id: "tu-fail", tool_name: "Edit", outcome: "failure" })],
+				}),
+			],
+		});
+
+		const result = computeToolSourcedDiff(events, editChains, "/project");
+
+		expect(result).toHaveLength(0);
+	});
+
+	test("agent name propagated from chain", async () => {
+		const { computeToolSourcedDiff } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makePreToolUseEvent({
+				t: 2000,
+				tool_name: "Edit",
+				tool_use_id: "tu-1",
+				tool_input: { old_string: "old", new_string: "new" },
+			}),
+		];
+
+		const editChains = makeEditChainsResult({
+			chains: [
+				makeEditChain({
+					file_path: "/project/src/foo.ts",
+					agent_name: "custom-agent",
+					steps: [makeEditStep({ tool_use_id: "tu-1", tool_name: "Edit" })],
+				}),
+			],
+		});
+
+		const result = computeToolSourcedDiff(events, editChains, "/project");
+
+		expect(result).toHaveLength(1);
+		expect(result[0].lines.every((l) => l.agent_name === "custom-agent")).toBe(true);
+	});
+
+	test("empty edit chains — empty result", async () => {
+		const { computeToolSourcedDiff } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makeSessionStartEvent("abc123"),
+		];
+
+		const editChains = makeEditChainsResult({ chains: [] });
+
+		const result = computeToolSourcedDiff(events, editChains, "/project");
+
+		expect(result).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Tests: toBag and bagDiff
+// ---------------------------------------------------------------------------
+
+describe("toBag", () => {
+	const importModule = () => import("../src/distill/diff-attribution");
+
+	test("counts occurrences of each line", async () => {
+		const { toBag } = await importModule();
+
+		const bag = toBag(["a", "b", "a", "c", "a"]);
+		expect(bag.get("a")).toBe(3);
+		expect(bag.get("b")).toBe(1);
+		expect(bag.get("c")).toBe(1);
+	});
+
+	test("empty input produces empty map", async () => {
+		const { toBag } = await importModule();
+
+		const bag = toBag([]);
+		expect(bag.size).toBe(0);
+	});
+});
+
+describe("bagDiff", () => {
+	const importModule = () => import("../src/distill/diff-attribution");
+
+	test("returns lines that exceed their count in the other bag", async () => {
+		const { toBag, bagDiff } = await importModule();
+
+		const a = toBag(["x", "x", "x", "y"]);
+		const b = toBag(["x", "y"]);
+
+		const diff = bagDiff(a, b);
+		expect(diff).toHaveLength(2);
+		expect(diff.every((l) => l === "x")).toBe(true);
+	});
+
+	test("returns empty when b contains all of a", async () => {
+		const { toBag, bagDiff } = await importModule();
+
+		const a = toBag(["x", "y"]);
+		const b = toBag(["x", "y", "z"]);
+
+		const diff = bagDiff(a, b);
+		expect(diff).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Tests: getStartCommit InstructionsLoaded fallback
+// ---------------------------------------------------------------------------
+
+describe("getStartCommit InstructionsLoaded fallback", () => {
+	const importModule = () => import("../src/distill/diff-attribution");
+
+	test("falls back to InstructionsLoaded when no SessionStart present", async () => {
+		const { getStartCommit } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makePreToolUseEvent({ t: 1000, tool_name: "Edit" }),
+			{
+				t: 500,
+				event: "InstructionsLoaded",
+				sid: "agent-session",
+				context: {
+					project_dir: "/project",
+					cwd: "/project",
+					git_branch: "main",
+					git_remote: null,
+					git_commit: "instructions-commit-hash",
+					git_worktree: null,
+					team_name: null,
+					task_list_dir: null,
+					claude_entrypoint: null,
+					model: null,
+					agent_type: null,
+				},
+				data: {
+					file_path: "/project/CLAUDE.md",
+					memory_type: "Project",
+					load_reason: "session_start",
+				},
+			},
+		];
+
+		const result = getStartCommit(events);
+		expect(result).toBe("instructions-commit-hash");
+	});
+
+	test("prefers SessionStart over InstructionsLoaded", async () => {
+		const { getStartCommit } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			makeSessionStartEvent("session-start-commit"),
+			{
+				t: 500,
+				event: "InstructionsLoaded",
+				sid: "agent-session",
+				context: {
+					project_dir: "/project",
+					cwd: "/project",
+					git_branch: "main",
+					git_remote: null,
+					git_commit: "instructions-commit-hash",
+					git_worktree: null,
+					team_name: null,
+					task_list_dir: null,
+					claude_entrypoint: null,
+					model: null,
+					agent_type: null,
+				},
+				data: {
+					file_path: "/project/CLAUDE.md",
+					memory_type: "Project",
+					load_reason: "session_start",
+				},
+			},
+		];
+
+		const result = getStartCommit(events);
+		expect(result).toBe("session-start-commit");
+	});
+
+	test("returns undefined when neither SessionStart nor InstructionsLoaded have git_commit", async () => {
+		const { getStartCommit } = await importModule();
+
+		const events: readonly StoredEvent[] = [
+			{
+				t: 500,
+				event: "InstructionsLoaded",
+				sid: "agent-session",
+				data: {
+					file_path: "/project/CLAUDE.md",
+					memory_type: "Project",
+					load_reason: "nested_traversal",
+				},
+			},
+		];
+
+		const result = getStartCommit(events);
+		expect(result).toBeUndefined();
+	});
+});

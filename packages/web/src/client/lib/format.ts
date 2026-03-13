@@ -8,9 +8,11 @@ export const formatDuration = (ms: number): string => {
 	return `${h}h ${m % 60}m`;
 };
 
-/** Format a USD cost value (e.g. "$1.23" or "<$0.01"). */
-export const formatCost = (usd: number): string =>
-	usd < 0.01 ? "<$0.01" : `$${usd.toFixed(2)}`;
+/** Format a USD cost value (e.g. "$1.23" or "~$1.23" for estimated). */
+export const formatCost = (usd: number, isEstimated?: boolean): string => {
+	const prefix = isEstimated ? "~" : "";
+	return usd < 0.01 ? "<$0.01" : `${prefix}$${usd.toFixed(2)}`;
+};
 
 /** Format a percentage from value/total (e.g. "59%" or "< 1%"). */
 export const formatPercentage = (value: number, total: number): string => {

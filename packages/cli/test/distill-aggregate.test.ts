@@ -18,6 +18,7 @@ import type {
 	FileMapEntry,
 	FileMapResult,
 	StatsResult,
+	TokenUsage,
 	TranscriptReasoning,
 } from "../src/types";
 
@@ -98,6 +99,7 @@ const makeCostEstimate = (
 	estimated_input_tokens: 1000,
 	estimated_output_tokens: 500,
 	estimated_cost_usd: 0.05,
+	is_estimated: false,
 	...overrides,
 });
 
@@ -315,6 +317,90 @@ describe("mergeStats", () => {
 
 		const result = mergeStats(parentStats, []);
 		expect(result.failure_rate).toBe(0);
+	});
+
+	test("sums token_usage from parent + agents", () => {
+		const parentStats = makeStatsResult({
+			tool_call_count: 5,
+			token_usage: {
+				input_tokens: 1000,
+				output_tokens: 500,
+				cache_read_tokens: 100,
+				cache_creation_tokens: 50,
+			},
+		});
+
+		const agent1: AgentStats = makeAgentStats({
+			tool_call_count: 3,
+			token_usage: {
+				input_tokens: 2000,
+				output_tokens: 800,
+				cache_read_tokens: 200,
+				cache_creation_tokens: 75,
+			},
+		});
+
+		const agent2: AgentStats = makeAgentStats({
+			tool_call_count: 2,
+			token_usage: {
+				input_tokens: 500,
+				output_tokens: 200,
+				cache_read_tokens: 50,
+				cache_creation_tokens: 25,
+			},
+		});
+
+		const result = mergeStats(parentStats, [agent1, agent2]);
+		expect(result.token_usage).toBeDefined();
+		expect(result.token_usage?.input_tokens).toBe(3500);
+		expect(result.token_usage?.output_tokens).toBe(1500);
+		expect(result.token_usage?.cache_read_tokens).toBe(350);
+		expect(result.token_usage?.cache_creation_tokens).toBe(150);
+	});
+
+	test("returns parent token_usage when agents have none", () => {
+		const parentStats = makeStatsResult({
+			token_usage: {
+				input_tokens: 1000,
+				output_tokens: 500,
+				cache_read_tokens: 100,
+				cache_creation_tokens: 50,
+			},
+		});
+
+		const agent: AgentStats = makeAgentStats({ tool_call_count: 2 });
+
+		const result = mergeStats(parentStats, [agent]);
+		expect(result.token_usage).toBeDefined();
+		expect(result.token_usage?.input_tokens).toBe(1000);
+		expect(result.token_usage?.output_tokens).toBe(500);
+	});
+
+	test("returns agent token_usage when parent has none", () => {
+		const parentStats = makeStatsResult({ tool_call_count: 1 });
+
+		const agent: AgentStats = makeAgentStats({
+			tool_call_count: 3,
+			token_usage: {
+				input_tokens: 2000,
+				output_tokens: 800,
+				cache_read_tokens: 0,
+				cache_creation_tokens: 0,
+			},
+		});
+
+		const result = mergeStats(parentStats, [agent]);
+		expect(result.token_usage).toBeDefined();
+		expect(result.token_usage?.input_tokens).toBe(2000);
+		expect(result.token_usage?.output_tokens).toBe(800);
+	});
+
+	test("token_usage is undefined when neither parent nor agents have it", () => {
+		const parentStats = makeStatsResult({ tool_call_count: 5 });
+		const agent: AgentStats = makeAgentStats({ tool_call_count: 3 });
+
+		const result = mergeStats(parentStats, [agent]);
+		expect(result.token_usage).toBeUndefined();
 	});
 });
 
@@ -719,6 +805,61 @@ describe("mergeCostEstimates", () => {
 		expect(result).toBeDefined();
 		// 0.00001 + 0.00002 = 0.00003, rounded to 4 decimals = 0
 		expect(result?.estimated_cost_usd).toBe(0);
+	});
+
+	test("all real costs → merged is_estimated: false", () => {
+		const parent = makeCostEstimate({ is_estimated: false, estimated_cost_usd: 0.5 });
+		const agent1 = makeCostEstimate({ is_estimated: false, estimated_cost_usd: 0.3 });
+		const agent2 = makeCostEstimate({ is_estimated: false, estimated_cost_usd: 0.2 });
+
+		const result = mergeCostEstimates(parent, [agent1, agent2]);
+		expect(result).toBeDefined();
+		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("one estimated + rest real → merged is_estimated: true", () => {
+		const parent = makeCostEstimate({ is_estimated: false, estimated_cost_usd: 0.5 });
+		const agentReal = makeCostEstimate({ is_estimated: false, estimated_cost_usd: 0.3 });
+		const agentEstimated = makeCostEstimate({ is_estimated: true, estimated_cost_usd: 0.2 });
+
+		const result = mergeCostEstimates(parent, [agentReal, agentEstimated]);
+		expect(result).toBeDefined();
+		expect(result?.is_estimated).toBe(true);
+	});
+
+	test("all estimated → merged is_estimated: true", () => {
+		const parent = makeCostEstimate({ is_estimated: true, estimated_cost_usd: 0.5 });
+		const agent1 = makeCostEstimate({ is_estimated: true, estimated_cost_usd: 0.3 });
+		const agent2 = makeCostEstimate({ is_estimated: true, estimated_cost_usd: 0.2 });
+
+		const result = mergeCostEstimates(parent, [agent1, agent2]);
+		expect(result).toBeDefined();
+		expect(result?.is_estimated).toBe(true);
+	});
+
+	test("parent estimated, agents real → merged is_estimated: true", () => {
+		const parent = makeCostEstimate({ is_estimated: true, estimated_cost_usd: 0.5 });
+		const agent = makeCostEstimate({ is_estimated: false, estimated_cost_usd: 0.3 });
+
+		const result = mergeCostEstimates(parent, [agent]);
+		expect(result).toBeDefined();
+		expect(result?.is_estimated).toBe(true);
+	});
+
+	test("cache tokens are summed across estimates", () => {
+		const parent = makeCostEstimate({
+			cache_read_tokens: 100,
+			cache_creation_tokens: 50,
+		});
+		const agent = makeCostEstimate({
+			cache_read_tokens: 200,
+			cache_creation_tokens: 75,
+		});
+
+		const result = mergeCostEstimates(parent, [agent]);
+		expect(result).toBeDefined();
+		expect(result?.cache_read_tokens).toBe(300);
+		expect(result?.cache_creation_tokens).toBe(125);
 	});
 });
 

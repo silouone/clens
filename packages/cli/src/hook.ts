@@ -21,8 +21,11 @@ try {
 	const sessionsDir = `${projectDir}/.clens/sessions`;
 	mkdirSync(sessionsDir, { recursive: true });
 
-	// Build stored event (with optional context enrichment on SessionStart)
-	const context = event === "SessionStart"
+	// Build stored event (with optional context enrichment on SessionStart or InstructionsLoaded with session_start)
+	const shouldEnrichContext = event === "SessionStart"
+		|| (event === "InstructionsLoaded" && input.load_reason === "session_start");
+
+	const context = shouldEnrichContext
 		? await (async () => {
 			try {
 				const { enrichSessionStart } = await import("./capture/context");

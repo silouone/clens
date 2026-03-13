@@ -253,8 +253,15 @@ export const TeamDashboard: Component = () => {
 									<div class="px-4 py-3 space-y-2">
 										<div class="flex items-center justify-between text-xs">
 											<span class="text-gray-500 dark:text-gray-400">Total cost</span>
-											<span class="font-medium text-gray-700 dark:text-gray-300">
-												{formatCost(s().cost_estimate?.estimated_cost_usd ?? totalCost())}
+											<span
+												class="font-medium tabular-nums"
+												classList={{
+													"text-gray-400 dark:text-gray-500": s().cost_estimate?.is_estimated === true,
+													"text-gray-700 dark:text-gray-300": s().cost_estimate?.is_estimated !== true,
+												}}
+												title={s().cost_estimate?.is_estimated ? "Estimated" : undefined}
+											>
+												{formatCost(s().cost_estimate?.estimated_cost_usd ?? totalCost(), s().cost_estimate?.is_estimated)}
 											</span>
 										</div>
 										<Show when={allAgents().length > 0}>
@@ -266,8 +273,15 @@ export const TeamDashboard: Component = () => {
 															<span class="truncate text-gray-600 dark:text-gray-400">
 																{agent.agent_name || agent.agent_type}
 															</span>
-															<span class="text-gray-700 tabular-nums dark:text-gray-300">
-																{formatCost(agent.cost_estimate?.estimated_cost_usd ?? 0)}
+															<span
+																class="tabular-nums"
+																classList={{
+																	"text-gray-400 dark:text-gray-500": agent.cost_estimate?.is_estimated === true,
+																	"text-gray-700 dark:text-gray-300": agent.cost_estimate?.is_estimated !== true,
+																}}
+																title={agent.cost_estimate?.is_estimated ? "Estimated" : undefined}
+															>
+																{formatCost(agent.cost_estimate?.estimated_cost_usd ?? 0, agent.cost_estimate?.is_estimated)}
 															</span>
 														</div>
 													)}

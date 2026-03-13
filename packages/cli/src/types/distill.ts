@@ -12,6 +12,7 @@ export interface StatsResult {
 	readonly unique_files: readonly string[];
 	readonly model?: string;
 	readonly cost_estimate?: CostEstimate;
+	readonly token_usage?: TokenUsage;
 	readonly failures_by_tool?: Readonly<Record<string, number>>;
 }
 
@@ -198,7 +199,8 @@ export interface CostEstimate {
 	readonly estimated_cost_usd: number;
 	readonly cache_read_tokens?: number;
 	readonly cache_creation_tokens?: number;
-	readonly is_estimated?: boolean;
+	readonly is_estimated: boolean;
+	readonly pricing_tier?: string;
 }
 
 export interface TokenUsage {
@@ -329,6 +331,8 @@ export interface EditChainsResult {
 	readonly chains: readonly EditChain[];
 	readonly net_changes?: readonly WorkingTreeChange[];
 	readonly diff_attribution?: readonly FileDiffAttribution[];
+	/** Git-based unified diffs with line numbers/context. May be stale if repo changed since session. */
+	readonly git_enriched_diffs?: readonly FileDiffAttribution[];
 }
 
 // --- Journey Types ---

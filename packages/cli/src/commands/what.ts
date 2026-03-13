@@ -26,7 +26,8 @@ const getCostSection = (distilled: DistilledSession): string => {
 	if (!cost) return "(no cost data)";
 	const prefix = cost.is_estimated ? "~" : "";
 	const model = cost.model;
-	return `${prefix}$${cost.estimated_cost_usd.toFixed(2)} (${model})`;
+	const tierSuffix = cost.pricing_tier ? `, ${cost.pricing_tier} tier` : "";
+	return `${prefix}$${cost.estimated_cost_usd.toFixed(2)} (${model}${tierSuffix})`;
 };
 
 const getIssuesSection = (distilled: DistilledSession): readonly string[] => {
@@ -100,7 +101,7 @@ const buildWhatJson = (distilled: DistilledSession): WhatJson => {
 		cost: cost
 			? {
 					estimated_cost_usd: cost.estimated_cost_usd,
-					is_estimated: cost.is_estimated ?? false,
+					is_estimated: cost.is_estimated,
 					model: cost.model,
 				}
 			: null,
@@ -144,10 +145,18 @@ export const whatCommand = async (args: {
 	readonly sessionId: string;
 	readonly projectDir: string;
 	readonly json: boolean;
+	readonly pricingTier?: import("../types").PricingTier;
 }): Promise<void> => {
 	const { readDistilled } = await import("../session/read");
 
-	const distilled = readDistilled(args.sessionId, args.projectDir);
+	// If --pricing is passed, re-distill to recalculate costs at the requested tier
+	const distilled = args.pricingTier
+		? await (async () => {
+				const { distill } = await import("../distill/index");
+				return distill(args.sessionId, args.projectDir, { pricingTier: args.pricingTier });
+			})()
+		: readDistilled(args.sessionId, args.projectDir);
+
 	if (!distilled) {
 		throw new Error(
 			`No distilled data for session ${args.sessionId.slice(0, 8)}. Run: clens distill ${args.sessionId.slice(0, 8)}`,

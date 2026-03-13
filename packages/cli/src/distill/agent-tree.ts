@@ -1,4 +1,4 @@
-import type { AgentNode, LinkEvent, MessageLink, SpawnLink, StopLink, StoredEvent, TaskLink, TranscriptEntry } from "../types";
+import type { AgentNode, LinkEvent, MessageLink, PricingTier, SpawnLink, StopLink, StoredEvent, TaskLink, TranscriptEntry } from "../types";
 import { computeEffectiveDuration, deduplicateSpawns, IDLE_THRESHOLD_MS } from "../utils";
 import { type DiffContext, distillAgent } from "./agent-distill";
 import { extractFileMap } from "./file-map";
@@ -97,9 +97,10 @@ export const enrichNodeWithTranscript = (
 	transcriptPath: string,
 	readTranscriptFn: ReadTranscriptFn,
 	diffContext?: DiffContext,
+	tier: PricingTier = "api",
 ): AgentNode => {
 	const entries = readTranscriptFn(transcriptPath);
-	const result = distillAgent(entries, diffContext);
+	const result = distillAgent(entries, diffContext, tier);
 	if (!result) {
 		// Fallback: record that enrichment was attempted
 		return { ...node, transcript_path: transcriptPath };
@@ -162,6 +163,7 @@ export const buildAgentTree = (
 	readTranscriptFn: ReadTranscriptFn,
 	readAgentEventsFn?: ReadAgentEventsFn,
 	diffContext?: DiffContext,
+	tier: PricingTier = "api",
 ): AgentNode[] => {
 	const spawns = deduplicateSpawns(links.filter(isSpawnLink));
 	const stops = links.filter(isStopLink);
@@ -209,7 +211,7 @@ export const buildAgentTree = (
 		// Auto-enrich when transcript path exists
 		const transcriptPath = matchingStop?.transcript_path;
 		if (transcriptPath) {
-			const enriched = enrichNodeWithTranscript(baseNode, transcriptPath, readTranscriptFn, diffContext);
+			const enriched = enrichNodeWithTranscript(baseNode, transcriptPath, readTranscriptFn, diffContext, tier);
 			// When hook-based toolCallCount is 0 but transcript enrichment produced stats, prefer transcript stats
 			const finalEnriched = enriched.tool_call_count === 0 && enriched.stats && enriched.stats.tool_call_count > 0
 				? { ...enriched, tool_call_count: enriched.stats.tool_call_count }

@@ -102,8 +102,14 @@ const AgentRow: Component<{
 					})()}
 					<Show when={props.agent.cost_estimate}>
 						{(cost) => (
-							<span class="text-gray-500 dark:text-gray-500">
-								{formatCost(cost().estimated_cost_usd)}
+							<span
+								classList={{
+									"text-gray-400 dark:text-gray-600": cost().is_estimated,
+									"text-gray-500 dark:text-gray-500": !cost().is_estimated,
+								}}
+								title={cost().is_estimated ? "Estimated" : undefined}
+							>
+								{formatCost(cost().estimated_cost_usd, cost().is_estimated)}
 							</span>
 						)}
 					</Show>

@@ -9,10 +9,20 @@ import { formatDuration, formatCost } from "../lib/format";
 const StatPill: Component<{
 	readonly label: string;
 	readonly value: string;
+	readonly muted?: boolean;
+	readonly title?: string;
 }> = (props) => (
-	<div class="flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs dark:bg-gray-800/60">
+	<div class="flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs dark:bg-gray-800/60" title={props.title}>
 		<span class="text-gray-500">{props.label}</span>
-		<span class="font-medium text-gray-700 dark:text-gray-300">{props.value}</span>
+		<span
+			class="font-medium"
+			classList={{
+				"text-gray-400 dark:text-gray-500": props.muted === true,
+				"text-gray-700 dark:text-gray-300": props.muted !== true,
+			}}
+		>
+			{props.value}
+		</span>
 	</div>
 );
 
@@ -33,6 +43,7 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 	const duration = () => session().stats.duration_ms;
 	const model = () => session().stats.model ?? "unknown";
 	const cost = () => session().cost_estimate?.estimated_cost_usd;
+	const costIsEstimated = () => session().cost_estimate?.is_estimated;
 	const [distilling, setDistilling] = createSignal(false);
 
 	return (
@@ -47,7 +58,12 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 					<StatPill label="Duration" value={formatDuration(duration())} />
 					<StatPill label="Model" value={model()} />
 					<Show when={cost() !== undefined}>
-						<StatPill label="Cost" value={formatCost(cost() ?? 0)} />
+						<StatPill
+							label="Cost"
+							value={formatCost(cost() ?? 0, costIsEstimated())}
+							muted={costIsEstimated()}
+							title={costIsEstimated() ? "Estimated cost (real token data unavailable)" : undefined}
+						/>
 					</Show>
 					<StatPill
 						label="Tools"
