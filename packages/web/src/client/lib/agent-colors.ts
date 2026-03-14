@@ -1,4 +1,4 @@
-/** Agent type badge color classes (shared between AgentTree and AgentWorkloadTable). */
+/** Agent type badge color classes (shared between AgentPanel and AgentWorkloadTable). */
 export const TYPE_COLORS: Readonly<Record<string, string>> = {
 	"general-purpose": "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-400",
 	builder: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-400",

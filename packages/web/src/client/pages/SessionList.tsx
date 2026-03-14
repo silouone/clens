@@ -1,9 +1,11 @@
-import { useNavigate, useSearchParams } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
+import { Search, ArrowUp, ArrowDown, RefreshCw, Inbox, ChevronRight, Database, Calendar, Activity, Clock, Users } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, globalError, clearError } from "../lib/stores";
 import type { SessionSummary } from "../../shared/types";
 import { formatDuration } from "../lib/format";
+import { StatusBadge } from "../components/ui/StatusBadge";
 
 // ── Live indicator ──────────────────────────────────────────────────
 
@@ -41,23 +43,6 @@ const formatSize = (bytes: number): string => {
 	return `${(kb / 1024).toFixed(1)} MB`;
 };
 
-// ── Status badge ────────────────────────────────────────────────────
-
-const StatusBadge: Component<{ readonly status: string }> = (props) => {
-	const cls = () =>
-		props.status === "complete"
-			? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-700/50"
-			: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50";
-
-	return (
-		<span
-			class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls()}`}
-		>
-			{props.status}
-		</span>
-	);
-};
-
 // ── Loading skeleton ────────────────────────────────────────────────
 
 const SkeletonRow: Component = () => (
@@ -70,6 +55,7 @@ const SkeletonRow: Component = () => (
 		<td class="px-4 py-3"><div class="h-4 w-14 rounded bg-gray-200 dark:bg-gray-800" /></td>
 		<td class="px-4 py-3"><div class="h-4 w-20 rounded bg-gray-200 dark:bg-gray-800" /></td>
 		<td class="px-4 py-3"><div class="h-4 w-16 rounded bg-gray-200 dark:bg-gray-800" /></td>
+		<td class="w-8 px-2 py-3" />
 	</tr>
 );
 
@@ -87,14 +73,45 @@ const LoadingSkeleton: Component = () => (
 
 const EmptyState: Component = () => (
 	<tr>
-		<td colspan="8" class="px-4 py-12 text-center text-gray-500">
-			<p class="text-lg font-medium">No sessions found</p>
-			<p class="mt-1 text-sm">
-				Run a Claude Code session with cLens hooks to capture data.
-			</p>
+		<td colspan="9" class="px-4 py-12 text-center text-gray-500">
+			<div class="flex flex-col items-center gap-2">
+				<Inbox class="h-8 w-8 text-gray-300 dark:text-gray-400" />
+				<p class="text-lg font-medium">No sessions found</p>
+				<p class="text-sm">
+					Run a Claude Code session with cLens hooks to capture data.
+				</p>
+			</div>
 		</td>
 	</tr>
 );
+
+// ── Summary stat pill ────────────────────────────────────────────────
+
+const SummaryStatPill: Component<{
+	readonly icon: Component<{ readonly class?: string }>;
+	readonly label: string;
+	readonly value: string | number;
+}> = (props) => (
+	<div class="flex items-center gap-1.5 rounded border border-gray-200 bg-white px-2 py-1 dark:border-gray-800 dark:bg-gray-900">
+		<props.icon class="h-3 w-3 text-gray-400 dark:text-gray-400" />
+		<span class="text-[10px] font-medium uppercase text-gray-400 dark:text-gray-400">{props.label}</span>
+		<span class="text-xs font-semibold tabular-nums text-gray-700 dark:text-gray-200">{props.value}</span>
+	</div>
+);
+
+// ── Summary stats helpers ───────────────────────────────────────────
+
+const isToday = (ts: number): boolean => {
+	const d = new Date(ts);
+	const now = new Date();
+	return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+};
+
+const computeAvgDuration = (sessions: readonly SessionSummary[]): number =>
+	sessions.length === 0 ? 0 : Math.round(sessions.reduce((sum, s) => sum + s.duration_ms, 0) / sessions.length);
+
+const computeTotalEvents = (sessions: readonly SessionSummary[]): number =>
+	sessions.reduce((sum, s) => sum + s.event_count, 0);
 
 // ── Filter types ────────────────────────────────────────────────────
 
@@ -179,23 +196,26 @@ const SortableHeader: Component<{
 	readonly field: SortField;
 	readonly sort: SortState;
 	readonly onSort: (field: SortField) => void;
+	readonly align?: "left" | "right";
 }> = (props) => {
 	const isActive = () => props.sort?.field === props.field;
-	const arrow = () => {
-		if (!isActive()) return "";
-		return props.sort?.dir === "asc" ? " \u2191" : " \u2193";
-	};
+	const isAsc = () => isActive() && props.sort?.dir === "asc";
+	const isDesc = () => isActive() && props.sort?.dir === "desc";
+	const alignClass = () => (props.align === "right" ? "text-right" : "");
 
 	return (
 		<th
-			class={`px-4 py-3 font-medium cursor-pointer select-none transition hover:text-gray-700 dark:hover:text-gray-300 ${
+			class={`px-4 py-3 font-medium cursor-pointer select-none transition hover:text-gray-700 dark:hover:text-gray-300 ${alignClass()} ${
 				isActive() ? "text-gray-800 dark:text-gray-200" : ""
 			}`}
 			onClick={() => props.onSort(props.field)}
 		>
 			{props.label}
-			<Show when={isActive()}>
-				<span class="ml-0.5 text-blue-500 dark:text-blue-400">{arrow()}</span>
+			<Show when={isAsc()}>
+				<ArrowUp class="ml-0.5 inline h-3 w-3 text-blue-500 dark:text-blue-400" />
+			</Show>
+			<Show when={isDesc()}>
+				<ArrowDown class="ml-0.5 inline h-3 w-3 text-blue-500 dark:text-blue-400" />
 			</Show>
 		</th>
 	);
@@ -292,6 +312,11 @@ export const SessionList: Component = () => {
 
 	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / PAGE_SIZE)));
 
+	// ── Summary stats (derived from filtered sessions) ────────
+	const todayCount = createMemo(() => filtered().filter((s) => isToday(s.start_time)).length);
+	const totalEvents = createMemo(() => computeTotalEvents(filtered()));
+	const avgDuration = createMemo(() => computeAvgDuration(filtered()));
+
 	const handleRowClick = (session: SessionSummary) => {
 		navigate(`/session/${session.session_id}`);
 	};
@@ -333,28 +358,39 @@ export const SessionList: Component = () => {
 	]);
 
 	return (
-		<div class="p-6">
-			{/* Header */}
-			<div class="flex items-center justify-between">
-				<div class="flex items-center gap-3">
-					<h1 class="text-2xl font-bold">Sessions</h1>
-					<div class="flex items-center gap-1.5" title="Live updates via SSE">
+		<div class="p-4">
+			{/* Header row: title + KPI stats + refresh */}
+			<div class="flex items-center gap-4">
+				<div class="flex items-center gap-2">
+					<h1 class="text-lg font-bold text-gray-800 dark:text-gray-100">Sessions</h1>
+					<div class="flex items-center gap-1" title="Live updates via SSE">
 						<LiveDot />
-						<span class="text-xs text-gray-500">Live</span>
+						<span class="text-[10px] text-gray-500">Live</span>
 					</div>
 				</div>
-				<button
-					onClick={() => refetchSessions()}
-					class="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-				>
-					Refresh
-				</button>
+
+				{/* KPI stats — pushed right */}
+				<Show when={sessionList.state !== "pending"}>
+					<div class="ml-auto flex items-center gap-2">
+						<SummaryStatPill icon={Database} label="Total" value={filtered().length} />
+						<SummaryStatPill icon={Calendar} label="Today" value={todayCount()} />
+						<SummaryStatPill icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
+						<SummaryStatPill icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
+						<button
+							onClick={() => refetchSessions()}
+							class="ml-1 flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+							title="Refresh sessions"
+						>
+							<RefreshCw class="h-3 w-3" />
+						</button>
+					</div>
+				</Show>
 			</div>
 
 			{/* Error banner */}
 			<Show when={globalError()}>
 				{(err) => (
-					<div class="mt-4 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400">
+					<div class="mt-3 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-600 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400">
 						<span>{err().message}</span>
 						<button onClick={clearError} class="ml-4 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300">
 							Dismiss
@@ -364,74 +400,83 @@ export const SessionList: Component = () => {
 			</Show>
 
 			{/* Filters */}
-			<div class="mt-4 flex flex-wrap items-center gap-4">
-				<input
-					type="text"
-					placeholder="Search sessions..."
-					value={search()}
-					onInput={(e) => {
-						setSearch(e.currentTarget.value);
-						setPage(1);
-						setSelectedRow(-1);
-					}}
-					class="w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-600"
-				/>
+			<div class="mt-3 flex flex-wrap items-center gap-3">
+				<div class="relative">
+					<Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-400" />
+					<input
+						type="text"
+						placeholder="Search sessions..."
+						value={search()}
+						onInput={(e) => {
+							setSearch(e.currentTarget.value);
+							setPage(1);
+							setSelectedRow(-1);
+						}}
+						class="w-64 rounded-md border border-gray-300 bg-white py-1.5 pl-8 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-600"
+					/>
+				</div>
 				{/* Status filter */}
 				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-					{(["all", "complete", "incomplete"] as const).map((s) => (
-						<button
-							onClick={() => {
-								setStatusFilter(s);
-								setPage(1);
-								setSelectedRow(-1);
-							}}
-							class={`px-3 py-1.5 text-xs font-medium transition ${
-								statusFilter() === s
-									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-							}`}
-						>
-							{s === "all" ? "All" : s === "complete" ? "Complete" : "Incomplete"}
-						</button>
-					))}
+					<For each={["all", "complete", "incomplete"] as const}>
+						{(s) => (
+							<button
+								onClick={() => {
+									setStatusFilter(s);
+									setPage(1);
+									setSelectedRow(-1);
+								}}
+								class={`px-3 py-1.5 text-xs font-medium transition ${
+									statusFilter() === s
+										? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+										: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+								}`}
+							>
+								{s === "all" ? "All" : s === "complete" ? "Complete" : "Incomplete"}
+							</button>
+						)}
+					</For>
 				</div>
 				{/* Analyzed filter */}
 				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-					{(["all", "analyzed", "not_analyzed"] as const).map((v) => (
-						<button
-							onClick={() => {
-								setAnalyzedFilter(v);
-								setPage(1);
-								setSelectedRow(-1);
-							}}
-							class={`px-3 py-1.5 text-xs font-medium transition ${
-								analyzedFilter() === v
-									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-							}`}
-						>
-							{v === "all" ? "All" : v === "analyzed" ? "Analyzed" : "Not analyzed"}
-						</button>
-					))}
+					<For each={["all", "analyzed", "not_analyzed"] as const}>
+						{(v) => (
+							<button
+								onClick={() => {
+									setAnalyzedFilter(v);
+									setPage(1);
+									setSelectedRow(-1);
+								}}
+								class={`px-3 py-1.5 text-xs font-medium transition ${
+									analyzedFilter() === v
+										? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+										: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+								}`}
+							>
+								{v === "all" ? "All" : v === "analyzed" ? "Analyzed" : "Not analyzed"}
+							</button>
+						)}
+					</For>
 				</div>
 				{/* Agents filter */}
 				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-					{(["all", "multi", "solo"] as const).map((v) => (
-						<button
-							onClick={() => {
-								setAgentsFilter(v);
-								setPage(1);
-								setSelectedRow(-1);
-							}}
-							class={`px-3 py-1.5 text-xs font-medium transition ${
-								agentsFilter() === v
-									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-							}`}
-						>
-							{v === "all" ? "All" : v === "multi" ? "Multi-agent" : "Solo"}
-						</button>
-					))}
+					<For each={["all", "multi", "solo"] as const}>
+						{(v) => (
+							<button
+								onClick={() => {
+									setAgentsFilter(v);
+									setPage(1);
+									setSelectedRow(-1);
+								}}
+								class={`px-3 py-1.5 text-xs font-medium transition ${
+									agentsFilter() === v
+										? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+										: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+								}`}
+							>
+								{v === "all" ? "All" : v === "multi" ? "Multi-agent" : "Solo"}
+							</button>
+						)}
+					</For>
 				</div>
 				<span class="text-sm text-gray-500">
 					{filtered().length} session{filtered().length !== 1 ? "s" : ""}
@@ -439,18 +484,19 @@ export const SessionList: Component = () => {
 			</div>
 
 			{/* Table */}
-			<div class="mt-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+			<div class="mt-3 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
 				<table class="w-full text-left text-sm">
-					<thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-800 dark:bg-gray-900/50">
+					<thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-800 dark:bg-gray-900">
 						<tr>
 							<SortableHeader label="Name" field="session_name" sort={sortState()} onSort={handleSort} />
 							<th class="px-4 py-3 font-medium">Status</th>
-							<SortableHeader label="Duration" field="duration_ms" sort={sortState()} onSort={handleSort} />
-							<SortableHeader label="Events" field="event_count" sort={sortState()} onSort={handleSort} />
-							<SortableHeader label="Agents" field="agent_count" sort={sortState()} onSort={handleSort} />
-							<SortableHeader label="Size" field="file_size_bytes" sort={sortState()} onSort={handleSort} />
+							<SortableHeader label="Duration" field="duration_ms" sort={sortState()} onSort={handleSort} align="right" />
+							<SortableHeader label="Events" field="event_count" sort={sortState()} onSort={handleSort} align="right" />
+							<SortableHeader label="Agents" field="agent_count" sort={sortState()} onSort={handleSort} align="right" />
+							<SortableHeader label="Size" field="file_size_bytes" sort={sortState()} onSort={handleSort} align="right" />
 							<th class="px-4 py-3 font-medium">Branch</th>
 							<SortableHeader label="When" field="start_time" sort={sortState()} onSort={handleSort} />
+							<th class="w-8 px-2 py-3"><span class="sr-only">Open</span></th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-gray-100 dark:divide-gray-800/50">
@@ -460,6 +506,14 @@ export const SessionList: Component = () => {
 									{(session, idx) => (
 										<tr
 											onClick={() => handleRowClick(session)}
+											onKeyDown={(e: KeyboardEvent) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.preventDefault();
+													handleRowClick(session);
+												}
+											}}
+											role="link"
+											tabIndex={0}
 											class={`cursor-pointer transition ${
 												selectedRow() === idx()
 													? "bg-blue-50 dark:bg-blue-900/20"
@@ -468,7 +522,13 @@ export const SessionList: Component = () => {
 										>
 											<td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
 												<div class="flex items-center gap-2">
-													{session.session_name ?? session.session_id.slice(0, 8)}
+													<A
+														href={`/session/${session.session_id}`}
+														class="hover:underline"
+														onClick={(e: MouseEvent) => e.stopPropagation()}
+													>
+														{session.session_name ?? session.session_id.slice(0, 8)}
+													</A>
 													<Show when={session.is_distilled}>
 														<span class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" title="Distilled">
 															analyzed
@@ -479,25 +539,41 @@ export const SessionList: Component = () => {
 											<td class="px-4 py-3">
 												<StatusBadge status={session.status} />
 											</td>
-											<td class="px-4 py-3 text-gray-500 dark:text-gray-400">
+											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
 												{formatDuration(session.duration_ms)}
 											</td>
-											<td class="px-4 py-3 text-gray-500 dark:text-gray-400">{session.event_count}</td>
-											<td class="px-4 py-3 text-gray-500 dark:text-gray-400">
-												{session.agent_count ?? 1}
+											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">{session.event_count}</td>
+											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
+												<div class="flex items-center justify-end gap-1.5">
+													{session.agent_count ?? 1}
+													<Show when={(session.agent_count ?? 0) > 1}>
+														<A
+															href={`/session/${session.session_id}?view=overview`}
+															class="inline-flex items-center gap-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+															onClick={(e: MouseEvent) => e.stopPropagation()}
+															title="View multi-agent session"
+														>
+															<Users class="h-3 w-3" />
+															team
+														</A>
+													</Show>
+												</div>
 											</td>
-											<td class="px-4 py-3 text-gray-500 dark:text-gray-400">
+											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
 												{formatSize(session.file_size_bytes)}
 											</td>
 											<td class="px-4 py-3">
-												<Show when={session.git_branch} fallback={<span class="text-gray-400 dark:text-gray-600">-</span>}>
+												<Show when={session.git_branch} fallback={<span class="text-gray-400 dark:text-gray-400">-</span>}>
 													<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
 														{session.git_branch}
 													</span>
 												</Show>
 											</td>
-											<td class="px-4 py-3 text-gray-400 dark:text-gray-500">
+											<td class="px-4 py-3 text-gray-400 dark:text-gray-400">
 												{formatDate(session.start_time)}
+											</td>
+											<td class="w-8 px-2 py-3 text-gray-300 dark:text-gray-400">
+												<ChevronRight class="h-4 w-4" />
 											</td>
 										</tr>
 									)}

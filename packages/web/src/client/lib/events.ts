@@ -199,7 +199,7 @@ const createSSEClient = (handlers: SSEEventHandler = {}): SSEClient => {
 
 /**
  * Signal tracking live events for a specific session.
- * Used by SessionView to append new events in real-time.
+ * Used by SessionDetail to append new events in real-time.
  */
 const [activeSessionId, setActiveSessionId] = createSignal<string | undefined>();
 const [liveEvents, setLiveEvents] = createSignal<readonly unknown[]>([]);
@@ -208,7 +208,7 @@ const clearLiveEvents = () => setLiveEvents([]);
 
 /**
  * Signal set when a distill_complete SSE event arrives.
- * SessionView watches this to refetch detail when the active session finishes distilling.
+ * SessionDetail watches this to refetch detail when the active session finishes distilling.
  */
 const [lastDistilledSessionId, setLastDistilledSessionId] = createSignal<string | undefined>();
 

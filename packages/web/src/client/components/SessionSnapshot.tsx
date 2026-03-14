@@ -1,4 +1,5 @@
 import { createMemo, createSignal, Show, type Component } from "solid-js";
+import { Activity } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatPercentage, truncateMultiline } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
@@ -81,7 +82,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 	const specPath = createMemo(() => session().plan_drift?.spec_path);
 
 	return (
-		<div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/50">
+		<div class="animate-fade-in rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
 			{/* Spec path banner (if plan_drift exists) */}
 			<Show when={specPath()}>
 				{(path) => (
@@ -98,13 +99,13 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 				{/* Left: Request */}
 				<div class="space-y-2">
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
 						Request
 					</h3>
 					<Show
 						when={rawPrompt()}
 						fallback={
-							<p class="text-sm text-gray-400 italic dark:text-gray-600">
+							<p class="text-sm text-gray-400 italic dark:text-gray-400">
 								No prompt captured
 							</p>
 						}
@@ -126,7 +127,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 				{/* Center: Outcome */}
 				<div class="space-y-2">
 					<div class="flex items-center gap-2">
-						<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+						<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
 							Outcome
 						</h3>
 						<StatusBadge complete={session().complete} />
@@ -143,7 +144,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 
 				{/* Right: Session Facts (raw data, no judgment) */}
 				<div class="space-y-2">
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
 						Session Facts
 					</h3>
 					<div class="space-y-1">
@@ -167,7 +168,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 							{formatDuration(totalMs())}
 						</span>
 						{" "}
-						<span class="text-gray-400 dark:text-gray-500">
+						<span class="text-gray-400 dark:text-gray-400">
 							({formatPercentage(activeMs() ?? 0, totalMs())})
 						</span>
 					</p>

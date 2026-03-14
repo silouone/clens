@@ -2,8 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ─────────────────────────────────────────────── */
+
+html {
+	font-size: 13px;
+}
+
+:root {
+	--clens-brand: theme("colors.blue.500");
+	--clens-surface: theme("colors.gray.50");
+	--clens-surface-raised: #ffffff;
+	--clens-surface-overlay: theme("colors.white");
+	--clens-muted: theme("colors.gray.500");
+	--clens-accent: theme("colors.blue.600");
+	--clens-success: theme("colors.emerald.500");
+	--clens-warning: theme("colors.amber.500");
+	--clens-danger: theme("colors.red.500");
+	--clens-info: theme("colors.sky.500");
+}
+
+.dark {
+	--clens-brand: theme("colors.blue.400");
+	--clens-surface: theme("colors.gray.950");
+	--clens-surface-raised: theme("colors.gray.900");
+	--clens-surface-overlay: theme("colors.gray.800");
+	--clens-muted: theme("colors.gray.400");
+	--clens-accent: theme("colors.blue.400");
+	--clens-success: theme("colors.emerald.400");
+	--clens-warning: theme("colors.amber.400");
+	--clens-danger: theme("colors.red.400");
+	--clens-info: theme("colors.sky.400");
+}
+
 body {
-	@apply bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
+	@apply bg-surface text-gray-900 antialiased dark:text-gray-100;
+	font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* ── Focus ring utility ──────────────────────────────────────────── */
+
+.focus-ring {
+	@apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900;
 }
 
 /* ── diff2html overrides ───────────────────────────────────────── */
@@ -82,3 +121,26 @@ body {
 	animation: clens-glow 1.2s ease-out;
 	border-radius: 0.5rem;
 }
+
+/* ── Thin scrollbar styling ─────────────────────────────────────── */
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: rgba(128, 128, 128, 0.3);
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(128, 128, 128, 0.5);
+}
+
+/* fadeIn and pageFade animations are defined in tailwind.config.js
+   and auto-generated as animate-fade-in / animate-page-fade utilities */

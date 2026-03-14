@@ -1,4 +1,5 @@
 import { For, Show, type Component } from "solid-js";
+import { Keyboard } from "lucide-solid";
 import { showHelp, setShowHelp, SHORTCUTS } from "../lib/keyboard";
 
 export const KeyboardHelp: Component = () => (
@@ -12,7 +13,7 @@ export const KeyboardHelp: Component = () => (
 				onClick={(e) => e.stopPropagation()}
 			>
 				<div class="flex items-center justify-between">
-					<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Keyboard Shortcuts</h2>
+					<h2 class="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100"><Keyboard class="h-5 w-5" /> Keyboard Shortcuts</h2>
 					<button
 						onClick={() => setShowHelp(false)}
 						class="rounded p-1 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"

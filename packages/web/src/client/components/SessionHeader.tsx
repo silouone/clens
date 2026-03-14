@@ -12,12 +12,12 @@ const StatPill: Component<{
 	readonly muted?: boolean;
 	readonly title?: string;
 }> = (props) => (
-	<div class="flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs dark:bg-gray-800/60" title={props.title}>
+	<div class="flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-800/60" title={props.title}>
 		<span class="text-gray-500">{props.label}</span>
 		<span
 			class="font-medium"
 			classList={{
-				"text-gray-400 dark:text-gray-500": props.muted === true,
+				"text-gray-400 dark:text-gray-400": props.muted === true,
 				"text-gray-700 dark:text-gray-300": props.muted !== true,
 			}}
 		>
@@ -47,14 +47,14 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 	const [distilling, setDistilling] = createSignal(false);
 
 	return (
-		<div class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/50">
-			{/* Top row: name + status + stats + re-distill */}
-			<div class="flex flex-wrap items-center gap-3">
-				<h2 class="text-lg font-semibold text-gray-900 truncate max-w-md dark:text-gray-100">
+		<div class="border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+			{/* Single row: name + status + stats + phases + re-distill */}
+			<div class="flex flex-wrap items-center gap-2">
+				<h2 class="text-sm font-semibold text-gray-900 truncate max-w-md dark:text-gray-100">
 					{session().session_name ?? session().session_id.slice(0, 12)}
 				</h2>
 				<StatusBadge complete={session().complete} />
-				<div class="flex flex-wrap items-center gap-2">
+				<div class="flex flex-wrap items-center gap-1.5">
 					<StatPill label="Duration" value={formatDuration(duration())} />
 					<StatPill label="Model" value={model()} />
 					<Show when={cost() !== undefined}>
@@ -74,6 +74,18 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 						value={String(summary()?.key_metrics.failures ?? session().stats.failure_count)}
 					/>
 				</div>
+
+				{/* Inline phase timeline */}
+				<Show when={phases().length > 0}>
+					<div class="hidden md:flex items-center border-l border-gray-200 pl-2 dark:border-gray-700">
+						<TimelineBar
+							phases={phases()}
+							totalDuration={duration()}
+							onPhaseClick={props.onPhaseClick}
+						/>
+					</div>
+				</Show>
+
 				<Show when={props.onRedistill}>
 					<div class="ml-auto">
 						<button
@@ -83,24 +95,13 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 								finally { setDistilling(false); }
 							}}
 							disabled={distilling()}
-							class="rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+							class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
 						>
 							{distilling() ? "Re-analyzing..." : "Re-analyze"}
 						</button>
 					</div>
 				</Show>
 			</div>
-
-			{/* Timeline bar */}
-			<Show when={phases().length > 0}>
-				<div class="mt-2">
-					<TimelineBar
-						phases={phases()}
-						totalDuration={duration()}
-						onPhaseClick={props.onPhaseClick}
-					/>
-				</div>
-			</Show>
 		</div>
 	);
 };

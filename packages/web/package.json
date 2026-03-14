@@ -22,6 +22,7 @@
     "@solidjs/router": "^0.15.0",
     "diff2html": "^3.4.0",
     "hono": "^4.0.0",
+    "lucide-solid": "^0.577.0",
     "solid-js": "^1.9.0"
   },
   "devDependencies": {

@@ -38,8 +38,8 @@ export const App: Component<RouteSectionProps> = (props) => {
 
 	return (
 		<div class="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-			<header class="flex items-center justify-between border-b border-gray-200 px-6 py-3 dark:border-gray-800">
-				<h1 class="text-lg font-semibold tracking-tight">cLens</h1>
+			<header class="flex items-center justify-between border-b border-gray-200 px-4 py-1.5 dark:border-gray-800">
+				<h1 class="text-sm font-semibold tracking-tight">cLens</h1>
 				<div class="flex items-center gap-2">
 					<button
 						onClick={toggleTheme}
@@ -78,7 +78,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 						</main>
 					)}
 				>
-					<main>{props.children}</main>
+					<main class="animate-page-fade">{props.children}</main>
 				</ErrorBoundary>
 			<KeyboardHelp />
 		</div>

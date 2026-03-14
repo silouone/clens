@@ -1,4 +1,5 @@
 import { createMemo, For, Show, type Component } from "solid-js";
+import { Brain } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatPercentage } from "../lib/format";
 
@@ -62,10 +63,13 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 
 	return (
 		<Show when={rows().length > 0}>
-			<div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/50">
-				<h3 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-					Thinking Patterns
-				</h3>
+			<div class="animate-fade-in rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
+				<div class="mb-3 flex items-center gap-2">
+					<Brain class="h-4 w-4 text-violet-500" />
+					<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+						Thinking Patterns
+					</h3>
+				</div>
 
 				<div class="space-y-2.5">
 					<For each={rows()}>

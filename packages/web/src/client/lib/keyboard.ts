@@ -15,13 +15,6 @@ type KeyboardContext = "global" | "session-list" | "session-view";
 const [showHelp, setShowHelp] = createSignal(false);
 const toggleHelp = () => setShowHelp((v) => !v);
 
-// ── Active panel focus ──────────────────────────────────────────────
-
-type PanelFocus = "conversation" | "diff";
-const [panelFocus, setPanelFocus] = createSignal<PanelFocus>("conversation");
-const togglePanelFocus = () =>
-	setPanelFocus((f) => (f === "conversation" ? "diff" : "conversation"));
-
 // ── Shortcut definitions (for help overlay display) ─────────────────
 
 const SHORTCUTS: readonly {
@@ -31,11 +24,11 @@ const SHORTCUTS: readonly {
 }[] = [
 	{ key: "?", label: "Show keyboard shortcuts", context: "Global" },
 	{ key: "Esc", label: "Close overlay / Go back", context: "Global" },
-	{ key: "j", label: "Next entry", context: "Session View" },
-	{ key: "k", label: "Previous entry", context: "Session View" },
+	{ key: "1", label: "Overview panel", context: "Session Detail" },
+	{ key: "2-9", label: "Select agent by index", context: "Session Detail" },
+	{ key: "j", label: "Next agent / entry", context: "Session Detail" },
+	{ key: "k", label: "Previous agent / entry", context: "Session Detail" },
 	{ key: "Enter", label: "Open session / Drill into agent", context: "Navigation" },
-	{ key: "[", label: "Focus conversation panel", context: "Session View" },
-	{ key: "]", label: "Focus diff panel", context: "Session View" },
 ];
 
 // ── Keyboard handler hook ───────────────────────────────────────────
@@ -73,18 +66,6 @@ const useKeyboard = (bindings: () => readonly KeyBinding[]): void => {
 			}
 		}
 
-		// Panel focus switching
-		if (e.key === "[" && !e.ctrlKey && !e.metaKey) {
-			e.preventDefault();
-			setPanelFocus("conversation");
-			return;
-		}
-		if (e.key === "]" && !e.ctrlKey && !e.metaKey) {
-			e.preventDefault();
-			setPanelFocus("diff");
-			return;
-		}
-
 		// Dispatch to component-specific bindings
 		const match = bindings().find((b) => b.key === e.key);
 		if (match) {
@@ -107,9 +88,6 @@ export {
 	showHelp,
 	setShowHelp,
 	toggleHelp,
-	panelFocus,
-	setPanelFocus,
-	togglePanelFocus,
 	SHORTCUTS,
 };
-export type { KeyBinding, KeyboardContext, PanelFocus };
+export type { KeyBinding, KeyboardContext };

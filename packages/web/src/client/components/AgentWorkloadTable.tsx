@@ -1,5 +1,5 @@
 import { createMemo, For, Show, type Component } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { Users } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatCost, formatPercentage } from "../lib/format";
 import { getTypeBadgeClass } from "../lib/agent-colors";
@@ -46,8 +46,6 @@ const sortAgentRows = (rows: readonly FlatAgent[]): readonly FlatAgent[] => {
 // ── Component ────────────────────────────────────────────────────────
 
 export const AgentWorkloadTable: Component<AgentWorkloadTableProps> = (props) => {
-	const navigate = useNavigate();
-
 	const rows = createMemo(() => {
 		const allAgents = flattenAgents(props.session.agents ?? []);
 		return sortAgentRows(allAgents.map(toFlatAgent));
@@ -57,28 +55,17 @@ export const AgentWorkloadTable: Component<AgentWorkloadTableProps> = (props) =>
 		rows().reduce((sum, r) => sum + r.costUsd, 0),
 	);
 
-	const handleViewTeam = () => {
-		navigate(`/session/${props.sessionId}/team`);
-	};
-
 	return (
-		<div class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900/50">
-			{/* Header with View Team Dashboard button */}
-			<div class="flex items-center justify-between border-b border-gray-200 px-4 py-2.5 dark:border-gray-800">
-				<div class="flex items-center gap-3">
-					<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-						Agent Workload
-					</h3>
-					<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-						{rows().length} agents
-					</span>
-				</div>
-				<button
-					onClick={handleViewTeam}
-					class="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
-				>
-					View Team Dashboard
-				</button>
+		<div class="animate-fade-in rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
+			{/* Header */}
+			<div class="flex items-center gap-3 border-b border-gray-200 px-3 py-2 dark:border-gray-800">
+				<Users class="h-4 w-4 text-gray-400" />
+				<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+					Agent Workload
+				</h3>
+				<span class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+					{rows().length} agents
+				</span>
 			</div>
 
 			{/* Table */}
@@ -86,48 +73,48 @@ export const AgentWorkloadTable: Component<AgentWorkloadTableProps> = (props) =>
 				<table class="w-full text-xs">
 					<thead>
 						<tr class="border-b border-gray-200 text-left text-gray-500 dark:border-gray-800 dark:text-gray-400">
-							<th class="px-4 py-2 font-medium">Agent</th>
-							<th class="px-3 py-2 font-medium text-right">Tool Calls</th>
-							<th class="px-3 py-2 font-medium text-right">Duration</th>
-							<th class="px-3 py-2 font-medium text-right">Files</th>
-							<th class="px-3 py-2 font-medium text-right">Cost</th>
+							<th class="px-3 py-1.5 font-medium">Agent</th>
+							<th class="px-2 py-1.5 font-medium text-right">Tool Calls</th>
+							<th class="px-2 py-1.5 font-medium text-right">Duration</th>
+							<th class="px-2 py-1.5 font-medium text-right">Files</th>
+							<th class="px-2 py-1.5 font-medium text-right">Cost</th>
 						</tr>
 					</thead>
 					<tbody>
 						<For each={rows()}>
 							{(row) => (
 								<tr class="border-b border-gray-100 dark:border-gray-800/50">
-									<td class="px-4 py-2">
+									<td class="px-3 py-1.5">
 										<div class="flex items-center gap-2">
 											<span
 												class={`rounded px-1 py-0.5 text-[9px] font-medium ${getTypeBadgeClass(row.agentType)}`}
 											>
-												{row.agentType.slice(0, 8)}
+												{row.agentType}
 											</span>
 											<span class="truncate font-medium text-gray-700 dark:text-gray-300">
 												{row.name}
 											</span>
 										</div>
 									</td>
-									<td class="px-3 py-2 text-right tabular-nums text-gray-600 dark:text-gray-400">
+									<td class="px-2 py-1.5 text-right tabular-nums text-gray-600 dark:text-gray-400">
 										{row.toolCalls}
 									</td>
-									<td class="px-3 py-2 text-right tabular-nums text-gray-600 dark:text-gray-400">
+									<td class="px-2 py-1.5 text-right tabular-nums text-gray-600 dark:text-gray-400">
 										{formatDuration(row.durationMs)}
 									</td>
-									<td class="px-3 py-2 text-right tabular-nums text-gray-600 dark:text-gray-400">
+									<td class="px-2 py-1.5 text-right tabular-nums text-gray-600 dark:text-gray-400">
 										{row.filesModified}
 									</td>
-									<td class="px-3 py-2 text-right tabular-nums">
+									<td class="px-2 py-1.5 text-right tabular-nums">
 										<Show
 											when={row.costUsd > 0}
 											fallback={
-												<span class="text-gray-400 dark:text-gray-600">--</span>
+												<span class="text-gray-400 dark:text-gray-400">--</span>
 											}
 										>
 											<span
 												classList={{
-													"text-gray-400 dark:text-gray-500": row.isEstimated,
+													"text-gray-400 dark:text-gray-400": row.isEstimated,
 													"text-gray-700 dark:text-gray-300": !row.isEstimated,
 												}}
 												title={row.isEstimated ? "Estimated" : undefined}
@@ -135,7 +122,7 @@ export const AgentWorkloadTable: Component<AgentWorkloadTableProps> = (props) =>
 												{formatCost(row.costUsd, row.isEstimated)}
 											</span>
 											<Show when={totalCost() > 0}>
-												<span class="ml-1 text-gray-400 dark:text-gray-500">
+												<span class="ml-1 text-gray-400 dark:text-gray-400">
 													({formatPercentage(row.costUsd, totalCost())})
 												</span>
 											</Show>

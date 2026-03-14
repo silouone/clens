@@ -5,10 +5,11 @@ import {
 	type Component,
 	type JSX,
 } from "solid-js";
+import { ChevronDown, ChevronUp, ChevronRight, ChevronLeft } from "lucide-solid";
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const STORAGE_KEY = "clens-split-ratio";
+const DEFAULT_STORAGE_KEY = "clens-split-ratio";
 const MIN_WIDTH_PX = 300;
 const HANDLE_WIDTH_PX = 4;
 const RESIZE_STEP = 0.01;
@@ -16,9 +17,9 @@ const DEFAULT_RATIO = 0.5;
 
 // ── LocalStorage helpers ─────────────────────────────────────────────
 
-const loadRatio = (fallback: number): number => {
+const loadRatio = (key: string, fallback: number): number => {
 	try {
-		const stored = localStorage.getItem(STORAGE_KEY);
+		const stored = localStorage.getItem(key);
 		if (stored === null) return fallback;
 		const parsed = Number.parseFloat(stored);
 		return Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : fallback;
@@ -27,9 +28,9 @@ const loadRatio = (fallback: number): number => {
 	}
 };
 
-const saveRatio = (ratio: number): void => {
+const saveRatio = (key: string, ratio: number): void => {
 	try {
-		localStorage.setItem(STORAGE_KEY, String(ratio));
+		localStorage.setItem(key, String(ratio));
 	} catch {
 		// Storage full or unavailable — silently ignore
 	}
@@ -44,6 +45,7 @@ type SplitPaneProps = {
 	readonly right: JSX.Element;
 	readonly defaultRatio?: number;
 	readonly direction?: "horizontal" | "vertical";
+	readonly id?: string;
 };
 
 // ── Component ────────────────────────────────────────────────────────
@@ -66,7 +68,8 @@ const createResponsiveDirection = (
 };
 
 export const SplitPane: Component<SplitPaneProps> = (props) => {
-	const initialRatio = loadRatio(props.defaultRatio ?? DEFAULT_RATIO);
+	const storageKey = props.id ? `clens-split-${props.id}` : DEFAULT_STORAGE_KEY;
+	const initialRatio = loadRatio(storageKey, props.defaultRatio ?? DEFAULT_RATIO);
 	const [ratio, setRatio] = createSignal(initialRatio);
 	const [dragging, setDragging] = createSignal(false);
 	const [collapsed, setCollapsed] = createSignal<CollapseState>("none");
@@ -79,7 +82,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 	createEffect(() => {
 		const r = ratio();
 		if (collapsed() === "none") {
-			saveRatio(r);
+			saveRatio(storageKey, r);
 		}
 	});
 
@@ -186,7 +189,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 		>
 			{/* First pane (left or top) */}
 			<div
-				class="relative overflow-auto transition-[width,height] duration-150"
+				class="group relative overflow-auto transition-[width,height] duration-150"
 				style={leftStyle()}
 			>
 				{props.left}
@@ -197,7 +200,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 					title={collapsed() === "left" ? "Expand pane" : "Collapse pane"}
 					aria-label={collapsed() === "left" ? "Expand pane" : "Collapse pane"}
 				>
-					{collapsed() === "left" ? (isVertical() ? "\u25BC" : "\u25B6") : (isVertical() ? "\u25B2" : "\u25C0")}
+					{collapsed() === "left" ? (isVertical() ? <ChevronDown class="h-3 w-3" /> : <ChevronRight class="h-3 w-3" />) : (isVertical() ? <ChevronUp class="h-3 w-3" /> : <ChevronLeft class="h-3 w-3" />)}
 				</button>
 			</div>
 
@@ -234,7 +237,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 
 			{/* Second pane (right or bottom) */}
 			<div
-				class="relative overflow-auto transition-[width,height] duration-150"
+				class="group relative overflow-auto transition-[width,height] duration-150"
 				style={rightStyle()}
 			>
 				{props.right}
@@ -245,7 +248,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 					title={collapsed() === "right" ? "Expand pane" : "Collapse pane"}
 					aria-label={collapsed() === "right" ? "Expand pane" : "Collapse pane"}
 				>
-					{collapsed() === "right" ? (isVertical() ? "\u25B2" : "\u25C0") : (isVertical() ? "\u25BC" : "\u25B6")}
+					{collapsed() === "right" ? (isVertical() ? <ChevronUp class="h-3 w-3" /> : <ChevronLeft class="h-3 w-3" />) : (isVertical() ? <ChevronDown class="h-3 w-3" /> : <ChevronRight class="h-3 w-3" />)}
 				</button>
 			</div>
 		</div>

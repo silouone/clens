@@ -1,4 +1,5 @@
 import { For, Show, createMemo, type Component } from "solid-js";
+import { AlertTriangle } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { classifySeverity } from "../lib/format";
 
@@ -42,10 +43,13 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 	);
 
 	return (
-		<div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/50">
-			<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-				Issues &amp; Errors
-			</h3>
+		<div class="animate-fade-in rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
+			<div class="flex items-center gap-2">
+				<AlertTriangle class="h-4 w-4 text-red-500" />
+				<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+					Issues &amp; Errors
+				</h3>
+			</div>
 
 			<Show
 				when={hasContent()}
@@ -91,7 +95,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 										</span>
 										<Show when={bt.error_message}>
 											{(msg) => (
-												<span class="truncate text-gray-400 dark:text-gray-500">
+												<span class="truncate text-gray-400 dark:text-gray-400">
 													{truncate(msg(), 80)}
 												</span>
 											)}
@@ -121,7 +125,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 										</span>
 										<Show when={err.sample_message}>
 											{(msg) => (
-												<span class="truncate text-gray-400 dark:text-gray-500">
+												<span class="truncate text-gray-400 dark:text-gray-400">
 													{truncate(msg(), 100)}
 												</span>
 											)}
