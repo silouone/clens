@@ -9,7 +9,6 @@ import { Files } from "lucide-solid";
 import type { DistilledSession } from "../../../shared/types";
 import { SessionSnapshot } from "../SessionSnapshot";
 import { NarrativeSection } from "../NarrativeSection";
-import { AgentWorkloadTable } from "../AgentWorkloadTable";
 import { IssuesPanel } from "../IssuesPanel";
 import { ThinkingBreakdown } from "../ThinkingBreakdown";
 import { PlanDriftSection } from "../PlanDriftSection";
@@ -17,14 +16,28 @@ import { FileList, buildFileRows } from "../FileList";
 import { BottomPanel } from "../BottomPanel";
 import { DecisionsSection } from "../DecisionsSection";
 import { computeClientRiskScores } from "../../lib/risk";
+import { TabBar } from "../ui/TabBar";
+import { TabButton } from "../ui/TabButton";
 
 // -- Types ----------------------------------------------------------------
+
+type RelatedSessionsData = {
+	readonly work_unit_id: string;
+	readonly spec_path?: string;
+	readonly sessions: readonly {
+		readonly session_id: string;
+		readonly session_name?: string;
+		readonly phase: string;
+		readonly role: string;
+		readonly start_time: number;
+	}[];
+};
 
 type OverviewPanelProps = {
 	readonly session: DistilledSession;
 	readonly sessionId: string;
 	readonly isMultiAgent: boolean;
-	readonly onSelectAgent?: (agentId: string) => void;
+	readonly relatedSessions?: RelatedSessionsData;
 };
 
 type TabId = "overview" | "backtracks" | "timeline" | "edits" | "comms";
@@ -74,26 +87,17 @@ const FileListCard: Component<{
 const OverviewContent: Component<OverviewPanelProps> = (props) => (
 	<div class="space-y-3">
 		{/* 1. Session Snapshot */}
-		<SessionSnapshot session={props.session} />
+		<SessionSnapshot session={props.session} relatedSessions={props.relatedSessions} />
 
 		{/* 2. Narrative */}
 		<Show when={props.session.summary?.narrative}>
 			<NarrativeSection session={props.session} />
 		</Show>
 
-		{/* 3. Agent Workload (multi-agent only) */}
-		<Show when={props.isMultiAgent}>
-			<AgentWorkloadTable
-				session={props.session}
-				sessionId={props.sessionId}
-				onSelectAgent={props.onSelectAgent}
-			/>
-		</Show>
-
-		{/* 4. Issues & Errors */}
+		{/* 3. Issues & Errors */}
 		<IssuesPanel session={props.session} />
 
-		{/* 4b. Decision Points */}
+		{/* 4. Decision Points */}
 		<Show when={props.session.decisions.length > 0}>
 			<DecisionsSection decisions={props.session.decisions} />
 		</Show>
@@ -111,25 +115,6 @@ const OverviewContent: Component<OverviewPanelProps> = (props) => (
 			<PlanDriftSection session={props.session} />
 		</Show>
 	</div>
-);
-
-// -- Tab badge component --------------------------------------------------
-
-const TabBadge: Component<{
-	readonly count: number;
-	readonly isBacktrack?: boolean;
-}> = (props) => (
-	<Show when={props.count > 0}>
-		<span
-			class="rounded-full px-1.5 py-0.5 text-[11px] font-medium"
-			classList={{
-				"bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400": props.isBacktrack === true && props.count > 0,
-				"bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400": props.isBacktrack !== true,
-			}}
-		>
-			{props.count}
-		</span>
-	</Show>
 );
 
 // -- Main component -------------------------------------------------------
@@ -176,25 +161,19 @@ export const OverviewPanel: Component<OverviewPanelProps> = (props) => {
 	return (
 		<div class="flex h-full flex-col overflow-hidden">
 			{/* Horizontal tab bar */}
-			<div role="tablist" class="flex items-center border-b border-gray-200 bg-gray-50 px-2 dark:border-gray-800 dark:bg-gray-900/50">
+			<TabBar>
 				<For each={visibleTabs()}>
 					{(tab) => (
-						<button
-							role="tab"
-							aria-selected={activeTab() === tab.id}
+						<TabButton
+							label={tab.label}
+							active={activeTab() === tab.id}
 							onClick={() => setActiveTab(tab.id)}
-							class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition border-b-2"
-							classList={{
-								"border-blue-500 text-blue-600 dark:text-blue-400": activeTab() === tab.id,
-								"border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300": activeTab() !== tab.id,
-							}}
-						>
-							{tab.label}
-							<TabBadge count={tab.count()} isBacktrack={tab.id === "backtracks"} />
-						</button>
+							badge={tab.count()}
+							badgeVariant={tab.id === "backtracks" ? "warning" : "default"}
+						/>
 					)}
 				</For>
-			</div>
+			</TabBar>
 
 			{/* Tab content */}
 			<div role="tabpanel" class="flex-1 overflow-y-auto">
@@ -204,6 +183,7 @@ export const OverviewPanel: Component<OverviewPanelProps> = (props) => {
 							session={props.session}
 							sessionId={props.sessionId}
 							isMultiAgent={props.isMultiAgent}
+							relatedSessions={props.relatedSessions}
 						/>
 					</div>
 				</Show>

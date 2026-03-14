@@ -1,6 +1,7 @@
 import { Hono } from "hono"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { distill } from "@clens/cli/src/distill"
+import { rebuildWorkUnitIndex } from "@clens/cli/src/session/work-units"
 import { broadcastSSE } from "./events"
 import { createLogger } from "../logger"
 
@@ -35,6 +36,7 @@ const createCommandsRoute = (projectDir: string) =>
 						JSON.stringify(result, null, 2),
 					)
 					log.info(`Distill complete: ${sessionId.slice(0, 8)}`)
+					try { rebuildWorkUnitIndex(projectDir) } catch { /* best-effort */ }
 					broadcastSSE({
 						type: "distill_complete",
 						data: { session_id: sessionId },

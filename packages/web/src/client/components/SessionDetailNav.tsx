@@ -1,9 +1,13 @@
 import { createSignal, For, Show, type Component } from "solid-js";
-import { ChevronRight, LayoutDashboard, MessageSquare } from "lucide-solid";
+import { LayoutDashboard, MessageSquare } from "lucide-solid";
 import type { AgentNode, DistilledSession } from "../../shared/types";
 import { getTypeBadgeClass } from "../lib/agent-colors";
 import { countAllAgents, sumDiffStats } from "../lib/agent-utils";
 import { formatCost, formatDuration } from "../lib/format";
+import { NavButton } from "./ui/NavButton";
+import { TreeToggle } from "./ui/TreeToggle";
+import { DetailNav } from "./DetailNav";
+import { NavSection } from "./NavSection";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -19,36 +23,6 @@ type SessionDetailNavProps = {
 
 const isLeadAgent = (agent: AgentNode, index: number): boolean =>
 	index === 0 || agent.agent_type === "leader" || agent.children.length > 0;
-
-// ── Nav item (Overview) ─────────────────────────────────────────────
-
-const NavItem: Component<{
-	readonly label: string;
-	readonly icon: Component<{ class?: string }>;
-	readonly active: boolean;
-	readonly onClick: () => void;
-	readonly shortcut?: string;
-}> = (props) => (
-	<button
-		onClick={props.onClick}
-		class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium transition-colors duration-150 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 dark:hover:bg-gray-800/50 dark:focus:ring-offset-gray-900"
-		classList={{
-			"bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300": props.active,
-			"text-gray-700 dark:text-gray-300": !props.active,
-		}}
-		aria-current={props.active ? "page" : undefined}
-	>
-		<props.icon class="h-3.5 w-3.5 shrink-0" />
-		{props.label}
-		<Show when={props.shortcut}>
-			{(sc) => (
-				<kbd class="ml-auto rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] font-mono text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-					{sc()}
-				</kbd>
-			)}
-		</Show>
-	</button>
-);
 
 // ── Collapsible agent row ────────────────────────────────────────────
 
@@ -86,21 +60,7 @@ const AgentNavRow: Component<{
 			>
 				{/* Row 1: chevron + badges + name */}
 				<div class="flex w-full items-center gap-1.5 px-2 pt-1.5 pb-0.5">
-					{/* Expand/collapse toggle */}
-					<Show when={hasChildren()} fallback={<span class="w-3" />}>
-						<button
-							type="button"
-							aria-label="Toggle subtree"
-							aria-expanded={expanded()}
-							class="flex items-center justify-center rounded p-0 hover:text-gray-700 dark:hover:text-gray-300"
-							onClick={handleToggle}
-						>
-							<ChevronRight
-								class="h-3 w-3 shrink-0 text-gray-400 transition-transform"
-								classList={{ "rotate-90": expanded() }}
-							/>
-						</button>
-					</Show>
+					<TreeToggle expanded={expanded()} onToggle={handleToggle} hasChildren={hasChildren()} />
 
 					{/* Type badge */}
 					<span
@@ -174,54 +134,43 @@ export const SessionDetailNav: Component<SessionDetailNavProps> = (props) => {
 	};
 
 	return (
-		<nav
-			class="flex h-full w-full flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-			role="navigation"
-			aria-label="Session navigation"
-		>
-			{/* Top nav items */}
-			<div class="px-2 py-2 space-y-0.5">
-				<NavItem
-					label="Overview"
-					icon={LayoutDashboard}
-					active={props.currentView === "overview"}
-					onClick={() => props.onSelectView("overview")}
-					shortcut="1"
-				/>
-				<NavItem
-					label="Conversation"
-					icon={MessageSquare}
-					active={props.currentView === "conversation"}
-					onClick={() => props.onSelectView("conversation")}
-					shortcut="c"
-				/>
-			</div>
-
-			{/* Agents section */}
-			<Show when={agents().length > 0}>
-				<div class="border-t border-clens" />
-				<div class="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
-					<h3 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400">
-						Agents
-					</h3>
-					<span class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:bg-gray-800 dark:text-gray-400">
-						{agentCount()}
-					</span>
-				</div>
-				<div class="flex-1 overflow-y-auto px-1 pb-2" role="tree" aria-label="Agent tree">
-					<For each={agents()}>
-						{(agent, i) => (
-							<AgentNavRow
-								agent={agent}
-								depth={0}
-								selectedAgentId={props.selectedAgentId}
-								isLead={isLeadAgent(agent, i())}
-								onSelect={handleAgentSelect}
-							/>
-						)}
-					</For>
-				</div>
-			</Show>
-		</nav>
+		<DetailNav
+			ariaLabel="Session navigation"
+			topItems={
+				<>
+					<NavButton
+						label="Overview"
+						icon={LayoutDashboard}
+						active={props.currentView === "overview"}
+						onClick={() => props.onSelectView("overview")}
+						shortcut="1"
+					/>
+					<NavButton
+						label="Conversation"
+						icon={MessageSquare}
+						active={props.currentView === "conversation"}
+						onClick={() => props.onSelectView("conversation")}
+						shortcut="c"
+					/>
+				</>
+			}
+			sections={
+				<Show when={agents().length > 0}>
+					<NavSection title="Agents" count={agentCount()} ariaLabel="Agent tree">
+						<For each={agents()}>
+							{(agent, i) => (
+								<AgentNavRow
+									agent={agent}
+									depth={0}
+									selectedAgentId={props.selectedAgentId}
+									isLead={isLeadAgent(agent, i())}
+									onSelect={handleAgentSelect}
+								/>
+							)}
+						</For>
+					</NavSection>
+				</Show>
+			}
+		/>
 	);
 };

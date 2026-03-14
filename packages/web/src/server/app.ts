@@ -6,6 +6,7 @@ import { authToken, validateSessionId, cors } from "./middleware/security"
 import { eventsRoute } from "./routes/events"
 import { createSessionsRoute } from "./routes/sessions"
 import { createCommandsRoute } from "./routes/commands"
+import { createWorkUnitsRoute } from "./routes/work-units"
 import { createLogger } from "./logger"
 
 const httpLog = createLogger("http")
@@ -78,6 +79,7 @@ const createApp = (options: AppOptions) => {
 		)
 		.route("/api/events", eventsRoute)
 		.route("/api/sessions", createSessionsRoute(options.projectDir))
+		.route("/api/work-units", createWorkUnitsRoute(options.projectDir))
 		.route("/api/commands/sessions", createCommandsRoute(options.projectDir))
 
 	// ── Static assets (production only) ──

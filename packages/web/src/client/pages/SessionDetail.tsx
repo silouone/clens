@@ -1,5 +1,5 @@
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { ArrowLeft, Menu, Search as SearchIcon, X } from "lucide-solid";
+import { Search as SearchIcon } from "lucide-solid";
 import {
 	createEffect,
 	createMemo,
@@ -26,6 +26,7 @@ import { SessionHeader } from "../components/SessionHeader";
 import { SessionDetailNav } from "../components/SessionDetailNav";
 import { OverviewPanel, AgentPanel } from "../components/panels";
 import { ConversationPanel } from "../components/ConversationPanel";
+import { DetailPageLayout } from "../components/layouts/DetailPageLayout";
 
 // ── Not distilled state ─────────────────────────────────────────────
 
@@ -140,44 +141,6 @@ const NotDistilledState: Component<{
 	);
 };
 
-// ── Back nav bar ─────────────────────────────────────────────────────
-
-const BackNavBar: Component<{
-	readonly sessionId: string;
-	readonly sidebarOpen?: boolean;
-	readonly onToggleSidebar?: () => void;
-}> = (props) => {
-	const navigate = useNavigate();
-
-	return (
-		<div class="flex items-center gap-2 border-b border-gray-200 px-3 py-1 dark:border-gray-800">
-			{/* Mobile sidebar toggle */}
-			<Show when={props.onToggleSidebar}>
-				{(toggle) => (
-					<button
-						onClick={toggle()}
-						class="rounded p-1 text-gray-500 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
-						aria-label="Toggle sidebar"
-					>
-						<Show when={props.sidebarOpen} fallback={<Menu class="h-4 w-4" />}>
-							<X class="h-4 w-4" />
-						</Show>
-					</button>
-				)}
-			</Show>
-			<button
-				onClick={() => navigate("/")}
-				class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-				aria-label="Back to session list"
-			>
-				<ArrowLeft class="h-3 w-3" />
-				Sessions
-			</button>
-			<span class="text-xs text-gray-400 dark:text-gray-400">{props.sessionId.slice(0, 12)}</span>
-		</div>
-	);
-};
-
 // ── Agent not found fallback ─────────────────────────────────────────
 
 const AgentNotFound: Component<{
@@ -222,6 +185,12 @@ export const SessionDetail: Component = () => {
 		return undefined;
 	});
 
+	const relatedSessions = createMemo(() => {
+		const detail = sessionDetail();
+		if (detail?.status === "ready") return detail.relatedSessions;
+		return undefined;
+	});
+
 	const isNotDistilled = createMemo(() => sessionDetail()?.status === "not_distilled");
 
 	const isMultiAgent = createMemo(() => {
@@ -239,15 +208,10 @@ export const SessionDetail: Component = () => {
 		return findAgentInTree(agents, agentId);
 	});
 
-	// ── Sidebar state (responsive) ──────────────────────────────
-	const [sidebarOpen, setSidebarOpen] = createSignal(false);
-	const toggleSidebar = () => setSidebarOpen((prev) => !prev);
-
 	// ── Navigation handler ──────────────────────────────────────
 
 	const handleSelectView = (view: string, agentId?: string) => {
 		setSearchParams({ view, agent: agentId ?? undefined });
-		setSidebarOpen(false); // close mobile sidebar on navigation
 	};
 
 	// ── Re-distill handler ──────────────────────────────────────
@@ -296,7 +260,6 @@ export const SessionDetail: Component = () => {
 	};
 
 	// ── Panel transition key ────────────────────────────────────
-	// Changes whenever the active panel changes, triggering a CSS fade animation
 	const panelKey = createMemo(() => `${currentView()}:${selectedAgentId() ?? ""}`);
 
 	useKeyboard(() => [
@@ -334,93 +297,72 @@ export const SessionDetail: Component = () => {
 
 	return (
 		<PageShell>
-			{/* Back nav bar */}
-			<BackNavBar
-				sessionId={params.id}
-				sidebarOpen={sidebarOpen()}
-				onToggleSidebar={toggleSidebar}
-			/>
-
-			{/* Main content */}
 			<Show when={!sessionDetail.loading} fallback={<LoadingSkeleton label="Loading session..." />}>
 				<Show when={!isNotDistilled()} fallback={<NotDistilledState sessionId={params.id} onDistill={refetchDetail} />}>
 					<Show when={session()}>
 						{(s) => (
-							<>
-								{/* Session header with timeline + re-distill */}
-								<SessionHeader session={s()} onRedistill={handleRedistill} />
-
-								{/* Body: sidebar nav + content panel */}
-								<div class="relative flex flex-1 overflow-hidden">
-									{/* Mobile backdrop */}
-									<Show when={sidebarOpen()}>
-										<div
-											class="fixed inset-0 z-20 bg-black/30 md:hidden"
-											onClick={() => setSidebarOpen(false)}
-										/>
-									</Show>
-
-									{/* Left sidebar nav -- wider, hidden on mobile unless toggled */}
-									<div
-										class="absolute inset-y-0 left-0 z-30 w-72 shrink-0 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0"
-										classList={{ "-translate-x-full": !sidebarOpen(), "translate-x-0": sidebarOpen() }}
-									>
-										<SessionDetailNav
-											session={s()}
-											sessionId={params.id}
-											currentView={currentView()}
-											selectedAgentId={selectedAgentId()}
-											onSelectView={handleSelectView}
-										/>
-									</div>
-
-									{/* Right content panel -- keyed wrapper triggers fade on panel switch */}
-									<Show when={panelKey()} keyed>
-										{(_panelKey) => (
-										<div class="flex-1 overflow-hidden animate-page-fade">
-											<Switch fallback={
+							<DetailPageLayout
+								backLabel="Sessions"
+								backHref="/"
+								id={params.id.slice(0, 12)}
+								header={<SessionHeader session={s()} onRedistill={handleRedistill} />}
+								nav={
+									<SessionDetailNav
+										session={s()}
+										sessionId={params.id}
+										currentView={currentView()}
+										selectedAgentId={selectedAgentId()}
+										onSelectView={handleSelectView}
+									/>
+								}
+							>
+								{/* Right content panel -- keyed wrapper triggers fade on panel switch */}
+								<Show when={panelKey()} keyed>
+									{(_panelKey) => (
+									<div class="flex-1 overflow-hidden animate-page-fade">
+										<Switch fallback={
+											<OverviewPanel
+												session={s()}
+												sessionId={params.id}
+												isMultiAgent={isMultiAgent()}
+												relatedSessions={relatedSessions()}
+											/>
+										}>
+											<Match when={currentView() === "overview"}>
 												<OverviewPanel
 													session={s()}
 													sessionId={params.id}
 													isMultiAgent={isMultiAgent()}
-													onSelectAgent={(agentId) => handleSelectView("agent", agentId)}
+													relatedSessions={relatedSessions()}
 												/>
-											}>
-												<Match when={currentView() === "overview"}>
-													<OverviewPanel
-														session={s()}
-														sessionId={params.id}
-														isMultiAgent={isMultiAgent()}
-													/>
-												</Match>
-												<Match when={currentView() === "agent" && selectedAgentId()}>
-													<Show
-														when={selectedAgent()}
-														fallback={
-															<AgentNotFound
-																agentId={selectedAgentId() ?? ""}
-																onGoOverview={() => handleSelectView("overview")}
-															/>
-														}
-													>
-														{(agent) => (
-															<AgentPanel
-																agent={agent()}
-																session={s()}
-																sessionId={params.id}
-															/>
-														)}
-													</Show>
-												</Match>
-												<Match when={currentView() === "conversation"}>
-													<ConversationPanel sessionId={params.id} />
-												</Match>
-											</Switch>
-										</div>
-										)}
-									</Show>
-								</div>
-							</>
+											</Match>
+											<Match when={currentView() === "agent" && selectedAgentId()}>
+												<Show
+													when={selectedAgent()}
+													fallback={
+														<AgentNotFound
+															agentId={selectedAgentId() ?? ""}
+															onGoOverview={() => handleSelectView("overview")}
+														/>
+													}
+												>
+													{(agent) => (
+														<AgentPanel
+															agent={agent()}
+															session={s()}
+															sessionId={params.id}
+														/>
+													)}
+												</Show>
+											</Match>
+											<Match when={currentView() === "conversation"}>
+												<ConversationPanel sessionId={params.id} />
+											</Match>
+										</Switch>
+									</div>
+									)}
+								</Show>
+							</DetailPageLayout>
 						)}
 					</Show>
 				</Show>

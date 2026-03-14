@@ -1,11 +1,12 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { Search, ArrowUp, ArrowDown, RefreshCw, Inbox, ChevronRight, Database, Calendar, Activity, Clock, Users } from "lucide-solid";
+import { Search, ArrowUp, ArrowDown, RefreshCw, Inbox, ChevronRight, Database, Calendar, Activity, Clock, Users, Layers } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
-import { sessionList, refetchSessions, globalError, clearError } from "../lib/stores";
-import type { SessionSummary } from "../../shared/types";
+import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
+import type { SessionSummary, WorkUnit } from "../../shared/types";
 import { formatDuration } from "../lib/format";
 import { StatusBadge } from "../components/ui/StatusBadge";
+import { WorkUnitCard } from "../components/WorkUnitCard";
 
 // ── Live indicator ──────────────────────────────────────────────────
 
@@ -115,9 +116,13 @@ const computeTotalEvents = (sessions: readonly SessionSummary[]): number =>
 
 // ── Filter types ────────────────────────────────────────────────────
 
+type ViewMode = "sessions" | "work_units";
 type StatusFilter = "all" | "complete" | "incomplete";
 type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
-type AgentsFilter = "all" | "multi" | "solo";
+type AgentsFilter = "all" | "top_level" | "multi" | "solo";
+
+const isValidViewMode = (s: string | undefined): s is ViewMode =>
+	s === "sessions" || s === "work_units";
 
 const isValidStatus = (s: string | undefined): s is StatusFilter =>
 	s === "all" || s === "complete" || s === "incomplete";
@@ -126,7 +131,7 @@ const isValidAnalyzed = (s: string | undefined): s is AnalyzedFilter =>
 	s === "all" || s === "analyzed" || s === "not_analyzed";
 
 const isValidAgents = (s: string | undefined): s is AgentsFilter =>
-	s === "all" || s === "multi" || s === "solo";
+	s === "all" || s === "top_level" || s === "multi" || s === "solo";
 
 // ── Sort types ──────────────────────────────────────────────────────
 
@@ -232,9 +237,13 @@ export const SessionList: Component = () => {
 		agents?: string;
 		sort?: string;
 		page?: string;
+		view?: string;
 	}>();
 
 	// Initialize from URL params
+	const [viewMode, setViewMode] = createSignal<ViewMode>(
+		isValidViewMode(searchParams.view) ? searchParams.view : "sessions",
+	);
 	const [search, setSearch] = createSignal(searchParams.q ?? "");
 	const [statusFilter, setStatusFilter] = createSignal<StatusFilter>(
 		isValidStatus(searchParams.status) ? searchParams.status : "all",
@@ -243,7 +252,7 @@ export const SessionList: Component = () => {
 		isValidAnalyzed(searchParams.analyzed) ? searchParams.analyzed : "all",
 	);
 	const [agentsFilter, setAgentsFilter] = createSignal<AgentsFilter>(
-		isValidAgents(searchParams.agents) ? searchParams.agents : "all",
+		isValidAgents(searchParams.agents) ? searchParams.agents : "top_level",
 	);
 	const [sortState, setSortState] = createSignal<SortState>(
 		parseSortParam(searchParams.sort),
@@ -263,12 +272,14 @@ export const SessionList: Component = () => {
 		const agents = agentsFilter();
 		const sort = sortState();
 		const p = page();
+		const v = viewMode();
 		params.q = q || undefined;
 		params.status = status !== "all" ? status : undefined;
 		params.analyzed = analyzed !== "all" ? analyzed : undefined;
-		params.agents = agents !== "all" ? agents : undefined;
+		params.agents = agents !== "top_level" ? agents : undefined;
 		params.sort = serializeSortParam(sort);
 		params.page = p > 1 ? String(p) : undefined;
+		params.view = v !== "sessions" ? v : undefined;
 		setSearchParams(params);
 	});
 
@@ -284,6 +295,7 @@ export const SessionList: Component = () => {
 			if (status !== "all" && s.status !== status) return false;
 			if (analyzed === "analyzed" && !s.is_distilled) return false;
 			if (analyzed === "not_analyzed" && s.is_distilled) return false;
+			if (agents === "top_level" && s.is_subagent === true) return false;
 			if (agents === "multi" && (s.agent_count ?? 0) <= 1) return false;
 			if (agents === "solo" && (s.agent_count ?? 0) > 1) return false;
 			if (q) {
@@ -311,6 +323,26 @@ export const SessionList: Component = () => {
 	});
 
 	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / PAGE_SIZE)));
+
+	// ── Work units filtered by search ────────────────────────
+	const filteredWorkUnits = createMemo(() => {
+		const units = workUnitList() ?? [];
+		const q = search().toLowerCase();
+		if (!q) return units;
+		return units.filter((u) => {
+			const spec = (u.spec_path ?? "").toLowerCase();
+			const branch = (u.git_branch ?? "").toLowerCase();
+			const sessionNames = u.sessions.map((s) => (s.session_name ?? s.session_id).toLowerCase());
+			return spec.includes(q) || branch.includes(q) || sessionNames.some((n) => n.includes(q));
+		});
+	});
+
+	const multiSessionUnits = createMemo(() =>
+		filteredWorkUnits().filter(u => u.sessions.length > 1)
+	);
+	const standaloneUnits = createMemo(() =>
+		filteredWorkUnits().filter(u => u.sessions.length <= 1)
+	);
 
 	// ── Summary stats (derived from filtered sessions) ────────
 	const todayCount = createMemo(() => filtered().filter((s) => isToday(s.start_time)).length);
@@ -370,8 +402,31 @@ export const SessionList: Component = () => {
 		<div class="p-4">
 			{/* Header row: title + KPI stats + refresh */}
 			<div class="flex items-center gap-4">
-				<div class="flex items-center gap-2">
-					<h1 class="text-lg font-bold text-gray-800 dark:text-gray-100">Sessions</h1>
+				<div class="flex items-center gap-3">
+					{/* View toggle: Sessions / Work Units */}
+					<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
+						<button
+							onClick={() => { setViewMode("sessions"); setPage(1); setSelectedRow(-1); }}
+							class={`px-3 py-1.5 text-xs font-medium transition ${
+								viewMode() === "sessions"
+									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+							}`}
+						>
+							Sessions
+						</button>
+						<button
+							onClick={() => { setViewMode("work_units"); refetchWorkUnits(); }}
+							class={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition ${
+								viewMode() === "work_units"
+									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+							}`}
+						>
+							<Layers class="h-3 w-3" />
+							Work Units
+						</button>
+					</div>
 					<div class="flex items-center gap-1" title="Live updates via SSE">
 						<LiveDot />
 						<span class="text-[10px] text-gray-500">Live</span>
@@ -469,7 +524,7 @@ export const SessionList: Component = () => {
 				</div>
 				{/* Agents filter */}
 				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-					<For each={["all", "multi", "solo"] as const}>
+					<For each={["all", "top_level", "multi", "solo"] as const}>
 						{(v) => (
 							<button
 								onClick={() => {
@@ -483,7 +538,7 @@ export const SessionList: Component = () => {
 										: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
 								}`}
 							>
-								{v === "all" ? "All" : v === "multi" ? "Multi-agent" : "Solo"}
+								{v === "all" ? "All" : v === "top_level" ? "Top-level" : v === "multi" ? "Multi-agent" : "Solo"}
 							</button>
 						)}
 					</For>
@@ -493,7 +548,38 @@ export const SessionList: Component = () => {
 				</span>
 			</div>
 
-			{/* Table */}
+			{/* Work Units View */}
+			<Show when={viewMode() === "work_units"}>
+				<div class="mt-3 space-y-3">
+					<Show
+						when={filteredWorkUnits().length > 0}
+						fallback={
+							<div class="flex flex-col items-center gap-2 py-12 text-gray-500">
+								<Layers class="h-8 w-8 text-gray-300 dark:text-gray-400" />
+								<p class="text-lg font-medium">No work units found</p>
+								<p class="text-sm">Distill sessions with spec files to generate work units.</p>
+							</div>
+						}
+					>
+						<For each={multiSessionUnits()}>
+							{(unit) => <WorkUnitCard unit={unit} />}
+						</For>
+						<Show when={standaloneUnits().length > 0}>
+							<div class="flex items-center gap-2 pt-2">
+								<div class="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
+								<span class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Standalone</span>
+								<div class="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
+							</div>
+							<For each={standaloneUnits()}>
+								{(unit) => <WorkUnitCard unit={unit} />}
+							</For>
+						</Show>
+					</Show>
+				</div>
+			</Show>
+
+			{/* Sessions Table */}
+			<Show when={viewMode() === "sessions"}>
 			<div class="mt-3 overflow-x-auto rounded-lg border border-clens">
 				<table class="w-full text-left text-sm">
 					<thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-800 dark:bg-gray-900">
@@ -592,9 +678,10 @@ export const SessionList: Component = () => {
 					</tbody>
 				</table>
 			</div>
+			</Show>
 
 			{/* Pagination */}
-			<Show when={totalPages() > 1}>
+			<Show when={viewMode() === "sessions" && totalPages() > 1}>
 				<div class="mt-4 flex items-center justify-between text-sm">
 					<span class="text-gray-500">
 						Page {page()} of {totalPages()}

@@ -38,6 +38,7 @@ import { estimateCostFromTokens, extractStats } from "./stats";
 import { extractSummary } from "./summary";
 import { extractTeamMetrics } from "./team";
 import { extractTimeline } from "./timeline";
+import { synthesizeSpawnLinks } from "./synthetic-links";
 import { extractUserMessages } from "./user-messages";
 
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
@@ -227,12 +228,19 @@ export const distill = async (
 	// Layer 0: Link reading (needed early for decisions enrichment)
 	const links = readLinks(projectDir);
 	const sessionLinks = filterLinksForSession(sessionId, links);
-	const nameMap = sessionLinks.length > 0 ? buildNameMap(sessionLinks) : undefined;
+
+	// Synthesize spawn/stop links for background sub-agents that lack SubagentStart/SubagentStop
+	const syntheticResult = synthesizeSpawnLinks(events, sessionLinks, projectDir, sessionId);
+	const effectiveSessionLinks = syntheticResult.spawns.length > 0
+		? [...sessionLinks, ...syntheticResult.spawns, ...syntheticResult.stops] as readonly LinkEvent[]
+		: sessionLinks;
+
+	const nameMap = effectiveSessionLinks.length > 0 ? buildNameMap(effectiveSessionLinks) : undefined;
 
 	// Layer 1: Hook-based extractors (stats receives reasoning + transcript token usage for cost)
 	const stats = extractStats(events, reasoning, token_usage, resolvedTier);
 	const backtracks = extractBacktracks(events);
-	const decisions = extractDecisions(events, sessionLinks.length > 0 ? sessionLinks : undefined);
+	const decisions = extractDecisions(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
 	const file_map = extractFileMap(events);
 	const git_diff = await extractGitDiff(sessionId, projectDir, events);
 
@@ -310,15 +318,15 @@ export const distill = async (
 	};
 	const diffContext: DiffContext = { projectDir, parentEvents: events };
 	const rawAgents =
-		sessionLinks.length > 0
-			? buildAgentTree(sessionId, sessionLinks, events, readTranscript, readAgentEvents, diffContext, resolvedTier)
+		effectiveSessionLinks.length > 0
+			? buildAgentTree(sessionId, effectiveSessionLinks, events, readTranscript, readAgentEvents, diffContext, resolvedTier)
 			: undefined;
 
 	// Merge spawn-based tree with comm-inferred agents (team teammates not captured by spawn links)
 	const agents = mergeSpawnAndInferredAgents({
 		sessionId,
 		rawAgents,
-		sessionLinks,
+		sessionLinks: effectiveSessionLinks,
 		nameMap,
 		readAgentEvents,
 		readTranscriptFn: readTranscript,
@@ -344,22 +352,22 @@ export const distill = async (
 	const finalNameMap = (() => {
 		const base = effectiveNameMap ?? new Map<string, string>();
 		if (base.has(sessionId)) return base;
-		if (sessionLinks.length === 0) return base;
+		if (effectiveSessionLinks.length === 0) return base;
 		return new Map([...base, [sessionId, "leader"]]);
 	})();
 
 	const allAgentIds =
-		sessionLinks.length > 0
-			? new Set(sessionLinks.filter(isSpawnLink).map((s) => s.agent_id))
+		effectiveSessionLinks.length > 0
+			? new Set(effectiveSessionLinks.filter(isSpawnLink).map((s) => s.agent_id))
 			: undefined;
 	const team_metrics =
-		sessionLinks.length > 0 ? extractTeamMetrics(sessionLinks, allAgentIds, sessionId) : undefined;
+		effectiveSessionLinks.length > 0 ? extractTeamMetrics(effectiveSessionLinks, allAgentIds, sessionId) : undefined;
 	const communication_graph =
-		sessionLinks.length > 0 ? buildCommGraph(sessionLinks, finalNameMap) : undefined;
+		effectiveSessionLinks.length > 0 ? buildCommGraph(effectiveSessionLinks, finalNameMap) : undefined;
 	const comm_sequence =
-		sessionLinks.length > 0 ? extractCommSequence(sessionLinks, finalNameMap) : undefined;
+		effectiveSessionLinks.length > 0 ? extractCommSequence(effectiveSessionLinks, finalNameMap) : undefined;
 	const agent_lifetimes =
-		sessionLinks.length > 0 ? extractAgentLifetimes(sessionLinks, finalNameMap) : undefined;
+		effectiveSessionLinks.length > 0 ? extractAgentLifetimes(effectiveSessionLinks, finalNameMap) : undefined;
 
 	// Model inference: stats.model → transcript model → first agent model
 	const inferredModel = stats.model ?? transcript_model ?? agents?.find((a) => a.model)?.model;
@@ -424,7 +432,7 @@ export const distill = async (
 			: rawActiveDuration;
 
 	// Layer 3: Synthesis
-	const phases = extractPhases(events, sessionLinks.length > 0 ? sessionLinks : undefined);
+	const phases = extractPhases(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
 	const summary = extractSummary({
 		stats: effectiveStats,
 		backtracks: effectiveBacktracks,
@@ -443,7 +451,7 @@ export const distill = async (
 		user_messages,
 		effectiveBacktracks,
 		phases,
-		sessionLinks.length > 0 ? sessionLinks : undefined,
+		effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined,
 		finalNameMap,
 	);
 

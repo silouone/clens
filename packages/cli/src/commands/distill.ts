@@ -132,6 +132,12 @@ export const distillCommand = async (args: {
 	mkdirSync(distilledDir, { recursive: true });
 	writeFileSync(`${distilledDir}/${args.sessionId}.json`, JSON.stringify(result, null, 2));
 
+	// Rebuild work unit index (best-effort)
+	try {
+		const { rebuildWorkUnitIndex } = await import("../session/work-units");
+		rebuildWorkUnitIndex(args.projectDir);
+	} catch { /* best-effort — index is a derived artifact */ }
+
 	if (args.json) {
 		console.log(JSON.stringify(result, null, 2));
 		return;

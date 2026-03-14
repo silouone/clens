@@ -54,4 +54,5 @@ export interface SessionSummary {
 	readonly agent_count?: number;    // 0 = single-agent, >0 = multi-agent
 	readonly is_distilled?: boolean;  // true if .clens/distilled/{sid}.json exists
 	readonly has_spec?: boolean;      // true if distilled data has plan_drift
+	readonly is_subagent?: boolean;   // true if spawned by another session
 }

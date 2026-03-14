@@ -47,7 +47,7 @@
   "main": "./dist/cli.js",
   "types": "./src/types/index.ts",
   "files": [
-    "dist/",
+    "dist/*.js",
     "agentic/"
   ],
   "bin": {

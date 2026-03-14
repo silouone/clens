@@ -151,5 +151,51 @@ body {
 	background: rgba(128, 128, 128, 0.5);
 }
 
+/* ── Lightweight prose for markdown in conversation ────────────── */
+
+.prose-sm-dark strong {
+	font-weight: 600;
+	color: inherit;
+}
+.prose-sm-dark code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.85em;
+	padding: 0.15em 0.35em;
+	border-radius: 0.25rem;
+	background: rgba(128, 128, 128, 0.15);
+}
+.prose-sm-dark pre {
+	margin: 0.5em 0;
+	padding: 0.5em 0.75em;
+	border-radius: 0.375rem;
+	background: rgba(0, 0, 0, 0.25);
+	overflow-x: auto;
+}
+.prose-sm-dark pre code {
+	padding: 0;
+	background: none;
+}
+.prose-sm-dark ul,
+.prose-sm-dark ol {
+	padding-left: 1.25em;
+	margin: 0.25em 0;
+}
+.prose-sm-dark li {
+	margin: 0.1em 0;
+}
+.prose-sm-dark a {
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.prose-sm-dark h1,
+.prose-sm-dark h2,
+.prose-sm-dark h3 {
+	font-weight: 600;
+	margin: 0.5em 0 0.25em;
+}
+.prose-sm-dark h1 { font-size: 1.1em; }
+.prose-sm-dark h2 { font-size: 1.05em; }
+.prose-sm-dark h3 { font-size: 1em; }
+
 /* fadeIn and pageFade animations are defined in tailwind.config.js
    and auto-generated as animate-fade-in / animate-page-fade utilities */

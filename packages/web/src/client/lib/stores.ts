@@ -1,5 +1,5 @@
 import { createResource, createSignal } from "solid-js";
-import type { ConversationEntry, DistilledSession, SessionSummary } from "../../shared/types";
+import type { ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
 import { api } from "./api";
 
 const LOG_PREFIX = "[cLens:api]";
@@ -45,9 +45,22 @@ const [sessionList, { refetch: refetchSessions }] =
 
 // ── Session detail (lazy) ───────────────────────────────────────────
 
+/** Related sessions data from work unit index. */
+type RelatedSessionsData = {
+	readonly work_unit_id: string;
+	readonly spec_path?: string;
+	readonly sessions: readonly {
+		readonly session_id: string;
+		readonly session_name?: string;
+		readonly phase: string;
+		readonly role: string;
+		readonly start_time: number;
+	}[];
+};
+
 /** Response from the session detail endpoint when distilled data exists. */
 type SessionDetailResult =
-	| { readonly status: "ready"; readonly data: DistilledSession }
+	| { readonly status: "ready"; readonly data: DistilledSession; readonly relatedSessions?: RelatedSessionsData }
 	| { readonly status: "not_distilled" };
 
 /**
@@ -81,9 +94,15 @@ const createSessionDetail = (sessionId: () => string | undefined) => {
 			return undefined;
 		}
 		console.debug(LOG_PREFIX, `Session ${id.slice(0, 8)}: loaded`);
+		const raw = "related_sessions" in body ? body.related_sessions : undefined;
+		const relatedSessions: RelatedSessionsData | undefined =
+			raw && typeof raw === "object" && "sessions" in raw && Array.isArray(raw.sessions)
+				? raw as RelatedSessionsData
+				: undefined;
 		return {
 			status: "ready",
 			data: data as DistilledSession,
+			relatedSessions,
 		};
 	};
 
@@ -214,6 +233,90 @@ const createAgentConversationResource = (
 	return createResource(key, fetcher);
 };
 
+// ── Work Units ──────────────────────────────────────────────────────
+
+const fetchWorkUnits = async (): Promise<readonly WorkUnit[]> => {
+	console.debug(LOG_PREFIX, "Fetching work units");
+	try {
+		const res = await fetch("/api/work-units");
+		if (!res.ok) {
+			console.error(LOG_PREFIX, `Work units error: HTTP ${res.status}`);
+			return [];
+		}
+		const body = await res.json();
+		const data = body.data;
+		if (!Array.isArray(data)) return [];
+		console.debug(LOG_PREFIX, `Work units: ${data.length} units`);
+		return data as readonly WorkUnit[];
+	} catch (err) {
+		console.error(LOG_PREFIX, "Work units fetch failed:", err);
+		return [];
+	}
+};
+
+const [workUnitList, { refetch: refetchWorkUnits }] =
+	createResource(fetchWorkUnits);
+
+// ── Work Unit Detail (lazy) ─────────────────────────────────────────
+
+/** Session data within a work unit detail response. */
+type WorkUnitDetailSession = {
+	readonly session_id: string;
+	readonly session_name?: string;
+	readonly phase: string;
+	readonly role: string;
+	readonly start_time: number;
+	readonly distilled: DistilledSession | null;
+	readonly summary: {
+		readonly session_id: string;
+		readonly session_name?: string;
+		readonly is_distilled: boolean;
+		readonly duration_ms: number;
+	};
+};
+
+/** Response from the work unit detail endpoint. */
+type WorkUnitDetailResult = {
+	readonly unit: WorkUnit;
+	readonly sessions: readonly WorkUnitDetailSession[];
+};
+
+/**
+ * Create a reactive resource for a work unit's enriched detail data.
+ * Lazily loaded — only fetches when id signal changes.
+ */
+const createWorkUnitDetail = (id: () => string | undefined) => {
+	const fetcher = async (
+		unitId: string,
+	): Promise<WorkUnitDetailResult | undefined> => {
+		console.debug(LOG_PREFIX, `Fetching work unit detail: ${unitId.slice(0, 12)}`);
+		try {
+			const res = await fetch(`/api/work-units/${unitId}/detail`);
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ error: "Unknown error" }));
+				const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
+				console.error(LOG_PREFIX, `Work unit detail error (${unitId.slice(0, 12)}):`, msg);
+				setGlobalError({ message: msg, code: String(res.status) });
+				return undefined;
+			}
+			const body = await res.json();
+			const data = body.data;
+			if (!data || typeof data !== "object" || !("unit" in data) || !("sessions" in data) || !Array.isArray(data.sessions)) {
+				console.error(LOG_PREFIX, `Work unit ${unitId.slice(0, 12)}: invalid data format`);
+				setGlobalError({ message: "Invalid work unit data format", code: "PARSE_ERROR" });
+				return undefined;
+			}
+			console.debug(LOG_PREFIX, `Work unit ${unitId.slice(0, 12)}: loaded`);
+			return data as WorkUnitDetailResult;
+		} catch (err) {
+			console.error(LOG_PREFIX, "Work unit detail fetch failed:", err);
+			return undefined;
+		}
+	};
+
+	return createResource(id, fetcher);
+};
+
 export {
 	globalError,
 	setGlobalError,
@@ -223,5 +326,9 @@ export {
 	createSessionDetail,
 	createConversationStore,
 	createAgentConversationResource,
+	workUnitList,
+	refetchWorkUnits,
+	fetchWorkUnits,
+	createWorkUnitDetail,
 };
-export type { ApiError, ConversationStore, SessionDetailResult };
+export type { ApiError, ConversationStore, RelatedSessionsData, SessionDetailResult, WorkUnitDetailResult, WorkUnitDetailSession };

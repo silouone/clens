@@ -21,8 +21,13 @@ import {
 } from "lucide-solid";
 import { createConversationStore } from "../lib/stores";
 import type { ConversationEntry } from "../../shared/types";
+import snarkdown from "snarkdown";
 import { Badge } from "./ui/Badge";
 import { Spinner } from "./ui/Spinner";
+
+/** Render markdown string to sanitized HTML */
+const renderMd = (text: string): string =>
+	snarkdown(text);
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -51,7 +56,7 @@ const intentVariant = (intent: string) =>
 const truncate = (text: string, max: number): string =>
 	text.length > max ? `${text.slice(0, max)}...` : text;
 
-// ── Teammate message parsing ────────────────────────────────────────
+// ── User prompt content parsing ─────────────────────────────────────
 
 type TeammateMessage = {
 	readonly teammate_id: string;
@@ -60,40 +65,91 @@ type TeammateMessage = {
 	readonly content: string;
 };
 
+type CommandInvocation = {
+	readonly command_name: string;
+	readonly command_message: string;
+	readonly command_args: string;
+};
+
 type TextSegment =
 	| { readonly kind: "text"; readonly value: string }
-	| { readonly kind: "teammate"; readonly msg: TeammateMessage };
+	| { readonly kind: "teammate"; readonly msg: TeammateMessage }
+	| { readonly kind: "command"; readonly cmd: CommandInvocation };
 
-const TEAMMATE_RE = /<teammate-message\s+([^>]*)>([\s\S]*?)<\/teammate-message>/g;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
 
-const parseTeammateSegments = (text: string): readonly TextSegment[] => {
-	const segments: TextSegment[] = [];
-	let lastIndex = 0;
+/** Tags to strip entirely (system metadata, not user-visible) */
+const SYSTEM_TAG_RE = /<(?:system-reminder|antml_thinking|available-deferred-tools|context-window-status)[^>]*>[\s\S]*?<\/(?:system-reminder|antml_thinking|available-deferred-tools|context-window-status)>/g;
 
-	for (const match of text.matchAll(TEAMMATE_RE)) {
-		const before = text.slice(lastIndex, match.index);
-		if (before.trim()) segments.push({ kind: "text", value: before.trim() });
+/** Command invocation block: <command-name>...</command-name> with optional siblings */
+const COMMAND_BLOCK_RE = /<command-message>([\s\S]*?)<\/command-message>\s*<command-name>([\s\S]*?)<\/command-name>\s*<command-args>([\s\S]*?)<\/command-args>/g;
+const COMMAND_BLOCK_RE2 = /<command-name>([\s\S]*?)<\/command-name>\s*<command-message>([\s\S]*?)<\/command-message>\s*<command-args>([\s\S]*?)<\/command-args>/g;
 
-		const attrs: Record<string, string> = {};
-		for (const a of match[1].matchAll(ATTR_RE)) {
-			attrs[a[1]] = a[2];
+/** Teammate message */
+const TEAMMATE_RE = /<teammate-message\s+([^>]*)>([\s\S]*?)<\/teammate-message>/g;
+
+/** Catch-all for any remaining unrecognized XML-like tags */
+const STRAY_TAG_RE = /<\/?(?:command-name|command-message|command-args|system-reminder|antml_thinking)[^>]*>/g;
+
+const parseUserPromptSegments = (raw: string): readonly TextSegment[] => {
+	// Phase 1: strip system tags
+	let text = raw.replace(SYSTEM_TAG_RE, "");
+
+	// Phase 2: extract command blocks
+	const commands: Array<{ index: number; length: number; cmd: CommandInvocation }> = [];
+
+	for (const re of [COMMAND_BLOCK_RE, COMMAND_BLOCK_RE2]) {
+		for (const m of text.matchAll(re)) {
+			const isReversed = re === COMMAND_BLOCK_RE;
+			commands.push({
+				index: m.index ?? 0,
+				length: m[0].length,
+				cmd: {
+					command_message: (isReversed ? m[1] : m[2]).trim(),
+					command_name: (isReversed ? m[2] : m[1]).trim(),
+					command_args: m[3].trim(),
+				},
+			});
 		}
+	}
 
-		segments.push({
-			kind: "teammate",
+	// Phase 3: extract teammate messages
+	const teammates: Array<{ index: number; length: number; msg: TeammateMessage }> = [];
+	for (const m of text.matchAll(TEAMMATE_RE)) {
+		const attrs: Record<string, string> = {};
+		for (const a of m[1].matchAll(ATTR_RE)) attrs[a[1]] = a[2];
+		teammates.push({
+			index: m.index ?? 0,
+			length: m[0].length,
 			msg: {
 				teammate_id: attrs.teammate_id ?? "unknown",
 				color: attrs.color ?? "gray",
 				summary: attrs.summary,
-				content: match[2].trim(),
+				content: m[2].trim(),
 			},
 		});
-		lastIndex = (match.index ?? 0) + match[0].length;
 	}
 
-	const tail = text.slice(lastIndex);
-	if (tail.trim()) segments.push({ kind: "text", value: tail.trim() });
+	// Phase 4: merge all parsed spans sorted by position
+	type Span = { index: number; length: number; segment: TextSegment };
+	const spans: Span[] = [
+		...commands.map((c) => ({ index: c.index, length: c.length, segment: { kind: "command" as const, cmd: c.cmd } })),
+		...teammates.map((t) => ({ index: t.index, length: t.length, segment: { kind: "teammate" as const, msg: t.msg } })),
+	].sort((a, b) => a.index - b.index);
+
+	const segments: TextSegment[] = [];
+	let cursor = 0;
+
+	for (const span of spans) {
+		const before = text.slice(cursor, span.index).replace(STRAY_TAG_RE, "").trim();
+		if (before) segments.push({ kind: "text", value: before });
+		segments.push(span.segment);
+		cursor = span.index + span.length;
+	}
+
+	const tail = text.slice(cursor).replace(STRAY_TAG_RE, "").trim();
+	if (tail) segments.push({ kind: "text", value: tail });
+
 	return segments;
 };
 
@@ -142,19 +198,27 @@ const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => {
 					</pre>
 				}
 			>
-				<div class="whitespace-pre-wrap text-xs leading-relaxed text-gray-300">
-					{props.msg.content}
-				</div>
+				<div class="prose-sm-dark whitespace-pre-wrap text-xs leading-relaxed text-gray-300" innerHTML={renderMd(props.msg.content)} />
 			</Show>
 		</div>
 	);
 };
 
+const CommandCard: Component<{ readonly cmd: CommandInvocation }> = (props) => (
+	<div class="flex items-center gap-2 rounded-lg border border-gray-600/40 bg-gray-900/40 px-3 py-1.5">
+		<Terminal class="h-3 w-3 shrink-0 text-gray-400" />
+		<span class="font-mono text-[11px] font-medium text-gray-300">{props.cmd.command_name.startsWith("/") ? props.cmd.command_name : `/${props.cmd.command_name}`}</span>
+		<Show when={props.cmd.command_args}>
+			<span class="truncate font-mono text-[11px] text-gray-500">{props.cmd.command_args}</span>
+		</Show>
+	</div>
+);
+
 // ── Entry renderers ──────────────────────────────────────────────────
 
 const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "user_prompt" } }> = (props) => {
-	const segments = () => parseTeammateSegments(props.entry.text);
-	const hasTeammate = () => segments().some((s) => s.kind === "teammate");
+	const segments = () => parseUserPromptSegments(props.entry.text);
+	const hasStructured = () => segments().some((s) => s.kind !== "text");
 
 	return (
 		<div class="flex gap-3 py-3">
@@ -167,11 +231,9 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 					<span class="text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
 				</div>
 				<Show
-					when={hasTeammate()}
+					when={hasStructured()}
 					fallback={
-						<div class="whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200">
-							{props.entry.text}
-						</div>
+						<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderMd(props.entry.text)} />
 					}
 				>
 					<div class="flex flex-col gap-2">
@@ -180,14 +242,17 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 								<Switch>
 									<Match when={seg.kind === "text" && seg}>
 										{(s) => (
-											<div class="whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200">
-												{(s() as TextSegment & { kind: "text" }).value}
-											</div>
+											<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderMd((s() as TextSegment & { kind: "text" }).value)} />
 										)}
 									</Match>
 									<Match when={seg.kind === "teammate" && seg}>
 										{(s) => (
 											<TeammateCard msg={(s() as TextSegment & { kind: "teammate" }).msg} />
+										)}
+									</Match>
+									<Match when={seg.kind === "command" && seg}>
+										{(s) => (
+											<CommandCard cmd={(s() as TextSegment & { kind: "command" }).cmd} />
 										)}
 									</Match>
 								</Switch>
@@ -202,6 +267,7 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 
 const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thinking" } }> = (props) => {
 	const [expanded, setExpanded] = createSignal(false);
+	const hasText = () => props.entry.text.trim().length > 0;
 
 	return (
 		<div class="flex gap-3 py-2">
@@ -209,22 +275,31 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 				<Brain class="h-3 w-3 text-text-muted" />
 			</div>
 			<div class="min-w-0 flex-1">
-				<button
-					onClick={() => setExpanded((p) => !p)}
-					class="flex w-full items-center gap-2 text-left text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+				<Show
+					when={hasText()}
+					fallback={
+						<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+							<Badge variant={intentVariant(props.entry.intent)}>{props.entry.intent}</Badge>
+						</div>
+					}
 				>
-					<Badge variant={intentVariant(props.entry.intent)}>{props.entry.intent}</Badge>
-					<span class="flex-1 truncate text-gray-400 dark:text-gray-500">
-						{truncate(props.entry.text, 120)}
-					</span>
-					<Show when={expanded()} fallback={<ChevronRight class="h-3 w-3 shrink-0" />}>
-						<ChevronDown class="h-3 w-3 shrink-0" />
+					<button
+						onClick={() => setExpanded((p) => !p)}
+						class="flex w-full items-center gap-2 text-left text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+					>
+						<Badge variant={intentVariant(props.entry.intent)}>{props.entry.intent}</Badge>
+						<span class="flex-1 truncate text-gray-400 dark:text-gray-500">
+							{truncate(props.entry.text, 120)}
+						</span>
+						<Show when={expanded()} fallback={<ChevronRight class="h-3 w-3 shrink-0" />}>
+							<ChevronDown class="h-3 w-3 shrink-0" />
+						</Show>
+					</button>
+					<Show when={expanded()}>
+						<div class="mt-1.5 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
+							{props.entry.text}
+						</div>
 					</Show>
-				</button>
-				<Show when={expanded()}>
-					<div class="mt-1.5 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
-						{props.entry.text}
-					</div>
 				</Show>
 			</div>
 		</div>

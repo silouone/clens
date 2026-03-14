@@ -47,6 +47,11 @@ export type {
 	ToolPivotDecision,
 	TransitionTrigger,
 	WorkingTreeChange,
+	WorkUnit,
+	WorkUnitIndex,
+	WorkUnitLinkType,
+	WorkUnitSession,
+	WorkUnitSessionRole,
 } from "./distill";
 export {
 	type AgentEvent,

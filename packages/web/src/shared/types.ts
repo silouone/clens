@@ -49,4 +49,11 @@ export type {
 	DistilledSummary,
 	TeamMetrics,
 	DecisionPoint,
+
+	// Work Units
+	WorkUnit,
+	WorkUnitIndex,
+	WorkUnitSession,
+	WorkUnitSessionRole,
+	WorkUnitLinkType,
 } from "@clens/cli";

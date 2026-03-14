@@ -26,6 +26,8 @@ export interface SpawnLink extends BaseLinkEvent {
 	readonly agent_id: string;
 	readonly agent_type: string;
 	readonly agent_name?: string;
+	/** Generated at distill time (from PreToolUse Agent events) rather than hook time */
+	readonly synthetic?: boolean;
 }
 
 export interface StopLink extends BaseLinkEvent {
@@ -33,6 +35,8 @@ export interface StopLink extends BaseLinkEvent {
 	readonly parent_session: string;
 	readonly agent_id: string;
 	readonly transcript_path?: string;
+	/** Generated at distill time (from PreToolUse Agent events) rather than hook time */
+	readonly synthetic?: boolean;
 }
 
 export interface MessageLink extends BaseLinkEvent {

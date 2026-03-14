@@ -1,6 +1,6 @@
 import { Hono } from "hono"
 import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
-import { readDistilled, readSessionEvents, readLinks, readTranscript } from "@clens/cli/src/session"
+import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions } from "@clens/cli/src/session"
 import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified } from "@clens/cli/src/utils"
 import type { AgentNode, SessionSummary, StoredEvent, LinkEvent, SpawnLink } from "@clens/cli"
@@ -135,6 +135,7 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 		},
 		new Map<string, number>(),
 	)
+	const subagentIds = new Set(spawns.map(s => s.agent_id))
 
 	// Fallback: count unique msg_send recipients per session when no spawns exist
 	const msgSendEvents = links.filter((l): l is Extract<LinkEvent, { type: "msg_send" }> => l.type === "msg_send")
@@ -188,6 +189,7 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 					file_size_bytes: stat.size,
 					agent_count: agentCount,
 					is_distilled: isDistilled,
+					is_subagent: subagentIds.has(sessionId),
 				}]
 			} catch (err) {
 				log.warn(`Failed to parse session file ${file}:`, err instanceof Error ? err.message : String(err))
@@ -300,7 +302,26 @@ const createSessionsRoute = (projectDir: string) =>
 				return c.json({ status: "not_distilled" as const }, 202)
 			}
 
-			return c.json({ data: distilled })
+			// Enrich with related sessions from work unit index
+			const related = getRelatedSessions(sessionId, projectDir)
+			const relatedSessions = related.work_unit
+				? {
+					work_unit_id: related.work_unit.id,
+					spec_path: related.work_unit.spec_path,
+					sessions: related.work_unit.sessions.map((s) => ({
+						session_id: s.session_id,
+						session_name: s.session_name,
+						phase: s.phase,
+						role: s.role,
+						start_time: s.start_time,
+					})),
+				}
+				: undefined
+
+			return c.json({
+				data: distilled,
+				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
+			})
 		})
 
 		// GET /api/sessions/:sessionId/events — paginated events

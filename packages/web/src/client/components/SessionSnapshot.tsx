@@ -1,13 +1,29 @@
 import { createMemo, createSignal, For, Show, type Component } from "solid-js";
-import { Activity } from "lucide-solid";
+import { A } from "@solidjs/router";
+import { ExternalLink } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatPercentage, truncateMultiline } from "../lib/format";
 import { StatusBadge } from "./ui/StatusBadge";
+import { MetaRow } from "./ui/MetaRow";
+import { RelatedSessionBadges } from "./RelatedSessionBadges";
 
 // ── Types ────────────────────────────────────────────────────────────
 
+type RelatedSessionsData = {
+	readonly work_unit_id: string;
+	readonly spec_path?: string;
+	readonly sessions: readonly {
+		readonly session_id: string;
+		readonly session_name?: string;
+		readonly phase: string;
+		readonly role: string;
+		readonly start_time: number;
+	}[];
+};
+
 type SessionSnapshotProps = {
 	readonly session: DistilledSession;
+	readonly relatedSessions?: RelatedSessionsData;
 };
 
 // ── Pure helpers ─────────────────────────────────────────────────────
@@ -24,20 +40,6 @@ const findFirstPrompt = (
 	const clean = stripHtml(msg.content).trim();
 	return clean.length > 0 ? clean : undefined;
 };
-
-// ── Stat row ─────────────────────────────────────────────────────────
-
-const StatRow: Component<{
-	readonly label: string;
-	readonly value: string | number;
-}> = (props) => (
-	<div class="flex items-center justify-between text-xs">
-		<span class="text-text-muted">{props.label}</span>
-		<span class="font-medium tabular-nums text-gray-700 dark:text-gray-300">
-			{props.value}
-		</span>
-	</div>
-);
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -86,11 +88,57 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 			{/* Spec path banner (if plan_drift exists) */}
 			<Show when={specPath()}>
 				{(path) => (
-					<div class="mb-3 flex items-center gap-2 rounded-md bg-violet-50 px-3 py-1.5 dark:bg-violet-900/20">
-						<span class="text-xs font-medium text-violet-600 dark:text-violet-400">Spec</span>
-						<span class="truncate font-mono text-xs text-violet-700 dark:text-violet-300" title={path()}>
-							{path()}
-						</span>
+					<div class="mb-3">
+						<div class="flex items-center gap-2 rounded-md bg-violet-50 px-3 py-1.5 dark:bg-violet-900/20">
+							<span class="text-xs font-medium text-violet-600 dark:text-violet-400">Spec</span>
+							<span class="flex-1 truncate font-mono text-xs text-violet-700 dark:text-violet-300" title={path()}>
+								{path()}
+							</span>
+							<Show when={props.relatedSessions?.work_unit_id}>
+								{(wuId) => (
+									<A
+										href={`/work-unit/${wuId()}`}
+										class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-violet-600 transition hover:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-800/30"
+									>
+										View Work Unit
+										<ExternalLink class="h-2.5 w-2.5" />
+									</A>
+								)}
+							</Show>
+						</div>
+						<Show when={props.relatedSessions}>
+							{(related) => (
+								<RelatedSessionBadges
+									currentSessionId={session().session_id}
+									relatedSessions={related().sessions}
+									specPath={related().spec_path}
+								/>
+							)}
+						</Show>
+					</div>
+				)}
+			</Show>
+			{/* Related sessions badges when no spec path but work unit exists */}
+			<Show when={!specPath() && props.relatedSessions}>
+				{(related) => (
+					<div class="mb-3">
+						<Show when={related().work_unit_id}>
+							{(wuId) => (
+								<div class="mb-2 flex items-center gap-2">
+									<A
+										href={`/work-unit/${wuId()}`}
+										class="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 transition hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+									>
+										View Work Unit
+										<ExternalLink class="h-3 w-3" />
+									</A>
+								</div>
+							)}
+						</Show>
+						<RelatedSessionBadges
+							currentSessionId={session().session_id}
+							relatedSessions={related().sessions}
+						/>
 					</div>
 				)}
 			</Show>
@@ -133,9 +181,9 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 						<StatusBadge complete={session().complete} />
 					</div>
 					<div class="space-y-1">
-						<StatRow label="Commits" value={commitCount()} />
-						<StatRow label="Files modified" value={filesModified()} />
-						<StatRow
+						<MetaRow label="Commits" value={commitCount()} />
+						<MetaRow label="Files modified" value={filesModified()} />
+						<MetaRow
 							label="Working tree changes"
 							value={workingTreeChanges()}
 						/>
@@ -148,9 +196,9 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 						Session Facts
 					</h3>
 					<div class="space-y-1">
-						<StatRow label="Tool calls" value={toolCallCount()} />
-						<StatRow label="Backtracks" value={backtrackCount()} />
-						<StatRow label="Failure rate" value={failureRatePct()} />
+						<MetaRow label="Tool calls" value={toolCallCount()} />
+						<MetaRow label="Backtracks" value={backtrackCount()} />
+						<MetaRow label="Failure rate" value={failureRatePct()} />
 						<Show when={Object.keys(session().stats.failures_by_tool ?? {}).length > 0}>
 							<div class="mt-1 flex flex-wrap gap-1">
 								<For each={Object.entries(session().stats.failures_by_tool ?? {})}>
