@@ -1,30 +1,10 @@
 import { Show, createSignal, type Component } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { TimelineBar } from "./TimelineBar";
-import { StatusBadge } from "./StatusBadge";
+import { StatusBadge } from "./ui/StatusBadge";
+import { CostDrilldown } from "./CostDrilldown";
+import { StatItem } from "./ui/StatItem";
 import { formatDuration, formatCost } from "../lib/format";
-
-// ── Stat pill ────────────────────────────────────────────────────────
-
-const StatPill: Component<{
-	readonly label: string;
-	readonly value: string;
-	readonly muted?: boolean;
-	readonly title?: string;
-}> = (props) => (
-	<div class="flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-800/60" title={props.title}>
-		<span class="text-gray-500">{props.label}</span>
-		<span
-			class="font-medium"
-			classList={{
-				"text-gray-400 dark:text-gray-400": props.muted === true,
-				"text-gray-700 dark:text-gray-300": props.muted !== true,
-			}}
-		>
-			{props.value}
-		</span>
-	</div>
-);
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -45,6 +25,7 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 	const cost = () => session().cost_estimate?.estimated_cost_usd;
 	const costIsEstimated = () => session().cost_estimate?.is_estimated;
 	const [distilling, setDistilling] = createSignal(false);
+	const [costOpen, setCostOpen] = createSignal(false);
 
 	return (
 		<div class="border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
@@ -55,21 +36,33 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 				</h2>
 				<StatusBadge complete={session().complete} />
 				<div class="flex flex-wrap items-center gap-1.5">
-					<StatPill label="Duration" value={formatDuration(duration())} />
-					<StatPill label="Model" value={model()} />
+					<StatItem variant="pill" label="Duration" value={formatDuration(duration())} />
+					<StatItem variant="pill" label="Model" value={model()} />
 					<Show when={cost() !== undefined}>
-						<StatPill
-							label="Cost"
-							value={formatCost(cost() ?? 0, costIsEstimated())}
-							muted={costIsEstimated()}
-							title={costIsEstimated() ? "Estimated cost (real token data unavailable)" : undefined}
-						/>
+						<div class="relative">
+							<button
+								onClick={() => setCostOpen((prev) => !prev)}
+								class="cursor-pointer rounded-md transition hover:ring-1 hover:ring-gray-300 dark:hover:ring-gray-600"
+							>
+								<StatItem variant="pill"
+									label="Cost"
+									value={formatCost(cost() ?? 0, costIsEstimated())}
+									muted={costIsEstimated()}
+									title={costIsEstimated() ? "Click for details — estimated cost" : "Click for cost breakdown"}
+								/>
+							</button>
+							<CostDrilldown
+								session={props.session}
+								open={costOpen()}
+								onClose={() => setCostOpen(false)}
+							/>
+						</div>
 					</Show>
-					<StatPill
+					<StatItem variant="pill"
 						label="Tools"
 						value={String(summary()?.key_metrics.tool_calls ?? session().stats.tool_call_count)}
 					/>
-					<StatPill
+					<StatItem variant="pill"
 						label="Failures"
 						value={String(summary()?.key_metrics.failures ?? session().stats.failure_count)}
 					/>

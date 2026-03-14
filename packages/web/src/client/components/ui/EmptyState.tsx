@@ -22,7 +22,7 @@ export const EmptyState: Component<EmptyStateProps> = (props) => (
 		<p class="text-lg font-medium text-gray-600 dark:text-gray-400">{props.title}</p>
 		<Show when={props.description}>
 			{(desc) => (
-				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{desc()}</p>
+				<p class="mt-1 text-sm text-text-muted">{desc()}</p>
 			)}
 		</Show>
 		<Show when={props.action}>

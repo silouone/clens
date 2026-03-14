@@ -10,9 +10,11 @@ import { flattenAgents } from "../lib/agent-utils";
 type AgentWorkloadTableProps = {
 	readonly session: DistilledSession;
 	readonly sessionId: string;
+	readonly onSelectAgent?: (agentId: string) => void;
 };
 
 type FlatAgent = {
+	readonly sessionId: string;
 	readonly name: string;
 	readonly agentType: string;
 	readonly toolCalls: number;
@@ -25,7 +27,8 @@ type FlatAgent = {
 // ── Pure helpers ─────────────────────────────────────────────────────
 
 /** Convert an AgentNode to a flat row for the table. */
-const toFlatAgent = (agent: { readonly agent_name?: string; readonly agent_type: string; readonly tool_call_count: number; readonly duration_ms: number; readonly file_map?: { readonly files: readonly { readonly edits: number }[] }; readonly cost_estimate?: { readonly estimated_cost_usd: number; readonly is_estimated: boolean } }): FlatAgent => ({
+const toFlatAgent = (agent: { readonly session_id: string; readonly agent_name?: string; readonly agent_type: string; readonly tool_call_count: number; readonly duration_ms: number; readonly file_map?: { readonly files: readonly { readonly edits: number }[] }; readonly cost_estimate?: { readonly estimated_cost_usd: number; readonly is_estimated: boolean } }): FlatAgent => ({
+	sessionId: agent.session_id,
 	name: agent.agent_name ?? agent.agent_type,
 	agentType: agent.agent_type,
 	toolCalls: agent.tool_call_count,
@@ -83,11 +86,17 @@ export const AgentWorkloadTable: Component<AgentWorkloadTableProps> = (props) =>
 					<tbody>
 						<For each={rows()}>
 							{(row) => (
-								<tr class="border-b border-gray-100 dark:border-gray-800/50">
+								<tr
+									class="border-b border-gray-100 dark:border-gray-800/50 transition"
+									classList={{
+										"cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30": props.onSelectAgent !== undefined,
+									}}
+									onClick={() => props.onSelectAgent?.(row.sessionId)}
+								>
 									<td class="px-3 py-1.5">
 										<div class="flex items-center gap-2">
 											<span
-												class={`rounded px-1 py-0.5 text-[9px] font-medium ${getTypeBadgeClass(row.agentType)}`}
+												class={`rounded px-1 py-0.5 text-[11px] font-medium ${getTypeBadgeClass(row.agentType)}`}
 											>
 												{row.agentType}
 											</span>

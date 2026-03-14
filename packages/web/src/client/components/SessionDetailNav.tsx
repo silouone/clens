@@ -1,5 +1,5 @@
 import { createSignal, For, Show, type Component } from "solid-js";
-import { ChevronRight, LayoutDashboard } from "lucide-solid";
+import { ChevronRight, LayoutDashboard, MessageSquare } from "lucide-solid";
 import type { AgentNode, DistilledSession } from "../../shared/types";
 import { getTypeBadgeClass } from "../lib/agent-colors";
 import { countAllAgents, sumDiffStats } from "../lib/agent-utils";
@@ -88,11 +88,18 @@ const AgentNavRow: Component<{
 				<div class="flex w-full items-center gap-1.5 px-2 pt-1.5 pb-0.5">
 					{/* Expand/collapse toggle */}
 					<Show when={hasChildren()} fallback={<span class="w-3" />}>
-						<ChevronRight
-							class="h-3 w-3 shrink-0 cursor-pointer text-gray-400 transition-transform hover:text-gray-700 dark:hover:text-gray-300"
-							classList={{ "rotate-90": expanded() }}
+						<button
+							type="button"
+							aria-label="Toggle subtree"
+							aria-expanded={expanded()}
+							class="flex items-center justify-center rounded p-0 hover:text-gray-700 dark:hover:text-gray-300"
 							onClick={handleToggle}
-						/>
+						>
+							<ChevronRight
+								class="h-3 w-3 shrink-0 text-gray-400 transition-transform"
+								classList={{ "rotate-90": expanded() }}
+							/>
+						</button>
 					</Show>
 
 					{/* Type badge */}
@@ -173,7 +180,7 @@ export const SessionDetailNav: Component<SessionDetailNavProps> = (props) => {
 			aria-label="Session navigation"
 		>
 			{/* Top nav items */}
-			<div class="px-2 py-2">
+			<div class="px-2 py-2 space-y-0.5">
 				<NavItem
 					label="Overview"
 					icon={LayoutDashboard}
@@ -181,11 +188,18 @@ export const SessionDetailNav: Component<SessionDetailNavProps> = (props) => {
 					onClick={() => props.onSelectView("overview")}
 					shortcut="1"
 				/>
+				<NavItem
+					label="Conversation"
+					icon={MessageSquare}
+					active={props.currentView === "conversation"}
+					onClick={() => props.onSelectView("conversation")}
+					shortcut="c"
+				/>
 			</div>
 
 			{/* Agents section */}
 			<Show when={agents().length > 0}>
-				<div class="border-t border-gray-200 dark:border-gray-800" />
+				<div class="border-t border-clens" />
 				<div class="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
 					<h3 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400">
 						Agents

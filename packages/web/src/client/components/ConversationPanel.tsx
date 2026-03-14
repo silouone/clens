@@ -1,0 +1,432 @@
+import {
+	createSignal,
+	For,
+	Match,
+	onCleanup,
+	Show,
+	Switch,
+	type Component,
+} from "solid-js";
+import {
+	AlertTriangle,
+	Brain,
+	Check,
+	ChevronDown,
+	ChevronRight,
+	Milestone,
+	Send,
+	Terminal,
+	User,
+	X,
+} from "lucide-solid";
+import { createConversationStore } from "../lib/stores";
+import type { ConversationEntry } from "../../shared/types";
+import { Badge } from "./ui/Badge";
+import { Spinner } from "./ui/Spinner";
+
+// ── Types ────────────────────────────────────────────────────────────
+
+type ConversationPanelProps = {
+	readonly sessionId: string;
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+const formatTimestamp = (t: number): string => {
+	const d = new Date(t);
+	return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+
+const INTENT_VARIANT: Readonly<Record<string, "info" | "warning" | "success" | "default">> = {
+	planning: "info",
+	debugging: "warning",
+	deciding: "info",
+	research: "success",
+	general: "default",
+};
+
+const intentVariant = (intent: string) =>
+	INTENT_VARIANT[intent] ?? "default";
+
+const truncate = (text: string, max: number): string =>
+	text.length > max ? `${text.slice(0, max)}...` : text;
+
+// ── Teammate message parsing ────────────────────────────────────────
+
+type TeammateMessage = {
+	readonly teammate_id: string;
+	readonly color: string;
+	readonly summary?: string;
+	readonly content: string;
+};
+
+type TextSegment =
+	| { readonly kind: "text"; readonly value: string }
+	| { readonly kind: "teammate"; readonly msg: TeammateMessage };
+
+const TEAMMATE_RE = /<teammate-message\s+([^>]*)>([\s\S]*?)<\/teammate-message>/g;
+const ATTR_RE = /(\w+)="([^"]*)"/g;
+
+const parseTeammateSegments = (text: string): readonly TextSegment[] => {
+	const segments: TextSegment[] = [];
+	let lastIndex = 0;
+
+	for (const match of text.matchAll(TEAMMATE_RE)) {
+		const before = text.slice(lastIndex, match.index);
+		if (before.trim()) segments.push({ kind: "text", value: before.trim() });
+
+		const attrs: Record<string, string> = {};
+		for (const a of match[1].matchAll(ATTR_RE)) {
+			attrs[a[1]] = a[2];
+		}
+
+		segments.push({
+			kind: "teammate",
+			msg: {
+				teammate_id: attrs.teammate_id ?? "unknown",
+				color: attrs.color ?? "gray",
+				summary: attrs.summary,
+				content: match[2].trim(),
+			},
+		});
+		lastIndex = (match.index ?? 0) + match[0].length;
+	}
+
+	const tail = text.slice(lastIndex);
+	if (tail.trim()) segments.push({ kind: "text", value: tail.trim() });
+	return segments;
+};
+
+const COLOR_MAP: Readonly<Record<string, string>> = {
+	orange: "border-orange-400/50 bg-orange-950/20",
+	pink: "border-pink-400/50 bg-pink-950/20",
+	blue: "border-blue-400/50 bg-blue-950/20",
+	green: "border-emerald-400/50 bg-emerald-950/20",
+	purple: "border-violet-400/50 bg-violet-950/20",
+	red: "border-red-400/50 bg-red-950/20",
+};
+
+const LABEL_COLOR_MAP: Readonly<Record<string, string>> = {
+	orange: "text-orange-400",
+	pink: "text-pink-400",
+	blue: "text-blue-400",
+	green: "text-emerald-400",
+	purple: "text-violet-400",
+	red: "text-red-400",
+};
+
+const isJsonContent = (s: string): boolean =>
+	s.startsWith("{") || s.startsWith("[");
+
+const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => {
+	const borderClass = () => COLOR_MAP[props.msg.color] ?? "border-gray-500/50 bg-gray-950/20";
+	const labelClass = () => LABEL_COLOR_MAP[props.msg.color] ?? "text-gray-400";
+
+	return (
+		<div class={`rounded-lg border px-3 py-2 ${borderClass()}`}>
+			<div class="mb-1 flex items-center gap-2">
+				<span class={`text-[10px] font-semibold uppercase tracking-wider ${labelClass()}`}>
+					{props.msg.teammate_id}
+				</span>
+				<Show when={props.msg.summary}>
+					{(s) => (
+						<span class="text-[11px] text-gray-300">{s()}</span>
+					)}
+				</Show>
+			</div>
+			<Show
+				when={!isJsonContent(props.msg.content)}
+				fallback={
+					<pre class="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-gray-500">
+						{truncate(props.msg.content, 200)}
+					</pre>
+				}
+			>
+				<div class="whitespace-pre-wrap text-xs leading-relaxed text-gray-300">
+					{props.msg.content}
+				</div>
+			</Show>
+		</div>
+	);
+};
+
+// ── Entry renderers ──────────────────────────────────────────────────
+
+const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "user_prompt" } }> = (props) => {
+	const segments = () => parseTeammateSegments(props.entry.text);
+	const hasTeammate = () => segments().some((s) => s.kind === "teammate");
+
+	return (
+		<div class="flex gap-3 py-3">
+			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40">
+				<User class="h-3 w-3 text-blue-600 dark:text-blue-400" />
+			</div>
+			<div class="min-w-0 flex-1">
+				<div class="mb-1 flex items-center gap-2">
+					<span class="text-xs font-semibold text-blue-700 dark:text-blue-300">User</span>
+					<span class="text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+				</div>
+				<Show
+					when={hasTeammate()}
+					fallback={
+						<div class="whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200">
+							{props.entry.text}
+						</div>
+					}
+				>
+					<div class="flex flex-col gap-2">
+						<For each={segments()}>
+							{(seg) => (
+								<Switch>
+									<Match when={seg.kind === "text" && seg}>
+										{(s) => (
+											<div class="whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200">
+												{(s() as TextSegment & { kind: "text" }).value}
+											</div>
+										)}
+									</Match>
+									<Match when={seg.kind === "teammate" && seg}>
+										{(s) => (
+											<TeammateCard msg={(s() as TextSegment & { kind: "teammate" }).msg} />
+										)}
+									</Match>
+								</Switch>
+							)}
+						</For>
+					</div>
+				</Show>
+			</div>
+		</div>
+	);
+};
+
+const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thinking" } }> = (props) => {
+	const [expanded, setExpanded] = createSignal(false);
+
+	return (
+		<div class="flex gap-3 py-2">
+			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+				<Brain class="h-3 w-3 text-text-muted" />
+			</div>
+			<div class="min-w-0 flex-1">
+				<button
+					onClick={() => setExpanded((p) => !p)}
+					class="flex w-full items-center gap-2 text-left text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+				>
+					<Badge variant={intentVariant(props.entry.intent)}>{props.entry.intent}</Badge>
+					<span class="flex-1 truncate text-gray-400 dark:text-gray-500">
+						{truncate(props.entry.text, 120)}
+					</span>
+					<Show when={expanded()} fallback={<ChevronRight class="h-3 w-3 shrink-0" />}>
+						<ChevronDown class="h-3 w-3 shrink-0" />
+					</Show>
+				</button>
+				<Show when={expanded()}>
+					<div class="mt-1.5 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
+						{props.entry.text}
+					</div>
+				</Show>
+			</div>
+		</div>
+	);
+};
+
+const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool_call" } }> = (props) => (
+	<div class="flex items-center gap-3 py-1.5">
+		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
+			<Terminal class="h-3 w-3 text-violet-600 dark:text-violet-400" />
+		</div>
+		<div class="flex min-w-0 flex-1 items-center gap-2">
+			<span class="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+				{props.entry.tool_name}
+			</span>
+			<Show when={props.entry.file_path}>
+				{(fp) => (
+					<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-500">
+						{fp()}
+					</span>
+				)}
+			</Show>
+			<span class="ml-auto shrink-0 text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+		</div>
+	</div>
+);
+
+const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "tool_result" } }> = (props) => {
+	const isSuccess = () => props.entry.outcome === "success";
+
+	return (
+		<div class="flex items-center gap-3 py-1 pl-9">
+			<Show
+				when={isSuccess()}
+				fallback={
+					<X class="h-3.5 w-3.5 shrink-0 text-red-500 dark:text-red-400" />
+				}
+			>
+				<Check class="h-3.5 w-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />
+			</Show>
+			<span class="font-mono text-[11px] text-gray-400 dark:text-gray-500">{props.entry.tool_name}</span>
+			<Show when={props.entry.error}>
+				{(err) => (
+					<span class="truncate text-[11px] text-red-500 dark:text-red-400">
+						{truncate(err(), 80)}
+					</span>
+				)}
+			</Show>
+		</div>
+	);
+};
+
+const BacktrackRow: Component<{ readonly entry: ConversationEntry & { type: "backtrack" } }> = (props) => (
+	<div class="flex items-center gap-3 py-2">
+		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+			<AlertTriangle class="h-3 w-3 text-amber-600 dark:text-amber-400" />
+		</div>
+		<Badge variant="warning">{props.entry.backtrack_type}</Badge>
+		<span class="text-xs text-text-muted">
+			Attempt {props.entry.attempt}
+		</span>
+		<Show when={props.entry.reverted_tool_ids.length > 0}>
+			<span class="text-[10px] text-gray-400">
+				({props.entry.reverted_tool_ids.length} reverted)
+			</span>
+		</Show>
+		<span class="ml-auto text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+	</div>
+);
+
+const PhaseBoundaryRow: Component<{ readonly entry: ConversationEntry & { type: "phase_boundary" } }> = (props) => (
+	<div class="flex items-center gap-3 py-3">
+		<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+		<div class="flex items-center gap-1.5">
+			<Milestone class="h-3 w-3 text-gray-400" />
+			<span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+				{props.entry.phase_name}
+			</span>
+		</div>
+		<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+	</div>
+);
+
+const AgentMessageRow: Component<{ readonly entry: ConversationEntry & { type: "agent_message" } }> = (props) => {
+	const isSent = () => props.entry.direction === "sent";
+
+	return (
+		<div class="flex items-center gap-3 py-1.5">
+			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30">
+				<Send class="h-3 w-3 text-teal-600 dark:text-teal-400" classList={{ "rotate-180": !isSent() }} />
+			</div>
+			<span class="text-xs text-text-muted">
+				{isSent() ? "Sent to" : "Received from"}{" "}
+				<span class="font-medium text-gray-700 dark:text-gray-300">{props.entry.partner}</span>
+			</span>
+			<Show when={props.entry.summary}>
+				{(s) => <span class="truncate text-[11px] text-gray-400 dark:text-gray-500">{s()}</span>}
+			</Show>
+			<span class="ml-auto text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+		</div>
+	);
+};
+
+// ── Entry dispatcher ────────────────────────────────────────────────
+
+const isType = <T extends ConversationEntry["type"]>(
+	entry: ConversationEntry,
+	type: T,
+): (ConversationEntry & { readonly type: T }) | false =>
+	entry.type === type ? (entry as ConversationEntry & { readonly type: T }) : false;
+
+const ConversationEntryRow: Component<{ readonly entry: ConversationEntry }> = (props) => (
+	<Switch>
+		<Match when={isType(props.entry, "user_prompt")}>
+			{(e) => <UserPromptRow entry={e()} />}
+		</Match>
+		<Match when={isType(props.entry, "thinking")}>
+			{(e) => <ThinkingRow entry={e()} />}
+		</Match>
+		<Match when={isType(props.entry, "tool_call")}>
+			{(e) => <ToolCallRow entry={e()} />}
+		</Match>
+		<Match when={isType(props.entry, "tool_result")}>
+			{(e) => <ToolResultRow entry={e()} />}
+		</Match>
+		<Match when={isType(props.entry, "backtrack")}>
+			{(e) => <BacktrackRow entry={e()} />}
+		</Match>
+		<Match when={isType(props.entry, "phase_boundary")}>
+			{(e) => <PhaseBoundaryRow entry={e()} />}
+		</Match>
+		<Match when={isType(props.entry, "agent_message")}>
+			{(e) => <AgentMessageRow entry={e()} />}
+		</Match>
+	</Switch>
+);
+
+// ── Main component ──────────────────────────────────────────────────
+
+export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
+	const store = createConversationStore(() => props.sessionId);
+	const [scrollRef, setScrollRef] = createSignal<HTMLDivElement | undefined>();
+
+	// Infinite scroll: detect near bottom
+	const handleScroll = () => {
+		const el = scrollRef();
+		if (!el || store.loading() || !store.hasMore()) return;
+		const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
+		if (nearBottom) store.loadMore();
+	};
+
+	// Attach/detach scroll listener
+	const attachListener = (el: HTMLDivElement) => {
+		setScrollRef(el);
+		el.addEventListener("scroll", handleScroll, { passive: true });
+		onCleanup(() => el.removeEventListener("scroll", handleScroll));
+	};
+
+	return (
+		<div class="flex h-full flex-col overflow-hidden">
+			{/* Header bar */}
+			<div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-800">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Conversation</h2>
+				<Show when={store.total() > 0}>
+					<span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-gray-400 dark:bg-gray-800">
+						{store.total()} entries
+					</span>
+				</Show>
+				<Show when={store.loading()}>
+					<Spinner size="sm" />
+				</Show>
+			</div>
+
+			{/* Scrollable entries */}
+			<div
+				ref={attachListener}
+				class="flex-1 overflow-y-auto px-4"
+			>
+				<Show
+					when={store.entries().length > 0}
+					fallback={
+						<Show when={!store.loading()}>
+							<div class="flex h-32 items-center justify-center text-xs text-gray-400">
+								No conversation data available
+							</div>
+						</Show>
+					}
+				>
+					<div class="divide-y divide-gray-100 dark:divide-gray-800/50">
+						<For each={store.entries()}>
+							{(entry) => <ConversationEntryRow entry={entry} />}
+						</For>
+					</div>
+				</Show>
+
+				{/* Load more indicator */}
+				<Show when={store.loading() && store.entries().length > 0}>
+					<div class="flex justify-center py-4">
+						<Spinner size="sm" />
+					</div>
+				</Show>
+			</div>
+		</div>
+	);
+};

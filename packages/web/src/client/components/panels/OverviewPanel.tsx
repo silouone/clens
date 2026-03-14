@@ -15,6 +15,8 @@ import { ThinkingBreakdown } from "../ThinkingBreakdown";
 import { PlanDriftSection } from "../PlanDriftSection";
 import { FileList, buildFileRows } from "../FileList";
 import { BottomPanel } from "../BottomPanel";
+import { DecisionsSection } from "../DecisionsSection";
+import { computeClientRiskScores } from "../../lib/risk";
 
 // -- Types ----------------------------------------------------------------
 
@@ -22,6 +24,7 @@ type OverviewPanelProps = {
 	readonly session: DistilledSession;
 	readonly sessionId: string;
 	readonly isMultiAgent: boolean;
+	readonly onSelectAgent?: (agentId: string) => void;
 };
 
 type TabId = "overview" | "backtracks" | "timeline" | "edits" | "comms";
@@ -38,7 +41,8 @@ type TabDef = {
 const FileListCard: Component<{
 	readonly session: DistilledSession;
 }> = (props) => {
-	const fileRows = createMemo(() => buildFileRows(props.session));
+	const riskMap = createMemo(() => computeClientRiskScores(props.session));
+	const fileRows = createMemo(() => buildFileRows(props.session, riskMap()));
 	const totalAdditions = createMemo(() =>
 		fileRows().reduce((sum, f) => sum + f.additions, 0),
 	);
@@ -82,11 +86,17 @@ const OverviewContent: Component<OverviewPanelProps> = (props) => (
 			<AgentWorkloadTable
 				session={props.session}
 				sessionId={props.sessionId}
+				onSelectAgent={props.onSelectAgent}
 			/>
 		</Show>
 
 		{/* 4. Issues & Errors */}
 		<IssuesPanel session={props.session} />
+
+		{/* 4b. Decision Points */}
+		<Show when={props.session.decisions.length > 0}>
+			<DecisionsSection decisions={props.session.decisions} />
+		</Show>
 
 		{/* 5. Thinking Breakdown */}
 		<Show when={props.session.reasoning.length > 0}>
@@ -111,7 +121,7 @@ const TabBadge: Component<{
 }> = (props) => (
 	<Show when={props.count > 0}>
 		<span
-			class="rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+			class="rounded-full px-1.5 py-0.5 text-[11px] font-medium"
 			classList={{
 				"bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400": props.isBacktrack === true && props.count > 0,
 				"bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400": props.isBacktrack !== true,
@@ -166,10 +176,12 @@ export const OverviewPanel: Component<OverviewPanelProps> = (props) => {
 	return (
 		<div class="flex h-full flex-col overflow-hidden">
 			{/* Horizontal tab bar */}
-			<div class="flex items-center border-b border-gray-200 bg-gray-50 px-2 dark:border-gray-800 dark:bg-gray-900/50">
+			<div role="tablist" class="flex items-center border-b border-gray-200 bg-gray-50 px-2 dark:border-gray-800 dark:bg-gray-900/50">
 				<For each={visibleTabs()}>
 					{(tab) => (
 						<button
+							role="tab"
+							aria-selected={activeTab() === tab.id}
 							onClick={() => setActiveTab(tab.id)}
 							class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition border-b-2"
 							classList={{
@@ -185,7 +197,7 @@ export const OverviewPanel: Component<OverviewPanelProps> = (props) => {
 			</div>
 
 			{/* Tab content */}
-			<div class="flex-1 overflow-y-auto">
+			<div role="tabpanel" class="flex-1 overflow-y-auto">
 				<Show when={activeTab() === "overview"}>
 					<div class="p-3">
 						<OverviewContent

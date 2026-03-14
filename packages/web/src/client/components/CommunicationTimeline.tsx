@@ -87,7 +87,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 				}
 			>
 				{/* Legend */}
-				<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800/30">
+				<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] text-text-muted border-b border-gray-100 dark:border-gray-800/30">
 					<span class="flex items-center gap-1">
 						<span class="inline-block h-2 w-2 rounded-full bg-gray-500" />
 						Sender (filled)
@@ -115,7 +115,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 					<For each={agents()}>
 						{(name) => (
 							<div
-								class="flex-1 truncate px-2 py-1.5 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400"
+								class="flex-1 truncate px-2 py-1.5 text-center text-[10px] font-medium text-text-muted"
 								title={name}
 							>
 								{name}

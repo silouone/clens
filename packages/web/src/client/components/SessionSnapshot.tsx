@@ -1,8 +1,8 @@
-import { createMemo, createSignal, Show, type Component } from "solid-js";
+import { createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { Activity } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatPercentage, truncateMultiline } from "../lib/format";
-import { StatusBadge } from "./StatusBadge";
+import { StatusBadge } from "./ui/StatusBadge";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ const StatRow: Component<{
 	readonly value: string | number;
 }> = (props) => (
 	<div class="flex items-center justify-between text-xs">
-		<span class="text-gray-500 dark:text-gray-400">{props.label}</span>
+		<span class="text-text-muted">{props.label}</span>
 		<span class="font-medium tabular-nums text-gray-700 dark:text-gray-300">
 			{props.value}
 		</span>
@@ -57,7 +57,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 	// ── Outcome column ───────────────────────────────────────────────
 	const commitCount = createMemo(() => session().git_diff.commits.length);
 	const filesModified = createMemo(
-		() => session().file_map.files.filter((f) => f.edits > 0).length,
+		() => session().file_map.files.filter((f) => f.edits > 0 || f.writes > 0).length,
 	);
 	const workingTreeChanges = createMemo(
 		() => session().git_diff.working_tree_changes?.length ?? 0,
@@ -151,6 +151,17 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 						<StatRow label="Tool calls" value={toolCallCount()} />
 						<StatRow label="Backtracks" value={backtrackCount()} />
 						<StatRow label="Failure rate" value={failureRatePct()} />
+						<Show when={Object.keys(session().stats.failures_by_tool ?? {}).length > 0}>
+							<div class="mt-1 flex flex-wrap gap-1">
+								<For each={Object.entries(session().stats.failures_by_tool ?? {})}>
+									{([tool, count]) => (
+										<span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400">
+											{tool} x{count}
+										</span>
+									)}
+								</For>
+							</div>
+						</Show>
 					</div>
 				</div>
 			</div>
@@ -158,7 +169,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 			{/* Bottom row: Active time */}
 			<Show when={activeMs() !== undefined}>
 				<div class="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-					<p class="text-xs text-gray-500 dark:text-gray-400">
+					<p class="text-xs text-text-muted">
 						Active:{" "}
 						<span class="font-medium text-gray-700 dark:text-gray-300">
 							{formatDuration(activeMs() ?? 0)}

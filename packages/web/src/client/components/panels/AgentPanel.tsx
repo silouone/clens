@@ -71,7 +71,7 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 					);
 					return (
 						<div class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
-							<div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-800">
+							<div class="px-4 py-2.5 border-b border-clens">
 								<h3 class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
 									<Wrench class="h-3.5 w-3.5" />
 									Top Tools
@@ -100,7 +100,7 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 			{/* Communication partners */}
 			<Show when={(props.agent.communication_partners?.length ?? 0) > 0}>
 				<div class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
-					<div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-800">
+					<div class="px-4 py-2.5 border-b border-clens">
 						<h3 class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
 							<MessageSquare class="h-3.5 w-3.5" />
 							Communication
@@ -123,7 +123,7 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 
 			{/* Per-agent files */}
 			<div class="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
-				<div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-gray-200 dark:border-gray-800">
+				<div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-clens">
 					<h3 class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
 						<FileCode class="h-3.5 w-3.5" />
 						Files

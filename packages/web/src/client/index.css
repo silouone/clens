@@ -19,6 +19,11 @@ html {
 	--clens-warning: theme("colors.amber.500");
 	--clens-danger: theme("colors.red.500");
 	--clens-info: theme("colors.sky.500");
+	--clens-text-primary: theme("colors.gray.900");
+	--clens-text-secondary: theme("colors.gray.700");
+	--clens-text-muted: theme("colors.gray.500");
+	--clens-border: theme("colors.gray.200");
+	--app-header-height: 37px;
 }
 
 .dark {
@@ -32,6 +37,10 @@ html {
 	--clens-warning: theme("colors.amber.400");
 	--clens-danger: theme("colors.red.400");
 	--clens-info: theme("colors.sky.400");
+	--clens-text-primary: theme("colors.gray.100");
+	--clens-text-secondary: theme("colors.gray.300");
+	--clens-text-muted: theme("colors.gray.400");
+	--clens-border: theme("colors.gray.800");
 }
 
 body {

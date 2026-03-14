@@ -16,7 +16,7 @@ export const SectionHeading: Component<SectionHeadingProps> = (props) => (
 					return <IconComp class="h-4 w-4 text-gray-400 dark:text-gray-400" />;
 				}}
 			</Show>
-			<h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+			<h3 class="text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-200">
 				{props.title}
 			</h3>
 			<Show when={props.count !== undefined}>

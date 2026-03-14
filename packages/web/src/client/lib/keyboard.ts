@@ -10,26 +10,34 @@ type KeyBinding = {
 
 type KeyboardContext = "global" | "session-list" | "session-view";
 
+type ShortcutEntry = {
+	readonly key: string;
+	readonly label: string;
+	readonly context: string;
+	readonly active: boolean;
+};
+
 // ── Help overlay state ──────────────────────────────────────────────
 
 const [showHelp, setShowHelp] = createSignal(false);
 const toggleHelp = () => setShowHelp((v) => !v);
 
-// ── Shortcut definitions (for help overlay display) ─────────────────
+// ── Reactive shortcut registry ──────────────────────────────────────
 
-const SHORTCUTS: readonly {
-	readonly key: string;
-	readonly label: string;
-	readonly context: string;
-}[] = [
-	{ key: "?", label: "Show keyboard shortcuts", context: "Global" },
-	{ key: "Esc", label: "Close overlay / Go back", context: "Global" },
-	{ key: "1", label: "Overview panel", context: "Session Detail" },
-	{ key: "2-9", label: "Select agent by index", context: "Session Detail" },
-	{ key: "j", label: "Next agent / entry", context: "Session Detail" },
-	{ key: "k", label: "Previous agent / entry", context: "Session Detail" },
-	{ key: "Enter", label: "Open session / Drill into agent", context: "Navigation" },
+const [activeShortcuts, setActiveShortcuts] = createSignal<readonly ShortcutEntry[]>([]);
+
+// Global shortcuts always present
+const GLOBAL_SHORTCUTS: readonly ShortcutEntry[] = [
+	{ key: "?", label: "Show keyboard shortcuts", context: "Global", active: true },
+	{ key: "Esc", label: "Close overlay / Go back", context: "Global", active: true },
 ];
+
+const registerShortcuts = (entries: readonly ShortcutEntry[]): (() => void) => {
+	setActiveShortcuts((prev) => [...prev, ...entries]);
+	return () => {
+		setActiveShortcuts((prev) => prev.filter((e) => !entries.includes(e)));
+	};
+};
 
 // ── Keyboard handler hook ───────────────────────────────────────────
 
@@ -37,8 +45,12 @@ const SHORTCUTS: readonly {
  * Register keyboard handlers for a component.
  * Handlers are only active while the component is mounted.
  * Ignores keystrokes in input/textarea/contentEditable elements.
+ * Registers shortcut descriptions into the reactive registry for KeyboardHelp.
  */
-const useKeyboard = (bindings: () => readonly KeyBinding[]): void => {
+const useKeyboard = (
+	bindings: () => readonly KeyBinding[],
+	context = "Navigation",
+): void => {
 	const handler = (e: KeyboardEvent): void => {
 		// Skip if user is typing in an input
 		const target = e.target as HTMLElement;
@@ -76,6 +88,16 @@ const useKeyboard = (bindings: () => readonly KeyBinding[]): void => {
 
 	onMount(() => {
 		document.addEventListener("keydown", handler);
+
+		// Register shortcuts into the reactive registry
+		const entries: readonly ShortcutEntry[] = bindings().map((b) => ({
+			key: b.key,
+			label: b.description,
+			context,
+			active: true,
+		}));
+		const unregister = registerShortcuts(entries);
+		onCleanup(unregister);
 	});
 
 	onCleanup(() => {
@@ -88,6 +110,7 @@ export {
 	showHelp,
 	setShowHelp,
 	toggleHelp,
-	SHORTCUTS,
+	activeShortcuts,
+	GLOBAL_SHORTCUTS,
 };
-export type { KeyBinding, KeyboardContext };
+export type { KeyBinding, KeyboardContext, ShortcutEntry };

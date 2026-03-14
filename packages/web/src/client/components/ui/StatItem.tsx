@@ -20,7 +20,7 @@ const valueClasses = (props: StatItemProps): string =>
 
 const RowLayout: Component<StatItemProps> = (props) => (
 	<div class="flex items-center justify-between py-0.5 text-xs" title={props.title}>
-		<span class="text-gray-500 dark:text-gray-400">{props.label}</span>
+		<span class="text-text-muted">{props.label}</span>
 		<span class={valueClasses(props)}>{props.value}</span>
 	</div>
 );
@@ -30,7 +30,7 @@ const PillLayout: Component<StatItemProps> = (props) => (
 		class="flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs dark:bg-gray-800/60"
 		title={props.title}
 	>
-		<span class="text-gray-500 dark:text-gray-400">{props.label}</span>
+		<span class="text-text-muted">{props.label}</span>
 		<span class={valueClasses(props)}>{props.value}</span>
 	</div>
 );

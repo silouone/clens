@@ -329,6 +329,8 @@ export const SessionList: Component = () => {
 
 	// ── Keyboard navigation ─────────────────────────────────────
 
+	let searchInputRef: HTMLInputElement | undefined;
+
 	useKeyboard(() => [
 		{
 			key: "j",
@@ -355,7 +357,14 @@ export const SessionList: Component = () => {
 				}
 			},
 		},
-	]);
+		{
+			key: "/",
+			description: "Focus search",
+			handler: () => {
+				searchInputRef?.focus();
+			},
+		},
+	], "Session List");
 
 	return (
 		<div class="p-4">
@@ -404,8 +413,9 @@ export const SessionList: Component = () => {
 				<div class="relative">
 					<Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-400" />
 					<input
+						ref={searchInputRef}
 						type="text"
-						placeholder="Search sessions..."
+						placeholder="Search sessions (press /)"
 						value={search()}
 						onInput={(e) => {
 							setSearch(e.currentTarget.value);
@@ -484,7 +494,7 @@ export const SessionList: Component = () => {
 			</div>
 
 			{/* Table */}
-			<div class="mt-3 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+			<div class="mt-3 overflow-x-auto rounded-lg border border-clens">
 				<table class="w-full text-left text-sm">
 					<thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-800 dark:bg-gray-900">
 						<tr>
@@ -512,7 +522,6 @@ export const SessionList: Component = () => {
 													handleRowClick(session);
 												}
 											}}
-											role="link"
 											tabIndex={0}
 											class={`cursor-pointer transition ${
 												selectedRow() === idx()
@@ -539,11 +548,11 @@ export const SessionList: Component = () => {
 											<td class="px-4 py-3">
 												<StatusBadge status={session.status} />
 											</td>
-											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
+											<td class="px-4 py-3 text-right tabular-nums text-text-muted">
 												{formatDuration(session.duration_ms)}
 											</td>
-											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">{session.event_count}</td>
-											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
+											<td class="px-4 py-3 text-right tabular-nums text-text-muted">{session.event_count}</td>
+											<td class="px-4 py-3 text-right tabular-nums text-text-muted">
 												<div class="flex items-center justify-end gap-1.5">
 													{session.agent_count ?? 1}
 													<Show when={(session.agent_count ?? 0) > 1}>
@@ -559,7 +568,7 @@ export const SessionList: Component = () => {
 													</Show>
 												</div>
 											</td>
-											<td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
+											<td class="px-4 py-3 text-right tabular-nums text-text-muted">
 												{formatSize(session.file_size_bytes)}
 											</td>
 											<td class="px-4 py-3">

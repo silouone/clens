@@ -23,6 +23,14 @@ export default {
 					to: { opacity: "1" },
 				},
 			},
+			textColor: {
+				"text-primary": "var(--clens-text-primary)",
+				"text-secondary": "var(--clens-text-secondary)",
+				"text-muted": "var(--clens-text-muted)",
+			},
+			borderColor: {
+				clens: "var(--clens-border)",
+			},
 			colors: {
 				brand: {
 					50: "#eff6ff",

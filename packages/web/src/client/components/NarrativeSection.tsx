@@ -58,7 +58,7 @@ export const NarrativeSection: Component<NarrativeSectionProps> = (props) => {
 										</Show>
 									</div>
 									<Show when={phase.description.length > 0}>
-										<p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+										<p class="mt-0.5 text-xs text-text-muted">
 											{phase.description}
 										</p>
 									</Show>

@@ -48,19 +48,18 @@ const debounce = <T extends (...args: readonly unknown[]) => void>(
 };
 
 const REFETCH_DEBOUNCE_MS = 10_000;
-// Pragmatic exception: mutable flag for in-flight guard (same rationale as debounce timer)
-let refetchInFlight = false;
-const guardedRefetch = () => {
-	if (refetchInFlight) {
-		console.debug(LOG_PREFIX, "Skipping refetch — already in flight");
-		return;
-	}
-	refetchInFlight = true;
-	console.debug(LOG_PREFIX, "Refetching session list from SSE event");
-	Promise.resolve(refetchSessions()).finally(() => {
-		refetchInFlight = false;
-	});
-};
+const guardedRefetch = (() => {
+	const [inFlight, setInFlight] = createSignal(false);
+	return () => {
+		if (inFlight()) {
+			console.debug(LOG_PREFIX, "Skipping refetch — already in flight");
+			return;
+		}
+		setInFlight(true);
+		console.debug(LOG_PREFIX, "Refetching session list from SSE event");
+		Promise.resolve(refetchSessions()).finally(() => setInFlight(false));
+	};
+})();
 const debouncedRefetch = debounce(guardedRefetch, REFETCH_DEBOUNCE_MS);
 
 // ── Constants ───────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ export const LoadingSkeleton: Component<{
 export const PageShell: Component<{
 	readonly children: JSX.Element;
 }> = (props) => (
-	<div class="flex h-[calc(100vh-37px)] flex-col">
+	<div class="flex h-[calc(100vh-var(--app-header-height))] flex-col">
 		<Show when={globalError()}>
 			{(err) => (
 				<ErrorBanner message={err().message} onDismiss={clearError} />

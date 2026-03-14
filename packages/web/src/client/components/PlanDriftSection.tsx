@@ -53,7 +53,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 									Plan Fidelity
 								</h3>
 							</div>
-							<span class="block truncate font-mono text-xs text-gray-500 dark:text-gray-400" title={d().spec_path}>{d().spec_path}</span>
+							<span class="block truncate font-mono text-xs text-text-muted" title={d().spec_path}>{d().spec_path}</span>
 						</div>
 						{/* Scores */}
 						<div class="flex shrink-0 items-end gap-4">
@@ -64,7 +64,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 								<div class="text-xs text-gray-400 dark:text-gray-400">aligned</div>
 							</div>
 							<div class="text-right">
-								<div class="text-2xl font-bold tabular-nums text-gray-500 dark:text-gray-400">
+								<div class="text-2xl font-bold tabular-nums text-text-muted">
 									{driftPct()}%
 								</div>
 								<div class="text-xs text-gray-400 dark:text-gray-400">drift</div>
@@ -74,7 +74,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 
 					{/* Expected files */}
 					<div class="mb-2">
-						<div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+						<div class="mb-1 text-xs font-medium text-text-muted">
 							Expected files ({d().expected_files.length})
 						</div>
 						<div class="space-y-0.5">
@@ -111,7 +111,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 					{/* Unexpected files */}
 					<Show when={d().unexpected_files.length > 0}>
 						<div>
-							<div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+							<div class="mb-1 text-xs font-medium text-text-muted">
 								Unexpected files ({d().unexpected_files.length})
 							</div>
 							<div class="space-y-0.5">

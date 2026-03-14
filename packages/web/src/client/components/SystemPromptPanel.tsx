@@ -7,39 +7,6 @@ type SystemPromptPanelProps = {
 	readonly prompt: string | undefined;
 };
 
-// ── Clipboard icon SVGs ──────────────────────────────────────────────
-
-const ClipboardIcon: Component = () => (
-	<svg
-		xmlns="http://www.w3.org/2000/svg"
-		class="h-3.5 w-3.5"
-		viewBox="0 0 24 24"
-		fill="none"
-		stroke="currentColor"
-		stroke-width="2"
-		stroke-linecap="round"
-		stroke-linejoin="round"
-	>
-		<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-		<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-	</svg>
-);
-
-const CheckIcon: Component = () => (
-	<svg
-		xmlns="http://www.w3.org/2000/svg"
-		class="h-3.5 w-3.5"
-		viewBox="0 0 24 24"
-		fill="none"
-		stroke="currentColor"
-		stroke-width="2"
-		stroke-linecap="round"
-		stroke-linejoin="round"
-	>
-		<polyline points="20 6 9 17 4 12" />
-	</svg>
-);
-
 // ── Component ────────────────────────────────────────────────────────
 
 const COPIED_FEEDBACK_MS = 1500;
@@ -58,7 +25,7 @@ export const SystemPromptPanel: Component<SystemPromptPanelProps> = (props) => {
 
 	return (
 		<div class="flex flex-col h-full">
-			<div class="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-800">
+			<div class="flex items-center justify-between px-4 py-2 border-b border-clens">
 				<h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
 					System Prompt
 				</h3>

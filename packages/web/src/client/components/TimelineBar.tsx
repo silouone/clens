@@ -93,7 +93,7 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 								{(phase) => (
 									<div class="flex items-center gap-0.5">
 										<span class={`inline-block h-1.5 w-1.5 rounded-full ${getPhaseDotColor(phase.name)}`} />
-										<span class="text-[9px] text-gray-400 capitalize">{phase.name}</span>
+										<span class="text-[11px] text-gray-400 capitalize">{phase.name}</span>
 									</div>
 								)}
 							</For>

@@ -25,6 +25,7 @@ import { PageShell, LoadingSkeleton } from "../components/PageShell";
 import { SessionHeader } from "../components/SessionHeader";
 import { SessionDetailNav } from "../components/SessionDetailNav";
 import { OverviewPanel, AgentPanel } from "../components/panels";
+import { ConversationPanel } from "../components/ConversationPanel";
 
 // ── Not distilled state ─────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ const NotDistilledState: Component<{
 					<SearchIcon class="h-6 w-6 text-amber-600 dark:text-amber-400" />
 				</div>
 				<h2 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Session not yet analyzed</h2>
-				<p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+				<p class="mt-2 text-xs text-text-muted">
 					Run distillation to unlock conversation view, diffs, backtracks, and more.
 				</p>
 				<div class="mt-4 flex items-center justify-center gap-3">
@@ -185,7 +186,7 @@ const AgentNotFound: Component<{
 }> = (props) => (
 	<div class="flex h-full items-center justify-center">
 		<div class="text-center">
-			<p class="text-xs text-gray-500 dark:text-gray-400">
+			<p class="text-xs text-text-muted">
 				Agent <code class="font-mono text-xs">{props.agentId.slice(0, 12)}</code> not found in this session.
 			</p>
 			<button
@@ -324,7 +325,12 @@ export const SessionDetail: Component = () => {
 			description: "Previous agent",
 			handler: () => navigateAgent(-1),
 		},
-	]);
+		{
+			key: "c",
+			description: "Conversation view",
+			handler: () => handleSelectView("conversation"),
+		},
+	], "Session Detail");
 
 	return (
 		<PageShell>
@@ -377,6 +383,7 @@ export const SessionDetail: Component = () => {
 													session={s()}
 													sessionId={params.id}
 													isMultiAgent={isMultiAgent()}
+													onSelectAgent={(agentId) => handleSelectView("agent", agentId)}
 												/>
 											}>
 												<Match when={currentView() === "overview"}>
@@ -404,6 +411,9 @@ export const SessionDetail: Component = () => {
 															/>
 														)}
 													</Show>
+												</Match>
+												<Match when={currentView() === "conversation"}>
+													<ConversationPanel sessionId={params.id} />
 												</Match>
 											</Switch>
 										</div>

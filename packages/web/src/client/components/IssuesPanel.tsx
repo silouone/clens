@@ -2,6 +2,7 @@ import { For, Show, createMemo, type Component } from "solid-js";
 import { AlertTriangle } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { classifySeverity } from "../lib/format";
+import { getBacktrackBadgeClass } from "../lib/severity";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -13,18 +14,6 @@ type IssuesPanelProps = {
 
 const truncate = (text: string, maxLen: number): string =>
 	text.length <= maxLen ? text : `${text.slice(0, maxLen - 1)}...`;
-
-const backtrackBadgeClass = (type: string): string => {
-	const classes: Readonly<Record<string, string>> = {
-		failure_retry:
-			"bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
-		iteration_struggle:
-			"bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
-		debugging_loop:
-			"bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400",
-	};
-	return classes[type] ?? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400";
-};
 
 const formatBacktrackType = (type: string): string =>
 	type.replace(/_/g, " ");
@@ -86,7 +75,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 								{(bt) => (
 									<div class="flex items-start gap-2 text-xs">
 										<span
-											class={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${backtrackBadgeClass(bt.type)}`}
+											class={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getBacktrackBadgeClass(bt.type)}`}
 										>
 											{formatBacktrackType(bt.type)}
 										</span>

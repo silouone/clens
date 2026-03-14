@@ -69,6 +69,7 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 					<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
 						Thinking Patterns
 					</h3>
+					<span class="text-[11px] text-gray-400 dark:text-gray-500">(keyword heuristic)</span>
 				</div>
 
 				<div class="space-y-2.5">
@@ -89,7 +90,7 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 								</div>
 
 								{/* Count + Percentage */}
-								<span class="w-16 shrink-0 text-right tabular-nums text-gray-500 dark:text-gray-400">
+								<span class="w-16 shrink-0 text-right tabular-nums text-text-muted">
 									{row.count} ({formatPercentage(row.count, total())})
 								</span>
 							</div>

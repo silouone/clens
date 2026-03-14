@@ -1,9 +1,10 @@
 import { html } from "diff2html";
 import { ChevronRight } from "lucide-solid";
 import { createMemo, createSignal, For, Show, type Component } from "solid-js";
-import type { AgentNode, DiffLine, DistilledSession, FileMapEntry } from "../../shared/types";
+import type { AgentNode, DiffLine, DistilledSession, FileMapEntry, RiskLevel } from "../../shared/types";
 import { isFilePath } from "../../shared/paths";
 import { diffLinesToUnified } from "../lib/diff-utils";
+import { riskBadgeClass } from "../lib/risk";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ export type FileRow = {
 	readonly additions: number;
 	readonly deletions: number;
 	readonly diffLines: readonly DiffLine[];
+	readonly riskLevel?: RiskLevel;
 };
 
 type FileListProps = {
@@ -30,7 +32,10 @@ export const truncatePath = (path: string, maxLen = 60): string =>
  * Build file rows from session-level file_map + edit_chains diff attribution.
  * Filters non-file paths, enriches with diff data, sorts edits-first then alpha.
  */
-export const buildFileRows = (session: DistilledSession): readonly FileRow[] => {
+export const buildFileRows = (
+	session: DistilledSession,
+	riskMap?: ReadonlyMap<string, RiskLevel>,
+): readonly FileRow[] => {
 	const attrMap = new Map(
 		(session.edit_chains?.diff_attribution ?? []).map((a) => [a.file_path, a] as const),
 	);
@@ -50,6 +55,7 @@ export const buildFileRows = (session: DistilledSession): readonly FileRow[] => 
 				additions: attr?.total_additions ?? 0,
 				deletions: attr?.total_deletions ?? 0,
 				diffLines: attr?.lines ?? [],
+				riskLevel: riskMap?.get(f.file_path),
 			};
 		});
 
@@ -124,7 +130,7 @@ export const FileList: Component<FileListProps> = (props) => {
 	return (
 		<>
 			{/* Header row with expand/collapse toggle */}
-			<div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 dark:border-gray-800">
+			<div class="flex items-center justify-between px-4 py-2.5 border-b border-clens">
 				<div class="flex items-center gap-3">
 					<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
 						{props.rows.length}
@@ -169,6 +175,12 @@ export const FileList: Component<FileListProps> = (props) => {
 										<ChevronRight
 											class={`h-3 w-3 text-gray-400 transition-transform ${expanded() ? "rotate-90" : ""}`}
 										/>
+										<Show when={row.riskLevel && row.riskLevel !== "low"}>
+											<span
+												class={`inline-block h-2 w-2 shrink-0 rounded-full ${riskBadgeClass(row.riskLevel!)}`}
+												title={`${row.riskLevel} risk`}
+											/>
+										</Show>
 										<span
 											class="flex-1 truncate font-mono text-gray-700 dark:text-gray-300"
 											title={row.filePath}

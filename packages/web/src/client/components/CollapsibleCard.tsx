@@ -34,7 +34,7 @@ export const CollapsibleCard: Component<CollapsibleCardProps> = (props) => {
 				style={{ "grid-template-rows": open() ? "1fr" : "0fr" }}
 			>
 				<div class="overflow-hidden">
-					<div class="border-t border-gray-200 dark:border-gray-800">
+					<div class="border-t border-clens">
 						{props.children}
 					</div>
 				</div>

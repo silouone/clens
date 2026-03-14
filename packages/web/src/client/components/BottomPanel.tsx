@@ -13,8 +13,10 @@ import type {
 	CommunicationSequenceEntry,
 	AgentLifetime,
 	DistilledSession,
+	TranscriptReasoning,
 } from "../../shared/types";
 import { CommunicationTimeline } from "./CommunicationTimeline";
+import { getSeverityStyle } from "../lib/severity";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -38,17 +40,6 @@ const formatRelTime = (t: number, start: number): string => {
 	const h = Math.floor(m / 60);
 	return `${h}h ${m % 60}m`;
 };
-
-// ── Backtrack severity ───────────────────────────────────────────────
-
-const SEVERITY_STYLES: Readonly<Record<string, string>> = {
-	failure_retry: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50",
-	iteration_struggle: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/50 dark:text-orange-400 dark:border-orange-700/50",
-	debugging_loop: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-400 dark:border-red-700/50",
-};
-
-const getSeverityStyle = (type: string): string =>
-	SEVERITY_STYLES[type] ?? "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-700/50";
 
 // ── Backtracks tab ───────────────────────────────────────────────────
 
@@ -76,7 +67,7 @@ const BacktracksTab: Component<{
 						>
 							{bt.type.replaceAll("_", " ")}
 						</span>
-						<span class="font-mono text-gray-500 dark:text-gray-400">{bt.tool_name}</span>
+						<span class="font-mono text-text-muted">{bt.tool_name}</span>
 						<Show when={bt.file_path}>
 							{(fp) => (
 								<span class="truncate font-mono text-gray-400 max-w-xs dark:text-gray-400">{fp()}</span>
@@ -148,12 +139,12 @@ const TimelineTab: Component<{
 		>
 			<div class="flex flex-col h-full">
 				{/* Filters */}
-				<div class="flex flex-wrap gap-1 px-3 py-1 border-b border-gray-200 dark:border-gray-800/50">
+				<div class="flex flex-wrap gap-1 px-3 py-1 border-b border-clens">
 					<For each={[...TIMELINE_TYPES]}>
 						{(type) => (
 							<button
 								onClick={() => toggleFilter(type)}
-								class="rounded px-1.5 py-0.5 text-[9px] font-medium transition border"
+								class="rounded px-1.5 py-0.5 text-[11px] font-medium transition border"
 								classList={{
 									"border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800/50": activeFilters().has(type),
 									"border-transparent text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300": !activeFilters().has(type),
@@ -163,7 +154,7 @@ const TimelineTab: Component<{
 							</button>
 						)}
 					</For>
-					<span class="ml-auto text-[9px] text-gray-400 dark:text-gray-400">{filtered().length} events</span>
+					<span class="ml-auto text-[11px] text-gray-400 dark:text-gray-400">{filtered().length} events</span>
 				</div>
 
 				{/* Event list */}
@@ -196,10 +187,33 @@ const TimelineTab: Component<{
 
 // ── Edits tab ────────────────────────────────────────────────────────
 
+/** Build a lookup map from tool_use_id to reasoning entry. */
+const buildReasoningLookup = (
+	reasoning: readonly TranscriptReasoning[],
+): ReadonlyMap<string, TranscriptReasoning> =>
+	new Map(
+		reasoning
+			.filter((r) => r.tool_use_id !== undefined)
+			.map((r) => [r.tool_use_id!, r]),
+	);
+
+/** Truncate text to maxLen characters with ellipsis. */
+const truncateText = (text: string, maxLen: number): string =>
+	text.length <= maxLen ? text : `${text.slice(0, maxLen)}...`;
+
 const EditsTab: Component<{
 	readonly editChains: EditChainsResult;
+	readonly reasoning?: readonly TranscriptReasoning[];
 }> = (props) => {
 	const chains = createMemo(() => props.editChains.chains);
+	const reasoningMap = createMemo(() =>
+		buildReasoningLookup(props.reasoning ?? []),
+	);
+	const [expandedStep, setExpandedStep] = createSignal<string | undefined>();
+
+	const toggleStep = (toolUseId: string) => {
+		setExpandedStep((prev) => (prev === toolUseId ? undefined : toolUseId));
+	};
 
 	return (
 		<Show
@@ -222,7 +236,7 @@ const EditsTab: Component<{
 									{chain.total_reads} read{chain.total_reads !== 1 ? "s" : ""}
 								</span>
 								<Show when={chain.has_backtrack}>
-									<span class="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] text-amber-600 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-400">
+									<span class="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[11px] text-amber-600 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-400">
 										backtrack
 									</span>
 								</Show>
@@ -233,19 +247,39 @@ const EditsTab: Component<{
 								<For each={chain.steps}>
 									{(step) => {
 										const isAbandoned = chain.abandoned_edit_ids.includes(step.tool_use_id);
+										const hasThinking = () => reasoningMap().has(step.tool_use_id);
+										const isExpanded = () => expandedStep() === step.tool_use_id;
+
 										return (
-											<span
-												class="rounded px-1 py-0.5 text-[9px]"
-												classList={{
-													"bg-emerald-900/30 text-emerald-500": step.outcome === "success" && !isAbandoned,
-													"bg-red-900/30 text-red-400": step.outcome === "failure",
-													"bg-gray-800/30 text-gray-500": step.outcome === "info",
-													"line-through opacity-50": isAbandoned,
-												}}
-											>
-												{step.tool_name}
-												{isAbandoned ? " (abandoned)" : ""}
-											</span>
+											<div class="inline-flex flex-col">
+												<button
+													onClick={() => hasThinking() ? toggleStep(step.tool_use_id) : undefined}
+													class="rounded px-1 py-0.5 text-[11px] inline-flex items-center gap-0.5"
+													classList={{
+														"bg-emerald-900/30 text-emerald-500": step.outcome === "success" && !isAbandoned,
+														"bg-red-900/30 text-red-400": step.outcome === "failure",
+														"bg-gray-800/30 text-gray-500": step.outcome === "info",
+														"line-through opacity-50": isAbandoned,
+														"cursor-pointer hover:ring-1 hover:ring-gray-500": hasThinking(),
+														"cursor-default": !hasThinking(),
+													}}
+												>
+													{step.tool_name}
+													{isAbandoned ? " (abandoned)" : ""}
+													<Show when={hasThinking()}>
+														<span class="text-violet-400 text-[11px]" title="Has thinking context">
+															&#x1D4D5;
+														</span>
+													</Show>
+												</button>
+												<Show when={isExpanded() && reasoningMap().get(step.tool_use_id)}>
+													{(r) => (
+														<div class="mt-0.5 rounded bg-gray-800/50 px-2 py-1 text-[10px] text-gray-400 max-w-xs whitespace-pre-wrap">
+															{truncateText(r().thinking, 200)}
+														</div>
+													)}
+												</Show>
+											</div>
 										);
 									}}
 								</For>
@@ -253,7 +287,7 @@ const EditsTab: Component<{
 
 							{/* Abandoned count */}
 							<Show when={chain.abandoned_edit_ids.length > 0}>
-								<div class="mt-1 text-[9px] text-amber-600/70 dark:text-amber-500/70">
+								<div class="mt-1 text-[11px] text-amber-600/70 dark:text-amber-500/70">
 									{chain.abandoned_edit_ids.length} abandoned edit{chain.abandoned_edit_ids.length !== 1 ? "s" : ""}
 								</div>
 							</Show>
@@ -300,6 +334,7 @@ export const BottomPanel: Component<BottomPanelProps> = (props) => {
 				return (
 					<EditsTab
 						editChains={props.session.edit_chains ?? { chains: [] }}
+						reasoning={props.session.reasoning}
 					/>
 				);
 			case "comms":
