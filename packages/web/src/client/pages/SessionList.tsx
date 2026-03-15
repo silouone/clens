@@ -1,9 +1,9 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { Search, ArrowUp, ArrowDown, ChevronRight, Users, Layers } from "lucide-solid";
+import { Search, ArrowUp, ArrowDown, ChevronRight, Users, Layers, RefreshCw } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
-import { sessionList, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
-import type { SessionSummary } from "../../shared/types";
+import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
+import type { SessionSummary, WorkUnit } from "../../shared/types";
 import { formatDuration, formatDate } from "../lib/format";
 import { preferences } from "../lib/settings";
 
@@ -11,6 +11,8 @@ import { StatusBadge } from "../components/ui/StatusBadge";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { WorkUnitCard } from "../components/WorkUnitCard";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
+import { ProjectFilter, ProjectBadge } from "../components/ProjectFilter";
+import { isGlobalMode, selectedProjectId } from "../lib/project-store";
 
 
 const formatSize = (bytes: number): string => {
@@ -176,6 +178,14 @@ const SortableHeader: Component<{
 	);
 };
 
+// ── Global-mode field accessors ──────────────────────────────────────
+
+const getProjectId = (s: SessionSummary): string | undefined =>
+	"project_id" in s ? (s as SessionSummary & { readonly project_id: string }).project_id : undefined;
+
+const getProjectName = (s: SessionSummary): string | undefined =>
+	"project_name" in s ? (s as SessionSummary & { readonly project_name: string }).project_name : undefined;
+
 // ── Main component ──────────────────────────────────────────────────
 
 export const SessionList: Component = () => {
@@ -244,8 +254,11 @@ export const SessionList: Component = () => {
 		const status = statusFilter();
 		const analyzed = analyzedFilter();
 		const agents = agentsFilter();
+		const projectId = selectedProjectId();
 
 		return sessions.filter((s) => {
+			// Project filter (global mode)
+			if (projectId !== undefined && getProjectId(s) !== projectId) return false;
 			if (status !== "all" && s.status !== status) return false;
 			if (analyzed === "analyzed" && !s.is_distilled) return false;
 			if (analyzed === "not_analyzed" && s.is_distilled) return false;
@@ -279,12 +292,16 @@ export const SessionList: Component = () => {
 
 	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / pageSize())));
 
-	// ── Work units filtered by search ────────────────────────
+	// ── Work units filtered by search + project ─────────────
 	const filteredWorkUnits = createMemo(() => {
 		const units = workUnitList() ?? [];
 		const q = search().toLowerCase();
-		if (!q) return units;
+		const projectId = selectedProjectId();
+
 		return units.filter((u) => {
+			// Project filter (global mode)
+			if (projectId !== undefined && "project_id" in u && (u as WorkUnit & { readonly project_id: string }).project_id !== projectId) return false;
+			if (!q) return true;
 			const spec = (u.spec_path ?? "").toLowerCase();
 			const branch = (u.git_branch ?? "").toLowerCase();
 			const sessionNames = u.sessions.map((s) => (s.session_name ?? s.session_id).toLowerCase());
@@ -362,6 +379,13 @@ export const SessionList: Component = () => {
 				)}
 			</Show>
 
+			{/* Project filter (global mode) */}
+			<Show when={isGlobalMode()}>
+				<div class="mt-3">
+					<ProjectFilter />
+				</div>
+			</Show>
+
 			{/* Filters */}
 			<div class="mt-3 flex flex-wrap items-center gap-3">
 				<div class="relative">
@@ -413,6 +437,16 @@ export const SessionList: Component = () => {
 				<span class="text-sm text-gray-500">
 					{filtered().length} session{filtered().length !== 1 ? "s" : ""}
 				</span>
+				<button
+					onClick={() => {
+						refetchSessions();
+						refetchWorkUnits();
+					}}
+					class="ml-auto flex items-center gap-1 rounded border border-clens px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
+					title="Refresh"
+				>
+					<RefreshCw class="h-3 w-3" />
+				</button>
 			</div>
 
 			{/* Work Units View */}
@@ -452,6 +486,9 @@ export const SessionList: Component = () => {
 					<thead class="border-b border-clens bg-surface-inset text-xs uppercase text-muted">
 						<tr>
 							<SortableHeader label="Name" field="session_name" sort={sortState()} onSort={handleSort} />
+							<Show when={isGlobalMode()}>
+								<th class="px-4 py-3 font-medium">Project</th>
+							</Show>
 							<th class="px-4 py-3 font-medium">Status</th>
 							<SortableHeader label="Duration" field="duration_ms" sort={sortState()} onSort={handleSort} align="right" />
 							<SortableHeader label="Events" field="event_count" sort={sortState()} onSort={handleSort} align="right" />
@@ -498,7 +535,18 @@ export const SessionList: Component = () => {
 													</Show>
 												</div>
 											</td>
+											<Show when={isGlobalMode()}>
 											<td class="px-4 py-2">
+												{(() => {
+													const pid = getProjectId(session);
+													const pname = getProjectName(session);
+													return pid && pname
+														? <ProjectBadge projectId={pid} projectName={pname} />
+														: null;
+												})()}
+											</td>
+										</Show>
+										<td class="px-4 py-2">
 												<StatusBadge status={session.status} compact />
 											</td>
 											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">

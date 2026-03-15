@@ -34,6 +34,9 @@ import { StatItem } from "../components/ui/StatItem";
 import { LiveSessionView } from "../components/LiveSessionView";
 import { createLiveSessionStore } from "../lib/live-store";
 import { preferences } from "../lib/settings";
+import type { SessionSummary } from "../../shared/types";
+import { isGlobalMode } from "../lib/project-store";
+import { ProjectBadge } from "../components/ProjectFilter";
 
 // ── Not distilled state ─────────────────────────────────────────────
 
@@ -200,6 +203,16 @@ export const SessionDetail: Component = () => {
 
 	const isNotDistilled = createMemo(() => sessionDetail()?.status === "not_distilled");
 
+	/** Project info derived from session list (available in global mode). */
+	const projectInfo = createMemo(() => {
+		const sessions = sessionList();
+		if (!sessions || !isGlobalMode()) return undefined;
+		const match = sessions.find((s) => s.session_id === params.id);
+		if (!match || !("project_id" in match) || !("project_name" in match)) return undefined;
+		const m = match as SessionSummary & { readonly project_id: string; readonly project_name: string };
+		return { project_id: m.project_id, project_name: m.project_name };
+	});
+
 	// ── Auto-distill when preference is enabled ──────────────
 	const [autoDistillTriggered, setAutoDistillTriggered] = createSignal(false);
 
@@ -362,6 +375,13 @@ export const SessionDetail: Component = () => {
 								backHref="/"
 								id={params.id.slice(0, 12)}
 								header={<SessionHeader session={s()} onRedistill={handleRedistill} />}
+								badge={
+									<Show when={projectInfo()}>
+										{(info) => (
+											<ProjectBadge projectId={info().project_id} projectName={info().project_name} />
+										)}
+									</Show>
+								}
 								nav={
 									<SessionDetailNav
 										session={s()}

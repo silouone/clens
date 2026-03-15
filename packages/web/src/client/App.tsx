@@ -1,7 +1,7 @@
 import type { RouteSectionProps } from "@solidjs/router";
 import { useNavigate, useLocation } from "@solidjs/router";
 import { createEffect, ErrorBoundary, For, onCleanup, onMount, Show, type Component } from "solid-js";
-import { Database, Calendar, Activity, Clock, RefreshCw } from "lucide-solid";
+import { Database, Calendar, Activity, Clock } from "lucide-solid";
 import { ErrorFallback } from "./components/ErrorFallback";
 import { KeyboardHelp } from "./components/KeyboardHelp";
 import { StatItem } from "./components/ui/StatItem";
@@ -9,7 +9,7 @@ import { initSSE } from "./lib/events";
 import { formatDuration } from "./lib/format";
 import { toggleHelp, setKeyboardNavigate } from "./lib/keyboard";
 import { preferences } from "./lib/settings";
-import { sessionList, refetchSessions } from "./lib/stores";
+import { sessionList } from "./lib/stores";
 import { theme, toggleTheme, initThemeListener } from "./lib/theme";
 
 // ── Icons ───────────────────────────────────────────────────────────
@@ -114,20 +114,29 @@ export const App: Component<RouteSectionProps> = (props) => {
 
 	return (
 		<div class="min-h-screen bg-surface text-primary">
-			<header class="sticky top-0 z-40 flex items-center gap-4 border-b border-clens bg-surface px-4 py-2.5 shadow-sm">
-				{/* Left: Logo + Nav + Live */}
-				<div class="flex items-center gap-4">
-					<button
-						onClick={() => navigate("/")}
-						class="flex items-center gap-1.5 rounded-md px-1 py-0.5 transition hover:opacity-80"
-						title="Home"
-					>
-						<LogoIcon />
-						<span class="text-base font-semibold tracking-tight">cLens</span>
-					</button>
+			<header class="sticky top-0 z-40 flex items-center border-b border-clens bg-surface px-4 py-2.5 shadow-sm">
+				{/* Logo */}
+				<button
+					onClick={() => navigate("/")}
+					class="flex items-center gap-1.5 rounded-md px-1 py-0.5 transition hover:opacity-80"
+					title="Home"
+				>
+					<LogoIcon />
+					<span class="text-base font-semibold tracking-tight">cLens</span>
+				</button>
 
-					<div class="h-5 w-px bg-clens" />
+				{/* KPIs (center area) */}
+				<Show when={sessionList.state !== "pending"}>
+					<div class="ml-6 flex items-center gap-2">
+						<StatItem variant="pill" bordered icon={Database} label="Total" value={String(sessions().length)} />
+						<StatItem variant="pill" bordered icon={Calendar} label="Today" value={String(todayCount())} />
+						<StatItem variant="pill" bordered icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
+						<StatItem variant="pill" bordered icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
+					</div>
+				</Show>
 
+				{/* Right: Nav + Live + separator + Actions */}
+				<div class="ml-auto flex items-center gap-1">
 					<nav class="flex items-center gap-1">
 						<For each={NAV_ITEMS}>
 							{(item) => (
@@ -145,34 +154,16 @@ export const App: Component<RouteSectionProps> = (props) => {
 						</For>
 					</nav>
 
-					<div class="flex items-center gap-1 ml-2" title="Live updates via SSE">
+					<div class="flex items-center gap-1 ml-1" title="Live updates via SSE">
 						<span class="relative flex h-2 w-2">
 							<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
 							<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
 						</span>
 						<span class="text-[10px] text-muted">Live</span>
 					</div>
-				</div>
 
-				{/* Center: KPIs */}
-				<Show when={sessionList.state !== "pending"}>
-					<div class="flex items-center gap-2 ml-auto mr-3">
-						<StatItem variant="pill" bordered icon={Database} label="Total" value={String(sessions().length)} />
-						<StatItem variant="pill" bordered icon={Calendar} label="Today" value={String(todayCount())} />
-						<StatItem variant="pill" bordered icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
-						<StatItem variant="pill" bordered icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
-						<button
-							onClick={() => refetchSessions()}
-							class="flex items-center gap-1 rounded border border-clens p-1.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
-							title="Refresh sessions"
-						>
-							<RefreshCw class="h-3 w-3" />
-						</button>
-					</div>
-				</Show>
+					<div class="mx-2 h-5 w-px bg-clens" />
 
-				{/* Right: Actions */}
-				<div class="flex items-center gap-1">
 					<button
 						onClick={toggleTheme}
 						class="rounded-md p-1.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
