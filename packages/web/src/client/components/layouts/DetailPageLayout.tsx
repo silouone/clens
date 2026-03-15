@@ -1,6 +1,7 @@
 import { createSignal, Show, type Component, type JSX } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { ArrowLeft, Menu, X } from "lucide-solid";
+import { preferences } from "../../lib/settings";
 
 type DetailPageLayoutProps = {
 	/** Label for the back button (e.g. "Sessions", "Work Units") */
@@ -59,10 +60,11 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 					/>
 				</Show>
 
-				{/* Left sidebar nav */}
+				{/* Left sidebar nav — width driven by sidebarWidth preference (percentage) */}
 				<aside
-					class="absolute inset-y-0 left-0 z-30 w-72 shrink-0 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0"
+					class="absolute inset-y-0 left-0 z-30 shrink-0 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0"
 					classList={{ "-translate-x-full": !sidebarOpen(), "translate-x-0": sidebarOpen() }}
+					style={{ width: `${preferences().sidebarWidth}%` }}
 					aria-label="Detail sidebar"
 				>
 					{props.nav}

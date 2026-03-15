@@ -33,6 +33,7 @@ import { DetailNav } from "../components/DetailNav";
 import { StatItem } from "../components/ui/StatItem";
 import { LiveSessionView } from "../components/LiveSessionView";
 import { createLiveSessionStore } from "../lib/live-store";
+import { preferences } from "../lib/settings";
 
 // ── Not distilled state ─────────────────────────────────────────────
 
@@ -198,6 +199,23 @@ export const SessionDetail: Component = () => {
 	});
 
 	const isNotDistilled = createMemo(() => sessionDetail()?.status === "not_distilled");
+
+	// ── Auto-distill when preference is enabled ──────────────
+	const [autoDistillTriggered, setAutoDistillTriggered] = createSignal(false);
+
+	createEffect(() => {
+		if (
+			preferences().autoDistill &&
+			isNotDistilled() &&
+			!autoDistillTriggered() &&
+			!sessionDetail.loading
+		) {
+			setAutoDistillTriggered(true);
+			api.api.commands.sessions[":sessionId"].distill.$post({
+				param: { sessionId: params.id },
+			}).catch(() => { /* distill error handled by SSE / polling */ });
+		}
+	});
 
 	/** Summary data for sessions that haven't been distilled yet. */
 	const notDistilledSummary = createMemo(() => {

@@ -65,4 +65,8 @@ export type {
 	WorkUnitSession,
 	WorkUnitSessionRole,
 	WorkUnitLinkType,
+
+	// Config
+	ClensConfig,
+	PricingTier,
 } from "@clens/cli";

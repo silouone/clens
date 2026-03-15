@@ -37,6 +37,34 @@ export const truncateMultiline = (text: string, maxLines: number): { readonly te
 	return { text: lines.slice(0, maxLines).join("\n"), truncated: true };
 };
 
+/** Format a timestamp as either relative ("2d ago") or absolute ("Mar 5, 14:32") based on mode. */
+export const formatDate = (ts: number, mode: "relative" | "absolute"): string => {
+	const d = new Date(ts);
+	if (mode === "absolute") {
+		return d.toLocaleDateString(undefined, {
+			month: "short",
+			day: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	}
+	const now = new Date();
+	const diffMs = now.getTime() - d.getTime();
+	const diffDays = Math.floor(diffMs / 86_400_000);
+	if (diffDays === 0) {
+		return d.toLocaleTimeString(undefined, {
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	}
+	if (diffDays === 1) return "Yesterday";
+	if (diffDays < 7) return `${diffDays}d ago`;
+	return d.toLocaleDateString(undefined, {
+		month: "short",
+		day: "numeric",
+	});
+};
+
 /** Format relative time from a reference start (e.g. "+2m 30s"). */
 export const formatRelTime = (t: number, start: number): string => {
 	const delta = Math.max(0, t - start);

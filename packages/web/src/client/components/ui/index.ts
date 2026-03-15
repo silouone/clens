@@ -12,5 +12,6 @@ export { StatItem } from "./StatItem";
 export { StatusBadge } from "./StatusBadge";
 export { TabBar } from "./TabBar";
 export { TabButton } from "./TabButton";
+export { Toggle } from "./Toggle";
 export { Tooltip } from "./Tooltip";
 export { TreeToggle } from "./TreeToggle";

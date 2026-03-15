@@ -22,6 +22,15 @@ type ShortcutEntry = {
 const [showHelp, setShowHelp] = createSignal(false);
 const toggleHelp = () => setShowHelp((v) => !v);
 
+// ── Router navigation callback (set by App shell) ──────────────────
+
+const [navigateFn, setNavigateFn] = createSignal<((path: string) => void) | undefined>(undefined);
+
+/** Called by App.tsx to wire the SolidJS router's navigate into keyboard shortcuts. */
+const setKeyboardNavigate = (fn: (path: string) => void): void => {
+	setNavigateFn(() => fn);
+};
+
 // ── Reactive shortcut registry ──────────────────────────────────────
 
 const [activeShortcuts, setActiveShortcuts] = createSignal<readonly ShortcutEntry[]>([]);
@@ -29,6 +38,7 @@ const [activeShortcuts, setActiveShortcuts] = createSignal<readonly ShortcutEntr
 // Global shortcuts always present
 const GLOBAL_SHORTCUTS: readonly ShortcutEntry[] = [
 	{ key: "?", label: "Show keyboard shortcuts", context: "Global", active: true },
+	{ key: ",", label: "Open settings", context: "Global", active: true },
 	{ key: "Esc", label: "Close overlay / Go back", context: "Global", active: true },
 ];
 
@@ -66,6 +76,14 @@ const useKeyboard = (
 		if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
 			e.preventDefault();
 			toggleHelp();
+			return;
+		}
+
+		// Settings shortcut (always active)
+		if (e.key === "," && !e.ctrlKey && !e.metaKey) {
+			e.preventDefault();
+			const nav = navigateFn();
+			if (nav) nav("/settings");
 			return;
 		}
 
@@ -112,5 +130,6 @@ export {
 	toggleHelp,
 	activeShortcuts,
 	GLOBAL_SHORTCUTS,
+	setKeyboardNavigate,
 };
 export type { KeyBinding, KeyboardContext, ShortcutEntry };

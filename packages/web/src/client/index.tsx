@@ -6,6 +6,7 @@ import { App } from "./App";
 import { SessionList } from "./pages/SessionList";
 import { SessionDetail } from "./pages/SessionDetail";
 import { WorkUnitDetail } from "./pages/WorkUnitDetail";
+import { SettingsPage } from "./pages/SettingsPage";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import "diff2html/bundles/css/diff2html.min.css";
@@ -43,6 +44,7 @@ render(
 			<Route path="/" component={SessionList} />
 			<Route path="/session/:id" component={SessionDetail} />
 			<Route path="/work-unit/:id" component={WorkUnitDetail} />
+			<Route path="/settings" component={SettingsPage} />
 			<Route path="/session/:id/team" component={TeamRedirect} />
 			<Route path="/session/:id/agent/:agentId" component={AgentRedirect} />
 		</Router>

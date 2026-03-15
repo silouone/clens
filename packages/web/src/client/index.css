@@ -60,6 +60,16 @@ body {
 	font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
+/* ── Invisible scrollbar ───────────────────────────────────────── */
+
+.scrollbar-hidden {
+	scrollbar-width: none;          /* Firefox */
+	-ms-overflow-style: none;       /* IE/Edge */
+}
+.scrollbar-hidden::-webkit-scrollbar {
+	display: none;                  /* Chrome/Safari */
+}
+
 /* ── Focus ring utility ──────────────────────────────────────────── */
 
 .focus-ring {

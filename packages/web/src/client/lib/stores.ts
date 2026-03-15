@@ -1,6 +1,7 @@
 import { createResource, createSignal } from "solid-js";
 import type { ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
 import { api } from "./api";
+import { preferences } from "./settings";
 
 const LOG_PREFIX = "[cLens:api]";
 
@@ -111,7 +112,8 @@ const createSessionDetail = (sessionId: () => string | undefined) => {
 
 // ── Conversation entries (paginated) ─────────────────────────────────
 
-const CONVERSATION_PAGE_SIZE = 200;
+/** Read conversation page size at call time from reactive preferences. */
+const conversationPageSize = (): number => preferences().conversationPageSize;
 
 type ConversationStore = {
 	readonly entries: () => readonly ConversationEntry[];
@@ -155,9 +157,10 @@ const createConversationStore = (sessionId: () => string | undefined): Conversat
 			}
 			const allData = Array.isArray(body.data) ? (body.data as readonly ConversationEntry[]) : [];
 			// Client-side pagination from full dataset
-			const pageData = allData.slice(pageOffset, pageOffset + CONVERSATION_PAGE_SIZE);
+			const ps = conversationPageSize();
+			const pageData = allData.slice(pageOffset, pageOffset + ps);
 			setTotal(allData.length);
-			setHasMore(pageOffset + CONVERSATION_PAGE_SIZE < allData.length);
+			setHasMore(pageOffset + ps < allData.length);
 
 			if (pageOffset === 0) {
 				setEntries(pageData);

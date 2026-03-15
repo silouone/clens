@@ -4,7 +4,8 @@ import { createEffect, createMemo, createSignal, For, Show, type Component } fro
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
 import type { SessionSummary, WorkUnit } from "../../shared/types";
-import { formatDuration } from "../lib/format";
+import { formatDuration, formatDate } from "../lib/format";
+import { preferences } from "../lib/settings";
 import { StatItem } from "../components/ui/StatItem";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
@@ -20,25 +21,6 @@ const LiveDot: Component = () => (
 	</span>
 );
 
-const formatDate = (ts: number): string => {
-	const d = new Date(ts);
-	const now = new Date();
-	const diffMs = now.getTime() - d.getTime();
-	const diffDays = Math.floor(diffMs / 86_400_000);
-
-	if (diffDays === 0) {
-		return d.toLocaleTimeString(undefined, {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-	}
-	if (diffDays === 1) return "Yesterday";
-	if (diffDays < 7) return `${diffDays}d ago`;
-	return d.toLocaleDateString(undefined, {
-		month: "short",
-		day: "numeric",
-	});
-};
 
 const formatSize = (bytes: number): string => {
 	if (bytes < 1024) return `${bytes} B`;
@@ -252,7 +234,7 @@ export const SessionList: Component = () => {
 		Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1),
 	);
 	const [selectedRow, setSelectedRow] = createSignal(-1);
-	const PAGE_SIZE = 20;
+	const pageSize = () => preferences().sessionListLimit;
 
 	// Sync state -> URL params
 	createEffect(() => {
@@ -309,11 +291,12 @@ export const SessionList: Component = () => {
 	// Paginated slice
 	const paginated = createMemo(() => {
 		const all = sorted();
-		const offset = (page() - 1) * PAGE_SIZE;
-		return all.slice(offset, offset + PAGE_SIZE);
+		const ps = pageSize();
+		const offset = (page() - 1) * ps;
+		return all.slice(offset, offset + ps);
 	});
 
-	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / PAGE_SIZE)));
+	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / pageSize())));
 
 	// ── Work units filtered by search ────────────────────────
 	const filteredWorkUnits = createMemo(() => {
@@ -613,7 +596,7 @@ export const SessionList: Component = () => {
 												</Show>
 											</td>
 											<td class="px-4 py-2 font-mono text-muted">
-												{formatDate(session.start_time)}
+												{formatDate(session.start_time, preferences().showTimestamps)}
 											</td>
 											<td class="w-8 px-2 py-2 text-muted">
 												<ChevronRight class="h-4 w-4" />
