@@ -1,11 +1,15 @@
 import type { RouteSectionProps } from "@solidjs/router";
 import { useNavigate, useLocation } from "@solidjs/router";
 import { createEffect, ErrorBoundary, For, onCleanup, onMount, Show, type Component } from "solid-js";
+import { Database, Calendar, Activity, Clock, RefreshCw } from "lucide-solid";
 import { ErrorFallback } from "./components/ErrorFallback";
 import { KeyboardHelp } from "./components/KeyboardHelp";
+import { StatItem } from "./components/ui/StatItem";
 import { initSSE } from "./lib/events";
+import { formatDuration } from "./lib/format";
 import { toggleHelp, setKeyboardNavigate } from "./lib/keyboard";
 import { preferences } from "./lib/settings";
+import { sessionList, refetchSessions } from "./lib/stores";
 import { theme, toggleTheme, initThemeListener } from "./lib/theme";
 
 // ── Icons ───────────────────────────────────────────────────────────
@@ -31,7 +35,7 @@ const GearIcon: Component = () => (
 );
 
 const LogoIcon: Component = () => (
-	<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+	<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
 		<circle cx="11" cy="11" r="7" class="stroke-brand-500" />
 		<path d="M16.5 16.5 21 21" class="stroke-brand-500" stroke-linecap="round" />
 		<path d="M8.5 9.5l-1.5 1.5 1.5 1.5" class="stroke-brand-400" stroke-linecap="round" stroke-linejoin="round" />
@@ -76,6 +80,21 @@ export const App: Component<RouteSectionProps> = (props) => {
 	const navigate = useNavigate();
 	const location = useLocation();
 	setKeyboardNavigate(navigate);
+
+	// ── KPI derivations ──────────────────────────────────────────────
+	const sessions = () => sessionList() ?? [];
+	const todayCount = () => {
+		const now = new Date();
+		return sessions().filter((s) => {
+			const d = new Date(s.start_time);
+			return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+		}).length;
+	};
+	const totalEvents = () => sessions().reduce((sum, s) => sum + s.event_count, 0);
+	const avgDuration = () => {
+		const s = sessions();
+		return s.length === 0 ? 0 : Math.round(s.reduce((sum, x) => sum + x.duration_ms, 0) / s.length);
+	};
 	let disconnectSSE: (() => void) | undefined;
 	let removeThemeListener: (() => void) | undefined;
 
@@ -95,8 +114,8 @@ export const App: Component<RouteSectionProps> = (props) => {
 
 	return (
 		<div class="min-h-screen bg-surface text-primary">
-			<header class="sticky top-0 z-40 flex items-center justify-between border-b border-clens bg-surface px-4 py-1.5 shadow-sm">
-				{/* Left: Logo + Nav */}
+			<header class="sticky top-0 z-40 flex items-center gap-4 border-b border-clens bg-surface px-4 py-2.5 shadow-sm">
+				{/* Left: Logo + Nav + Live */}
 				<div class="flex items-center gap-4">
 					<button
 						onClick={() => navigate("/")}
@@ -104,10 +123,12 @@ export const App: Component<RouteSectionProps> = (props) => {
 						title="Home"
 					>
 						<LogoIcon />
-						<span class="text-sm font-semibold tracking-tight">cLens</span>
+						<span class="text-base font-semibold tracking-tight">cLens</span>
 					</button>
 
-					<nav class="flex items-center gap-0.5">
+					<div class="h-5 w-px bg-clens" />
+
+					<nav class="flex items-center gap-1">
 						<For each={NAV_ITEMS}>
 							{(item) => (
 								<button
@@ -123,7 +144,32 @@ export const App: Component<RouteSectionProps> = (props) => {
 							)}
 						</For>
 					</nav>
+
+					<div class="flex items-center gap-1 ml-2" title="Live updates via SSE">
+						<span class="relative flex h-2 w-2">
+							<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+							<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+						</span>
+						<span class="text-[10px] text-muted">Live</span>
+					</div>
 				</div>
+
+				{/* Center: KPIs */}
+				<Show when={sessionList.state !== "pending"}>
+					<div class="flex items-center gap-2 ml-auto mr-3">
+						<StatItem variant="pill" bordered icon={Database} label="Total" value={String(sessions().length)} />
+						<StatItem variant="pill" bordered icon={Calendar} label="Today" value={String(todayCount())} />
+						<StatItem variant="pill" bordered icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
+						<StatItem variant="pill" bordered icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
+						<button
+							onClick={() => refetchSessions()}
+							class="flex items-center gap-1 rounded border border-clens p-1.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
+							title="Refresh sessions"
+						>
+							<RefreshCw class="h-3 w-3" />
+						</button>
+					</div>
+				</Show>
 
 				{/* Right: Actions */}
 				<div class="flex items-center gap-1">

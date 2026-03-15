@@ -1,25 +1,16 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { Search, ArrowUp, ArrowDown, RefreshCw, ChevronRight, Database, Calendar, Activity, Clock, Users, Layers } from "lucide-solid";
+import { Search, ArrowUp, ArrowDown, ChevronRight, Users, Layers } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
-import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
-import type { SessionSummary, WorkUnit } from "../../shared/types";
+import { sessionList, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
+import type { SessionSummary } from "../../shared/types";
 import { formatDuration, formatDate } from "../lib/format";
 import { preferences } from "../lib/settings";
-import { StatItem } from "../components/ui/StatItem";
+
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { WorkUnitCard } from "../components/WorkUnitCard";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
-
-// ── Live indicator ──────────────────────────────────────────────────
-
-const LiveDot: Component = () => (
-	<span class="relative flex h-2 w-2">
-		<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-		<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-	</span>
-);
 
 
 const formatSize = (bytes: number): string => {
@@ -72,20 +63,6 @@ const EmptyState: Component = () => (
 );
 
 
-
-// ── Summary stats helpers ───────────────────────────────────────────
-
-const isToday = (ts: number): boolean => {
-	const d = new Date(ts);
-	const now = new Date();
-	return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-};
-
-const computeAvgDuration = (sessions: readonly SessionSummary[]): number =>
-	sessions.length === 0 ? 0 : Math.round(sessions.reduce((sum, s) => sum + s.duration_ms, 0) / sessions.length);
-
-const computeTotalEvents = (sessions: readonly SessionSummary[]): number =>
-	sessions.reduce((sum, s) => sum + s.event_count, 0);
 
 // ── Filter types ────────────────────────────────────────────────────
 
@@ -213,10 +190,9 @@ export const SessionList: Component = () => {
 		view?: string;
 	}>();
 
-	// Initialize from URL params
-	const [viewMode, setViewMode] = createSignal<ViewMode>(
-		isValidViewMode(searchParams.view) ? searchParams.view : "sessions",
-	);
+	// viewMode is derived from URL params (header nav controls it)
+	const viewMode = (): ViewMode =>
+		isValidViewMode(searchParams.view) ? searchParams.view : "sessions";
 	const [search, setSearch] = createSignal(searchParams.q ?? "");
 	const [statusFilter, setStatusFilter] = createSignal<StatusFilter>(
 		isValidStatus(searchParams.status) ? searchParams.status : "all",
@@ -236,7 +212,7 @@ export const SessionList: Component = () => {
 	const [selectedRow, setSelectedRow] = createSignal(-1);
 	const pageSize = () => preferences().sessionListLimit;
 
-	// Sync state -> URL params
+	// Sync state -> URL params (viewMode is driven by URL, not synced back)
 	createEffect(() => {
 		const params: Record<string, string | undefined> = {};
 		const q = search();
@@ -245,15 +221,20 @@ export const SessionList: Component = () => {
 		const agents = agentsFilter();
 		const sort = sortState();
 		const p = page();
-		const v = viewMode();
 		params.q = q || undefined;
 		params.status = status !== "all" ? status : undefined;
 		params.analyzed = analyzed !== "all" ? analyzed : undefined;
 		params.agents = agents !== "top_level" ? agents : undefined;
 		params.sort = serializeSortParam(sort);
 		params.page = p > 1 ? String(p) : undefined;
-		params.view = v !== "sessions" ? v : undefined;
 		setSearchParams(params);
+	});
+
+	// Refetch work units when switching to work_units view
+	createEffect(() => {
+		if (viewMode() === "work_units") {
+			refetchWorkUnits();
+		}
 	});
 
 	// Filtered + searched sessions
@@ -318,11 +299,6 @@ export const SessionList: Component = () => {
 		filteredWorkUnits().filter(u => u.sessions.length <= 1)
 	);
 
-	// ── Summary stats (derived from filtered sessions) ────────
-	const todayCount = createMemo(() => filtered().filter((s) => isToday(s.start_time)).length);
-	const totalEvents = createMemo(() => computeTotalEvents(filtered()));
-	const avgDuration = createMemo(() => computeAvgDuration(filtered()));
-
 	const handleRowClick = (session: SessionSummary) => {
 		navigate(`/session/${session.session_id}`);
 	};
@@ -374,46 +350,6 @@ export const SessionList: Component = () => {
 
 	return (
 		<div class="mx-auto max-w-[1440px] p-4">
-			{/* Header row: title + KPI stats + refresh */}
-			<div class="flex items-center gap-4">
-				<div class="flex items-center gap-3">
-					{/* View toggle: Sessions / Work Units */}
-					<SegmentedControl
-						options={[
-							{ label: "Sessions", value: "sessions" as ViewMode },
-							{ label: "Work Units", value: "work_units" as ViewMode },
-						]}
-						value={viewMode()}
-						onChange={(v) => {
-							setViewMode(v);
-							if (v === "sessions") { setPage(1); setSelectedRow(-1); }
-							else { refetchWorkUnits(); }
-						}}
-					/>
-					<div class="flex items-center gap-1" title="Live updates via SSE">
-						<LiveDot />
-						<span class="text-[10px] text-gray-500">Live</span>
-					</div>
-				</div>
-
-				{/* KPI stats — pushed right */}
-				<Show when={sessionList.state !== "pending"}>
-					<div class="ml-auto flex items-center gap-2">
-						<StatItem variant="pill" bordered icon={Database} label="Total" value={String(filtered().length)} />
-						<StatItem variant="pill" bordered icon={Calendar} label="Today" value={String(todayCount())} />
-						<StatItem variant="pill" bordered icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
-						<StatItem variant="pill" bordered icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
-						<button
-							onClick={() => refetchSessions()}
-							class="ml-1 flex items-center gap-1 rounded border border-clens px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
-							title="Refresh sessions"
-						>
-							<RefreshCw class="h-3 w-3" />
-						</button>
-					</div>
-				</Show>
-			</div>
-
 			{/* Error banner */}
 			<Show when={globalError()}>
 				{(err) => (
