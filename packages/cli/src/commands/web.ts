@@ -4,6 +4,7 @@ interface WebCommandOptions {
 	readonly projectDir: string;
 	readonly port: number;
 	readonly open: boolean;
+	readonly global: boolean;
 }
 
 /** Open a URL in the default browser (macOS). */
@@ -19,14 +20,27 @@ export const webCommand = async (options: WebCommandOptions): Promise<void> => {
 	const { startServer, findProjectDir } = await import("@clens/web/server");
 
 	const projectDir = findProjectDir(options.projectDir);
+
+	// In global mode, read project registry and pass all projects to the server
+	const projects = options.global
+		? await (async () => {
+			const { resolveProjectEntries } = await import("../session/registry");
+			return resolveProjectEntries();
+		})()
+		: undefined;
+
 	const handle = startServer({
 		projectDir,
 		port: options.port,
+		...(projects && projects.length > 0 ? { projects } : {}),
 	});
 
 	const authUrl = `${handle.url}?token=${handle.token}`;
 
 	console.log(`${bold("cLens Web")} started on ${cyan(handle.url)}`);
+	if (projects && projects.length > 0) {
+		console.log(`${dim("Mode:")}  global (${projects.length} project${projects.length === 1 ? "" : "s"})`);
+	}
 	console.log(`${dim("Token:")} ${handle.token}`);
 	console.log(`${dim("Open:")}  ${authUrl}`);
 

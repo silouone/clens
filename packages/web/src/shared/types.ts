@@ -69,4 +69,12 @@ export type {
 	// Config
 	ClensConfig,
 	PricingTier,
+
+	// Project Registry
+	ProjectEntry,
+	ProjectRegistry,
+
+	// Global mode
+	GlobalSessionSummary,
+	GlobalWorkUnit,
 } from "@clens/cli";

@@ -10,6 +10,8 @@ type DetailPageLayoutProps = {
 	readonly backHref: string;
 	/** ID string shown next to back button */
 	readonly id: string;
+	/** Optional badge shown next to the ID (e.g. project badge in global mode) */
+	readonly badge?: JSX.Element;
 	/** Header component */
 	readonly header: JSX.Element;
 	/** Sidebar nav component */
@@ -45,6 +47,7 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 					{props.backLabel}
 				</button>
 				<span class="font-mono text-xs text-muted">{props.id}</span>
+				{props.badge}
 			</div>
 
 			{/* Header */}

@@ -3,7 +3,7 @@ import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, close
 import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions } from "@clens/cli/src/session"
 import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified } from "@clens/cli/src/utils"
-import type { AgentNode, SessionSummary, StoredEvent, LinkEvent, SpawnLink } from "@clens/cli"
+import type { AgentNode, SessionSummary, StoredEvent, LinkEvent, SpawnLink, ProjectEntry } from "@clens/cli"
 import { getCachedEvents, setCachedEvents } from "../cache"
 import { createLogger } from "../logger"
 import { pathsMatch } from "../../shared/paths"
@@ -501,4 +501,223 @@ const createSessionsRoute = (projectDir: string) =>
 			})
 		})
 
-export { createSessionsRoute }
+// ── Global multi-project helpers ─────────────────────────────────
+
+/** Build a map from session ID to project entry by scanning all projects. */
+const buildSessionMap = (projects: readonly ProjectEntry[]): ReadonlyMap<string, ProjectEntry> =>
+	new Map(
+		projects.flatMap((project) => {
+			const sessionsDir = `${project.path}/.clens/sessions`
+			try {
+				return readdirSync(sessionsDir)
+					.filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
+					.map((f): readonly [string, ProjectEntry] => [f.replace(".jsonl", ""), project])
+			} catch {
+				return []
+			}
+		}),
+	)
+
+/** Lightweight listing that tags sessions with project info. */
+const listGlobalSessionsLightweight = (
+	projects: readonly ProjectEntry[],
+): readonly (SessionSummary & { readonly project_id: string; readonly project_name: string })[] =>
+	projects
+		.flatMap((project) =>
+			listSessionsLightweight(project.path).map((session) => ({
+				...session,
+				project_id: project.id,
+				project_name: project.name,
+			})),
+		)
+		.sort((a, b) => b.start_time - a.start_time)
+
+// ── Global sessions route factory ───────────────────────────────
+
+/**
+ * Global sessions route — aggregates sessions from multiple projects.
+ * Session detail routes resolve the owning project from the session map.
+ */
+const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackProjectDir: string) => {
+	const resolveProjectDir = (sessionId: string): string => {
+		const project = buildSessionMap(projects).get(sessionId)
+		return project?.path ?? fallbackProjectDir
+	}
+
+	return new Hono()
+		// GET /api/sessions — list sessions from all projects with pagination
+		.get("/", (c) => {
+
+			log.debug("GET /api/sessions (global)", c.req.query())
+			const page = parseIntParam(c.req.query("page"), 1, 1, 1000)
+			const limit = parseIntParam(c.req.query("limit"), 20, 1, 100)
+			const sort = (c.req.query("sort") ?? "-start_time") as SortField
+			const statusFilter = c.req.query("status")
+			const projectFilter = c.req.query("project")
+
+			if (page === -1) return c.json({ error: "Invalid page", code: "INVALID_PARAM", detail: "page must be 1-1000" }, 400)
+			if (limit === -1) return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-100" }, 400)
+			if (!VALID_SORTS.includes(sort)) return c.json({ error: "Invalid sort", code: "INVALID_PARAM", detail: `sort must be one of: ${VALID_SORTS.join(", ")}` }, 400)
+			if (statusFilter && !VALID_STATUSES.includes(statusFilter)) return c.json({ error: "Invalid status", code: "INVALID_PARAM", detail: "status must be 'complete' or 'incomplete'" }, 400)
+
+			const enriched = listGlobalSessionsLightweight(projects)
+
+			// Filter by status
+			const afterStatus = statusFilter ? enriched.filter((s) => s.status === statusFilter) : enriched
+
+			// Filter by project
+			const afterProject = projectFilter ? afterStatus.filter((s) => s.project_id === projectFilter) : afterStatus
+
+			// Sort
+			const sorted = [...afterProject].sort(buildComparator(sort))
+
+			// Paginate
+			const total = sorted.length
+			const offset = (page - 1) * limit
+			const data = sorted.slice(offset, offset + limit)
+
+			return c.json({
+				data,
+				pagination: { page, limit, total, has_next: offset + limit < total },
+			})
+		})
+
+		// GET /api/sessions/:sessionId — session detail (resolves project)
+		.get("/:sessionId", (c) => {
+			const sessionId = c.req.param("sessionId")
+			const projectDir = resolveProjectDir(sessionId)
+			log.info(`Session detail (global): ${sessionId.slice(0, 8)} → ${projectDir}`)
+
+			const distilled = readDistilled(sessionId, projectDir)
+			if (!distilled) {
+				const exists = existsSync(`${projectDir}/.clens/sessions/${sessionId}.jsonl`)
+				if (!exists) return c.json({ error: "Session not found", code: "NOT_FOUND" }, 404)
+				return c.json({ status: "not_distilled" as const }, 202)
+			}
+
+			const related = getRelatedSessions(sessionId, projectDir)
+			const relatedSessions = related.work_unit
+				? {
+					work_unit_id: related.work_unit.id,
+					spec_path: related.work_unit.spec_path,
+					sessions: related.work_unit.sessions.map((s) => ({
+						session_id: s.session_id,
+						session_name: s.session_name,
+						phase: s.phase,
+						role: s.role,
+						start_time: s.start_time,
+					})),
+				}
+				: undefined
+
+			return c.json({
+				data: distilled,
+				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
+			})
+		})
+
+		// GET /api/sessions/:sessionId/events — paginated events
+		.get("/:sessionId/events", (c) => {
+			const sessionId = c.req.param("sessionId")
+			const projectDir = resolveProjectDir(sessionId)
+			const offset = parseIntParam(c.req.query("offset"), 0, 0, 1_000_000)
+			const limit = parseIntParam(c.req.query("limit"), 100, 1, 1000)
+
+			if (offset === -1) return c.json({ error: "Invalid offset", code: "INVALID_PARAM", detail: "offset must be 0-1000000" }, 400)
+			if (limit === -1) return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-1000" }, 400)
+
+			const events = loadEvents(sessionId, projectDir)
+			if (!events) return c.json({ error: "Session not found", code: "NOT_FOUND" }, 404)
+
+			const total = events.length
+			const data = events.slice(offset, offset + limit)
+			return c.json({ data, pagination: { offset, limit, total, has_next: offset + limit < total } })
+		})
+
+		// GET /api/sessions/:sessionId/conversation
+		.get("/:sessionId/conversation", (c) => {
+			const sessionId = c.req.param("sessionId")
+			const projectDir = resolveProjectDir(sessionId)
+			log.info(`Conversation (global): ${sessionId.slice(0, 8)}`)
+			const offset = parseIntParam(c.req.query("offset"), 0, 0, 1_000_000)
+			const limit = parseIntParam(c.req.query("limit"), 100, 1, 1000)
+
+			if (offset === -1) return c.json({ error: "Invalid offset", code: "INVALID_PARAM", detail: "offset must be 0-1000000" }, 400)
+			if (limit === -1) return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-1000" }, 400)
+
+			const distilled = readDistilled(sessionId, projectDir)
+			if (!distilled) {
+				const exists = existsSync(`${projectDir}/.clens/sessions/${sessionId}.jsonl`)
+				if (!exists) return c.json({ error: "Session not found", code: "NOT_FOUND" }, 404)
+				return c.json({ error: "Session not distilled", code: "NOT_DISTILLED" }, 202)
+			}
+
+			const events = loadEvents(sessionId, projectDir)
+			if (!events) return c.json({ error: "Session events not found", code: "NOT_FOUND" }, 404)
+
+			const conversation = buildConversation(distilled, events)
+			const total = conversation.length
+			const data = conversation.slice(offset, offset + limit)
+			return c.json({ data, pagination: { offset, limit, total, has_next: offset + limit < total } })
+		})
+
+		// GET /api/sessions/:sessionId/agents/:agentId/conversation
+		.get("/:sessionId/agents/:agentId/conversation", (c) => {
+			const sessionId = c.req.param("sessionId")
+			const agentId = c.req.param("agentId")
+			const projectDir = resolveProjectDir(sessionId)
+			log.info(`Agent conversation (global): session=${sessionId.slice(0, 8)} agent=${agentId.slice(0, 8)}`)
+			const offset = parseIntParam(c.req.query("offset"), 0, 0, 1_000_000)
+			const limit = parseIntParam(c.req.query("limit"), 100, 1, 1000)
+
+			if (offset === -1) return c.json({ error: "Invalid offset", code: "INVALID_PARAM", detail: "offset must be 0-1000000" }, 400)
+			if (limit === -1) return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-1000" }, 400)
+
+			const distilled = readDistilled(sessionId, projectDir)
+			if (!distilled) return c.json({ error: "Session not distilled", code: "NOT_DISTILLED" }, 202)
+
+			const agent = findAgentById(distilled.agents ?? [], agentId)
+			if (!agent) return c.json({ error: "Agent not found", code: "NOT_FOUND" }, 404)
+
+			const agentEvents = loadEvents(agentId, projectDir)
+			const conversation = (() => {
+				if (agentEvents) {
+					const agentDistilled = readDistilled(agentId, projectDir)
+					return agentDistilled
+						? buildConversation(agentDistilled, agentEvents)
+						: buildConversation({ ...distilled, reasoning: agent.reasoning ?? [], user_messages: [], backtracks: agent.backtracks ?? [], summary: distilled.summary }, agentEvents)
+				}
+				const transcriptPath = agent.transcript_path
+				if (transcriptPath && existsSync(transcriptPath)) {
+					const transcript = readTranscript(transcriptPath)
+					return buildConversationFromTranscript(transcript, agent)
+				}
+				return buildConversationFromTranscript([], agent)
+			})()
+
+			const total = conversation.length
+			const data = conversation.slice(offset, offset + limit)
+			return c.json({ data, pagination: { offset, limit, total, has_next: offset + limit < total } })
+		})
+
+		// GET /api/sessions/:sessionId/diff/*
+		.get("/:sessionId/diff/*", (c) => {
+			const sessionId = c.req.param("sessionId")
+			const projectDir = resolveProjectDir(sessionId)
+			log.info(`Diff (global): session=${sessionId.slice(0, 8)} path=${c.req.path}`)
+			const filePath = c.req.path.replace(/^\/api\/sessions\/[^/]+\/diff\//, "")
+
+			if (!filePath) return c.json({ error: "File path required", code: "INVALID_PARAM" }, 400)
+
+			const distilled = readDistilled(sessionId, projectDir)
+			if (!distilled) return c.json({ error: "Session not distilled", code: "NOT_DISTILLED" }, 202)
+
+			const attribution = distilled.edit_chains?.diff_attribution?.find((da) => pathsMatch(da.file_path, filePath))
+			if (!attribution) return c.json({ error: "No diff found for file", code: "NOT_FOUND" }, 404)
+
+			const unified_diff = diffLinesToUnified(filePath, attribution.lines)
+			return c.json({ data: { file_path: filePath, unified_diff, total_additions: attribution.total_additions, total_deletions: attribution.total_deletions } })
+		})
+}
+
+export { createSessionsRoute, createGlobalSessionsRoute }

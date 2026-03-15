@@ -11,8 +11,11 @@ import {
 } from "solid-js";
 import {
 	createWorkUnitDetail,
+	workUnitList,
 	type WorkUnitDetailSession,
 } from "../lib/stores";
+import { isGlobalMode } from "../lib/project-store";
+import { ProjectBadge } from "../components/ProjectFilter";
 import { useKeyboard } from "../lib/keyboard";
 import { findAgentInTree, flattenAgents } from "../lib/agent-utils";
 import { formatDuration, formatCost } from "../lib/format";
@@ -321,6 +324,16 @@ export const WorkUnitDetail: Component = () => {
 		[...(detail()?.sessions ?? [])].sort((a, b) => a.start_time - b.start_time),
 	);
 
+	/** Project info derived from work unit list (available in global mode). */
+	const projectInfo = createMemo(() => {
+		const units = workUnitList();
+		if (!units || !isGlobalMode()) return undefined;
+		const match = units.find((u) => u.id === params.id);
+		if (!match || !("project_id" in match) || !("project_name" in match)) return undefined;
+		const m = match as WorkUnit & { readonly project_id: string; readonly project_name: string };
+		return { project_id: m.project_id, project_name: m.project_name };
+	});
+
 	// ── View state ──────────────────────────────────────────────
 	const currentView = createMemo(() => searchParams.view ?? "overview");
 	const selectedSessionId = createMemo(() => searchParams.session);
@@ -411,6 +424,13 @@ export const WorkUnitDetail: Component = () => {
 							backLabel="Work Units"
 							backHref="/"
 							id={params.id.slice(0, 12)}
+							badge={
+								<Show when={projectInfo()}>
+									{(info) => (
+										<ProjectBadge projectId={info().project_id} projectName={info().project_name} />
+									)}
+								</Show>
+							}
 							header={<WorkUnitHeader unit={u()} sessions={sessions()} />}
 							nav={
 								<DetailNav

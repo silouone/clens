@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { type ClensConfig, type DelegatedHooks, HOOK_EVENTS } from "../types";
+import { registerProject } from "../session/registry";
 import type { Flags } from "./shared";
 import { dim, green, red, yellow } from "./shared";
 
@@ -218,6 +219,9 @@ export const init = (projectDir: string, target: InitTarget = "local"): InitResu
 		const config: ClensConfig = { capture: true };
 		writeFileSync(configPath, JSON.stringify(config, null, 2));
 	}
+
+	// Auto-register project in global registry
+	registerProject(projectDir);
 
 	// Detect legacy hooks when installing to local tier
 	const legacyWarning =

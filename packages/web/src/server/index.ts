@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 import { resolve, dirname } from "node:path"
+import type { ProjectEntry } from "@clens/cli"
 import { createApp } from "./app"
 import { startLiveWatcher } from "./live"
 import { log, currentLevel } from "./logger"
@@ -10,6 +11,7 @@ type StartServerOptions = {
 	readonly projectDir: string
 	readonly port?: number
 	readonly token?: string
+	readonly projects?: readonly ProjectEntry[]
 }
 
 type ServerHandle = {
@@ -39,7 +41,12 @@ const startServer = (options: StartServerOptions): ServerHandle => {
 	const mode = process.env.NODE_ENV === "production" ? "production" as const : "development" as const
 
 	log.info(`Starting server mode=${mode} logLevel=${currentLevel}`)
-	const app = createApp({ token, mode, projectDir: options.projectDir })
+	const app = createApp({
+		token,
+		mode,
+		projectDir: options.projectDir,
+		...(options.projects ? { projects: options.projects } : {}),
+	})
 
 	const server = Bun.serve({
 		port,
@@ -54,15 +61,17 @@ const startServer = (options: StartServerOptions): ServerHandle => {
 	log.info(`Server bound to ${url}`)
 	log.info(`Project dir: ${options.projectDir}`)
 
-	// Start file watcher for live SSE push
-	const watcher = startLiveWatcher(options.projectDir)
+	// Start file watcher(s) for live SSE push
+	const watchers = options.projects
+		? options.projects.map((p) => startLiveWatcher(p.path))
+		: [startLiveWatcher(options.projectDir)]
 
 	return {
 		url,
 		port: actualPort,
 		token,
 		stop: () => {
-			watcher.stop()
+			watchers.forEach((w) => w.stop())
 			server.stop(true)
 		},
 	}

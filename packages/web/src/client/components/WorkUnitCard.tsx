@@ -4,6 +4,7 @@ import { FileText, GitBranch, Clock, ChevronRight } from "lucide-solid";
 import type { WorkUnit } from "../../shared/types";
 import { formatDuration } from "../lib/format";
 import { LIFECYCLE_LABELS, LIFECYCLE_COLORS } from "../lib/work-unit-constants";
+import { isGlobalMode, projectColor } from "../lib/project-store";
 
 // ── Pure helpers ─────────────────────────────────────────────────────
 
@@ -26,6 +27,14 @@ const formatDateRange = (start: number, end: number): string => {
 	}
 	return `${startDate.toLocaleDateString(undefined, dateOpts)} - ${endDate.toLocaleDateString(undefined, dateOpts)}`;
 };
+
+// ── Global-mode field accessors ───────────────────────────────────────
+
+const getWorkUnitProjectId = (u: WorkUnit): string | undefined =>
+	"project_id" in u ? (u as WorkUnit & { readonly project_id: string }).project_id : undefined;
+
+const getWorkUnitProjectName = (u: WorkUnit): string | undefined =>
+	"project_name" in u ? (u as WorkUnit & { readonly project_name: string }).project_name : undefined;
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -63,6 +72,21 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 
 			{/* Meta row */}
 			<div class="mt-2 flex items-center gap-4 text-xs text-muted">
+				<Show when={isGlobalMode()}>
+					{(() => {
+						const pid = getWorkUnitProjectId(unit());
+						const pname = getWorkUnitProjectName(unit());
+						return pid && pname
+							? <span class="inline-flex items-center gap-1">
+								<span
+									class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+									style={{ "background-color": projectColor(pid) }}
+								/>
+								<span class="truncate max-w-[120px]">{pname}</span>
+							</span>
+							: null;
+					})()}
+				</Show>
 				<span class="flex items-center gap-1">
 					<Clock class="h-3 w-3" />
 					{formatDuration(unit().total_duration_ms)}

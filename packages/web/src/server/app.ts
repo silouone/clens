@@ -2,11 +2,12 @@ import { resolve } from "node:path"
 import { Hono } from "hono"
 import { serveStatic } from "hono/bun"
 import { createMiddleware } from "hono/factory"
+import type { ProjectEntry } from "@clens/cli"
 import { authToken, validateSessionId, cors } from "./middleware/security"
 import { eventsRoute } from "./routes/events"
-import { createSessionsRoute } from "./routes/sessions"
+import { createSessionsRoute, createGlobalSessionsRoute } from "./routes/sessions"
 import { createCommandsRoute } from "./routes/commands"
-import { createWorkUnitsRoute } from "./routes/work-units"
+import { createWorkUnitsRoute, createGlobalWorkUnitsRoute } from "./routes/work-units"
 import { createConfigRoute } from "./routes/config"
 import { createLogger } from "./logger"
 
@@ -21,6 +22,7 @@ type AppOptions = {
 	readonly token: string
 	readonly mode: "development" | "production"
 	readonly projectDir: string
+	readonly projects?: readonly ProjectEntry[]
 }
 
 /**
@@ -74,13 +76,23 @@ const createApp = (options: AppOptions) => {
 	app.use("/api/commands/sessions/:sessionId", validateSessionId())
 
 	// ── API routes ──
+	const projects = options.projects ?? []
+	const isGlobal = projects.length > 0
+
 	const api = app
 		.get("/api/health", (c) =>
 			c.json({ status: "ok" as const, ts: Date.now() }),
 		)
+		.get("/api/projects", (c) =>
+			c.json({ data: projects }),
+		)
 		.route("/api/events", eventsRoute)
-		.route("/api/sessions", createSessionsRoute(options.projectDir))
-		.route("/api/work-units", createWorkUnitsRoute(options.projectDir))
+		.route("/api/sessions", isGlobal
+			? createGlobalSessionsRoute(projects, options.projectDir)
+			: createSessionsRoute(options.projectDir))
+		.route("/api/work-units", isGlobal
+			? createGlobalWorkUnitsRoute(projects, options.projectDir)
+			: createWorkUnitsRoute(options.projectDir))
 		.route("/api/commands/sessions", createCommandsRoute(options.projectDir))
 		.route("/api/config", createConfigRoute(options.projectDir))
 

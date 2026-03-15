@@ -1,3 +1,4 @@
+import type { SessionSummary } from "./session";
 import type { TranscriptReasoning, TranscriptUserMessage } from "./transcript";
 
 // Distill types
@@ -562,4 +563,16 @@ export interface DistilledSession {
 	readonly agent_lifetimes?: readonly AgentLifetime[];
 	readonly plan_drift?: PlanDriftReport;
 	readonly task_list?: TaskListResult;
+}
+
+// --- Global Mode Types ---
+
+export interface GlobalSessionSummary extends SessionSummary {
+	readonly project_id: string;
+	readonly project_name: string;
+}
+
+export interface GlobalWorkUnit extends WorkUnit {
+	readonly project_id: string;
+	readonly project_name: string;
 }

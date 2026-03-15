@@ -56,3 +56,17 @@ export interface SessionSummary {
 	readonly has_spec?: boolean;      // true if distilled data has plan_drift
 	readonly is_subagent?: boolean;   // true if spawned by another session
 }
+
+// --- Project Registry Types ---
+
+export interface ProjectEntry {
+	readonly id: string;        // kebab-case slug, e.g. "agent-observability-project"
+	readonly path: string;      // absolute path to project root
+	readonly name: string;      // display name (basename of path by default)
+	readonly added_at: number;  // timestamp
+}
+
+export interface ProjectRegistry {
+	readonly version: 1;
+	readonly projects: readonly ProjectEntry[];
+}

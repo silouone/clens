@@ -4,4 +4,6 @@ export { exportSession } from "./export";
 export { listJourneys, resolveJourneyId } from "./journey";
 export { enrichSessionSummaries, listSessions, readDistilled, readLinks, readSessionEvents } from "./read";
 export { readSessionName, readTranscript, resolveTranscriptPath } from "./transcript";
+export { registerProject, unregisterProject, readRegistry, writeRegistry, registryPath, resolveProjectEntries } from "./registry";
 export { getRelatedSessions, readWorkUnitIndex, rebuildWorkUnitIndex, writeWorkUnitIndex } from "./work-units";
+export { listGlobalSessions, listGlobalWorkUnits, resolveProjectForSession } from "./global-read";

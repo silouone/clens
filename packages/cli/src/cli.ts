@@ -28,7 +28,7 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		description: "List captured sessions",
 		handler: async (ctx) => {
 			const { listCommand } = await import("./commands/list");
-			await listCommand({ projectDir: ctx.projectDir, json: ctx.flags.json });
+			await listCommand({ projectDir: ctx.projectDir, json: ctx.flags.json, global: ctx.flags.global });
 		},
 	},
 	distill: {
@@ -172,8 +172,25 @@ const commands: Readonly<Record<string, CommandDef>> = {
 	what: {
 		description: "Quick session summary (request, outcome, cost, issues)",
 		handler: async (ctx) => {
-			const { resolveSessionId } = await import("./commands/shared");
 			const { whatCommand } = await import("./commands/what");
+
+			if (ctx.flags.global && ctx.flags.last) {
+				const { listGlobalSessions, resolveProjectForSession } = await import("./session/global-read");
+				const sessions = listGlobalSessions();
+				if (sessions.length === 0) throw new Error("No sessions found across registered projects.");
+				const sessionId = sessions[0].session_id;
+				const project = resolveProjectForSession(sessionId);
+				const projectDir = project ? project.path : ctx.projectDir;
+				await whatCommand({
+					sessionId,
+					projectDir,
+					json: ctx.flags.json,
+					pricingTier: ctx.flags.pricing as import("./types").PricingTier | undefined,
+				});
+				return;
+			}
+
+			const { resolveSessionId } = await import("./commands/shared");
 			await whatCommand({
 				sessionId: resolveSessionId(ctx.positional[1], ctx.flags.last, ctx.projectDir),
 				projectDir: ctx.projectDir,
@@ -205,6 +222,7 @@ const commands: Readonly<Record<string, CommandDef>> = {
 				projectDir: ctx.projectDir,
 				port,
 				open: !ctx.rawArgs.includes("--no-open"),
+				global: ctx.flags.global,
 			});
 		},
 	},
@@ -239,7 +257,7 @@ const GLOBAL_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
 
 const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	init: new Set(["--remove", "--status", "--dev", "--global", "--legacy"]),
-	list: new Set(["--json"]),
+	list: new Set(["--json", "--global"]),
 	distill: new Set(["--last", "--all", "--deep", "--json", "--pricing"]),
 	report: new Set(["--last", "--json", "--detail", "--full", "--intent"]),
 	agents: new Set(["--last", "--json", "--comms"]),
@@ -247,8 +265,8 @@ const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	explore: new Set([]),
 	clean: new Set(["--last", "--all", "--force"]),
 	export: new Set(["--last", "--otel"]),
-	what: new Set(["--last", "--json", "--pricing"]),
-	web: new Set(["--port", "--no-open"]),
+	what: new Set(["--last", "--json", "--pricing", "--global"]),
+	web: new Set(["--port", "--no-open", "--global"]),
 };
 
 /** Find which command a flag belongs to, for suggestion messages. */
@@ -301,6 +319,7 @@ ${bold("Setup:")}
 
 ${bold("Sessions:")}
   ${cyan("list")}              List captured sessions
+  ${cyan("list --global")}     List sessions across all registered projects
   ${cyan("distill")}           Extract insights from session data
   ${cyan("clean")}             Remove session data
   ${cyan("export")}            Export session as archive
@@ -329,7 +348,7 @@ ${bold("Options:")}
   ${dim("--intent")}       Filter by reasoning intent type
   ${dim("--all")}          Distill all sessions
   ${dim("--comms")}        Show communication timeline
-  ${dim("--global")}       Install hooks globally (~/.claude/settings.json)
+  ${dim("--global")}       Global mode: operate across all registered projects
   ${dim("--legacy")}       Include legacy hooks in --remove
   ${dim("--port <n>")}     Web dashboard port (default 3700)
   ${dim("--no-open")}      Don't open browser automatically

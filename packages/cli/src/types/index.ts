@@ -49,6 +49,8 @@ export type {
 	ToolPivotDecision,
 	TransitionTrigger,
 	WorkingTreeChange,
+	GlobalSessionSummary,
+	GlobalWorkUnit,
 	WorkUnit,
 	WorkUnitIndex,
 	WorkUnitLinkType,
@@ -90,6 +92,8 @@ export type {
 	DelegatedHooks,
 	ExportManifest,
 	PricingTier,
+	ProjectEntry,
+	ProjectRegistry,
 	SessionSummary,
 } from "./session";
 export type {
