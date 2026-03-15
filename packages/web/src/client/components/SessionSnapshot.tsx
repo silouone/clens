@@ -3,6 +3,8 @@ import { A } from "@solidjs/router";
 import { ExternalLink } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatPercentage, truncateMultiline } from "../lib/format";
+import { renderMarkdown } from "../lib/markdown";
+import { Card } from "./ui/Card";
 import { StatusBadge } from "./ui/StatusBadge";
 import { MetaRow } from "./ui/MetaRow";
 import { RelatedSessionBadges } from "./RelatedSessionBadges";
@@ -84,7 +86,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 	const specPath = createMemo(() => session().plan_drift?.spec_path);
 
 	return (
-		<div class="animate-fade-in rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
+		<Card class="p-4">
 			{/* Spec path banner (if plan_drift exists) */}
 			<Show when={specPath()}>
 				{(path) => (
@@ -147,20 +149,21 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 				{/* Left: Request */}
 				<div class="space-y-2">
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-muted">
 						Request
 					</h3>
 					<Show
 						when={rawPrompt()}
 						fallback={
-							<p class="text-sm text-gray-400 italic dark:text-gray-400">
+							<p class="text-sm text-gray-400 italic text-muted">
 								No prompt captured
 							</p>
 						}
 					>
-						<p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
-							{displayText()}
-						</p>
+						<div
+							class="prose-sm-dark text-sm text-secondary"
+							innerHTML={renderMarkdown(displayText())}
+						/>
 						<Show when={truncated().truncated}>
 							<button
 								onClick={() => setExpanded((prev) => !prev)}
@@ -175,7 +178,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 				{/* Center: Outcome */}
 				<div class="space-y-2">
 					<div class="flex items-center gap-2">
-						<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
+						<h3 class="text-xs font-semibold uppercase tracking-wide text-muted">
 							Outcome
 						</h3>
 						<StatusBadge complete={session().complete} />
@@ -192,7 +195,7 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 
 				{/* Right: Session Facts (raw data, no judgment) */}
 				<div class="space-y-2">
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-400">
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-muted">
 						Session Facts
 					</h3>
 					<div class="space-y-1">
@@ -216,23 +219,23 @@ export const SessionSnapshot: Component<SessionSnapshotProps> = (props) => {
 
 			{/* Bottom row: Active time */}
 			<Show when={activeMs() !== undefined}>
-				<div class="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-					<p class="text-xs text-text-muted">
+				<div class="mt-3 border-t border-clens pt-3">
+					<p class="text-xs text-muted">
 						Active:{" "}
-						<span class="font-medium text-gray-700 dark:text-gray-300">
+						<span class="font-medium text-secondary">
 							{formatDuration(activeMs() ?? 0)}
 						</span>
 						{" / "}
-						<span class="font-medium text-gray-700 dark:text-gray-300">
+						<span class="font-medium text-secondary">
 							{formatDuration(totalMs())}
 						</span>
 						{" "}
-						<span class="text-gray-400 dark:text-gray-400">
+						<span class="text-muted">
 							({formatPercentage(activeMs() ?? 0, totalMs())})
 						</span>
 					</p>
 				</div>
 			</Show>
-		</div>
+		</Card>
 	);
 };

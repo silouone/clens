@@ -139,11 +139,16 @@ export const extractLinkEvent = (event: string, input: Record<string, unknown>):
 					session_id: sid,
 					agent: sid,
 					subject: toolInput.subject as string | undefined,
+					description: toolInput.description as string | undefined,
+					active_form: toolInput.activeForm as string | undefined,
 				} satisfies TaskLink;
 			}
 
 			if (toolName === "TaskUpdate") {
 				const action = toolInput.status ? ("status_change" as const) : ("assign" as const);
+				const blockedBy = Array.isArray(toolInput.addBlockedBy)
+					? (toolInput.addBlockedBy as readonly string[])
+					: undefined;
 				return {
 					t,
 					type: "task",
@@ -153,6 +158,7 @@ export const extractLinkEvent = (event: string, input: Record<string, unknown>):
 					agent: sid,
 					owner: toolInput.owner as string | undefined,
 					status: toolInput.status as string | undefined,
+					...(blockedBy && blockedBy.length > 0 ? { blocked_by: blockedBy } : {}),
 				} satisfies TaskLink;
 			}
 

@@ -87,7 +87,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 				}
 			>
 				{/* Legend */}
-				<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] text-text-muted border-b border-gray-100 dark:border-gray-800/30">
+				<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] text-muted border-b border-clens/30">
 					<span class="flex items-center gap-1">
 						<span class="inline-block h-2 w-2 rounded-full bg-gray-500" />
 						Sender (filled)
@@ -96,7 +96,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 						<span class="inline-block h-2 w-2 rounded-full border-2 border-gray-500" />
 						Receiver (hollow)
 					</span>
-					<span class="text-gray-300 dark:text-gray-700">|</span>
+					<span class="text-muted">|</span>
 					<For each={LEGEND_ITEMS}>
 						{(item) => (
 							<span class="flex items-center gap-1">
@@ -108,14 +108,14 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 				</div>
 
 				{/* Swim lane headers */}
-				<div class="flex border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
-					<div class="w-14 flex-shrink-0 px-2 py-1 text-[10px] text-gray-400 dark:text-gray-400">
+				<div class="flex border-b border-clens bg-surface-inset">
+					<div class="w-14 flex-shrink-0 px-2 py-1 text-[10px] text-muted">
 						Time
 					</div>
 					<For each={agents()}>
 						{(name) => (
 							<div
-								class="flex-1 truncate px-2 py-1.5 text-center text-[10px] font-medium text-text-muted"
+								class="flex-1 truncate px-2 py-1.5 text-center text-[10px] font-medium text-muted"
 								title={name}
 							>
 								{name}
@@ -135,9 +135,9 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 							const isLeftToRight = fromLane < toLane;
 
 							return (
-								<div class="group relative flex items-center border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800/30 dark:hover:bg-gray-800/20">
+								<div class="group relative flex items-center border-b border-clens transition hover:bg-surface-hover">
 									{/* Timestamp */}
-									<div class="w-14 flex-shrink-0 px-2 py-0.5 text-[10px] text-gray-400 dark:text-gray-400">
+									<div class="w-14 flex-shrink-0 px-2 py-0.5 text-[10px] text-muted">
 										{formatRelativeTime(msg.t, startTime())}
 									</div>
 
@@ -191,7 +191,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 
 														{/* Vertical lane marker */}
 														<Show when={!isFrom && !isTo && !isBetween}>
-															<div class="h-full w-px bg-gray-200 absolute dark:bg-gray-800/50" />
+															<div class="h-full w-px bg-gray-200 absolute " />
 														</Show>
 													</div>
 												);
@@ -201,7 +201,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 
 									{/* Message preview tooltip — absolutely positioned, no layout shift */}
 									<div class="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-										<div class="mr-2 rounded border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-600 shadow-sm whitespace-nowrap max-w-xs truncate dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+										<div class="mr-2 rounded border border-clens bg-surface-raised px-2 py-1 text-[10px] text-secondary shadow-sm whitespace-nowrap max-w-xs truncate">
 											{msg.summary ?? msg.content_preview ?? msg.msg_type}
 										</div>
 									</div>

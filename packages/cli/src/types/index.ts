@@ -40,6 +40,8 @@ export type {
 	StatsResult,
 	TaskCompletionDecision,
 	TaskDelegationDecision,
+	TaskListResult,
+	TaskRecord,
 	TeamMetrics,
 	TimelineEntry,
 	TimingGapDecision,

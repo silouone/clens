@@ -29,6 +29,7 @@ type SSEEventHandler = {
 	readonly onSessionUpdate?: (data: SessionUpdateData) => void;
 	readonly onLiveEvent?: (data: LiveEventData) => void;
 	readonly onDistillComplete?: (data: DistillCompleteData) => void;
+	readonly onLiveLink?: (data: { link: unknown }) => void;
 };
 
 // ── Debounce ────────────────────────────────────────────────────────
@@ -159,6 +160,14 @@ const createSSEClient = (handlers: SSEEventHandler = {}): SSEClient => {
 			}
 		});
 
+		es.addEventListener("live_link", (e) => {
+			if (e.lastEventId) setLastEventId(e.lastEventId);
+			const raw = parseData(e.data);
+			if (raw && typeof raw === "object" && "link" in raw) {
+				handlers.onLiveLink?.(raw as { link: unknown });
+			}
+		});
+
 		es.onerror = () => {
 			console.warn(LOG_PREFIX, "Connection error, will reconnect");
 			if (stabilityTimer) clearTimeout(stabilityTimer);
@@ -205,6 +214,11 @@ const [liveEvents, setLiveEvents] = createSignal<readonly unknown[]>([]);
 
 const clearLiveEvents = () => setLiveEvents([]);
 
+const [liveLinks, setLiveLinks] = createSignal<readonly unknown[]>([]);
+const appendLiveLink = (link: unknown) =>
+	setLiveLinks((prev) => [...prev, link]);
+const clearLiveLinks = () => setLiveLinks([]);
+
 /**
  * Signal set when a distill_complete SSE event arrives.
  * SessionDetail watches this to refetch detail when the active session finishes distilling.
@@ -236,6 +250,9 @@ const initSSE = (): (() => void) => {
 		onDistillComplete: (data) => {
 			setLastDistilledSessionId(data.session_id);
 		},
+		onLiveLink: (data) => {
+			appendLiveLink(data.link);
+		},
 	});
 	activeClient = client;
 
@@ -249,6 +266,9 @@ export {
 	setActiveSessionId,
 	liveEvents,
 	clearLiveEvents,
+	liveLinks,
+	appendLiveLink,
+	clearLiveLinks,
 	lastDistilledSessionId,
 };
 export type {

@@ -1,4 +1,4 @@
-import type { Component } from "solid-js";
+import { Show, type Component } from "solid-js";
 
 type StatItemVariant = "row" | "pill";
 
@@ -9,28 +9,40 @@ type StatItemProps = {
 	readonly title?: string;
 	readonly colorClass?: string;
 	readonly variant?: StatItemVariant;
+	readonly icon?: Component<{ readonly class?: string }>;
+	readonly bordered?: boolean;
 };
 
 const valueClasses = (props: StatItemProps): string =>
 	props.colorClass
 		? `font-medium tabular-nums ${props.colorClass}`
 		: props.muted === true
-			? "font-medium tabular-nums text-gray-400 dark:text-gray-400"
-			: "font-medium tabular-nums text-gray-700 dark:text-gray-300";
+			? "font-medium tabular-nums text-muted"
+			: "font-medium tabular-nums text-secondary";
 
 const RowLayout: Component<StatItemProps> = (props) => (
-	<div class="flex items-center justify-between py-0.5 text-xs" title={props.title}>
-		<span class="text-text-muted">{props.label}</span>
-		<span class={valueClasses(props)}>{props.value}</span>
+	<div class="flex items-center justify-between gap-2 py-0.5 text-xs min-w-0" title={props.title ?? props.value}>
+		<span class="shrink-0 text-muted">{props.label}</span>
+		<span class={`truncate ${valueClasses(props)}`}>{props.value}</span>
 	</div>
 );
 
 const PillLayout: Component<StatItemProps> = (props) => (
 	<div
-		class="flex items-center gap-1.5 rounded-md bg-gray-100 px-2.5 py-1 text-xs dark:bg-gray-800/60"
+		class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs"
+		classList={{
+			"bg-surface-muted/60": !props.bordered,
+			"border border-clens bg-surface-raised": props.bordered === true,
+		}}
 		title={props.title}
 	>
-		<span class="text-text-muted">{props.label}</span>
+		<Show when={props.icon}>
+			{(Icon) => {
+				const IconComp = Icon();
+				return <IconComp class="h-3 w-3 text-muted" />;
+			}}
+		</Show>
+		<span class="text-muted">{props.label}</span>
 		<span class={valueClasses(props)}>{props.value}</span>
 	</div>
 );

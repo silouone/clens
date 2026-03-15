@@ -24,11 +24,11 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 	return (
 		<>
 			{/* Back nav bar */}
-			<div class="flex items-center gap-2 border-b border-gray-200 px-3 py-1 dark:border-gray-800">
+			<div class="flex items-center gap-2 border-b border-clens px-3 py-1">
 				{/* Mobile sidebar toggle */}
 				<button
 					onClick={() => setSidebarOpen((prev) => !prev)}
-					class="rounded p-1 text-gray-500 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
+					class="rounded p-1 text-gray-500 transition hover:bg-surface-hover text-muted md:hidden"
 					aria-label="Toggle sidebar"
 				>
 					<Show when={sidebarOpen()} fallback={<Menu class="h-4 w-4" />}>
@@ -37,13 +37,13 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 				</button>
 				<button
 					onClick={() => navigate(props.backHref)}
-					class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+					class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-surface-hover hover:text-secondary focus:outline-none focus:ring-2 focus:ring-brand-500 text-muted"
 					aria-label={`Back to ${props.backLabel}`}
 				>
 					<ArrowLeft class="h-3 w-3" />
 					{props.backLabel}
 				</button>
-				<span class="text-xs text-gray-400 dark:text-gray-400">{props.id}</span>
+				<span class="font-mono text-xs text-muted">{props.id}</span>
 			</div>
 
 			{/* Header */}
@@ -60,12 +60,13 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 				</Show>
 
 				{/* Left sidebar nav */}
-				<div
+				<aside
 					class="absolute inset-y-0 left-0 z-30 w-72 shrink-0 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0"
 					classList={{ "-translate-x-full": !sidebarOpen(), "translate-x-0": sidebarOpen() }}
+					aria-label="Detail sidebar"
 				>
 					{props.nav}
-				</div>
+				</aside>
 
 				{/* Right content panel */}
 				{props.children}

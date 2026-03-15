@@ -6,6 +6,8 @@ import { App } from "./App";
 import { SessionList } from "./pages/SessionList";
 import { SessionDetail } from "./pages/SessionDetail";
 import { WorkUnitDetail } from "./pages/WorkUnitDetail";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/jetbrains-mono";
 import "diff2html/bundles/css/diff2html.min.css";
 import "./index.css";
 

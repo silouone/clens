@@ -59,13 +59,13 @@ const mapSummaryPhaseToPhaseType = (name: string): PhaseType | undefined => {
 
 /**
  * Infer the phase of a distilled session from its content.
- * Priority: spec_path -> user message pattern -> summary.phases[0] -> tool count heuristic -> "other"
+ * Priority: user message pattern -> plan_drift -> summary.phases[0] -> tool count heuristic -> "other"
+ *
+ * User-explicit intent (slash commands, headings) is the strongest signal — always wins.
+ * plan_drift.spec_path is a derived signal that only kicks in as fallback.
  */
 export const inferPhase = (s: DistilledSessionSummary): PhaseType | "other" => {
-	// 1. Explicit spec reference means build
-	if (s.plan_drift?.spec_path) return "build";
-
-	// 2. User message pattern matching (check first 3 messages)
+	// 1. User message pattern matching — explicit intent is the strongest signal
 	const messages = s.user_messages.slice(0, 3);
 	const PHASE_PATTERNS: readonly [RegExp, PhaseType][] = [
 		[/\/prime\b|^#\s*Prime\b|<command-message>prime<\/command-message>/im, "prime"],
@@ -78,6 +78,9 @@ export const inferPhase = (s: DistilledSessionSummary): PhaseType | "other" => {
 		undefined,
 	);
 	if (matchedPhase) return matchedPhase;
+
+	// 2. plan_drift.spec_path → session was tracking against a spec (likely build)
+	if (s.plan_drift?.spec_path) return "build";
 
 	// 3. Fall back to distilled summary phases (already analyzed during distillation)
 	const firstSummaryPhase = s.summary_phases?.[0];
@@ -116,11 +119,12 @@ const simpleHash = (input: string): string => {
 
 /**
  * Scan sessions to find those that WROTE spec files.
- * Returns Map: spec_path -> session_id (earliest session if multiple).
+ * Returns Map: spec_path -> session_ids[] (all writers, sorted by start_time ascending).
+ * Downstream logic picks the best creator using phase context.
  */
 export const detectSpecCreators = (
 	sessions: readonly DistilledSessionSummary[],
-): ReadonlyMap<string, string> => {
+): ReadonlyMap<string, readonly string[]> => {
 	const pairs = sessions.flatMap((session) =>
 		session.file_map.files
 			.filter(
@@ -135,22 +139,22 @@ export const detectSpecCreators = (
 			})),
 	);
 
-	// Group by spec_path, keep earliest
+	// Group by spec_path, collect all writers sorted by start_time
 	const grouped = pairs.reduce<
-		Readonly<Record<string, { readonly session_id: string; readonly start_time: number }>>
+		Readonly<Record<string, readonly { readonly session_id: string; readonly start_time: number }[]>>
 	>(
 		(acc, pair) => {
-			const existing = acc[pair.spec_path];
-			if (existing === undefined || pair.start_time < existing.start_time) {
-				return { ...acc, [pair.spec_path]: { session_id: pair.session_id, start_time: pair.start_time } };
-			}
-			return acc;
+			const existing = acc[pair.spec_path] ?? [];
+			return { ...acc, [pair.spec_path]: [...existing, { session_id: pair.session_id, start_time: pair.start_time }] };
 		},
 		{},
 	);
 
 	return new Map(
-		Object.entries(grouped).map(([spec, val]) => [spec, val.session_id]),
+		Object.entries(grouped).map(([spec, writers]) => [
+			spec,
+			[...writers].sort((a, b) => a.start_time - b.start_time).map((w) => w.session_id),
+		]),
 	);
 };
 
@@ -204,83 +208,115 @@ export const detectSpecConsumers = (
 
 // --- classifyLifecycle ---
 
+/**
+ * Classify the lifecycle of a work unit based on session phases AND temporal order.
+ * Sessions must be sorted by start_time. Only labels "X > Y" if X temporally precedes Y.
+ */
 const classifyLifecycle = (
 	sessions: readonly WorkUnitSession[],
 ): WorkUnit["lifecycle"] => {
-	const phases = new Set(sessions.map((s) => s.phase));
-	const hasPrime = phases.has("prime");
-	const hasPlan = phases.has("plan");
-	const hasBuild = phases.has("build") || phases.has("orchestrated_build");
-	const hasReview = phases.has("review") || phases.has("test");
-	const consumerCount = sessions.filter((s) => s.role === "consumer").length;
+	// Sessions should already be sorted by start_time
+	const sorted = [...sessions].sort((a, b) => a.start_time - b.start_time);
 
-	if ((hasPrime || hasPlan) && hasBuild && hasReview) return "plan-build-review";
-	if (hasPrime && hasPlan && hasBuild) return "prime-plan-build";
-	if (hasPrime && hasBuild) return "prime-build";
-	if ((hasPrime || hasPlan) && hasBuild) return "plan-build";
+	// Find temporal index of first occurrence of each phase category
+	const firstPlanningIdx = sorted.findIndex((s) => s.phase === "prime" || s.phase === "plan");
+	const firstBuildIdx = sorted.findIndex((s) => s.phase === "build" || s.phase === "orchestrated_build");
+	const firstReviewIdx = sorted.findIndex((s) => s.phase === "review" || s.phase === "test");
+
+	const hasPlanning = firstPlanningIdx >= 0;
+	const hasBuild = firstBuildIdx >= 0;
+	const hasReview = firstReviewIdx >= 0;
+
+	// Temporal order checks: "X > Y" only if X came before Y
+	const planningBeforeBuild = hasPlanning && hasBuild && firstPlanningIdx < firstBuildIdx;
+	const buildBeforeReview = hasBuild && hasReview && firstBuildIdx < firstReviewIdx;
+	const planningBeforeReview = hasPlanning && hasReview && firstPlanningIdx < firstReviewIdx;
+
+	const hasPrime = sorted.some((s) => s.phase === "prime");
+	const hasPlan = sorted.some((s) => s.phase === "plan");
+	const consumerCount = sorted.filter((s) => s.role === "consumer").length;
+
+	// Lifecycle requires correct temporal ordering
+	if (planningBeforeBuild && buildBeforeReview) return "plan-build-review";
+	if (hasPrime && hasPlan && planningBeforeBuild) return "prime-plan-build";
+	if (hasPrime && planningBeforeBuild) return "prime-build";
+	if (planningBeforeBuild) return "plan-build";
 	if (consumerCount > 1) return "multi-build";
 	return "ad-hoc";
+};
+
+// --- Phase-aware creator selection ---
+
+const PLANNING_PHASES = new Set<string>(["plan", "prime"]);
+
+/**
+ * Pick the best creator from a list of spec writers using phase context.
+ * Prefers planning-phase writers (plan/prime) over build-phase writers.
+ * Falls back to earliest writer if no planning-phase writer exists.
+ */
+const pickBestCreator = (
+	writerIds: readonly string[],
+	sessionMeta: ReadonlyMap<string, WorkUnitSessionMeta>,
+): string | undefined => {
+	if (writerIds.length === 0) return undefined;
+
+	const withMeta = writerIds.flatMap((id) => {
+		const meta = sessionMeta.get(id);
+		return meta ? [meta] : [];
+	});
+	if (withMeta.length === 0) return undefined;
+
+	// Prefer writers with planning phases (plan, prime)
+	const planningWriter = withMeta.find((m) => PLANNING_PHASES.has(m.phase));
+	if (planningWriter) return planningWriter.session_id;
+
+	// Fall back to earliest writer (writerIds already sorted by start_time)
+	return withMeta[0].session_id;
 };
 
 // --- buildSpecWorkUnits ---
 
 /**
- * Build WorkUnit[] from creators + consumers + session metadata.
+ * Build WorkUnit[] from writers + consumers + session metadata.
+ * Uses phase-aware creator selection: prefers planning-phase writers over build-phase writers.
  */
 export const buildSpecWorkUnits = (
-	creators: ReadonlyMap<string, string>,
+	writers: ReadonlyMap<string, readonly string[]>,
 	consumers: ReadonlyMap<string, readonly string[]>,
 	sessionMeta: ReadonlyMap<string, WorkUnitSessionMeta>,
 ): readonly WorkUnit[] => {
 	const allSpecPaths = [
-		...new Set([...creators.keys(), ...consumers.keys()]),
+		...new Set([...writers.keys(), ...consumers.keys()]),
 	];
 
 	return allSpecPaths.map((specPath) => {
-		const creatorId = creators.get(specPath);
+		const writerIds = writers.get(specPath) ?? [];
 		const consumerIds = consumers.get(specPath) ?? [];
+		const creatorId = pickBestCreator(writerIds, sessionMeta);
 
-		const creatorSessions: readonly WorkUnitSession[] = creatorId
-			? (() => {
-					const meta = sessionMeta.get(creatorId);
-					return meta
-						? [
-								{
-									session_id: meta.session_id,
-									session_name: meta.session_name,
-									phase: meta.phase,
-									role: "creator" as const,
-									start_time: meta.start_time,
-									duration_ms: meta.duration_ms,
-									git_branch: meta.git_branch,
-								},
-							]
-						: [];
-				})()
-			: [];
+		// All unique session IDs involved (writers + consumers, deduplicated)
+		const allIds = [...new Set([...writerIds, ...consumerIds])];
 
-		const consumerSessions: readonly WorkUnitSession[] = consumerIds
-			.filter((id) => id !== creatorId)
+		const toSession = (id: string, role: WorkUnitSessionRole): WorkUnitSession | undefined => {
+			const meta = sessionMeta.get(id);
+			return meta ? {
+				session_id: meta.session_id,
+				session_name: meta.session_name,
+				phase: meta.phase,
+				role,
+				start_time: meta.start_time,
+				duration_ms: meta.duration_ms,
+				git_branch: meta.git_branch,
+			} : undefined;
+		};
+
+		const allSessions = allIds
 			.flatMap((id) => {
-				const meta = sessionMeta.get(id);
-				return meta
-					? [
-							{
-								session_id: meta.session_id,
-								session_name: meta.session_name,
-								phase: meta.phase,
-								role: "consumer" as WorkUnitSessionRole,
-								start_time: meta.start_time,
-								duration_ms: meta.duration_ms,
-								git_branch: meta.git_branch,
-							},
-						]
-					: [];
-			});
-
-		const allSessions = [...creatorSessions, ...consumerSessions].sort(
-			(a, b) => a.start_time - b.start_time,
-		);
+				const role: WorkUnitSessionRole = id === creatorId ? "creator" : "consumer";
+				const session = toSession(id, role);
+				return session ? [session] : [];
+			})
+			.sort((a, b) => a.start_time - b.start_time);
 
 		const startTimes = allSessions.map((s) => s.start_time);
 		const endTimes = allSessions.map((s) => s.start_time + s.duration_ms);
@@ -408,10 +444,10 @@ export const buildWorkUnitIndex = (
 	subagentIds: ReadonlySet<string> = new Set(),
 ): WorkUnitIndex => {
 	const topLevelSessions = sessions.filter((s) => !subagentIds.has(s.session_id));
-	const creators = detectSpecCreators(topLevelSessions);
+	const writers = detectSpecCreators(topLevelSessions);
 	const consumers = detectSpecConsumers(topLevelSessions);
 
-	// Build session meta map
+	// Build session meta map (phases must be computed before buildSpecWorkUnits for creator selection)
 	const sessionMeta: ReadonlyMap<string, WorkUnitSessionMeta> = new Map(
 		topLevelSessions.map((s) => [
 			s.session_id,
@@ -426,7 +462,7 @@ export const buildWorkUnitIndex = (
 		]),
 	);
 
-	const specUnits = buildSpecWorkUnits(creators, consumers, sessionMeta);
+	const specUnits = buildSpecWorkUnits(writers, consumers, sessionMeta);
 
 	// Collect already-grouped session IDs
 	const groupedIds = new Set(

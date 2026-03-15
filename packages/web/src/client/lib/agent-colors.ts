@@ -9,4 +9,4 @@ export const TYPE_COLORS: Readonly<Record<string, string>> = {
 };
 
 export const getTypeBadgeClass = (agentType: string): string =>
-	TYPE_COLORS[agentType] ?? "bg-gray-100 text-gray-600 dark:bg-gray-800/60 dark:text-gray-400";
+	TYPE_COLORS[agentType] ?? "bg-surface-muted text-muted";

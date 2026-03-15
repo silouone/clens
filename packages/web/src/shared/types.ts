@@ -33,6 +33,13 @@ export type {
 	// Events
 	StoredEvent,
 
+	// Links
+	LinkEvent,
+	SpawnLink,
+	StopLink,
+	MessageLink,
+	LinkEventType,
+
 	// Conversation
 	AgentMessageEntry,
 	ConversationEntry,
@@ -49,6 +56,8 @@ export type {
 	DistilledSummary,
 	TeamMetrics,
 	DecisionPoint,
+	TaskRecord,
+	TaskListResult,
 
 	// Work Units
 	WorkUnit,

@@ -15,7 +15,7 @@ export const LIFECYCLE_COLORS: Readonly<Record<WorkUnit["lifecycle"], string>> =
 	"plan-build": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
 	"plan-build-review": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
 	"multi-build": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-	"ad-hoc": "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+	"ad-hoc": "bg-surface-muted text-muted",
 } as const;
 
 export const PHASE_COLORS: Readonly<Record<string, string>> = {
@@ -23,5 +23,5 @@ export const PHASE_COLORS: Readonly<Record<string, string>> = {
 	plan: "bg-amber-400 dark:bg-amber-500",
 	build: "bg-emerald-400 dark:bg-emerald-500",
 	review: "bg-blue-400 dark:bg-blue-500",
-	other: "bg-gray-400 dark:bg-gray-500",
+	other: "bg-gray-400",
 } as const;

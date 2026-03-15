@@ -1,5 +1,6 @@
 import { createSignal, Show, type Component } from "solid-js";
 import { Clipboard, Check } from "lucide-solid";
+import { renderMarkdown } from "../lib/markdown";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ export const SystemPromptPanel: Component<SystemPromptPanelProps> = (props) => {
 				<Show when={props.prompt}>
 					<button
 						onClick={handleCopy}
-						class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-400 transition hover:bg-surface-hover hover:text-secondary text-muted"
 						title="Copy to clipboard"
 					>
 						<Show when={copied()} fallback={<Clipboard class="h-3.5 w-3.5" />}>
@@ -45,17 +46,16 @@ export const SystemPromptPanel: Component<SystemPromptPanelProps> = (props) => {
 			<Show
 				when={props.prompt}
 				fallback={
-					<div class="flex-1 flex items-center justify-center text-sm text-gray-400 dark:text-gray-400">
+					<div class="flex-1 flex items-center justify-center text-sm text-muted">
 						No system prompt available
 					</div>
 				}
 			>
 				{(text) => (
-					<div class="flex-1 overflow-y-auto p-4">
-						<pre class="font-mono text-xs text-gray-700 whitespace-pre-wrap break-words leading-relaxed dark:text-gray-300">
-							{text()}
-						</pre>
-					</div>
+					<div
+						class="flex-1 overflow-y-auto p-4 prose-sm-dark text-sm text-secondary leading-relaxed"
+						innerHTML={renderMarkdown(text())}
+					/>
 				)}
 			</Show>
 		</div>

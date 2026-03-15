@@ -1,5 +1,4 @@
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { Search as SearchIcon } from "lucide-solid";
 import {
 	createEffect,
 	createMemo,
@@ -21,12 +20,19 @@ import { lastDistilledSessionId } from "../lib/events";
 import { useKeyboard } from "../lib/keyboard";
 import { formatDuration } from "../lib/format";
 import { findAgentInTree, flattenAgents } from "../lib/agent-utils";
+import { Spinner } from "../components/ui/Spinner";
+import { FlaskIllustration } from "../components/ui/EmptyState";
 import { PageShell, LoadingSkeleton } from "../components/PageShell";
 import { SessionHeader } from "../components/SessionHeader";
 import { SessionDetailNav } from "../components/SessionDetailNav";
 import { OverviewPanel, AgentPanel } from "../components/panels";
 import { ConversationPanel } from "../components/ConversationPanel";
 import { DetailPageLayout } from "../components/layouts/DetailPageLayout";
+import { DetailHeader } from "../components/DetailHeader";
+import { DetailNav } from "../components/DetailNav";
+import { StatItem } from "../components/ui/StatItem";
+import { LiveSessionView } from "../components/LiveSessionView";
+import { createLiveSessionStore } from "../lib/live-store";
 
 // ── Not distilled state ─────────────────────────────────────────────
 
@@ -91,16 +97,16 @@ const NotDistilledState: Component<{
 
 	return (
 		<div class="flex h-full items-center justify-center">
-			<div class="max-w-md rounded-lg border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900">
-				<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-					<SearchIcon class="h-6 w-6 text-amber-600 dark:text-amber-400" />
+			<div class="max-w-md rounded-lg border border-clens bg-surface-inset p-8 text-center">
+				<div class="mx-auto mb-4">
+					<FlaskIllustration class="h-14 w-14 text-amber-500 dark:text-amber-400" />
 				</div>
-				<h2 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Session not yet analyzed</h2>
-				<p class="mt-2 text-xs text-text-muted">
+				<h2 class="text-sm font-semibold text-primary">Session not yet analyzed</h2>
+				<p class="mt-2 text-xs text-muted">
 					Run distillation to unlock conversation view, diffs, backtracks, and more.
 				</p>
 				<div class="mt-4 flex items-center justify-center gap-3">
-					<div class="rounded-md bg-gray-100 px-4 py-3 dark:bg-gray-800">
+					<div class="rounded-md bg-surface-muted px-4 py-3">
 						<code class="font-mono text-xs text-emerald-600 dark:text-emerald-400">
 							clens distill {props.sessionId.slice(0, 8)}
 						</code>
@@ -116,7 +122,7 @@ const NotDistilledState: Component<{
 				</div>
 				<Show when={distilling()}>
 					<div class="mt-3 flex items-center justify-center gap-2 text-xs text-gray-500">
-						<div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-emerald-500" />
+						<Spinner size="sm" />
 						<span>Analyzing session...</span>
 					</div>
 				</Show>
@@ -131,7 +137,7 @@ const NotDistilledState: Component<{
 							<span>{s().event_count} events</span>
 							<span>{formatDuration(s().duration_ms)}</span>
 							<Show when={s().git_branch}>
-								<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">{s().git_branch}</span>
+								<span class="rounded bg-surface-muted px-1.5 py-0.5 font-mono">{s().git_branch}</span>
 							</Show>
 						</div>
 					)}
@@ -149,12 +155,12 @@ const AgentNotFound: Component<{
 }> = (props) => (
 	<div class="flex h-full items-center justify-center">
 		<div class="text-center">
-			<p class="text-xs text-text-muted">
+			<p class="text-xs text-muted">
 				Agent <code class="font-mono text-xs">{props.agentId.slice(0, 12)}</code> not found in this session.
 			</p>
 			<button
 				onClick={props.onGoOverview}
-				class="mt-3 rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+				class="mt-3 rounded-md bg-surface-muted px-3 py-1 text-xs font-medium text-secondary transition hover:bg-surface-hover"
 			>
 				Go to Overview
 			</button>
@@ -192,6 +198,17 @@ export const SessionDetail: Component = () => {
 	});
 
 	const isNotDistilled = createMemo(() => sessionDetail()?.status === "not_distilled");
+
+	/** Summary data for sessions that haven't been distilled yet. */
+	const notDistilledSummary = createMemo(() => {
+		const sessions = sessionList() ?? [];
+		return sessions.find((s) => s.session_id === params.id);
+	});
+
+	const liveStore = createLiveSessionStore(() => {
+		const detail = sessionDetail();
+		return detail?.status === "not_distilled" ? params.id : undefined;
+	});
 
 	const isMultiAgent = createMemo(() => {
 		const agents = session()?.agents;
@@ -298,7 +315,28 @@ export const SessionDetail: Component = () => {
 	return (
 		<PageShell>
 			<Show when={!sessionDetail.loading} fallback={<LoadingSkeleton label="Loading session..." />}>
-				<Show when={!isNotDistilled()} fallback={<NotDistilledState sessionId={params.id} onDistill={refetchDetail} />}>
+				<Show when={!isNotDistilled()} fallback={
+					<Show
+						when={(() => { const s = liveStore.state(); return s && s.event_count > 0 ? s : undefined })()}
+						fallback={<NotDistilledState sessionId={params.id} onDistill={refetchDetail} />}
+					>
+						{(liveState) => (
+							<div class="flex flex-col h-full">
+								<LiveSessionView state={liveState()} elapsed={liveStore.elapsed()} />
+								<Show when={liveState().status === "complete"}>
+									<div class="flex justify-center py-3">
+										<button
+											class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+											onClick={handleRedistill}
+										>
+											Analyze Session
+										</button>
+									</div>
+								</Show>
+							</div>
+						)}
+					</Show>
+				}>
 					<Show when={session()}>
 						{(s) => (
 							<DetailPageLayout

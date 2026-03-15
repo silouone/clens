@@ -10,7 +10,7 @@ type DetailNavProps = {
 
 export const DetailNav: Component<DetailNavProps> = (props) => (
 	<nav
-		class="flex h-full w-full flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+		class="flex h-full w-full flex-col border-r border-clens bg-surface-raised"
 		role="navigation"
 		aria-label={props.ariaLabel ?? "Navigation"}
 	>

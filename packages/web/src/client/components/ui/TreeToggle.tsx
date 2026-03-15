@@ -13,7 +13,7 @@ export const TreeToggle: Component<TreeToggleProps> = (props) => (
 			type="button"
 			aria-label="Toggle subtree"
 			aria-expanded={props.expanded}
-			class="flex items-center justify-center rounded p-0 hover:text-gray-700 dark:hover:text-gray-300"
+			class="flex items-center justify-center rounded p-0 hover:text-secondary"
 			onClick={props.onToggle}
 		>
 			<ChevronRight

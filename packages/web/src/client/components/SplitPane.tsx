@@ -190,7 +190,8 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 		>
 			{/* First pane (left or top) */}
 			<div
-				class="relative overflow-auto transition-[width,height] duration-150"
+				class="relative overflow-auto"
+				classList={{ "transition-[width,height] duration-150": !dragging() }}
 				style={leftStyle()}
 			>
 				{props.left}
@@ -222,7 +223,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 				<Show when={collapsed() === "left"}>
 					<button
 						onClick={(e) => { e.stopPropagation(); toggleCollapseLeft(); }}
-						class="absolute z-10 flex items-center justify-center rounded bg-gray-200/90 p-0.5 text-gray-500 shadow-sm transition hover:bg-gray-300 hover:text-gray-700 dark:bg-gray-800/90 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+						class="absolute z-10 flex items-center justify-center rounded bg-surface-muted/90 p-0.5 text-muted shadow-sm transition hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"-left-3 top-1/2 -translate-y-1/2": !isVertical(),
 							"-top-3 left-1/2 -translate-x-1/2": isVertical(),
@@ -236,7 +237,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 				<Show when={collapsed() === "right"}>
 					<button
 						onClick={(e) => { e.stopPropagation(); toggleCollapseRight(); }}
-						class="absolute z-10 flex items-center justify-center rounded bg-gray-200/90 p-0.5 text-gray-500 shadow-sm transition hover:bg-gray-300 hover:text-gray-700 dark:bg-gray-800/90 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+						class="absolute z-10 flex items-center justify-center rounded bg-surface-muted/90 p-0.5 text-muted shadow-sm transition hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"-right-3 top-1/2 -translate-y-1/2": !isVertical(),
 							"-bottom-3 left-1/2 -translate-x-1/2": isVertical(),
@@ -250,15 +251,15 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 				<Show when={collapsed() === "none"}>
 					{/* Drag indicator dots */}
 					<div class="flex items-center justify-center gap-0.5" classList={{ "flex-col": !isVertical() }}>
-						<div class="h-1 w-1 rounded-full bg-gray-400 dark:bg-gray-500" />
-						<div class="h-1 w-1 rounded-full bg-gray-400 dark:bg-gray-500" />
-						<div class="h-1 w-1 rounded-full bg-gray-400 dark:bg-gray-500" />
-						<div class="h-1 w-1 rounded-full bg-gray-400 dark:bg-gray-500" />
+						<div class="h-1 w-1 rounded-full bg-gray-400" />
+						<div class="h-1 w-1 rounded-full bg-gray-400" />
+						<div class="h-1 w-1 rounded-full bg-gray-400" />
+						<div class="h-1 w-1 rounded-full bg-gray-400" />
 					</div>
 					{/* Collapse buttons on hover */}
 					<button
 						onClick={(e) => { e.stopPropagation(); toggleCollapseLeft(); }}
-						class="absolute z-10 rounded bg-gray-200/80 p-0.5 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-300 hover:text-gray-600 dark:bg-gray-800/80 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+						class="absolute z-10 rounded bg-surface-muted/80 p-0.5 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"left-0 top-1/2 -translate-y-1/2 -translate-x-full": !isVertical(),
 							"top-0 left-1/2 -translate-x-1/2 -translate-y-full": isVertical(),
@@ -270,7 +271,7 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 					</button>
 					<button
 						onClick={(e) => { e.stopPropagation(); toggleCollapseRight(); }}
-						class="absolute z-10 rounded bg-gray-200/80 p-0.5 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-300 hover:text-gray-600 dark:bg-gray-800/80 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+						class="absolute z-10 rounded bg-surface-muted/80 p-0.5 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"right-0 top-1/2 -translate-y-1/2 translate-x-full": !isVertical(),
 							"bottom-0 left-1/2 -translate-x-1/2 translate-y-full": isVertical(),
@@ -285,7 +286,8 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 
 			{/* Second pane (right or bottom) */}
 			<div
-				class="relative overflow-auto transition-[width,height] duration-150"
+				class="relative overflow-auto"
+				classList={{ "transition-[width,height] duration-150": !dragging() }}
 				style={rightStyle()}
 			>
 				{props.right}

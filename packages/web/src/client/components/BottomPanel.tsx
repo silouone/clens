@@ -16,6 +16,7 @@ import type {
 	TranscriptReasoning,
 } from "../../shared/types";
 import { CommunicationTimeline } from "./CommunicationTimeline";
+import { formatRelTime } from "../lib/format";
 import { getSeverityStyle } from "../lib/severity";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -29,18 +30,6 @@ type BottomPanelProps = {
 	readonly onBacktrackClick?: (startT: number) => void;
 };
 
-// ── Formatting helpers ───────────────────────────────────────────────
-
-const formatRelTime = (t: number, start: number): string => {
-	const delta = Math.max(0, t - start);
-	const s = Math.floor(delta / 1000);
-	if (s < 60) return `${s}s`;
-	const m = Math.floor(s / 60);
-	if (m < 60) return `${m}m ${s % 60}s`;
-	const h = Math.floor(m / 60);
-	return `${h}h ${m % 60}m`;
-};
-
 // ── Backtracks tab ───────────────────────────────────────────────────
 
 const BacktracksTab: Component<{
@@ -52,14 +41,14 @@ const BacktracksTab: Component<{
 		when={props.backtracks.length > 0}
 		fallback={<EmptyTab message="No backtracks detected" />}
 	>
-		<div class="divide-y divide-gray-100 dark:divide-gray-800/50">
+		<div class="divide-y divide-clens">
 			<For each={props.backtracks}>
 				{(bt) => (
 					<button
 						onClick={() => props.onBacktrackClick?.(bt.start_t)}
-						class="flex w-full items-center gap-3 px-3 py-1.5 text-left text-xs transition hover:bg-gray-50 dark:hover:bg-gray-800/30"
+						class="flex w-full items-center gap-3 px-3 py-1.5 text-left text-xs transition hover:bg-surface-hover/30"
 					>
-						<span class="text-[10px] text-gray-400 tabular-nums w-12 dark:text-gray-400">
+						<span class="text-[10px] tabular-nums w-12 text-muted">
 							{formatRelTime(bt.start_t, props.startTime)}
 						</span>
 						<span
@@ -67,13 +56,13 @@ const BacktracksTab: Component<{
 						>
 							{bt.type.replaceAll("_", " ")}
 						</span>
-						<span class="font-mono text-text-muted">{bt.tool_name}</span>
+						<span class="font-mono text-muted">{bt.tool_name}</span>
 						<Show when={bt.file_path}>
 							{(fp) => (
-								<span class="truncate font-mono text-gray-400 max-w-xs dark:text-gray-400">{fp()}</span>
+								<span class="truncate font-mono max-w-xs text-muted">{fp()}</span>
 							)}
 						</Show>
-						<span class="ml-auto text-gray-400 dark:text-gray-400">
+						<span class="ml-auto text-muted">
 							{bt.attempts} attempt{bt.attempts !== 1 ? "s" : ""}
 						</span>
 					</button>
@@ -146,34 +135,34 @@ const TimelineTab: Component<{
 								onClick={() => toggleFilter(type)}
 								class="rounded px-1.5 py-0.5 text-[11px] font-medium transition border"
 								classList={{
-									"border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800/50": activeFilters().has(type),
-									"border-transparent text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300": !activeFilters().has(type),
+									"border-clens bg-surface-muted ": activeFilters().has(type),
+									"border-transparent text-muted hover:text-secondary": !activeFilters().has(type),
 								}}
 							>
 								{type.replaceAll("_", " ")}
 							</button>
 						)}
 					</For>
-					<span class="ml-auto text-[11px] text-gray-400 dark:text-gray-400">{filtered().length} events</span>
+					<span class="ml-auto text-[11px] text-muted">{filtered().length} events</span>
 				</div>
 
 				{/* Event list */}
-				<div class="flex-1 overflow-y-auto">
+				<div class="flex-1 overflow-y-auto divide-y divide-clens">
 					<For each={filtered()}>
 						{(entry) => (
-							<div class="flex items-center gap-3 px-3 py-0.5 text-xs border-b border-gray-100 dark:border-gray-800/20">
-								<span class="text-[10px] text-gray-400 tabular-nums w-12 dark:text-gray-400">
+							<div class="flex items-center gap-3 px-3 py-1 text-xs">
+								<span class="text-[10px] tabular-nums w-12 text-muted">
 									{formatRelTime(entry.t, props.startTime)}
 								</span>
 								<span class={`font-medium ${TIMELINE_TYPE_COLORS[entry.type] ?? "text-gray-500"}`}>
 									{entry.type.replaceAll("_", " ")}
 								</span>
 								<Show when={entry.tool_name}>
-									{(tn) => <span class="font-mono text-gray-500">{tn()}</span>}
+									{(tn) => <span class="font-mono text-muted">{tn()}</span>}
 								</Show>
 								<Show when={entry.content_preview}>
 									{(cp) => (
-										<span class="truncate text-gray-600 max-w-md">{cp()}</span>
+										<span class="truncate text-muted max-w-md">{cp()}</span>
 									)}
 								</Show>
 							</div>
@@ -220,19 +209,19 @@ const EditsTab: Component<{
 			when={chains().length > 0}
 			fallback={<EmptyTab message="No edit chains" />}
 		>
-			<div class="divide-y divide-gray-100 dark:divide-gray-800/50">
+			<div class="divide-y divide-clens">
 				<For each={chains()}>
 					{(chain) => (
 						<div class="px-3 py-1.5">
 							{/* File header */}
 							<div class="flex items-center gap-2">
-								<span class="font-mono text-xs text-gray-700 truncate flex-1 dark:text-gray-300">
+								<span class="font-mono text-xs text-secondary truncate flex-1">
 									{chain.file_path}
 								</span>
-								<span class="text-[10px] text-gray-400 dark:text-gray-400">
+								<span class="text-[10px] text-muted">
 									{chain.total_edits} edit{chain.total_edits !== 1 ? "s" : ""}
 								</span>
-								<span class="text-[10px] text-gray-400 dark:text-gray-400">
+								<span class="text-[10px] text-muted">
 									{chain.total_reads} read{chain.total_reads !== 1 ? "s" : ""}
 								</span>
 								<Show when={chain.has_backtrack}>
@@ -302,7 +291,7 @@ const EditsTab: Component<{
 // ── Empty tab state ──────────────────────────────────────────────────
 
 const EmptyTab: Component<{ readonly message: string }> = (props) => (
-	<div class="flex h-full items-center justify-center text-sm text-gray-500 py-8">
+	<div class="flex h-full items-center justify-center text-sm text-muted py-8">
 		{props.message}
 	</div>
 );

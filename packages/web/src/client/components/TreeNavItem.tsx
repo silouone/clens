@@ -36,7 +36,7 @@ export const TreeNavItem: Component<TreeNavItemProps> = (props) => {
 		>
 			<button
 				onClick={props.onClick}
-				class="group flex w-full flex-col rounded-md mx-1.5 mb-0.5 text-left text-xs transition-colors duration-150 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 dark:hover:bg-gray-800/50 dark:focus:ring-offset-gray-900"
+				class="group flex w-full flex-col rounded-md mx-1.5 mb-0.5 text-left text-xs transition-colors duration-150 hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
 				classList={{
 					"bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800/40": props.selected,
 				}}
@@ -51,7 +51,7 @@ export const TreeNavItem: Component<TreeNavItemProps> = (props) => {
 
 				{/* Row 2: stats row */}
 				<Show when={props.bottomRow}>
-					<div class="flex w-full items-center gap-2 px-2 pb-1.5 pl-[26px] text-[10px] tabular-nums text-gray-400 dark:text-gray-400">
+					<div class="flex w-full items-center gap-2 px-2 pb-1.5 pl-[26px] text-[10px] tabular-nums text-muted">
 						{props.bottomRow}
 					</div>
 				</Show>

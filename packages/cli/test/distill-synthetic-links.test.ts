@@ -4,8 +4,12 @@ import {
 	extractUnlinkedAgentCalls,
 	matchAgentCallsToSessions,
 	synthesizeSpawnLinks,
+	type ScanSessionFilesFn,
 } from "../src/distill/synthetic-links";
 import type { LinkEvent, SpawnLink, StopLink, StoredEvent } from "../src/types";
+
+/** No-op scan function for tests that never reach the scan phase. */
+const noopScan: ScanSessionFilesFn = () => [];
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -452,7 +456,7 @@ describe("synthesizeSpawnLinks", () => {
 			makeSpawnLink({ t: 1100, agent_type: "builder", agent_id: "child-1" }),
 		];
 
-		const result = synthesizeSpawnLinks(events, links, "/tmp/proj", "root-session");
+		const result = synthesizeSpawnLinks(events, links, "/tmp/proj", "root-session", noopScan);
 		expect(result.spawns).toEqual([]);
 		expect(result.stops).toEqual([]);
 	});
@@ -463,13 +467,13 @@ describe("synthesizeSpawnLinks", () => {
 			makeStoredEvent({ t: 2000, event: "PostToolUse", data: { tool_name: "Edit" } }),
 		];
 
-		const result = synthesizeSpawnLinks(events, [], "/tmp/proj", "root-session");
+		const result = synthesizeSpawnLinks(events, [], "/tmp/proj", "root-session", noopScan);
 		expect(result.spawns).toEqual([]);
 		expect(result.stops).toEqual([]);
 	});
 
 	test("returns empty for empty events array", () => {
-		const result = synthesizeSpawnLinks([], [], "/tmp/proj", "root-session");
+		const result = synthesizeSpawnLinks([], [], "/tmp/proj", "root-session", noopScan);
 		expect(result.spawns).toEqual([]);
 		expect(result.stops).toEqual([]);
 	});
@@ -486,7 +490,7 @@ describe("synthesizeSpawnLinks", () => {
 			}),
 		];
 
-		const result = synthesizeSpawnLinks(events, [], "/tmp/proj", "root-session");
+		const result = synthesizeSpawnLinks(events, [], "/tmp/proj", "root-session", noopScan);
 		expect(result.spawns).toEqual([]);
 		expect(result.stops).toEqual([]);
 	});

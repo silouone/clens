@@ -77,10 +77,10 @@ describe("detectSpecCreators", () => {
 			}),
 		];
 		const result = detectSpecCreators(sessions);
-		expect(result.get("specs/plan.md")).toBe("s1");
+		expect(result.get("specs/plan.md")).toEqual(["s1"]);
 	});
 
-	test("keeps earliest session when multiple write same spec", () => {
+	test("returns all writers sorted by start_time when multiple write same spec", () => {
 		const sessions = [
 			makeSession({
 				session_id: "s2",
@@ -98,7 +98,7 @@ describe("detectSpecCreators", () => {
 			}),
 		];
 		const result = detectSpecCreators(sessions);
-		expect(result.get("specs/plan.md")).toBe("s1");
+		expect(result.get("specs/plan.md")).toEqual(["s1", "s2"]);
 		expect(result.size).toBe(1);
 	});
 
@@ -276,14 +276,14 @@ describe("detectSpecConsumers", () => {
 
 describe("buildSpecWorkUnits", () => {
 	test("builds plan+build pair", () => {
-		const creators = new Map([["specs/plan.md", "s1"]]);
+		const writers = new Map([["specs/plan.md", ["s1"]]]);
 		const consumers = new Map([["specs/plan.md", ["s2"]]]);
 		const meta = new Map([
 			["s1", makeMeta({ session_id: "s1", start_time: 1000, duration_ms: 5000, phase: "plan" })],
 			["s2", makeMeta({ session_id: "s2", start_time: 10000, duration_ms: 8000, phase: "build" })],
 		]);
 
-		const result = buildSpecWorkUnits(creators, consumers, meta);
+		const result = buildSpecWorkUnits(writers, consumers, meta);
 		expect(result).toHaveLength(1);
 		expect(result[0].link_type).toBe("spec");
 		expect(result[0].spec_path).toBe("specs/plan.md");
@@ -297,7 +297,7 @@ describe("buildSpecWorkUnits", () => {
 	});
 
 	test("builds plan+build+review triple", () => {
-		const creators = new Map([["specs/plan.md", "s1"]]);
+		const writers = new Map([["specs/plan.md", ["s1"]]]);
 		const consumers = new Map([["specs/plan.md", ["s2", "s3"]]]);
 		const meta = new Map([
 			["s1", makeMeta({ session_id: "s1", start_time: 1000, duration_ms: 5000, phase: "plan" })],
@@ -305,39 +305,39 @@ describe("buildSpecWorkUnits", () => {
 			["s3", makeMeta({ session_id: "s3", start_time: 20000, duration_ms: 3000, phase: "review" })],
 		]);
 
-		const result = buildSpecWorkUnits(creators, consumers, meta);
+		const result = buildSpecWorkUnits(writers, consumers, meta);
 		expect(result[0].lifecycle).toBe("plan-build-review");
 		expect(result[0].sessions).toHaveLength(3);
 	});
 
 	test("orphan plan (no consumers) results in ad-hoc", () => {
-		const creators = new Map([["specs/orphan.md", "s1"]]);
+		const writers = new Map([["specs/orphan.md", ["s1"]]]);
 		const consumers: ReadonlyMap<string, readonly string[]> = new Map();
 		const meta = new Map([
 			["s1", makeMeta({ session_id: "s1", start_time: 1000, duration_ms: 5000, phase: "plan" })],
 		]);
 
-		const result = buildSpecWorkUnits(creators, consumers, meta);
+		const result = buildSpecWorkUnits(writers, consumers, meta);
 		expect(result).toHaveLength(1);
 		expect(result[0].sessions).toHaveLength(1);
 		expect(result[0].lifecycle).toBe("ad-hoc");
 	});
 
-	test("orphan build (no creator) results in ad-hoc", () => {
-		const creators: ReadonlyMap<string, string> = new Map();
+	test("orphan build (no writer) results in ad-hoc", () => {
+		const writers: ReadonlyMap<string, readonly string[]> = new Map();
 		const consumers = new Map([["specs/orphan.md", ["s1"]]]);
 		const meta = new Map([
 			["s1", makeMeta({ session_id: "s1", start_time: 1000, duration_ms: 5000, phase: "build" })],
 		]);
 
-		const result = buildSpecWorkUnits(creators, consumers, meta);
+		const result = buildSpecWorkUnits(writers, consumers, meta);
 		expect(result).toHaveLength(1);
 		expect(result[0].sessions).toHaveLength(1);
 		expect(result[0].sessions[0].role).toBe("consumer");
 	});
 
 	test("multiple builds from same spec -> multi-build", () => {
-		const creators = new Map([["specs/plan.md", "s1"]]);
+		const writers = new Map([["specs/plan.md", ["s1"]]]);
 		const consumers = new Map([["specs/plan.md", ["s2", "s3"]]]);
 		const meta = new Map([
 			["s1", makeMeta({ session_id: "s1", start_time: 1000, duration_ms: 5000, phase: "freeform" })],
@@ -345,22 +345,52 @@ describe("buildSpecWorkUnits", () => {
 			["s3", makeMeta({ session_id: "s3", start_time: 20000, duration_ms: 3000, phase: "freeform" })],
 		]);
 
-		const result = buildSpecWorkUnits(creators, consumers, meta);
+		const result = buildSpecWorkUnits(writers, consumers, meta);
 		expect(result[0].lifecycle).toBe("multi-build");
 	});
 
-	test("consumer same as creator is excluded from consumer list", () => {
-		const creators = new Map([["specs/plan.md", "s1"]]);
+	test("writer+consumer overlap: session appears once with creator role", () => {
+		const writers = new Map([["specs/plan.md", ["s1"]]]);
 		const consumers = new Map([["specs/plan.md", ["s1", "s2"]]]);
 		const meta = new Map([
 			["s1", makeMeta({ session_id: "s1", start_time: 1000, phase: "plan" })],
 			["s2", makeMeta({ session_id: "s2", start_time: 10000, phase: "build" })],
 		]);
 
-		const result = buildSpecWorkUnits(creators, consumers, meta);
+		const result = buildSpecWorkUnits(writers, consumers, meta);
 		expect(result[0].sessions).toHaveLength(2);
 		expect(result[0].sessions[0].role).toBe("creator");
 		expect(result[0].sessions[1].role).toBe("consumer");
+	});
+
+	test("prefers planning-phase writer as creator over earlier build-phase writer", () => {
+		// Build session (s1) started first and edited the spec, but plan session (s2) wrote it later
+		const writers = new Map([["specs/plan.md", ["s1", "s2"]]]);
+		const consumers = new Map([["specs/plan.md", ["s1"]]]);
+		const meta = new Map([
+			["s1", makeMeta({ session_id: "s1", start_time: 1000, duration_ms: 5000, phase: "build" })],
+			["s2", makeMeta({ session_id: "s2", start_time: 8000, duration_ms: 3000, phase: "plan" })],
+		]);
+
+		const result = buildSpecWorkUnits(writers, consumers, meta);
+		// s2 (plan phase) should be creator, not s1 (build phase)
+		const creator = result[0].sessions.find((s) => s.role === "creator");
+		expect(creator?.session_id).toBe("s2");
+	});
+
+	test("build-first + prime-later does NOT produce prime-build lifecycle", () => {
+		// Regression: build ran first, prime ran later — must not label "Prime > Build"
+		const writers = new Map([["specs/plan.md", ["s1"]]]);
+		const consumers = new Map([["specs/plan.md", ["s1", "s2"]]]);
+		const meta = new Map([
+			["s1", makeMeta({ session_id: "s1", start_time: 1000, duration_ms: 46 * 60000, phase: "build" })],
+			["s2", makeMeta({ session_id: "s2", start_time: 50 * 60000, duration_ms: 11 * 60000, phase: "prime" })],
+		]);
+
+		const result = buildSpecWorkUnits(writers, consumers, meta);
+		// Build came first temporally, so lifecycle should NOT be "prime-build"
+		expect(result[0].lifecycle).not.toBe("prime-build");
+		expect(result[0].lifecycle).toBe("ad-hoc");
 	});
 });
 
@@ -734,6 +764,38 @@ describe("inferPhase", () => {
 			user_messages: [makeUserMessage("<command-message>prime</command-message>\n# Prime\nSetup")],
 		});
 		expect(inferPhase(session)).toBe("prime");
+	});
+
+	test("user message overrides plan_drift: /plan with plan_drift → plan, not build", () => {
+		const session = makeSession({
+			session_id: "s1",
+			user_messages: [makeUserMessage("/plan create a new feature")],
+			plan_drift: {
+				spec_path: "specs/feature.md",
+				expected_files: [],
+				actual_files: [],
+				unexpected_files: [],
+				missing_files: [],
+				drift_score: 0,
+			},
+		});
+		expect(inferPhase(session)).toBe("plan");
+	});
+
+	test("user message overrides plan_drift: /review with plan_drift → review, not build", () => {
+		const session = makeSession({
+			session_id: "s1",
+			user_messages: [makeUserMessage("/review check the implementation")],
+			plan_drift: {
+				spec_path: "specs/feature.md",
+				expected_files: [],
+				actual_files: [],
+				unexpected_files: [],
+				missing_files: [],
+				drift_score: 0,
+			},
+		});
+		expect(inferPhase(session)).toBe("review");
 	});
 });
 

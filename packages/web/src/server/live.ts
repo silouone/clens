@@ -65,9 +65,9 @@ const DEBOUNCE_MS = 100
 const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 	const sessionsDir = `${projectDir}/.clens/sessions`
 	const distilledDir = `${projectDir}/.clens/distilled`
-	const refs = {
-		watchers: [] as FSWatcher[],
-		pollTimers: [] as ReturnType<typeof setInterval>[],
+	const refs: { watchers: readonly FSWatcher[]; pollTimers: readonly ReturnType<typeof setInterval>[] } = {
+		watchers: [],
+		pollTimers: [],
 	}
 	const usePoll = process.env.CLENS_POLL === "1"
 
@@ -89,7 +89,17 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 				closeSync(fd)
 				return [filePath, { offset: size }] as const
 			})
-		for (const [k, v] of sessionEntries) offsets.set(k, v)
+		sessionEntries.forEach(([k, v]) => offsets.set(k, v))
+
+		// Seed _links.jsonl offset so only new links trigger events
+		const linksFile = `${sessionsDir}/_links.jsonl`
+		if (existsSync(linksFile)) {
+			const fd = openSync(linksFile, "r")
+			const size = fstatSync(fd).size
+			closeSync(fd)
+			offsets.set(linksFile, { offset: size })
+		}
+
 		log.info(`Seeded offsets for ${offsets.size} session files`)
 	} catch (err) {
 		log.warn("Failed to seed session offsets:", err instanceof Error ? err.message : String(err))
@@ -105,7 +115,7 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 				closeSync(fd)
 				return [filePath, { offset: size }] as const
 			})
-		for (const [k, v] of distillEntries) offsets.set(k, v)
+		distillEntries.forEach(([k, v]) => offsets.set(k, v))
 	} catch {
 		// distilled dir may be empty — that's fine
 	}
@@ -118,7 +128,7 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 			const files = readdirSync(sessionsDir)
 			files
 				.filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
-				.map((file) => {
+				.forEach((file) => {
 					const filePath = `${sessionsDir}/${file}`
 					const newLines = readNewLines(filePath)
 					if (newLines.length === 0) return
@@ -128,7 +138,7 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 
 					// Parse and broadcast each new event
 					log.debug(`New lines: ${newLines.length} for ${sessionId.slice(0, 8)}`)
-					newLines.map((line) => {
+					newLines.forEach((line) => {
 						try {
 							const event = JSON.parse(line)
 							broadcastSSE({
@@ -146,6 +156,26 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 						data: { session_id: sessionId, new_events: newLines.length },
 					})
 				})
+
+			// Handle _links.jsonl separately
+			const linksFile = `${sessionsDir}/_links.jsonl`
+			if (existsSync(linksFile)) {
+				const linkLines = readNewLines(linksFile)
+				if (linkLines.length > 0) {
+					log.debug(`New link lines: ${linkLines.length}`)
+					linkLines.forEach((line) => {
+						try {
+							const link = JSON.parse(line)
+							broadcastSSE({
+								type: "live_link",
+								data: { link },
+							})
+						} catch (err) {
+							log.warn("Malformed link line:", err instanceof Error ? err.message : String(err))
+						}
+					})
+				}
+			}
 		} catch (err) {
 			log.warn("Session scan error:", err instanceof Error ? err.message : String(err))
 		}
@@ -158,7 +188,7 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 			const files = readdirSync(distilledDir)
 			files
 				.filter((f) => f.endsWith(".json"))
-				.map((file) => {
+				.forEach((file) => {
 					const filePath = `${distilledDir}/${file}`
 					const entry = offsets.get(filePath)
 					// Only broadcast if we haven't seen this file before or it changed

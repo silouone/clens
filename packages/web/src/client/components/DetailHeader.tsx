@@ -6,20 +6,29 @@ type DetailHeaderProps = {
 	readonly children?: JSX.Element;
 	/** Optional right-aligned action area */
 	readonly action?: JSX.Element;
+	/** Optional second row content (stat pills, timeline, etc.) */
+	readonly bottomRow?: JSX.Element;
 };
 
 export const DetailHeader: Component<DetailHeaderProps> = (props) => (
-	<div class="border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+	<div class="border-b border-clens bg-surface-inset px-3 py-2">
+		{/* Row 1: title + inline children + action */}
 		<div class="flex flex-wrap items-center gap-2">
-			<h2 class="text-sm font-semibold text-gray-900 truncate max-w-md dark:text-gray-100">
+			<h2 class="text-base font-bold text-primary truncate max-w-md font-mono">
 				{props.title}
 			</h2>
-			{props.children}
+			{!props.bottomRow && props.children}
 			<Show when={props.action}>
 				<div class="ml-auto">
 					{props.action}
 				</div>
 			</Show>
 		</div>
+		{/* Row 2: bottom row content */}
+		<Show when={props.bottomRow}>
+			<div class="mt-1.5 flex flex-wrap items-center gap-2">
+				{props.bottomRow}
+			</div>
+		</Show>
 	</div>
 );

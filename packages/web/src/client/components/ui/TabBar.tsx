@@ -5,7 +5,7 @@ type TabBarProps = {
 };
 
 export const TabBar: Component<TabBarProps> = (props) => (
-	<div role="tablist" class="flex items-center border-b border-gray-200 bg-gray-50 px-2 dark:border-gray-800 dark:bg-gray-900/50">
+	<div role="tablist" class="flex items-center gap-1 border-b border-clens bg-surface-inset px-2 py-1">
 		{props.children}
 	</div>
 );

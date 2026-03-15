@@ -1,5 +1,6 @@
 import { createMemo, For, onCleanup, Show, type Component } from "solid-js";
 import { Keyboard } from "lucide-solid";
+import { KbdShortcut } from "./ui/KbdShortcut";
 import { showHelp, setShowHelp, activeShortcuts, GLOBAL_SHORTCUTS } from "../lib/keyboard";
 
 // ── Group shortcuts by context ──────────────────────────────────────
@@ -77,20 +78,20 @@ export const KeyboardHelp: Component = () => {
 						onClick={() => setShowHelp(false)}
 					>
 						<div
-							class="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+							class="w-full max-w-md rounded-xl border border-clens bg-surface-raised p-6 shadow-card"
 							onClick={(e) => e.stopPropagation()}
 						>
 							<div class="flex items-center justify-between">
 								<h2
 									id="keyboard-help-title"
-									class="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100"
+									class="flex items-center gap-2 text-lg font-semibold text-primary"
 								>
 									<Keyboard class="h-5 w-5" /> Keyboard Shortcuts
 								</h2>
 								<button
 									ref={closeButtonRef}
 									onClick={() => setShowHelp(false)}
-									class="rounded p-1 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+									class="rounded p-1 text-muted transition hover:bg-surface-hover hover:text-secondary"
 								>
 									Esc
 								</button>
@@ -99,15 +100,15 @@ export const KeyboardHelp: Component = () => {
 								<For each={grouped()}>
 									{(group) => (
 										<div>
-											<h3 class="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+											<h3 class="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
 												{group.context}
 											</h3>
 											<div class="space-y-0.5">
 												<For each={group.entries}>
 													{(shortcut) => (
 														<div class="flex items-center justify-between py-1.5">
-															<span class="text-sm text-gray-700 dark:text-gray-300">{shortcut.label}</span>
-															<kbd class="rounded border border-gray-300 bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+															<span class="text-sm text-secondary">{shortcut.label}</span>
+															<kbd class="rounded border border-clens bg-surface-muted px-2 py-0.5 font-mono text-xs text-secondary">
 																{shortcut.key}
 															</kbd>
 														</div>

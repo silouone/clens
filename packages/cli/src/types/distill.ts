@@ -518,6 +518,26 @@ export interface WorkUnitIndex {
 	readonly units: readonly WorkUnit[];
 }
 
+export interface TaskRecord {
+	readonly task_id: string;
+	readonly subject: string;
+	readonly description?: string;
+	readonly active_form?: string;
+	readonly status: "pending" | "in_progress" | "completed";
+	readonly owner?: string;
+	readonly blocked_by?: readonly string[];
+	readonly created_at: number;
+	readonly completed_at?: number;
+	readonly created_by: string;
+}
+
+export interface TaskListResult {
+	readonly tasks: readonly TaskRecord[];
+	readonly total_count: number;
+	readonly completed_count: number;
+	readonly completion_rate: number;
+}
+
 export interface DistilledSession {
 	readonly session_id: string;
 	readonly session_name?: string;
@@ -541,4 +561,5 @@ export interface DistilledSession {
 	readonly comm_sequence?: readonly CommunicationSequenceEntry[];
 	readonly agent_lifetimes?: readonly AgentLifetime[];
 	readonly plan_drift?: PlanDriftReport;
+	readonly task_list?: TaskListResult;
 }

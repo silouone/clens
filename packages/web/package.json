@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@clens/cli": "workspace:*",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@kobalte/core": "^0.13.0",
     "@solidjs/router": "^0.15.0",
     "diff2html": "^3.4.0",

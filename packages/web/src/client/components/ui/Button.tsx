@@ -13,9 +13,9 @@ const VARIANT_CLASSES: Readonly<Record<ButtonVariant, string>> = {
 	primary:
 		"bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600 disabled:opacity-50",
 	secondary:
-		"bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50",
+		"bg-surface-muted text-secondary hover:bg-surface-hover disabled:opacity-50",
 	ghost:
-		"text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 disabled:opacity-40",
+		"text-gray-500 hover:bg-surface-hover hover:text-secondary text-muted disabled:opacity-40",
 } as const;
 
 const SIZE_CLASSES: Readonly<Record<ButtonSize, string>> = {

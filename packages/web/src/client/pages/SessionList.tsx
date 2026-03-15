@@ -1,12 +1,15 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { Search, ArrowUp, ArrowDown, RefreshCw, Inbox, ChevronRight, Database, Calendar, Activity, Clock, Users, Layers } from "lucide-solid";
+import { Search, ArrowUp, ArrowDown, RefreshCw, ChevronRight, Database, Calendar, Activity, Clock, Users, Layers } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
 import type { SessionSummary, WorkUnit } from "../../shared/types";
 import { formatDuration } from "../lib/format";
+import { StatItem } from "../components/ui/StatItem";
 import { StatusBadge } from "../components/ui/StatusBadge";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { WorkUnitCard } from "../components/WorkUnitCard";
+import { TelescopeIllustration } from "../components/ui/EmptyState";
 
 // ── Live indicator ──────────────────────────────────────────────────
 
@@ -48,15 +51,15 @@ const formatSize = (bytes: number): string => {
 
 const SkeletonRow: Component = () => (
 	<tr class="animate-pulse">
-		<td class="px-4 py-3"><div class="h-4 w-40 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="px-4 py-3"><div class="h-4 w-16 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="px-4 py-3"><div class="h-4 w-12 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="px-4 py-3"><div class="h-4 w-10 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="px-4 py-3"><div class="h-4 w-10 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="px-4 py-3"><div class="h-4 w-14 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="px-4 py-3"><div class="h-4 w-20 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="px-4 py-3"><div class="h-4 w-16 rounded bg-gray-200 dark:bg-gray-800" /></td>
-		<td class="w-8 px-2 py-3" />
+		<td class="px-4 py-2"><div class="h-4 w-40 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-16 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-12 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-10 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-10 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-14 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-20 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-16 rounded bg-surface-muted" /></td>
+		<td class="w-8 px-2 py-2" />
 	</tr>
 );
 
@@ -76,7 +79,7 @@ const EmptyState: Component = () => (
 	<tr>
 		<td colspan="9" class="px-4 py-12 text-center text-gray-500">
 			<div class="flex flex-col items-center gap-2">
-				<Inbox class="h-8 w-8 text-gray-300 dark:text-gray-400" />
+				<TelescopeIllustration class="h-12 w-12 text-muted" />
 				<p class="text-lg font-medium">No sessions found</p>
 				<p class="text-sm">
 					Run a Claude Code session with cLens hooks to capture data.
@@ -86,19 +89,7 @@ const EmptyState: Component = () => (
 	</tr>
 );
 
-// ── Summary stat pill ────────────────────────────────────────────────
 
-const SummaryStatPill: Component<{
-	readonly icon: Component<{ readonly class?: string }>;
-	readonly label: string;
-	readonly value: string | number;
-}> = (props) => (
-	<div class="flex items-center gap-1.5 rounded border border-gray-200 bg-white px-2 py-1 dark:border-gray-800 dark:bg-gray-900">
-		<props.icon class="h-3 w-3 text-gray-400 dark:text-gray-400" />
-		<span class="text-[10px] font-medium uppercase text-gray-400 dark:text-gray-400">{props.label}</span>
-		<span class="text-xs font-semibold tabular-nums text-gray-700 dark:text-gray-200">{props.value}</span>
-	</div>
-);
 
 // ── Summary stats helpers ───────────────────────────────────────────
 
@@ -210,17 +201,17 @@ const SortableHeader: Component<{
 
 	return (
 		<th
-			class={`px-4 py-3 font-medium cursor-pointer select-none transition hover:text-gray-700 dark:hover:text-gray-300 ${alignClass()} ${
-				isActive() ? "text-gray-800 dark:text-gray-200" : ""
+			class={`px-4 py-3 font-medium cursor-pointer select-none transition hover:text-secondary ${alignClass()} ${
+				isActive() ? "text-primary" : ""
 			}`}
 			onClick={() => props.onSort(props.field)}
 		>
 			{props.label}
 			<Show when={isAsc()}>
-				<ArrowUp class="ml-0.5 inline h-3 w-3 text-blue-500 dark:text-blue-400" />
+				<ArrowUp class="ml-0.5 inline h-3 w-3 text-brand-500 dark:text-brand-400" />
 			</Show>
 			<Show when={isDesc()}>
-				<ArrowDown class="ml-0.5 inline h-3 w-3 text-blue-500 dark:text-blue-400" />
+				<ArrowDown class="ml-0.5 inline h-3 w-3 text-brand-500 dark:text-brand-400" />
 			</Show>
 		</th>
 	);
@@ -399,34 +390,23 @@ export const SessionList: Component = () => {
 	], "Session List");
 
 	return (
-		<div class="p-4">
+		<div class="mx-auto max-w-[1440px] p-4">
 			{/* Header row: title + KPI stats + refresh */}
 			<div class="flex items-center gap-4">
 				<div class="flex items-center gap-3">
 					{/* View toggle: Sessions / Work Units */}
-					<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-						<button
-							onClick={() => { setViewMode("sessions"); setPage(1); setSelectedRow(-1); }}
-							class={`px-3 py-1.5 text-xs font-medium transition ${
-								viewMode() === "sessions"
-									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-							}`}
-						>
-							Sessions
-						</button>
-						<button
-							onClick={() => { setViewMode("work_units"); refetchWorkUnits(); }}
-							class={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition ${
-								viewMode() === "work_units"
-									? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-									: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-							}`}
-						>
-							<Layers class="h-3 w-3" />
-							Work Units
-						</button>
-					</div>
+					<SegmentedControl
+						options={[
+							{ label: "Sessions", value: "sessions" as ViewMode },
+							{ label: "Work Units", value: "work_units" as ViewMode },
+						]}
+						value={viewMode()}
+						onChange={(v) => {
+							setViewMode(v);
+							if (v === "sessions") { setPage(1); setSelectedRow(-1); }
+							else { refetchWorkUnits(); }
+						}}
+					/>
 					<div class="flex items-center gap-1" title="Live updates via SSE">
 						<LiveDot />
 						<span class="text-[10px] text-gray-500">Live</span>
@@ -436,13 +416,13 @@ export const SessionList: Component = () => {
 				{/* KPI stats — pushed right */}
 				<Show when={sessionList.state !== "pending"}>
 					<div class="ml-auto flex items-center gap-2">
-						<SummaryStatPill icon={Database} label="Total" value={filtered().length} />
-						<SummaryStatPill icon={Calendar} label="Today" value={todayCount()} />
-						<SummaryStatPill icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
-						<SummaryStatPill icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
+						<StatItem variant="pill" bordered icon={Database} label="Total" value={String(filtered().length)} />
+						<StatItem variant="pill" bordered icon={Calendar} label="Today" value={String(todayCount())} />
+						<StatItem variant="pill" bordered icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
+						<StatItem variant="pill" bordered icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
 						<button
 							onClick={() => refetchSessions()}
-							class="ml-1 flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+							class="ml-1 flex items-center gap-1 rounded border border-clens px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
 							title="Refresh sessions"
 						>
 							<RefreshCw class="h-3 w-3" />
@@ -466,7 +446,7 @@ export const SessionList: Component = () => {
 			{/* Filters */}
 			<div class="mt-3 flex flex-wrap items-center gap-3">
 				<div class="relative">
-					<Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-400" />
+					<Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
 					<input
 						ref={searchInputRef}
 						type="text"
@@ -477,72 +457,40 @@ export const SessionList: Component = () => {
 							setPage(1);
 							setSelectedRow(-1);
 						}}
-						class="w-64 rounded-md border border-gray-300 bg-white py-1.5 pl-8 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-600"
+						class="w-64 rounded-md border border-clens bg-surface-raised py-1.5 pl-8 pr-3 text-sm text-primary placeholder-gray-400 focus:border-brand-500 focus:outline-none"
 					/>
 				</div>
 				{/* Status filter */}
-				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-					<For each={["all", "complete", "incomplete"] as const}>
-						{(s) => (
-							<button
-								onClick={() => {
-									setStatusFilter(s);
-									setPage(1);
-									setSelectedRow(-1);
-								}}
-								class={`px-3 py-1.5 text-xs font-medium transition ${
-									statusFilter() === s
-										? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-										: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-								}`}
-							>
-								{s === "all" ? "All" : s === "complete" ? "Complete" : "Incomplete"}
-							</button>
-						)}
-					</For>
-				</div>
+				<SegmentedControl
+					options={[
+						{ label: "All", value: "all" as StatusFilter },
+						{ label: "Complete", value: "complete" as StatusFilter },
+						{ label: "Incomplete", value: "incomplete" as StatusFilter },
+					]}
+					value={statusFilter()}
+					onChange={(v) => { setStatusFilter(v); setPage(1); setSelectedRow(-1); }}
+				/>
 				{/* Analyzed filter */}
-				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-					<For each={["all", "analyzed", "not_analyzed"] as const}>
-						{(v) => (
-							<button
-								onClick={() => {
-									setAnalyzedFilter(v);
-									setPage(1);
-									setSelectedRow(-1);
-								}}
-								class={`px-3 py-1.5 text-xs font-medium transition ${
-									analyzedFilter() === v
-										? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-										: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-								}`}
-							>
-								{v === "all" ? "All" : v === "analyzed" ? "Analyzed" : "Not analyzed"}
-							</button>
-						)}
-					</For>
-				</div>
+				<SegmentedControl
+					options={[
+						{ label: "All", value: "all" as AnalyzedFilter },
+						{ label: "Analyzed", value: "analyzed" as AnalyzedFilter },
+						{ label: "Not analyzed", value: "not_analyzed" as AnalyzedFilter },
+					]}
+					value={analyzedFilter()}
+					onChange={(v) => { setAnalyzedFilter(v); setPage(1); setSelectedRow(-1); }}
+				/>
 				{/* Agents filter */}
-				<div class="flex rounded-md border border-gray-300 dark:border-gray-700">
-					<For each={["all", "top_level", "multi", "solo"] as const}>
-						{(v) => (
-							<button
-								onClick={() => {
-									setAgentsFilter(v);
-									setPage(1);
-									setSelectedRow(-1);
-								}}
-								class={`px-3 py-1.5 text-xs font-medium transition ${
-									agentsFilter() === v
-										? "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
-										: "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-								}`}
-							>
-								{v === "all" ? "All" : v === "top_level" ? "Top-level" : v === "multi" ? "Multi-agent" : "Solo"}
-							</button>
-						)}
-					</For>
-				</div>
+				<SegmentedControl
+					options={[
+						{ label: "All", value: "all" as AgentsFilter },
+						{ label: "Top-level", value: "top_level" as AgentsFilter },
+						{ label: "Multi-agent", value: "multi" as AgentsFilter },
+						{ label: "Solo", value: "solo" as AgentsFilter },
+					]}
+					value={agentsFilter()}
+					onChange={(v) => { setAgentsFilter(v); setPage(1); setSelectedRow(-1); }}
+				/>
 				<span class="text-sm text-gray-500">
 					{filtered().length} session{filtered().length !== 1 ? "s" : ""}
 				</span>
@@ -555,7 +503,7 @@ export const SessionList: Component = () => {
 						when={filteredWorkUnits().length > 0}
 						fallback={
 							<div class="flex flex-col items-center gap-2 py-12 text-gray-500">
-								<Layers class="h-8 w-8 text-gray-300 dark:text-gray-400" />
+								<Layers class="h-8 w-8 text-muted" />
 								<p class="text-lg font-medium">No work units found</p>
 								<p class="text-sm">Distill sessions with spec files to generate work units.</p>
 							</div>
@@ -566,9 +514,9 @@ export const SessionList: Component = () => {
 						</For>
 						<Show when={standaloneUnits().length > 0}>
 							<div class="flex items-center gap-2 pt-2">
-								<div class="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
-								<span class="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Standalone</span>
-								<div class="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
+								<div class="h-px flex-1 bg-surface-muted" />
+								<span class="text-[10px] font-medium uppercase tracking-wide text-muted">Standalone</span>
+								<div class="h-px flex-1 bg-surface-muted" />
 							</div>
 							<For each={standaloneUnits()}>
 								{(unit) => <WorkUnitCard unit={unit} />}
@@ -582,7 +530,7 @@ export const SessionList: Component = () => {
 			<Show when={viewMode() === "sessions"}>
 			<div class="mt-3 overflow-x-auto rounded-lg border border-clens">
 				<table class="w-full text-left text-sm">
-					<thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500 dark:border-gray-800 dark:bg-gray-900">
+					<thead class="border-b border-clens bg-surface-inset text-xs uppercase text-muted">
 						<tr>
 							<SortableHeader label="Name" field="session_name" sort={sortState()} onSort={handleSort} />
 							<th class="px-4 py-3 font-medium">Status</th>
@@ -595,7 +543,7 @@ export const SessionList: Component = () => {
 							<th class="w-8 px-2 py-3"><span class="sr-only">Open</span></th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-gray-100 dark:divide-gray-800/50">
+					<tbody class="divide-y divide-clens">
 						<Show when={sessionList.state !== "pending"} fallback={<LoadingSkeleton />}>
 							<Show when={paginated().length > 0} fallback={<EmptyState />}>
 								<For each={paginated()}>
@@ -609,42 +557,42 @@ export const SessionList: Component = () => {
 												}
 											}}
 											tabIndex={0}
-											class={`cursor-pointer transition ${
+											class={`cursor-pointer transition even:bg-surface-muted/30 ${
 												selectedRow() === idx()
-													? "bg-blue-50 dark:bg-blue-900/20"
-													: "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+													? "bg-brand-50 dark:bg-brand-900/20"
+													: "hover:bg-surface-hover"
 											}`}
 										>
-											<td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
+											<td class="px-4 py-2 font-medium text-primary">
 												<div class="flex items-center gap-2">
 													<A
 														href={`/session/${session.session_id}`}
-														class="hover:underline"
+														class="font-mono hover:underline"
 														onClick={(e: MouseEvent) => e.stopPropagation()}
 													>
 														{session.session_name ?? session.session_id.slice(0, 8)}
 													</A>
 													<Show when={session.is_distilled}>
-														<span class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/40 dark:text-blue-400" title="Distilled">
+														<span class="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-400" title="Distilled">
 															analyzed
 														</span>
 													</Show>
 												</div>
 											</td>
-											<td class="px-4 py-3">
-												<StatusBadge status={session.status} />
+											<td class="px-4 py-2">
+												<StatusBadge status={session.status} compact />
 											</td>
-											<td class="px-4 py-3 text-right tabular-nums text-text-muted">
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">
 												{formatDuration(session.duration_ms)}
 											</td>
-											<td class="px-4 py-3 text-right tabular-nums text-text-muted">{session.event_count}</td>
-											<td class="px-4 py-3 text-right tabular-nums text-text-muted">
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">{session.event_count}</td>
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">
 												<div class="flex items-center justify-end gap-1.5">
 													{session.agent_count ?? 1}
 													<Show when={(session.agent_count ?? 0) > 1}>
 														<A
 															href={`/session/${session.session_id}?view=overview`}
-															class="inline-flex items-center gap-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+															class="inline-flex items-center gap-0.5 rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted transition hover:bg-surface-hover"
 															onClick={(e: MouseEvent) => e.stopPropagation()}
 															title="View multi-agent session"
 														>
@@ -654,20 +602,20 @@ export const SessionList: Component = () => {
 													</Show>
 												</div>
 											</td>
-											<td class="px-4 py-3 text-right tabular-nums text-text-muted">
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">
 												{formatSize(session.file_size_bytes)}
 											</td>
-											<td class="px-4 py-3">
-												<Show when={session.git_branch} fallback={<span class="text-gray-400 dark:text-gray-400">-</span>}>
-													<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+											<td class="px-4 py-2">
+												<Show when={session.git_branch} fallback={<span class="text-muted">-</span>}>
+													<span class="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-xs text-muted">
 														{session.git_branch}
 													</span>
 												</Show>
 											</td>
-											<td class="px-4 py-3 text-gray-400 dark:text-gray-400">
+											<td class="px-4 py-2 font-mono text-muted">
 												{formatDate(session.start_time)}
 											</td>
-											<td class="w-8 px-2 py-3 text-gray-300 dark:text-gray-400">
+											<td class="w-8 px-2 py-2 text-muted">
 												<ChevronRight class="h-4 w-4" />
 											</td>
 										</tr>
@@ -693,7 +641,7 @@ export const SessionList: Component = () => {
 								setPage((p) => p - 1);
 								setSelectedRow(-1);
 							}}
-							class="rounded-md bg-gray-100 px-3 py-1 text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+							class="rounded-md bg-surface-muted px-3 py-1 text-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							Previous
 						</button>
@@ -703,7 +651,7 @@ export const SessionList: Component = () => {
 								setPage((p) => p + 1);
 								setSelectedRow(-1);
 							}}
-							class="rounded-md bg-gray-100 px-3 py-1 text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+							class="rounded-md bg-surface-muted px-3 py-1 text-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							Next
 						</button>

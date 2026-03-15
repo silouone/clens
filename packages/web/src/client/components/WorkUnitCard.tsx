@@ -39,7 +39,7 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 	return (
 		<A
 			href={`/work-unit/${unit().id}`}
-			class="block rounded-lg border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+			class="block rounded-lg border border-clens bg-surface-raised p-4 transition hover:border-gray-300 hover:shadow-sm shadow-card"
 		>
 			{/* Header */}
 			<div class="flex items-start justify-between gap-3">
@@ -47,12 +47,12 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 					<Show
 						when={unit().spec_path}
 						fallback={
-							<GitBranch class="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+							<GitBranch class="h-4 w-4 flex-shrink-0 text-muted" />
 						}
 					>
 						<FileText class="h-4 w-4 flex-shrink-0 text-violet-500 dark:text-violet-400" />
 					</Show>
-					<span class="truncate font-mono text-sm font-medium text-gray-800 dark:text-gray-200">
+					<span class="truncate font-mono text-sm font-medium text-primary">
 						{unit().spec_path ?? unit().git_branch ?? "Unknown"}
 					</span>
 				</div>
@@ -62,7 +62,7 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 			</div>
 
 			{/* Meta row */}
-			<div class="mt-2 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+			<div class="mt-2 flex items-center gap-4 text-xs text-muted">
 				<span class="flex items-center gap-1">
 					<Clock class="h-3 w-3" />
 					{formatDuration(unit().total_duration_ms)}
@@ -77,24 +77,24 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 					{(session) => (
 						<A
 							href={`/session/${session.session_id}`}
-							class="group flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-gray-50 dark:hover:bg-gray-800/50"
+							class="group flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-surface-hover"
 							onClick={(e: MouseEvent) => e.stopPropagation()}
 						>
 							{/* Role dot */}
 							<span class={`h-2 w-2 flex-shrink-0 rounded-full ${ROLE_COLORS[session.role] ?? "bg-gray-400"}`} />
 							{/* Phase label */}
-							<span class="w-16 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+							<span class="w-16 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted">
 								{session.phase}
 							</span>
 							{/* Session name */}
-							<span class="min-w-0 flex-1 truncate text-xs text-gray-700 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-gray-100">
+							<span class="min-w-0 flex-1 truncate text-xs text-secondary group-hover:text-primary">
 								{session.session_name ?? session.session_id.slice(0, 8)}
 							</span>
 							{/* Role badge */}
-							<span class="flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+							<span class="flex-shrink-0 text-[10px] text-muted">
 								{session.role}
 							</span>
-							<ChevronRight class="h-3 w-3 flex-shrink-0 text-gray-300 transition group-hover:translate-x-0.5 dark:text-gray-600" />
+							<ChevronRight class="h-3 w-3 flex-shrink-0 text-muted transition group-hover:translate-x-0.5" />
 						</A>
 					)}
 				</For>

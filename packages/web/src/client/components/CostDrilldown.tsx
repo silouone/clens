@@ -26,8 +26,8 @@ const TokenRow: Component<{
 	readonly value: number;
 }> = (props) => (
 	<div class="flex items-center justify-between text-xs">
-		<span class="text-text-muted">{props.label}</span>
-		<span class="font-medium tabular-nums text-gray-700 dark:text-gray-300">
+		<span class="text-muted">{props.label}</span>
+		<span class="font-medium tabular-nums text-secondary">
 			{fmt(props.value)}
 		</span>
 	</div>
@@ -56,7 +56,7 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 			<div class="fixed inset-0 z-40" onClick={props.onClose} />
 
 			{/* Popover */}
-			<div class="absolute top-full left-0 z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/40">
+			<div class="absolute top-full left-0 z-50 mt-1 w-72 rounded-lg border border-clens bg-surface-raised p-3 shadow-lg">
 				{/* Estimated banner */}
 				<Show when={cost()?.is_estimated}>
 					<div class="mb-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
@@ -68,7 +68,7 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 				<Show
 					when={tokens()}
 					fallback={
-						<p class="text-xs text-text-muted">
+						<p class="text-xs text-muted">
 							Token breakdown not available for this session
 						</p>
 					}
@@ -81,9 +81,9 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 							<TokenRow label="Cache creation" value={tu().cache_creation_tokens} />
 
 							{/* Cache efficiency */}
-							<div class="mt-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+							<div class="mt-2 border-t border-clens pt-2">
 								<div class="flex items-center justify-between text-xs">
-									<span class="text-text-muted">Cache hit rate</span>
+									<span class="text-muted">Cache hit rate</span>
 									<span class="font-medium text-emerald-600 dark:text-emerald-400">
 										{cacheEfficiency(tu().input_tokens, tu().cache_read_tokens)}
 									</span>
@@ -96,10 +96,10 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 				{/* Pricing tier */}
 				<Show when={cost()?.pricing_tier}>
 					{(tier) => (
-						<div class="mt-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+						<div class="mt-2 border-t border-clens pt-2">
 							<div class="flex items-center justify-between text-xs">
-								<span class="text-text-muted">Pricing tier</span>
-								<span class="font-medium text-gray-700 dark:text-gray-300">{tier()}</span>
+								<span class="text-muted">Pricing tier</span>
+								<span class="font-medium text-secondary">{tier()}</span>
 							</div>
 						</div>
 					)}
@@ -107,7 +107,7 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 
 				{/* Confidence label when estimated */}
 				<Show when={cost()?.is_estimated}>
-					<div class="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
+					<div class="mt-2 text-[10px] text-muted">
 						Confidence: low — based on heuristic token estimates
 					</div>
 				</Show>

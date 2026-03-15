@@ -37,7 +37,9 @@ import { extractReasoning } from "./reasoning";
 import { estimateCostFromTokens, extractStats } from "./stats";
 import { extractSummary } from "./summary";
 import { extractTeamMetrics } from "./team";
+import { extractTaskList } from "./task-list";
 import { extractTimeline } from "./timeline";
+import { scanSessionFiles } from "../session/synthetic-scan";
 import { synthesizeSpawnLinks } from "./synthetic-links";
 import { extractUserMessages } from "./user-messages";
 
@@ -230,7 +232,7 @@ export const distill = async (
 	const sessionLinks = filterLinksForSession(sessionId, links);
 
 	// Synthesize spawn/stop links for background sub-agents that lack SubagentStart/SubagentStop
-	const syntheticResult = synthesizeSpawnLinks(events, sessionLinks, projectDir, sessionId);
+	const syntheticResult = synthesizeSpawnLinks(events, sessionLinks, projectDir, sessionId, scanSessionFiles);
 	const effectiveSessionLinks = syntheticResult.spawns.length > 0
 		? [...sessionLinks, ...syntheticResult.spawns, ...syntheticResult.stops] as readonly LinkEvent[]
 		: sessionLinks;
@@ -368,6 +370,8 @@ export const distill = async (
 		effectiveSessionLinks.length > 0 ? extractCommSequence(effectiveSessionLinks, finalNameMap) : undefined;
 	const agent_lifetimes =
 		effectiveSessionLinks.length > 0 ? extractAgentLifetimes(effectiveSessionLinks, finalNameMap) : undefined;
+	const task_list =
+		effectiveSessionLinks.length > 0 ? extractTaskList(effectiveSessionLinks) : undefined;
 
 	// Model inference: stats.model → transcript model → first agent model
 	const inferredModel = stats.model ?? transcript_model ?? agents?.find((a) => a.model)?.model;
@@ -476,6 +480,7 @@ export const distill = async (
 		...(comm_sequence && comm_sequence.length > 0 ? { comm_sequence } : {}),
 		...(agent_lifetimes && agent_lifetimes.length > 0 ? { agent_lifetimes } : {}),
 		...(plan_drift ? { plan_drift } : {}),
+		...(task_list && task_list.tasks.length > 0 ? { task_list } : {}),
 		complete: true,
 	};
 

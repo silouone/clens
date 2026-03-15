@@ -1,6 +1,7 @@
 import { createMemo, Show, type Component } from "solid-js";
 import type { WorkUnit } from "../../shared/types";
 import type { WorkUnitDetailSession } from "../lib/stores";
+import { Card } from "./ui/Card";
 import { MetaRow } from "./ui/MetaRow";
 import { formatDuration, formatCost } from "../lib/format";
 import { LIFECYCLE_LABELS, LIFECYCLE_COLORS } from "../lib/work-unit-constants";
@@ -32,7 +33,7 @@ export const WorkUnitSnapshot: Component<WorkUnitSnapshotProps> = (props) => {
 	const failures = createMemo(() => totalFailures(distilled()));
 
 	return (
-		<div class="animate-fade-in rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
+		<Card class="p-3">
 			{/* Spec/branch banner */}
 			<Show when={props.unit.spec_path}>
 				{(path) => (
@@ -95,6 +96,6 @@ export const WorkUnitSnapshot: Component<WorkUnitSnapshotProps> = (props) => {
 					</div>
 				</div>
 			</div>
-		</div>
+		</Card>
 	);
 };

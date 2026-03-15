@@ -6,7 +6,7 @@ const log = createLogger("sse")
 
 // ── SSE Event Types ────────────────────────────────────────────────
 
-type SSEEventType = "session_update" | "live_event" | "distill_complete"
+type SSEEventType = "session_update" | "live_event" | "distill_complete" | "live_link"
 
 type SSEEvent = {
 	readonly type: SSEEventType

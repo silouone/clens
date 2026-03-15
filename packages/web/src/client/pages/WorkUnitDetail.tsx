@@ -17,7 +17,7 @@ import { useKeyboard } from "../lib/keyboard";
 import { findAgentInTree, flattenAgents } from "../lib/agent-utils";
 import { formatDuration, formatCost } from "../lib/format";
 import { getTypeBadgeClass } from "../lib/agent-colors";
-import { distilledSessions, aggregateCosts } from "../lib/work-unit-utils";
+import { distilledSessions, aggregateCosts, aggregateFileMap } from "../lib/work-unit-utils";
 import { LIFECYCLE_LABELS, LIFECYCLE_COLORS, PHASE_COLORS } from "../lib/work-unit-constants";
 import { PageShell, LoadingSkeleton } from "../components/PageShell";
 import { DetailPageLayout } from "../components/layouts/DetailPageLayout";
@@ -61,7 +61,7 @@ const AgentTreeItem: Component<{
 						<span class={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${getTypeBadgeClass(props.agent.agent_type)}`}>
 							{props.agent.agent_type}
 						</span>
-						<span class="flex-1 truncate font-medium text-gray-700 dark:text-gray-300">
+						<span class="flex-1 truncate font-medium text-secondary">
 							{props.agent.agent_name ?? props.agent.agent_type}
 						</span>
 					</>
@@ -121,7 +121,7 @@ const SessionTreeItem: Component<{
 					<span class="w-14 shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400">
 						{props.session.phase}
 					</span>
-					<span class="flex-1 truncate font-medium text-gray-700 dark:text-gray-300">
+					<span class="flex-1 truncate font-medium text-secondary">
 						{props.session.session_name ?? props.session.session_id.slice(0, 8)}
 					</span>
 				</>
@@ -189,52 +189,117 @@ const WorkUnitHeader: Component<{
 const WorkUnitOverview: Component<{
 	readonly unit: WorkUnit;
 	readonly sessions: readonly WorkUnitDetailSession[];
-}> = (props) => (
-	<div class="flex-1 overflow-y-auto p-3 space-y-3">
-		<WorkUnitSnapshot unit={props.unit} sessions={props.sessions} />
+}> = (props) => {
+	const distilled = createMemo(() => distilledSessions(props.sessions));
+	const allAgents = createMemo(() => distilled().flatMap((s) => flattenAgents(s.agents ?? [])));
+	const fileList = createMemo(() => aggregateFileMap(distilled()).filter((f) => f.edits > 0 || f.writes > 0));
 
-		{/* Session phase timeline visualization */}
-		<div class="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
-			<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-				Session Timeline
-			</h3>
-			<div class="space-y-1.5">
-				<For each={props.sessions}>
-					{(session) => {
-						const startOffset = () => {
-							const range = props.unit.date_range;
-							const total = range.end - range.start;
-							return total > 0 ? ((session.start_time - range.start) / total) * 100 : 0;
-						};
-						const widthPct = () => {
-							const dur = session.distilled?.stats.duration_ms ?? session.summary.duration_ms;
-							const total = props.unit.date_range.end - props.unit.date_range.start;
-							return total > 0 ? Math.max(2, (dur / total) * 100) : 100;
-						};
+	return (
+		<div class="flex-1 overflow-y-auto p-3 space-y-3">
+			<WorkUnitSnapshot unit={props.unit} sessions={props.sessions} />
 
-						return (
-							<div class="flex items-center gap-2">
-								<span class="w-20 shrink-0 truncate text-[10px] text-gray-500 dark:text-gray-400">
-									{session.session_name ?? session.session_id.slice(0, 8)}
-								</span>
-								<div class="relative flex-1 h-4 rounded bg-gray-100 dark:bg-gray-800">
-									<div
-										class={`absolute top-0.5 bottom-0.5 rounded ${PHASE_COLORS[session.phase] ?? PHASE_COLORS.other}`}
-										style={{ left: `${startOffset()}%`, width: `${widthPct()}%` }}
-										title={`${session.phase} - ${formatDuration(session.distilled?.stats.duration_ms ?? 0)}`}
-									/>
-								</div>
-								<span class="w-10 shrink-0 text-right text-[10px] text-gray-400">
-									{session.phase}
-								</span>
-							</div>
-						);
-					}}
-				</For>
+			{/* Responsive grid: timeline + agents side by side on wider screens */}
+			<div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+				{/* Session phase timeline visualization */}
+				<div class="rounded-lg border border-clens bg-surface-raised p-3 shadow-card">
+					<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+						Session Timeline
+					</h3>
+					<div class="space-y-1.5">
+						<For each={props.sessions}>
+							{(session) => {
+								const startOffset = () => {
+									const range = props.unit.date_range;
+									const total = range.end - range.start;
+									return total > 0 ? ((session.start_time - range.start) / total) * 100 : 0;
+								};
+								const widthPct = () => {
+									const dur = session.distilled?.stats.duration_ms ?? session.summary.duration_ms;
+									const total = props.unit.date_range.end - props.unit.date_range.start;
+									return total > 0 ? Math.max(2, (dur / total) * 100) : 100;
+								};
+
+								return (
+									<div class="flex items-center gap-2">
+										<span class="w-20 shrink-0 truncate text-[10px] text-muted">
+											{session.session_name ?? session.session_id.slice(0, 8)}
+										</span>
+										<div class="relative flex-1 h-4 rounded bg-surface-muted">
+											<div
+												class={`absolute top-0.5 bottom-0.5 rounded ${PHASE_COLORS[session.phase] ?? PHASE_COLORS.other}`}
+												style={{ left: `${startOffset()}%`, width: `${widthPct()}%` }}
+												title={`${session.phase} - ${formatDuration(session.distilled?.stats.duration_ms ?? 0)}`}
+											/>
+										</div>
+										<span class="w-10 shrink-0 text-right text-[10px] text-gray-400">
+											{session.phase}
+										</span>
+									</div>
+								);
+							}}
+						</For>
+					</div>
+				</div>
+
+				{/* Agent breakdown */}
+				<Show when={allAgents().length > 0}>
+					<div class="rounded-lg border border-clens bg-surface-raised p-3 shadow-card">
+						<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+							Agents ({allAgents().length})
+						</h3>
+						<div class="space-y-1">
+							<For each={allAgents()}>
+								{(agent) => (
+									<div class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-hover transition-colors">
+										<span class={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${getTypeBadgeClass(agent.agent_type)}`}>
+											{agent.agent_type}
+										</span>
+										<span class="flex-1 truncate text-xs text-secondary">
+											{agent.agent_name ?? agent.session_id?.slice(0, 8) ?? "unknown"}
+										</span>
+										<Show when={agent.cost_estimate}>
+											{(cost) => (
+												<span class="text-[10px] tabular-nums text-muted" title={cost().is_estimated ? "Estimated" : undefined}>
+													{formatCost(cost().estimated_cost_usd, cost().is_estimated)}
+												</span>
+											)}
+										</Show>
+										<span class="text-[10px] tabular-nums text-gray-400">
+											{formatDuration(agent.duration_ms)}
+										</span>
+									</div>
+								)}
+							</For>
+						</div>
+					</div>
+				</Show>
 			</div>
+
+			{/* File list */}
+			<Show when={fileList().length > 0}>
+				<div class="rounded-lg border border-clens bg-surface-raised p-3 shadow-card">
+					<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+						Files Modified ({fileList().length})
+					</h3>
+					<div class="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
+						<For each={fileList()}>
+							{(file) => (
+								<div class="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-hover transition-colors">
+									<span class="flex-1 truncate font-mono text-[11px] text-secondary" title={file.file_path}>
+										{file.file_path.split("/").slice(-1)[0]}
+									</span>
+									<span class="shrink-0 text-[10px] tabular-nums text-muted">
+										{file.edits > 0 ? `${file.edits}e` : ""}{file.writes > 0 ? ` ${file.writes}w` : ""}
+									</span>
+								</div>
+							)}
+						</For>
+					</div>
+				</div>
+			</Show>
 		</div>
-	</div>
-);
+	);
+};
 
 // ── Main component ───────────────────────────────────────────────────
 
@@ -252,7 +317,9 @@ export const WorkUnitDetail: Component = () => {
 	const [detail, { refetch }] = createWorkUnitDetail(unitId);
 
 	const unit = createMemo(() => detail()?.unit);
-	const sessions = createMemo(() => detail()?.sessions ?? []);
+	const sessions = createMemo(() =>
+		[...(detail()?.sessions ?? [])].sort((a, b) => a.start_time - b.start_time),
+	);
 
 	// ── View state ──────────────────────────────────────────────
 	const currentView = createMemo(() => searchParams.view ?? "overview");
@@ -336,7 +403,7 @@ export const WorkUnitDetail: Component = () => {
 			<Show when={!detail.loading} fallback={<LoadingSkeleton label="Loading work unit..." />}>
 				<Show when={unit()} fallback={
 					<div class="flex h-full items-center justify-center">
-						<p class="text-xs text-text-muted">Work unit not found.</p>
+						<p class="text-xs text-muted">Work unit not found.</p>
 					</div>
 				}>
 					{(u) => (
@@ -394,7 +461,7 @@ export const WorkUnitDetail: Component = () => {
 												{/* Session-level view: reuse OverviewPanel or show "not analyzed" */}
 												<Show when={selectedSession()?.distilled} fallback={
 													<div class="flex h-full items-center justify-center">
-														<p class="text-xs text-text-muted">
+														<p class="text-xs text-muted">
 															Session not yet analyzed. Run <code class="font-mono">clens distill</code> first.
 														</p>
 													</div>

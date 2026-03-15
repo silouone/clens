@@ -1,0 +1,75 @@
+import type { LinkEvent, TaskCompleteLink, TaskLink, TaskListResult, TaskRecord } from "../types";
+
+const isTaskLink = (link: LinkEvent): link is TaskLink => link.type === "task";
+const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink => link.type === "task_complete";
+
+const buildTaskFromCreate = (link: TaskLink, ordinal: number): TaskRecord => ({
+	task_id: link.task_id || `task-${ordinal}`,
+	subject: link.subject ?? `Task ${ordinal}`,
+	description: link.description,
+	active_form: link.active_form,
+	status: "pending",
+	created_at: link.t,
+	created_by: link.session_id,
+});
+
+const applyUpdate = (existing: TaskRecord, link: TaskLink): TaskRecord => ({
+	...existing,
+	...(link.owner ? { owner: link.owner } : {}),
+	...(link.status === "in_progress" ? { status: "in_progress" as const } : {}),
+	...(link.blocked_by && link.blocked_by.length > 0 ? { blocked_by: link.blocked_by } : {}),
+});
+
+const applyCompletion = (existing: TaskRecord, link: TaskCompleteLink): TaskRecord => ({
+	...existing,
+	status: "completed",
+	completed_at: link.t,
+});
+
+const buildOrphanComplete = (link: TaskCompleteLink): TaskRecord => ({
+	task_id: link.task_id,
+	subject: link.subject ?? link.task_id,
+	status: "completed",
+	created_at: link.t,
+	completed_at: link.t,
+	created_by: link.session_id ?? "unknown",
+	owner: link.agent,
+});
+
+export const extractTaskList = (links: readonly LinkEvent[]): TaskListResult => {
+	const taskLinks = links.filter(isTaskLink);
+	const taskCompleteLinks = links.filter(isTaskCompleteLink);
+
+	// Build initial task records from create events
+	const createLinks = taskLinks.filter((l) => l.action === "create");
+	const seedMap = createLinks.reduce<ReadonlyMap<string, TaskRecord>>((acc, link, i) => {
+		const ordinal = i + 1;
+		const record = buildTaskFromCreate(link, ordinal);
+		return new Map([...acc, [record.task_id, record]]);
+	}, new Map());
+
+	// Apply updates (assign, status_change)
+	const updateLinks = taskLinks.filter((l) => l.action === "assign" || l.action === "status_change");
+	const updatedMap = updateLinks.reduce<ReadonlyMap<string, TaskRecord>>((acc, link) => {
+		const existing = acc.get(link.task_id);
+		if (!existing) return acc;
+		return new Map([...acc, [link.task_id, applyUpdate(existing, link)]]);
+	}, seedMap);
+
+	// Apply completions
+	const finalMap = taskCompleteLinks.reduce<ReadonlyMap<string, TaskRecord>>((acc, link) => {
+		const existing = acc.get(link.task_id);
+		const record = existing ? applyCompletion(existing, link) : buildOrphanComplete(link);
+		return new Map([...acc, [link.task_id, record]]);
+	}, updatedMap);
+
+	const tasks = [...finalMap.values()].sort((a, b) => a.created_at - b.created_at);
+	const completedCount = tasks.filter((t) => t.status === "completed").length;
+
+	return {
+		tasks,
+		total_count: tasks.length,
+		completed_count: completedCount,
+		completion_rate: tasks.length > 0 ? completedCount / tasks.length : 0,
+	};
+};

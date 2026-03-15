@@ -12,6 +12,8 @@ import { NarrativeSection } from "../NarrativeSection";
 import { IssuesPanel } from "../IssuesPanel";
 import { ThinkingBreakdown } from "../ThinkingBreakdown";
 import { PlanDriftSection } from "../PlanDriftSection";
+import { TaskListSection } from "../TaskListSection";
+import { Card } from "../ui/Card";
 import { FileList, buildFileRows } from "../FileList";
 import { BottomPanel } from "../BottomPanel";
 import { DecisionsSection } from "../DecisionsSection";
@@ -64,10 +66,10 @@ const FileListCard: Component<{
 	);
 
 	return (
-		<div class="animate-fade-in rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
-			<div class="flex items-center gap-3 border-b border-gray-200 px-3 py-2 dark:border-gray-800">
+		<Card>
+			<div class="flex items-center gap-3 border-b border-clens px-3 py-2">
 				<Files class="h-4 w-4 text-emerald-500" />
-				<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+				<h3 class="text-sm font-semibold text-secondary">
 					Modified Files
 				</h3>
 				<Show when={totalAdditions() > 0}>
@@ -78,7 +80,7 @@ const FileListCard: Component<{
 				</Show>
 			</div>
 			<FileList rows={fileRows()} />
-		</div>
+		</Card>
 	);
 };
 
@@ -89,28 +91,33 @@ const OverviewContent: Component<OverviewPanelProps> = (props) => (
 		{/* 1. Session Snapshot */}
 		<SessionSnapshot session={props.session} relatedSessions={props.relatedSessions} />
 
-		{/* 2. Narrative */}
+		{/* 2. Task Plan */}
+		<Show when={props.session.task_list && props.session.task_list.tasks.length > 0 && props.session.task_list}>
+			{(taskList) => <TaskListSection taskList={taskList()} />}
+		</Show>
+
+		{/* 3. Narrative */}
 		<Show when={props.session.summary?.narrative}>
 			<NarrativeSection session={props.session} />
 		</Show>
 
-		{/* 3. Issues & Errors */}
+		{/* 4. Issues & Errors */}
 		<IssuesPanel session={props.session} />
 
-		{/* 4. Decision Points */}
+		{/* 5. Decision Points */}
 		<Show when={props.session.decisions.length > 0}>
 			<DecisionsSection decisions={props.session.decisions} />
 		</Show>
 
-		{/* 5. Thinking Breakdown */}
+		{/* 6. Thinking Breakdown */}
 		<Show when={props.session.reasoning.length > 0}>
 			<ThinkingBreakdown session={props.session} />
 		</Show>
 
-		{/* 6. Modified Files */}
+		{/* 7. Modified Files */}
 		<FileListCard session={props.session} />
 
-		{/* 7. Plan Drift */}
+		{/* 8. Plan Drift */}
 		<Show when={props.session.plan_drift}>
 			<PlanDriftSection session={props.session} />
 		</Show>

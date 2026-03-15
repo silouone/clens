@@ -1,6 +1,7 @@
 import { For, Show, type Component } from "solid-js";
 import { Check, X, PlusCircle, GitBranch } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
+import { Card } from "./ui/Card";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -43,17 +44,17 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 	return (
 		<Show when={drift()}>
 			{(d) => (
-				<div class="animate-fade-in rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
+				<Card class="p-3">
 					{/* Header */}
 					<div class="mb-3 flex items-start justify-between gap-3">
 						<div class="min-w-0">
 							<div class="flex items-center gap-2">
 								<GitBranch class="h-4 w-4 text-amber-500" />
-								<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+								<h3 class="text-sm font-semibold text-secondary">
 									Plan Fidelity
 								</h3>
 							</div>
-							<span class="block truncate font-mono text-xs text-text-muted" title={d().spec_path}>{d().spec_path}</span>
+							<span class="block truncate font-mono text-xs text-muted" title={d().spec_path}>{d().spec_path}</span>
 						</div>
 						{/* Scores */}
 						<div class="flex shrink-0 items-end gap-4">
@@ -61,20 +62,20 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 								<div class={`text-2xl font-bold tabular-nums ${alignmentColorClass(alignment())}`}>
 									{alignment()}%
 								</div>
-								<div class="text-xs text-gray-400 dark:text-gray-400">aligned</div>
+								<div class="text-xs text-muted">aligned</div>
 							</div>
 							<div class="text-right">
-								<div class="text-2xl font-bold tabular-nums text-text-muted">
+								<div class="text-2xl font-bold tabular-nums text-muted">
 									{driftPct()}%
 								</div>
-								<div class="text-xs text-gray-400 dark:text-gray-400">drift</div>
+								<div class="text-xs text-muted">drift</div>
 							</div>
 						</div>
 					</div>
 
 					{/* Expected files */}
 					<div class="mb-2">
-						<div class="mb-1 text-xs font-medium text-text-muted">
+						<div class="mb-1 text-xs font-medium text-muted">
 							Expected files ({d().expected_files.length})
 						</div>
 						<div class="space-y-0.5">
@@ -95,7 +96,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 												class={`truncate font-mono text-xs ${
 													isMissing()
 														? "text-red-500 line-through dark:text-red-400"
-														: "text-gray-600 dark:text-gray-300"
+														: "text-secondary"
 												}`}
 												title={file}
 											>
@@ -111,7 +112,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 					{/* Unexpected files */}
 					<Show when={d().unexpected_files.length > 0}>
 						<div>
-							<div class="mb-1 text-xs font-medium text-text-muted">
+							<div class="mb-1 text-xs font-medium text-muted">
 								Unexpected files ({d().unexpected_files.length})
 							</div>
 							<div class="space-y-0.5">
@@ -128,7 +129,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 							</div>
 						</div>
 					</Show>
-				</div>
+				</Card>
 			)}
 		</Show>
 	);

@@ -17,7 +17,7 @@ const TabBadge: Component<{
 			class="rounded-full px-1.5 py-0.5 text-[11px] font-medium"
 			classList={{
 				"bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400": props.variant === "warning",
-				"bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400": props.variant !== "warning",
+				"bg-surface-muted text-muted": props.variant !== "warning",
 			}}
 		>
 			{props.count}
@@ -30,10 +30,10 @@ export const TabButton: Component<TabButtonProps> = (props) => (
 		role="tab"
 		aria-selected={props.active}
 		onClick={props.onClick}
-		class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition border-b-2"
+		class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors rounded-md"
 		classList={{
-			"border-blue-500 text-blue-600 dark:text-blue-400": props.active,
-			"border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300": !props.active,
+			"bg-surface-muted text-primary": props.active,
+			"text-muted hover:text-secondary hover:bg-surface-hover": !props.active,
 		}}
 	>
 		{props.label}

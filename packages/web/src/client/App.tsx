@@ -21,6 +21,17 @@ const MoonIcon: Component = () => (
 	</svg>
 );
 
+// ── Logo icon ────────────────────────────────────────────────────────
+
+const LogoIcon: Component = () => (
+	<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+		<circle cx="11" cy="11" r="7" class="stroke-brand-500" />
+		<path d="M16.5 16.5 21 21" class="stroke-brand-500" stroke-linecap="round" />
+		<path d="M8.5 9.5l-1.5 1.5 1.5 1.5" class="stroke-brand-400" stroke-linecap="round" stroke-linejoin="round" />
+		<path d="M13.5 9.5l1.5 1.5-1.5 1.5" class="stroke-brand-400" stroke-linecap="round" stroke-linejoin="round" />
+	</svg>
+);
+
 // ── App ─────────────────────────────────────────────────────────────
 
 export const App: Component<RouteSectionProps> = (props) => {
@@ -38,13 +49,16 @@ export const App: Component<RouteSectionProps> = (props) => {
 	});
 
 	return (
-		<div class="min-h-screen bg-surface text-gray-900 dark:text-gray-100">
-			<header class="flex items-center justify-between border-b border-gray-200 px-4 py-1.5 dark:border-gray-800">
-				<h1 class="text-sm font-semibold tracking-tight">cLens</h1>
+		<div class="min-h-screen bg-surface text-primary">
+			<header class="flex items-center justify-between border-b border-clens px-4 py-1.5 shadow-sm">
+				<div class="flex items-center gap-1.5">
+					<LogoIcon />
+					<h1 class="text-sm font-semibold tracking-tight">cLens</h1>
+				</div>
 				<div class="flex items-center gap-2">
 					<button
 						onClick={toggleTheme}
-						class="rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+						class="rounded-md p-1.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title={`Switch to ${theme() === "dark" ? "light" : "dark"} mode`}
 					>
 						<Show when={theme() === "dark"} fallback={<MoonIcon />}>
@@ -53,7 +67,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 					</button>
 					<button
 						onClick={() => toggleHelp()}
-						class="rounded-md px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+						class="rounded-md px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title="Keyboard shortcuts"
 					>
 						<kbd class="font-mono">?</kbd>
@@ -67,7 +81,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 							<div class="mt-2 text-center">
 								<a
 									href="/"
-									class="text-sm text-blue-500 underline transition-colors duration-150 hover:text-blue-400"
+									class="text-sm text-brand-500 underline transition-colors duration-150 hover:text-brand-400"
 								>
 									Go Home
 								</a>

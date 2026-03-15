@@ -132,14 +132,14 @@ export const FileList: Component<FileListProps> = (props) => {
 			{/* Header row with expand/collapse toggle */}
 			<div class="flex items-center justify-between px-4 py-2.5 border-b border-clens">
 				<div class="flex items-center gap-3">
-					<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+					<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted">
 						{props.rows.length}
 					</span>
 				</div>
 				<Show when={props.rows.length > 0}>
 					<button
 						onClick={toggleAll}
-						class="rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+						class="rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-surface-hover hover:text-secondary text-muted"
 					>
 						{allExpanded() ? "Collapse all" : "Expand all"}
 					</button>
@@ -150,7 +150,7 @@ export const FileList: Component<FileListProps> = (props) => {
 			<Show
 				when={props.rows.length > 0}
 				fallback={
-					<div class="py-8 text-center text-sm text-gray-400 dark:text-gray-400">
+					<div class="py-8 text-center text-sm text-muted">
 						{props.emptyMessage ?? "No file changes detected"}
 					</div>
 				}
@@ -167,10 +167,10 @@ export const FileList: Component<FileListProps> = (props) => {
 								});
 							});
 							return (
-								<div class="border-b border-gray-100 last:border-0 dark:border-gray-800/50 overflow-hidden">
+								<div class="border-b border-clens last:border-0 overflow-hidden">
 									<button
 										onClick={() => toggleFile(row.filePath)}
-										class="flex w-full items-center gap-2 px-4 py-1.5 text-xs text-left transition hover:bg-gray-50 dark:hover:bg-gray-800/30"
+										class="flex w-full items-center gap-2 px-4 py-1.5 text-xs text-left transition hover:bg-surface-hover/30"
 									>
 										<ChevronRight
 											class={`h-3 w-3 text-gray-400 transition-transform ${expanded() ? "rotate-90" : ""}`}
@@ -182,28 +182,28 @@ export const FileList: Component<FileListProps> = (props) => {
 											/>
 										</Show>
 										<span
-											class="flex-1 truncate font-mono text-gray-700 dark:text-gray-300"
+											class="flex-1 truncate font-mono text-secondary"
 											title={row.filePath}
 										>
 											{truncatePath(row.filePath)}
 										</span>
 										<Show when={row.reads > 0}>
-											<span class="text-gray-400 tabular-nums" title="files read">
+											<span class="font-mono text-gray-400 tabular-nums" title="files read">
 												{row.reads}r
 											</span>
 										</Show>
 										<Show when={row.edits > 0}>
-											<span class="text-blue-500 tabular-nums" title="files edited">
+											<span class="font-mono text-blue-500 tabular-nums" title="files edited">
 												{row.edits}e
 											</span>
 										</Show>
 										<Show when={row.additions > 0}>
-											<span class="text-emerald-500 tabular-nums" title="lines added">
+											<span class="font-mono text-emerald-500 tabular-nums" title="lines added">
 												+{row.additions}
 											</span>
 										</Show>
 										<Show when={row.deletions > 0}>
-											<span class="text-red-500 tabular-nums" title="lines removed">
+											<span class="font-mono text-red-500 tabular-nums" title="lines removed">
 												-{row.deletions}
 											</span>
 										</Show>
@@ -212,7 +212,7 @@ export const FileList: Component<FileListProps> = (props) => {
 										</Show>
 									</button>
 									<Show when={expanded()}>
-										<div class="border-t border-gray-100 dark:border-gray-800/50 overflow-hidden">
+										<div class="border-t border-clens/50 overflow-hidden">
 											<Show
 												when={row.diffLines.length > 0}
 												fallback={

@@ -1,4 +1,5 @@
 import { Show, type Component, type JSX } from "solid-js";
+import { Spinner } from "./ui/Spinner";
 import { globalError, clearError } from "../lib/stores";
 
 // ── Error banner ────────────────────────────────────────────────────
@@ -22,9 +23,17 @@ export const LoadingSkeleton: Component<{
 }> = (props) => (
 	<div class="flex h-full items-center justify-center">
 		<div class="flex flex-col items-center gap-3">
-			<div class="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500 dark:border-gray-700" />
+			<Spinner size="md" />
 			<span class="text-sm text-gray-500">{props.label ?? "Loading..."}</span>
 		</div>
+	</div>
+);
+
+// ── Skeleton block (shimmer placeholder) ─────────────────────────────
+
+export const SkeletonBlock: Component<{ readonly class?: string }> = (props) => (
+	<div class={`relative overflow-hidden rounded-md bg-surface-muted ${props.class ?? ""}`}>
+		<div class="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 	</div>
 );
 

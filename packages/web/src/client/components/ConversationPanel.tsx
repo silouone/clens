@@ -21,13 +21,12 @@ import {
 } from "lucide-solid";
 import { createConversationStore } from "../lib/stores";
 import type { ConversationEntry } from "../../shared/types";
-import snarkdown from "snarkdown";
+import { renderMarkdown } from "../lib/markdown";
 import { Badge } from "./ui/Badge";
 import { Spinner } from "./ui/Spinner";
 
 /** Render markdown string to sanitized HTML */
-const renderMd = (text: string): string =>
-	snarkdown(text);
+const renderMd = renderMarkdown;
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -93,64 +92,62 @@ const STRAY_TAG_RE = /<\/?(?:command-name|command-message|command-args|system-re
 
 const parseUserPromptSegments = (raw: string): readonly TextSegment[] => {
 	// Phase 1: strip system tags
-	let text = raw.replace(SYSTEM_TAG_RE, "");
+	const text = raw.replace(SYSTEM_TAG_RE, "");
 
 	// Phase 2: extract command blocks
-	const commands: Array<{ index: number; length: number; cmd: CommandInvocation }> = [];
-
-	for (const re of [COMMAND_BLOCK_RE, COMMAND_BLOCK_RE2]) {
-		for (const m of text.matchAll(re)) {
+	const commands = [COMMAND_BLOCK_RE, COMMAND_BLOCK_RE2].flatMap((re) =>
+		[...text.matchAll(re)].map((m) => {
 			const isReversed = re === COMMAND_BLOCK_RE;
-			commands.push({
+			return {
 				index: m.index ?? 0,
 				length: m[0].length,
-				cmd: {
-					command_message: (isReversed ? m[1] : m[2]).trim(),
-					command_name: (isReversed ? m[2] : m[1]).trim(),
-					command_args: m[3].trim(),
+				segment: {
+					kind: "command" as const,
+					cmd: {
+						command_message: (isReversed ? m[1] : m[2]).trim(),
+						command_name: (isReversed ? m[2] : m[1]).trim(),
+						command_args: m[3].trim(),
+					},
 				},
-			});
-		}
-	}
+			};
+		}),
+	);
 
 	// Phase 3: extract teammate messages
-	const teammates: Array<{ index: number; length: number; msg: TeammateMessage }> = [];
-	for (const m of text.matchAll(TEAMMATE_RE)) {
-		const attrs: Record<string, string> = {};
-		for (const a of m[1].matchAll(ATTR_RE)) attrs[a[1]] = a[2];
-		teammates.push({
+	const teammates = [...text.matchAll(TEAMMATE_RE)].map((m) => {
+		const attrs = Object.fromEntries([...m[1].matchAll(ATTR_RE)].map((a) => [a[1], a[2]]));
+		return {
 			index: m.index ?? 0,
 			length: m[0].length,
-			msg: {
-				teammate_id: attrs.teammate_id ?? "unknown",
-				color: attrs.color ?? "gray",
-				summary: attrs.summary,
-				content: m[2].trim(),
+			segment: {
+				kind: "teammate" as const,
+				msg: {
+					teammate_id: attrs.teammate_id ?? "unknown",
+					color: attrs.color ?? "gray",
+					summary: attrs.summary,
+					content: m[2].trim(),
+				},
 			},
-		});
-	}
+		};
+	});
 
-	// Phase 4: merge all parsed spans sorted by position
-	type Span = { index: number; length: number; segment: TextSegment };
-	const spans: Span[] = [
-		...commands.map((c) => ({ index: c.index, length: c.length, segment: { kind: "command" as const, cmd: c.cmd } })),
-		...teammates.map((t) => ({ index: t.index, length: t.length, segment: { kind: "teammate" as const, msg: t.msg } })),
-	].sort((a, b) => a.index - b.index);
+	// Phase 4: merge all parsed spans sorted by position, then interleave with text gaps
+	type Span = { readonly index: number; readonly length: number; readonly segment: TextSegment };
+	const spans: readonly Span[] = [...commands, ...teammates].sort((a, b) => a.index - b.index);
 
-	const segments: TextSegment[] = [];
-	let cursor = 0;
+	const { segments, cursor: finalCursor } = spans.reduce<{ readonly segments: readonly TextSegment[]; readonly cursor: number }>(
+		(acc, span) => {
+			const before = text.slice(acc.cursor, span.index).replace(STRAY_TAG_RE, "").trim();
+			return {
+				segments: [...acc.segments, ...(before ? [{ kind: "text" as const, value: before }] : []), span.segment],
+				cursor: span.index + span.length,
+			};
+		},
+		{ segments: [], cursor: 0 },
+	);
 
-	for (const span of spans) {
-		const before = text.slice(cursor, span.index).replace(STRAY_TAG_RE, "").trim();
-		if (before) segments.push({ kind: "text", value: before });
-		segments.push(span.segment);
-		cursor = span.index + span.length;
-	}
-
-	const tail = text.slice(cursor).replace(STRAY_TAG_RE, "").trim();
-	if (tail) segments.push({ kind: "text", value: tail });
-
-	return segments;
+	const tail = text.slice(finalCursor).replace(STRAY_TAG_RE, "").trim();
+	return tail ? [...segments, { kind: "text" as const, value: tail }] : segments;
 };
 
 const COLOR_MAP: Readonly<Record<string, string>> = {
@@ -221,14 +218,14 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 	const hasStructured = () => segments().some((s) => s.kind !== "text");
 
 	return (
-		<div class="flex gap-3 py-3">
+		<div class="flex gap-3 py-3 ml-4 pl-4 border-l-2 border-l-blue-400 dark:border-l-blue-500">
 			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40">
 				<User class="h-3 w-3 text-blue-600 dark:text-blue-400" />
 			</div>
 			<div class="min-w-0 flex-1">
 				<div class="mb-1 flex items-center gap-2">
 					<span class="text-xs font-semibold text-blue-700 dark:text-blue-300">User</span>
-					<span class="text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+					<span class="font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
 				</div>
 				<Show
 					when={hasStructured()}
@@ -270,25 +267,25 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 	const hasText = () => props.entry.text.trim().length > 0;
 
 	return (
-		<div class="flex gap-3 py-2">
-			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-				<Brain class="h-3 w-3 text-text-muted" />
+		<div class="flex gap-3 py-2 ml-4 pl-4 border-l-2 border-l-gray-300 dark:border-l-gray-700">
+			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-muted">
+				<Brain class="h-3 w-3 text-muted" />
 			</div>
 			<div class="min-w-0 flex-1">
 				<Show
 					when={hasText()}
 					fallback={
-						<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+						<div class="flex items-center gap-2 text-xs text-muted">
 							<Badge variant={intentVariant(props.entry.intent)}>{props.entry.intent}</Badge>
 						</div>
 					}
 				>
 					<button
 						onClick={() => setExpanded((p) => !p)}
-						class="flex w-full items-center gap-2 text-left text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+						class="flex w-full items-center gap-2 text-left text-xs text-muted hover:text-secondary"
 					>
 						<Badge variant={intentVariant(props.entry.intent)}>{props.entry.intent}</Badge>
-						<span class="flex-1 truncate text-gray-400 dark:text-gray-500">
+						<span class="flex-1 truncate text-muted">
 							{truncate(props.entry.text, 120)}
 						</span>
 						<Show when={expanded()} fallback={<ChevronRight class="h-3 w-3 shrink-0" />}>
@@ -296,7 +293,7 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 						</Show>
 					</button>
 					<Show when={expanded()}>
-						<div class="mt-1.5 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
+						<div class="mt-1.5 whitespace-pre-wrap rounded border border-clens bg-surface-inset px-3 py-2 text-xs leading-relaxed text-secondary">
 							{props.entry.text}
 						</div>
 					</Show>
@@ -307,7 +304,7 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 };
 
 const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool_call" } }> = (props) => (
-	<div class="flex items-center gap-3 py-1.5">
+	<div class="flex items-center gap-3 py-1.5 ml-8 pl-4 border-l-2 border-l-emerald-400 dark:border-l-emerald-600">
 		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
 			<Terminal class="h-3 w-3 text-violet-600 dark:text-violet-400" />
 		</div>
@@ -317,12 +314,12 @@ const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool
 			</span>
 			<Show when={props.entry.file_path}>
 				{(fp) => (
-					<span class="truncate font-mono text-[11px] text-gray-400 dark:text-gray-500">
+					<span class="truncate font-mono text-[11px] text-muted">
 						{fp()}
 					</span>
 				)}
 			</Show>
-			<span class="ml-auto shrink-0 text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+			<span class="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
 		</div>
 	</div>
 );
@@ -331,7 +328,7 @@ const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "to
 	const isSuccess = () => props.entry.outcome === "success";
 
 	return (
-		<div class="flex items-center gap-3 py-1 pl-9">
+		<div class="flex items-center gap-3 py-1 ml-8 pl-4 border-l-2 border-l-emerald-400 dark:border-l-emerald-600">
 			<Show
 				when={isSuccess()}
 				fallback={
@@ -340,7 +337,7 @@ const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "to
 			>
 				<Check class="h-3.5 w-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />
 			</Show>
-			<span class="font-mono text-[11px] text-gray-400 dark:text-gray-500">{props.entry.tool_name}</span>
+			<span class="font-mono text-[11px] text-muted">{props.entry.tool_name}</span>
 			<Show when={props.entry.error}>
 				{(err) => (
 					<span class="truncate text-[11px] text-red-500 dark:text-red-400">
@@ -353,12 +350,12 @@ const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "to
 };
 
 const BacktrackRow: Component<{ readonly entry: ConversationEntry & { type: "backtrack" } }> = (props) => (
-	<div class="flex items-center gap-3 py-2">
+	<div class="flex items-center gap-3 py-2 ml-4 pl-4 border-l-2 border-l-amber-400">
 		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
 			<AlertTriangle class="h-3 w-3 text-amber-600 dark:text-amber-400" />
 		</div>
 		<Badge variant="warning">{props.entry.backtrack_type}</Badge>
-		<span class="text-xs text-text-muted">
+		<span class="text-xs text-muted">
 			Attempt {props.entry.attempt}
 		</span>
 		<Show when={props.entry.reverted_tool_ids.length > 0}>
@@ -366,20 +363,20 @@ const BacktrackRow: Component<{ readonly entry: ConversationEntry & { type: "bac
 				({props.entry.reverted_tool_ids.length} reverted)
 			</span>
 		</Show>
-		<span class="ml-auto text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+		<span class="ml-auto font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
 	</div>
 );
 
 const PhaseBoundaryRow: Component<{ readonly entry: ConversationEntry & { type: "phase_boundary" } }> = (props) => (
-	<div class="flex items-center gap-3 py-3">
-		<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+	<div class="flex items-center gap-3 py-3 ml-4 pl-4 border-l-2 border-l-amber-400">
+		<div class="h-px flex-1 bg-surface-muted" />
 		<div class="flex items-center gap-1.5">
 			<Milestone class="h-3 w-3 text-gray-400" />
 			<span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
 				{props.entry.phase_name}
 			</span>
 		</div>
-		<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+		<div class="h-px flex-1 bg-surface-muted" />
 	</div>
 );
 
@@ -387,18 +384,18 @@ const AgentMessageRow: Component<{ readonly entry: ConversationEntry & { type: "
 	const isSent = () => props.entry.direction === "sent";
 
 	return (
-		<div class="flex items-center gap-3 py-1.5">
+		<div class="flex items-center gap-3 py-1.5 ml-4 pl-4 border-l-2 border-l-gray-300 dark:border-l-gray-700">
 			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30">
 				<Send class="h-3 w-3 text-teal-600 dark:text-teal-400" classList={{ "rotate-180": !isSent() }} />
 			</div>
-			<span class="text-xs text-text-muted">
+			<span class="text-xs text-muted">
 				{isSent() ? "Sent to" : "Received from"}{" "}
-				<span class="font-medium text-gray-700 dark:text-gray-300">{props.entry.partner}</span>
+				<span class="font-medium text-secondary">{props.entry.partner}</span>
 			</span>
 			<Show when={props.entry.summary}>
-				{(s) => <span class="truncate text-[11px] text-gray-400 dark:text-gray-500">{s()}</span>}
+				{(s) => <span class="truncate text-[11px] text-muted">{s()}</span>}
 			</Show>
-			<span class="ml-auto text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+			<span class="ml-auto font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
 		</div>
 	);
 };
@@ -461,10 +458,10 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 	return (
 		<div class="flex h-full flex-col overflow-hidden">
 			{/* Header bar */}
-			<div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-800">
+			<div class="flex items-center gap-2 border-b border-clens px-4 py-2">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Conversation</h2>
 				<Show when={store.total() > 0}>
-					<span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-gray-400 dark:bg-gray-800">
+					<span class="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted">
 						{store.total()} entries
 					</span>
 				</Show>
@@ -488,7 +485,7 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 						</Show>
 					}
 				>
-					<div class="divide-y divide-gray-100 dark:divide-gray-800/50">
+					<div class="divide-y divide-clens">
 						<For each={store.entries()}>
 							{(entry) => <ConversationEntryRow entry={entry} />}
 						</For>

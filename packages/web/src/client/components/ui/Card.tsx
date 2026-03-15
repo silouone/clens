@@ -11,19 +11,19 @@ type CardProps = {
 
 export const Card: Component<CardProps> = (props) => (
 	<div
-		class={`animate-fade-in rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5 ${props.class ?? ""}`}
+		class={`animate-fade-in rounded-lg border border-clens bg-surface-raised shadow-card ${props.class ?? ""}`}
 		style={props.colorAccent ? { "border-left": `3px solid ${props.colorAccent}` } : undefined}
 	>
 		<Show when={props.title}>
-			<div class="flex items-center justify-between border-b border-gray-200 px-4 py-2.5 dark:border-gray-800">
+			<div class="flex items-center justify-between border-b border-clens px-4 py-2.5">
 				<div class="flex items-center gap-2">
 					<Show when={props.icon}>
 						{(Icon) => {
 							const IconComp = Icon();
-							return <IconComp class="h-4 w-4 text-gray-400 dark:text-gray-400" />;
+							return <IconComp class="h-4 w-4 text-muted" />;
 						}}
 					</Show>
-					<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+					<h3 class="text-sm font-semibold text-secondary">
 						{props.title}
 					</h3>
 				</div>

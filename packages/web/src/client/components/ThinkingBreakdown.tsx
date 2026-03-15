@@ -2,6 +2,7 @@ import { createMemo, For, Show, type Component } from "solid-js";
 import { Brain } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatPercentage } from "../lib/format";
+import { Card } from "./ui/Card";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -22,11 +23,11 @@ const INTENT_COLORS: Readonly<Record<string, string>> = {
 	research: "bg-blue-500 dark:bg-blue-400",
 	debugging: "bg-red-500 dark:bg-red-400",
 	deciding: "bg-amber-500 dark:bg-amber-400",
-	general: "bg-gray-400 dark:bg-gray-500",
+	general: "bg-gray-400",
 };
 
 const getIntentBarClass = (intent: string): string =>
-	INTENT_COLORS[intent] ?? "bg-gray-400 dark:bg-gray-500";
+	INTENT_COLORS[intent] ?? "bg-gray-400";
 
 // ── Pure helpers ─────────────────────────────────────────────────────
 
@@ -63,13 +64,13 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 
 	return (
 		<Show when={rows().length > 0}>
-			<div class="animate-fade-in rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 dark:ring-1 dark:ring-white/5">
+			<Card class="p-3">
 				<div class="mb-3 flex items-center gap-2">
 					<Brain class="h-4 w-4 text-violet-500" />
-					<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+					<h3 class="text-sm font-semibold text-secondary">
 						Thinking Patterns
 					</h3>
-					<span class="text-[11px] text-gray-400 dark:text-gray-500">(keyword heuristic)</span>
+					<span class="text-[11px] text-muted">(keyword heuristic)</span>
 				</div>
 
 				<div class="space-y-2.5">
@@ -77,12 +78,12 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 						{(row) => (
 							<div class="flex items-center gap-3 text-xs">
 								{/* Label */}
-								<span class="w-20 shrink-0 text-right font-medium capitalize text-gray-600 dark:text-gray-400">
+								<span class="w-20 shrink-0 text-right font-medium capitalize text-muted">
 									{row.intent}
 								</span>
 
 								{/* Bar */}
-								<div class="min-w-16 flex-1 rounded-full bg-gray-100 dark:bg-gray-800 h-2.5">
+								<div class="min-w-16 flex-1 rounded-full bg-surface-muted h-2.5">
 									<div
 										class={`h-2.5 rounded-full transition-all ${getIntentBarClass(row.intent)}`}
 										style={{ width: `${Math.max(row.pct, 4)}%`, "min-width": "0.5rem" }}
@@ -90,14 +91,14 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 								</div>
 
 								{/* Count + Percentage */}
-								<span class="w-16 shrink-0 text-right tabular-nums text-text-muted">
+								<span class="w-16 shrink-0 text-right tabular-nums text-muted">
 									{row.count} ({formatPercentage(row.count, total())})
 								</span>
 							</div>
 						)}
 					</For>
 				</div>
-			</div>
+			</Card>
 		</Show>
 	);
 };

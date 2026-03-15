@@ -6,6 +6,7 @@ export { KbdShortcut } from "./KbdShortcut";
 export { MetaRow } from "./MetaRow";
 export { NavButton } from "./NavButton";
 export { SectionHeading } from "./SectionHeading";
+export { SegmentedControl } from "./SegmentedControl";
 export { Spinner } from "./Spinner";
 export { StatItem } from "./StatItem";
 export { StatusBadge } from "./StatusBadge";

@@ -65,7 +65,9 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 			<div class="flex items-center gap-2">
 				{/* Compact segmented bar */}
 				<div
-					class="flex h-1.5 w-32 overflow-hidden rounded-full"
+					class="flex h-3 w-48 overflow-hidden rounded-full"
+					role="img"
+					aria-label={`Timeline: ${props.phases.map((p) => p.name).join(", ")}`}
 					onMouseLeave={() => setHoveredIndex(null)}
 				>
 					<For each={props.phases}>
@@ -103,10 +105,10 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 					{(phase) => (
 						<div class="flex items-center gap-1">
 							<span class={`inline-block h-1.5 w-1.5 rounded-full ${getPhaseDotColor(phase().name)}`} />
-							<span class="text-[10px] font-medium text-gray-500 capitalize dark:text-gray-400">
+							<span class="text-[10px] font-medium text-gray-500 capitalize text-muted">
 								{phase().name}
 							</span>
-							<span class="text-[10px] text-gray-400 dark:text-gray-500">
+							<span class="text-[10px] text-muted">
 								{phase().description}
 							</span>
 						</div>

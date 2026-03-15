@@ -59,8 +59,11 @@ export interface TaskLink extends BaseLinkEvent {
 	readonly session_id: string;
 	readonly agent?: string;
 	readonly subject?: string;
+	readonly description?: string;
+	readonly active_form?: string;
 	readonly owner?: string;
 	readonly status?: string;
+	readonly blocked_by?: readonly string[];
 }
 
 export interface TeamLink extends BaseLinkEvent {

@@ -36,6 +36,7 @@ const AgentNavRow: Component<{
 	const hasChildren = () => props.agent.children.length > 0;
 	const [expanded, setExpanded] = createSignal(true);
 	const isSelected = () => props.selectedAgentId === props.agent.session_id;
+	const isGhost = () => props.agent.duration_ms === 0 && props.agent.tool_call_count === 0;
 
 	const handleClick = () => {
 		if (!props.agent.session_id) return;
@@ -48,14 +49,23 @@ const AgentNavRow: Component<{
 	};
 
 	return (
-		<div role="treeitem" aria-selected={isSelected()} aria-expanded={hasChildren() ? expanded() : undefined}>
+		<div
+			role="treeitem"
+			aria-selected={isSelected()}
+			aria-expanded={hasChildren() ? expanded() : undefined}
+			class="relative"
+			classList={{
+				"ml-3": props.depth > 0,
+			}}
+		>
 			<button
 				onClick={handleClick}
-				class="group flex w-full flex-col rounded-md mx-1.5 mb-0.5 text-left text-xs transition-colors duration-150 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 dark:hover:bg-gray-800/50 dark:focus:ring-offset-gray-900"
+				class="group flex w-full flex-col rounded-md mx-1.5 mb-0.5 text-left text-xs transition-colors duration-150 hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
 				classList={{
 					"bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800/40": isSelected(),
+					"opacity-50": isGhost() && !isSelected(),
 				}}
-				style={{ "margin-left": `${6 + props.depth * 12}px` }}
+				style={{ "margin-left": `${6 + props.depth * 8}px` }}
 				aria-label={`Agent: ${props.agent.agent_name || props.agent.agent_type}${props.isLead ? " (Lead)" : ""}`}
 			>
 				{/* Row 1: chevron + badges + name */}
@@ -71,25 +81,25 @@ const AgentNavRow: Component<{
 
 					{/* Lead badge */}
 					<Show when={props.isLead}>
-						<span class="shrink-0 rounded bg-yellow-100 px-1 py-0.5 text-[10px] font-medium leading-none text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400">
+						<span class="shrink-0 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
 							Lead
 						</span>
 					</Show>
 
 					{/* Name */}
-					<span class="flex-1 truncate font-medium text-gray-700 dark:text-gray-300">
+					<span class="flex-1 truncate font-medium text-secondary">
 						{props.agent.agent_name || props.agent.agent_type}
 					</span>
 				</div>
 
 				{/* Row 2: stats (cost, duration, diff) — right-aligned under name */}
-				<div class="flex w-full items-center gap-2 px-2 pb-1.5 pl-[26px] text-[10px] tabular-nums text-gray-400 dark:text-gray-400">
+				<div class="flex w-full items-center gap-2 px-2 pb-1.5 pl-[26px] font-mono text-[10px] tabular-nums text-muted">
 					{(() => {
 						const diff = sumDiffStats(props.agent);
 						return diff ? (
 							<span>
 								<span class="text-emerald-500 dark:text-emerald-400">+{diff.additions}</span>
-								<span class="mx-0.5 text-gray-300 dark:text-gray-600">/</span>
+								<span class="mx-0.5 text-muted">/</span>
 								<span class="text-red-500 dark:text-red-400">-{diff.deletions}</span>
 							</span>
 						) : null;
