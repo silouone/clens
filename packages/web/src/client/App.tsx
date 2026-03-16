@@ -35,12 +35,7 @@ const GearIcon: Component = () => (
 );
 
 const LogoIcon: Component = () => (
-	<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-		<circle cx="11" cy="11" r="7" class="stroke-brand-500" />
-		<path d="M16.5 16.5 21 21" class="stroke-brand-500" stroke-linecap="round" />
-		<path d="M8.5 9.5l-1.5 1.5 1.5 1.5" class="stroke-brand-400" stroke-linecap="round" stroke-linejoin="round" />
-		<path d="M13.5 9.5l1.5 1.5-1.5 1.5" class="stroke-brand-400" stroke-linecap="round" stroke-linejoin="round" />
-	</svg>
+	<img src="/logo.png" alt="cLens" class="h-11 w-11 object-contain" />
 );
 
 // ── Navigation items ────────────────────────────────────────────────
@@ -122,7 +117,6 @@ export const App: Component<RouteSectionProps> = (props) => {
 					title="Home"
 				>
 					<LogoIcon />
-					<span class="text-base font-semibold tracking-tight">cLens</span>
 				</button>
 
 				{/* KPIs (center area) */}

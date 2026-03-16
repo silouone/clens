@@ -1,5 +1,5 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { Search, ArrowUp, ArrowDown, ChevronRight, Users, Layers, RefreshCw } from "lucide-solid";
+import { ArrowUp, ArrowDown, ChevronRight, Users, Layers } from "lucide-solid";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
@@ -8,8 +8,8 @@ import { formatDuration, formatDate } from "../lib/format";
 import { preferences } from "../lib/settings";
 
 import { StatusBadge } from "../components/ui/StatusBadge";
-import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { WorkUnitCard } from "../components/WorkUnitCard";
+import { FilterBar } from "../components/FilterBar";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
 import { ProjectFilter, ProjectBadge } from "../components/ProjectFilter";
 import { isGlobalMode, selectedProjectId } from "../lib/project-store";
@@ -72,6 +72,8 @@ type ViewMode = "sessions" | "work_units";
 type StatusFilter = "all" | "complete" | "incomplete";
 type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
 type AgentsFilter = "all" | "top_level" | "multi" | "solo";
+type LifecycleFilter = "all" | "prime-plan-build" | "prime-build" | "plan-build" | "plan-build-review" | "multi-build" | "ad-hoc";
+type LinkTypeFilter = "all" | "spec" | "branch_time";
 
 const isValidViewMode = (s: string | undefined): s is ViewMode =>
 	s === "sessions" || s === "work_units";
@@ -84,6 +86,12 @@ const isValidAnalyzed = (s: string | undefined): s is AnalyzedFilter =>
 
 const isValidAgents = (s: string | undefined): s is AgentsFilter =>
 	s === "all" || s === "top_level" || s === "multi" || s === "solo";
+
+const isValidLifecycle = (s: string | undefined): s is LifecycleFilter =>
+	s === "all" || s === "prime-plan-build" || s === "prime-build" || s === "plan-build" || s === "plan-build-review" || s === "multi-build" || s === "ad-hoc";
+
+const isValidLinkType = (s: string | undefined): s is LinkTypeFilter =>
+	s === "all" || s === "spec" || s === "branch_time";
 
 // ── Sort types ──────────────────────────────────────────────────────
 
@@ -180,11 +188,23 @@ const SortableHeader: Component<{
 
 // ── Global-mode field accessors ──────────────────────────────────────
 
+const hasProjectId = (s: SessionSummary): s is SessionSummary & { readonly project_id: string } =>
+	"project_id" in s;
+
+const hasProjectName = (s: SessionSummary): s is SessionSummary & { readonly project_name: string } =>
+	"project_name" in s;
+
 const getProjectId = (s: SessionSummary): string | undefined =>
-	"project_id" in s ? (s as SessionSummary & { readonly project_id: string }).project_id : undefined;
+	hasProjectId(s) ? s.project_id : undefined;
 
 const getProjectName = (s: SessionSummary): string | undefined =>
-	"project_name" in s ? (s as SessionSummary & { readonly project_name: string }).project_name : undefined;
+	hasProjectName(s) ? s.project_name : undefined;
+
+const hasWorkUnitProjectId = (u: WorkUnit): u is WorkUnit & { readonly project_id: string } =>
+	"project_id" in u;
+
+const getWorkUnitProjectId = (u: WorkUnit): string | undefined =>
+	hasWorkUnitProjectId(u) ? u.project_id : undefined;
 
 // ── Main component ──────────────────────────────────────────────────
 
@@ -198,6 +218,8 @@ export const SessionList: Component = () => {
 		sort?: string;
 		page?: string;
 		view?: string;
+		lifecycle?: string;
+		link_type?: string;
 	}>();
 
 	// viewMode is derived from URL params (header nav controls it)
@@ -212,6 +234,12 @@ export const SessionList: Component = () => {
 	);
 	const [agentsFilter, setAgentsFilter] = createSignal<AgentsFilter>(
 		isValidAgents(searchParams.agents) ? searchParams.agents : "top_level",
+	);
+	const [lifecycleFilter, setLifecycleFilter] = createSignal<LifecycleFilter>(
+		isValidLifecycle(searchParams.lifecycle) ? searchParams.lifecycle : "all",
+	);
+	const [linkTypeFilter, setLinkTypeFilter] = createSignal<LinkTypeFilter>(
+		isValidLinkType(searchParams.link_type) ? searchParams.link_type : "all",
 	);
 	const [sortState, setSortState] = createSignal<SortState>(
 		parseSortParam(searchParams.sort),
@@ -229,12 +257,16 @@ export const SessionList: Component = () => {
 		const status = statusFilter();
 		const analyzed = analyzedFilter();
 		const agents = agentsFilter();
+		const lifecycle = lifecycleFilter();
+		const linkType = linkTypeFilter();
 		const sort = sortState();
 		const p = page();
 		params.q = q || undefined;
 		params.status = status !== "all" ? status : undefined;
 		params.analyzed = analyzed !== "all" ? analyzed : undefined;
 		params.agents = agents !== "top_level" ? agents : undefined;
+		params.lifecycle = lifecycle !== "all" ? lifecycle : undefined;
+		params.link_type = linkType !== "all" ? linkType : undefined;
 		params.sort = serializeSortParam(sort);
 		params.page = p > 1 ? String(p) : undefined;
 		setSearchParams(params);
@@ -257,6 +289,7 @@ export const SessionList: Component = () => {
 		const projectId = selectedProjectId();
 
 		return sessions.filter((s) => {
+			if (s.duration_ms <= 0) return false;
 			// Project filter (global mode)
 			if (projectId !== undefined && getProjectId(s) !== projectId) return false;
 			if (status !== "all" && s.status !== status) return false;
@@ -292,15 +325,20 @@ export const SessionList: Component = () => {
 
 	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / pageSize())));
 
-	// ── Work units filtered by search + project ─────────────
+	// ── Work units filtered by search + project + lifecycle + link_type ──
 	const filteredWorkUnits = createMemo(() => {
 		const units = workUnitList() ?? [];
 		const q = search().toLowerCase();
 		const projectId = selectedProjectId();
+		const lifecycle = lifecycleFilter();
+		const linkType = linkTypeFilter();
 
 		return units.filter((u) => {
+			if (u.total_duration_ms <= 0) return false;
 			// Project filter (global mode)
-			if (projectId !== undefined && "project_id" in u && (u as WorkUnit & { readonly project_id: string }).project_id !== projectId) return false;
+			if (projectId !== undefined && getWorkUnitProjectId(u) !== projectId) return false;
+			if (lifecycle !== "all" && u.lifecycle !== lifecycle) return false;
+			if (linkType !== "all" && u.link_type !== linkType) return false;
 			if (!q) return true;
 			const spec = (u.spec_path ?? "").toLowerCase();
 			const branch = (u.git_branch ?? "").toLowerCase();
@@ -308,13 +346,6 @@ export const SessionList: Component = () => {
 			return spec.includes(q) || branch.includes(q) || sessionNames.some((n) => n.includes(q));
 		});
 	});
-
-	const multiSessionUnits = createMemo(() =>
-		filteredWorkUnits().filter(u => u.sessions.length > 1)
-	);
-	const standaloneUnits = createMemo(() =>
-		filteredWorkUnits().filter(u => u.sessions.length <= 1)
-	);
 
 	const handleRowClick = (session: SessionSummary) => {
 		navigate(`/session/${session.session_id}`);
@@ -386,72 +417,42 @@ export const SessionList: Component = () => {
 				</div>
 			</Show>
 
-			{/* Filters */}
-			<div class="mt-3 flex flex-wrap items-center gap-3">
-				<div class="relative">
-					<Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-					<input
-						ref={searchInputRef}
-						type="text"
-						placeholder="Search sessions (press /)"
-						value={search()}
-						onInput={(e) => {
-							setSearch(e.currentTarget.value);
-							setPage(1);
-							setSelectedRow(-1);
-						}}
-						class="w-64 rounded-md border border-clens bg-surface-raised py-1.5 pl-8 pr-3 text-sm text-primary placeholder-gray-400 focus:border-brand-500 focus:outline-none"
-					/>
-				</div>
-				{/* Status filter */}
-				<SegmentedControl
-					options={[
-						{ label: "All", value: "all" as StatusFilter },
-						{ label: "Complete", value: "complete" as StatusFilter },
-						{ label: "Incomplete", value: "incomplete" as StatusFilter },
+			{/* Filters — view-aware */}
+			<Show when={viewMode() === "sessions"}>
+				<FilterBar
+					searchPlaceholder="Search sessions (press /)"
+					searchValue={search()}
+					onSearch={(v) => { setSearch(v); setPage(1); setSelectedRow(-1); }}
+					searchRef={(el) => { searchInputRef = el; }}
+					filters={[
+						{ key: "status", options: [{ label: "All", value: "all" }, { label: "Complete", value: "complete" }, { label: "Incomplete", value: "incomplete" }], value: statusFilter(), onChange: (v: string) => { setStatusFilter(v as StatusFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "analyzed", options: [{ label: "All", value: "all" }, { label: "Analyzed", value: "analyzed" }, { label: "Not analyzed", value: "not_analyzed" }], value: analyzedFilter(), onChange: (v: string) => { setAnalyzedFilter(v as AnalyzedFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "agents", options: [{ label: "All", value: "all" }, { label: "Top-level", value: "top_level" }, { label: "Multi-agent", value: "multi" }, { label: "Solo", value: "solo" }], value: agentsFilter(), onChange: (v: string) => { setAgentsFilter(v as AgentsFilter); setPage(1); setSelectedRow(-1); } },
 					]}
-					value={statusFilter()}
-					onChange={(v) => { setStatusFilter(v); setPage(1); setSelectedRow(-1); }}
+					resultCount={filtered().length}
+					resultLabel={`session${filtered().length !== 1 ? "s" : ""}`}
+					onRefresh={() => { refetchSessions(); refetchWorkUnits(); }}
 				/>
-				{/* Analyzed filter */}
-				<SegmentedControl
-					options={[
-						{ label: "All", value: "all" as AnalyzedFilter },
-						{ label: "Analyzed", value: "analyzed" as AnalyzedFilter },
-						{ label: "Not analyzed", value: "not_analyzed" as AnalyzedFilter },
+			</Show>
+			<Show when={viewMode() === "work_units"}>
+				<FilterBar
+					searchPlaceholder="Search work units (press /)"
+					searchValue={search()}
+					onSearch={(v) => { setSearch(v); }}
+					searchRef={(el) => { searchInputRef = el; }}
+					filters={[
+						{ key: "lifecycle", variant: "dropdown", label: "Lifecycle", options: [{ label: "All Lifecycles", value: "all" }, { label: "Prime > Build", value: "prime-build" }, { label: "Prime > Plan > Build", value: "prime-plan-build" }, { label: "Plan > Build", value: "plan-build" }, { label: "Plan > Build > Review", value: "plan-build-review" }, { label: "Multi-Build", value: "multi-build" }, { label: "Ad-hoc", value: "ad-hoc" }], value: lifecycleFilter(), onChange: (v: string) => { setLifecycleFilter(v as LifecycleFilter); } },
+						{ key: "link_type", variant: "dropdown", label: "Link Type", options: [{ label: "All Types", value: "all" }, { label: "Spec-linked", value: "spec" }, { label: "Branch-linked", value: "branch_time" }], value: linkTypeFilter(), onChange: (v: string) => { setLinkTypeFilter(v as LinkTypeFilter); } },
 					]}
-					value={analyzedFilter()}
-					onChange={(v) => { setAnalyzedFilter(v); setPage(1); setSelectedRow(-1); }}
+					resultCount={filteredWorkUnits().length}
+					resultLabel={`work unit${filteredWorkUnits().length !== 1 ? "s" : ""}`}
+					onRefresh={() => { refetchWorkUnits(); }}
 				/>
-				{/* Agents filter */}
-				<SegmentedControl
-					options={[
-						{ label: "All", value: "all" as AgentsFilter },
-						{ label: "Top-level", value: "top_level" as AgentsFilter },
-						{ label: "Multi-agent", value: "multi" as AgentsFilter },
-						{ label: "Solo", value: "solo" as AgentsFilter },
-					]}
-					value={agentsFilter()}
-					onChange={(v) => { setAgentsFilter(v); setPage(1); setSelectedRow(-1); }}
-				/>
-				<span class="text-sm text-gray-500">
-					{filtered().length} session{filtered().length !== 1 ? "s" : ""}
-				</span>
-				<button
-					onClick={() => {
-						refetchSessions();
-						refetchWorkUnits();
-					}}
-					class="ml-auto flex items-center gap-1 rounded border border-clens px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
-					title="Refresh"
-				>
-					<RefreshCw class="h-3 w-3" />
-				</button>
-			</div>
+			</Show>
 
 			{/* Work Units View */}
 			<Show when={viewMode() === "work_units"}>
-				<div class="mt-3 space-y-3">
+				<div class="mt-3">
 					<Show
 						when={filteredWorkUnits().length > 0}
 						fallback={
@@ -462,19 +463,11 @@ export const SessionList: Component = () => {
 							</div>
 						}
 					>
-						<For each={multiSessionUnits()}>
-							{(unit) => <WorkUnitCard unit={unit} />}
-						</For>
-						<Show when={standaloneUnits().length > 0}>
-							<div class="flex items-center gap-2 pt-2">
-								<div class="h-px flex-1 bg-surface-muted" />
-								<span class="text-[10px] font-medium uppercase tracking-wide text-muted">Standalone</span>
-								<div class="h-px flex-1 bg-surface-muted" />
-							</div>
-							<For each={standaloneUnits()}>
+						<div class="overflow-hidden rounded-lg border border-clens">
+							<For each={filteredWorkUnits()}>
 								{(unit) => <WorkUnitCard unit={unit} />}
 							</For>
-						</Show>
+						</div>
 					</Show>
 				</div>
 			</Show>
