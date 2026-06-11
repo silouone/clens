@@ -15,17 +15,17 @@ type CommunicationTimelineProps = {
 // ── Message type colors ──────────────────────────────────────────────
 
 const MSG_TYPE_COLORS: Readonly<Record<string, string>> = {
-	message: "bg-blue-500",
-	task_complete: "bg-emerald-500",
-	idle_notify: "bg-gray-500",
-	task_assign: "bg-violet-500",
-	shutdown_request: "bg-red-500",
-	shutdown_response: "bg-red-400",
-	broadcast: "bg-amber-500",
+	message: "bg-brand-500",
+	task_complete: "bg-[var(--clens-success)]",
+	idle_notify: "bg-muted",
+	task_assign: "bg-[var(--clens-text-secondary)]",
+	shutdown_request: "bg-[var(--clens-danger)]",
+	shutdown_response: "bg-[var(--clens-danger)]",
+	broadcast: "bg-[var(--clens-warning)]",
 };
 
 const getMsgColor = (msgType: string): string =>
-	MSG_TYPE_COLORS[msgType] ?? "bg-gray-500";
+	MSG_TYPE_COLORS[msgType] ?? "bg-muted";
 
 const getMsgBorderColor = (msgType: string): string =>
 	getMsgColor(msgType).replace("bg-", "border-");
@@ -36,12 +36,12 @@ const LEGEND_ITEMS: readonly {
 	readonly label: string;
 	readonly color: string;
 }[] = [
-	{ label: "message", color: "bg-blue-500" },
-	{ label: "task assign", color: "bg-violet-500" },
-	{ label: "task complete", color: "bg-emerald-500" },
-	{ label: "shutdown", color: "bg-red-500" },
-	{ label: "broadcast", color: "bg-amber-500" },
-	{ label: "other", color: "bg-gray-500" },
+	{ label: "message", color: "bg-brand-500" },
+	{ label: "task assign", color: "bg-[var(--clens-text-secondary)]" },
+	{ label: "task complete", color: "bg-[var(--clens-success)]" },
+	{ label: "shutdown", color: "bg-[var(--clens-danger)]" },
+	{ label: "broadcast", color: "bg-[var(--clens-warning)]" },
+	{ label: "other", color: "bg-muted" },
 ] as const;
 
 // ── Time formatting ──────────────────────────────────────────────────
@@ -81,26 +81,27 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 			<Show
 				when={props.sequence.length > 0}
 				fallback={
-					<div class="flex-1 flex items-center justify-center text-sm text-gray-500">
-						No communication data
+					<div class="flex-1 flex flex-col items-center justify-center gap-1">
+						<span class="instrument-microcaps text-[10px] text-muted">No data</span>
+						<span class="text-sm text-muted">No communication data</span>
 					</div>
 				}
 			>
 				{/* Legend */}
-				<div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] text-muted border-b border-clens/30">
+				<div class="instrument-microcaps flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[10px] text-muted border-b border-clens">
 					<span class="flex items-center gap-1">
-						<span class="inline-block h-2 w-2 rounded-full bg-gray-500" />
+						<span class="inline-block h-2 w-2 rounded-[1px] bg-muted" />
 						Sender (filled)
 					</span>
 					<span class="flex items-center gap-1">
-						<span class="inline-block h-2 w-2 rounded-full border-2 border-gray-500" />
+						<span class="inline-block h-2 w-2 rounded-[1px] border border-muted" />
 						Receiver (hollow)
 					</span>
 					<span class="text-muted">|</span>
 					<For each={LEGEND_ITEMS}>
 						{(item) => (
 							<span class="flex items-center gap-1">
-								<span class={`inline-block h-1.5 w-1.5 rounded-full ${item.color}`} />
+								<span class={`inline-block h-1.5 w-1.5 rounded-[1px] ${item.color}`} />
 								{item.label}
 							</span>
 						)}
@@ -109,13 +110,13 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 
 				{/* Swim lane headers */}
 				<div class="flex border-b border-clens bg-surface-inset">
-					<div class="w-14 flex-shrink-0 px-2 py-1 text-[10px] text-muted">
+					<div class="instrument-microcaps w-14 flex-shrink-0 px-2 py-1 text-[10px] text-muted">
 						Time
 					</div>
 					<For each={agents()}>
 						{(name) => (
 							<div
-								class="flex-1 truncate px-2 py-1.5 text-center text-[10px] font-medium text-muted"
+								class="instrument-microcaps flex-1 truncate px-2 py-1.5 text-center text-[10px] text-muted"
 								title={name}
 							>
 								{name}
@@ -155,13 +156,13 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 														{/* Dot for sender/receiver */}
 														<Show when={isFrom}>
 															<div
-																class={`h-2.5 w-2.5 rounded-full ${getMsgColor(msg.msg_type)} z-10`}
+																class={`h-2.5 w-2.5 rounded-[1px] ${getMsgColor(msg.msg_type)} z-10`}
 																title={`${msg.from_name} → ${msg.to_name}: ${msg.summary ?? msg.msg_type}`}
 															/>
 														</Show>
 														<Show when={isTo && !isFrom}>
 															<div
-																class={`h-2.5 w-2.5 rounded-full border-2 ${getMsgBorderColor(msg.msg_type)} z-10`}
+																class={`h-2.5 w-2.5 rounded-[1px] border ${getMsgBorderColor(msg.msg_type)} z-10`}
 																title={`${msg.from_name} → ${msg.to_name}`}
 															/>
 														</Show>
@@ -191,7 +192,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 
 														{/* Vertical lane marker */}
 														<Show when={!isFrom && !isTo && !isBetween}>
-															<div class="h-full w-px bg-gray-200 absolute " />
+															<div class="h-full w-px bg-[var(--clens-tick)] absolute " />
 														</Show>
 													</div>
 												);
@@ -201,7 +202,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 
 									{/* Message preview tooltip — absolutely positioned, no layout shift */}
 									<div class="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-										<div class="mr-2 rounded border border-clens bg-surface-raised px-2 py-1 text-[10px] text-secondary shadow-sm whitespace-nowrap max-w-xs truncate">
+										<div class="mr-2 rounded-none border border-clens bg-surface-overlay px-2 py-1 text-[10px] text-secondary whitespace-nowrap max-w-xs truncate">
 											{msg.summary ?? msg.content_preview ?? msg.msg_type}
 										</div>
 									</div>

@@ -64,22 +64,22 @@ export const RelatedSessionBadges: Component<RelatedSessionBadgesProps> = (props
 					{(session) => (
 						<A
 							href={`/session/${session.session_id}`}
-							class="group inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:border-violet-700 dark:hover:bg-violet-900/30"
+							class="group inline-flex items-center gap-1.5 rounded-none border border-clens bg-surface-inset px-2.5 py-1 text-xs font-medium text-secondary transition hover:bg-surface-hover"
 						>
-							<span class="text-violet-500 dark:text-violet-400">
+							<span class="instrument-microcaps text-[10px] text-muted">
 								{badgeLabel(currentSession()?.role, session)}
 							</span>
-							<span class="max-w-[160px] truncate">
+							<span class="max-w-[160px] truncate font-mono">
 								{session.session_name ?? session.session_id.slice(0, 8)}
 							</span>
 							<Show when={currentSession()} keyed>
 								{(current) => (
-									<span class="text-[10px] text-violet-400 dark:text-violet-500">
+									<span class="font-mono text-[10px] tabular-nums text-muted">
 										{formatRelativeTime(current.start_time, session.start_time)}
 									</span>
 								)}
 							</Show>
-							<ArrowRight class="h-3 w-3 text-violet-400 transition group-hover:translate-x-0.5 dark:text-violet-500" />
+							<ArrowRight class="h-3 w-3 text-muted transition group-hover:translate-x-0.5" />
 						</A>
 					)}
 				</For>

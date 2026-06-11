@@ -12,10 +12,10 @@ type NavButtonProps = {
 export const NavButton: Component<NavButtonProps> = (props) => (
 	<button
 		onClick={props.onClick}
-		class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium transition-colors duration-150 hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
+		class="flex w-full items-center gap-2 rounded-none border-l-2 px-2 py-1.5 text-left text-xs font-medium transition-colors duration-150 hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
 		classList={{
-			"bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-300": props.active,
-			"text-secondary": !props.active,
+			"border-brand-500 bg-surface-selected text-primary": props.active,
+			"border-transparent text-secondary": !props.active,
 		}}
 		aria-current={props.active ? "page" : undefined}
 	>

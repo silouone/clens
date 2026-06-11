@@ -18,16 +18,18 @@ type IntentRow = {
 
 // ── Intent bar colors ───────────────────────────────────────────────
 
+// Instrument trace colors — graphite ramp for neutral intents, status tokens
+// reserved for debugging (danger) and deciding (warning).
 const INTENT_COLORS: Readonly<Record<string, string>> = {
-	planning: "bg-violet-500 dark:bg-violet-400",
-	research: "bg-blue-500 dark:bg-blue-400",
-	debugging: "bg-red-500 dark:bg-red-400",
-	deciding: "bg-amber-500 dark:bg-amber-400",
-	general: "bg-gray-400",
+	planning: "bg-[var(--clens-text-secondary)]",
+	research: "bg-[var(--clens-text-muted)]",
+	debugging: "bg-[var(--clens-danger)]",
+	deciding: "bg-[var(--clens-warning)]",
+	general: "bg-[var(--clens-tick)]",
 };
 
 const getIntentBarClass = (intent: string): string =>
-	INTENT_COLORS[intent] ?? "bg-gray-400";
+	INTENT_COLORS[intent] ?? "bg-[var(--clens-tick)]";
 
 // ── Pure helpers ─────────────────────────────────────────────────────
 
@@ -66,8 +68,8 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 		<Show when={rows().length > 0}>
 			<Card class="p-3">
 				<div class="mb-3 flex items-center gap-2">
-					<Brain class="h-4 w-4 text-violet-500" />
-					<h3 class="text-sm font-semibold text-secondary">
+					<Brain class="h-4 w-4 text-muted" />
+					<h3 class="instrument-microcaps text-[11px] text-muted">
 						Thinking Patterns
 					</h3>
 					<span class="text-[11px] text-muted">(keyword heuristic)</span>
@@ -82,16 +84,16 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 									{row.intent}
 								</span>
 
-								{/* Bar */}
-								<div class="min-w-16 flex-1 rounded-full bg-surface-muted h-2.5">
+								{/* Bar — square instrument trace */}
+								<div class="min-w-16 flex-1 rounded-none bg-surface-inset h-2.5 border border-clens">
 									<div
-										class={`h-2.5 rounded-full transition-all ${getIntentBarClass(row.intent)}`}
+										class={`h-full rounded-none transition-all ${getIntentBarClass(row.intent)}`}
 										style={{ width: `${Math.max(row.pct, 4)}%`, "min-width": "0.5rem" }}
 									/>
 								</div>
 
 								{/* Count + Percentage */}
-								<span class="w-16 shrink-0 text-right tabular-nums text-muted">
+								<span class="w-16 shrink-0 text-right font-mono tabular-nums text-muted">
 									{row.count} ({formatPercentage(row.count, total())})
 								</span>
 							</div>

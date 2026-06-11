@@ -1,7 +1,8 @@
-import { createMemo, createSignal, For, onCleanup, onMount, type Component } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
 import type { BaseChartProps } from "./shared";
-import { CHART_COLORS, CHART_PADDING, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
+import { CHART_COLORS, CHART_HAIRLINE, CHART_PADDING, MAX_BAND, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
 import { hideTooltip, showTooltip } from "./ChartTooltip";
+import { ChartEmpty } from "./ChartEmpty";
 
 interface BarChartProps<T> extends BaseChartProps {
 	readonly data: readonly T[];
@@ -33,30 +34,42 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 	const ticks = createMemo(() => generateTicks(maxY()));
 	const yScale = createMemo(() => linearScale([0, maxY()], [chartHeight(), 0]));
 
+	const slot = createMemo(() => {
+		const n = props.data.length;
+		if (n === 0) return 0;
+		const available = chartWidth();
+		const gap = Math.max(2, available / n * 0.2);
+		return (available - gap * (n - 1)) / n + gap;
+	});
+
+	// Cap a single/sparse bar so one datapoint reads as a tick, not a wall.
 	const barWidth = createMemo(() => {
 		const n = props.data.length;
 		if (n === 0) return 0;
 		const available = chartWidth();
 		const gap = Math.max(2, available / n * 0.2);
-		return Math.max(2, (available - gap * (n - 1)) / n);
+		return Math.max(2, Math.min(MAX_BAND, (available - gap * (n - 1)) / n));
 	});
 
 	const barX = (i: number) => {
 		const n = props.data.length;
 		if (n === 0) return 0;
-		const gap = Math.max(2, chartWidth() / n * 0.2);
-		return i * (barWidth() + gap);
+		return i * slot() + (slot() - barWidth()) / 2;
 	};
 
 	return (
-		<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
-			<svg
-				width={width()}
-				height={props.height ?? 200}
-				role="img"
-				aria-label={props.ariaLabel}
-				class="overflow-visible"
-			>
+		<Show
+			when={props.data.length > 0}
+			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+		>
+			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
+				<svg
+					width={width()}
+					height={props.height ?? 200}
+					role="img"
+					aria-label={props.ariaLabel}
+					class="overflow-visible"
+				>
 				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
 					{/* Y-axis grid lines + labels */}
 					<For each={ticks()}>
@@ -65,12 +78,12 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 								<line
 									x1={0} y1={yScale()(tick)}
 									x2={chartWidth()} y2={yScale()(tick)}
-									stroke="currentColor" stroke-opacity="0.1"
+									stroke={CHART_HAIRLINE}
 								/>
 								<text
 									x={-8} y={yScale()(tick)}
 									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted text-[10px]"
+									class="fill-muted font-mono text-[10px] tabular-nums"
 								>
 									{formatCompact(tick)}
 								</text>
@@ -90,7 +103,7 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 									width={barWidth()}
 									height={Math.max(0, h)}
 									fill={color()}
-									rx={2}
+									rx={0}
 									class="cursor-pointer transition-opacity hover:opacity-80"
 									onClick={(e) => {
 										e.stopPropagation();
@@ -118,7 +131,7 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 									x={barX(i()) + barWidth() / 2}
 									y={chartHeight() + 16}
 									text-anchor="middle"
-									class="fill-muted text-[10px]"
+									class="fill-muted font-mono text-[10px] tabular-nums"
 								>
 									{formatShortDate(props.x(d))}
 								</text>
@@ -126,7 +139,8 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 						}}
 					</For>
 				</g>
-			</svg>
-		</div>
+				</svg>
+			</div>
+		</Show>
 	);
 };

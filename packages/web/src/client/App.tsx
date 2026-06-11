@@ -108,10 +108,10 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 			{/* Trigger button */}
 			<button
 				onClick={() => props.onNavigate("/usage")}
-				class="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition"
+				class="instrument-microcaps flex items-center gap-1 rounded-none border-b-2 px-2.5 py-1 text-[10px] transition"
 				classList={{
-					"text-primary bg-surface-muted": props.active,
-					"text-muted hover:text-secondary hover:bg-surface-hover": !props.active,
+					"text-primary border-brand-500": props.active,
+					"text-muted border-transparent hover:text-secondary": !props.active,
 				}}
 			>
 				Analytics
@@ -123,37 +123,37 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 
 			{/* Dropdown panel */}
 			<Show when={open()}>
-				<div class="absolute right-0 top-full z-50 mt-1.5 w-64 origin-top-right animate-dropdown rounded-lg border border-clens bg-surface-raised shadow-lg">
+				<div class="absolute right-0 top-full z-50 mt-1.5 w-64 origin-top-right animate-dropdown rounded-none border border-clens bg-surface-raised">
 					{/* KPI quick-view */}
 					<Show when={props.loaded}>
 						<div class="border-b border-clens">
 							<div class="grid grid-cols-2 gap-px bg-clens">
-								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5 rounded-tl-lg">
+								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Database class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										<div class="text-[10px] text-muted leading-none">Total</div>
-										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{props.sessionCount}</div>
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">Total</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.sessionCount}</div>
 									</div>
 								</div>
-								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5 rounded-tr-lg">
+								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Calendar class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										<div class="text-[10px] text-muted leading-none">Today</div>
-										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{props.todayCount}</div>
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">Today</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.todayCount}</div>
 									</div>
 								</div>
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Activity class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										<div class="text-[10px] text-muted leading-none">Tool Calls</div>
-										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{props.totalEvents.toLocaleString()}</div>
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">Tool Calls</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.totalEvents.toLocaleString()}</div>
 									</div>
 								</div>
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Clock class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										<div class="text-[10px] text-muted leading-none">Avg Duration</div>
-										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{formatDuration(props.avgDuration)}</div>
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">Avg Duration</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{formatDuration(props.avgDuration)}</div>
 									</div>
 								</div>
 							</div>
@@ -161,8 +161,8 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 							<div class="flex items-center gap-2 px-3 py-2.5 border-t border-clens">
 								<DollarSign class="h-3.5 w-3.5 text-muted shrink-0" />
 								<div class="min-w-0">
-									<div class="text-[10px] text-muted leading-none">Total Cost</div>
-									<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">
+									<div class="instrument-microcaps text-[9px] text-muted leading-none">Total Cost</div>
+									<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">
 										${props.totalCost < 1 ? props.totalCost.toFixed(2) : props.totalCost.toFixed(2)}
 									</div>
 								</div>
@@ -174,7 +174,7 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 					<div class="p-1.5">
 						<button
 							onClick={() => { props.onNavigate("/usage"); setOpen(false); }}
-							class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
+							class="flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
 						>
 							<BarChart3 class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />
 							<div class="text-left">
@@ -184,7 +184,7 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 						</button>
 						<button
 							onClick={() => { props.onNavigate("/insights"); setOpen(false); }}
-							class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
+							class="flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
 						>
 							<Lightbulb class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />
 							<div class="text-left">
@@ -228,14 +228,18 @@ export const App: Component<RouteSectionProps> = (props) => {
 
 	return (
 		<div class="min-h-screen bg-surface text-primary">
-			<header class="sticky top-0 z-40 flex items-center border-b border-clens bg-surface px-4 py-2.5 shadow-sm">
-				{/* Logo */}
+			<header class="sticky top-0 z-40 flex items-center border-b border-clens bg-surface px-4 py-2.5">
+				{/* Logo + wordmark */}
 				<button
 					onClick={() => navigate("/")}
-					class="flex items-center gap-1.5 rounded-md px-1 py-0.5 transition hover:opacity-80"
+					class="flex items-center gap-2 rounded-none px-1 py-0.5 transition hover:opacity-80"
 					title="Home"
 				>
 					<LogoIcon />
+					<span class="hidden items-baseline gap-1.5 sm:flex">
+						<span class="font-mono text-sm font-semibold tracking-tight text-primary">cLens</span>
+						<span class="instrument-microcaps text-[9px] text-muted">instrument</span>
+					</span>
 				</button>
 
 				{/* Right: Nav + Live + separator + Actions */}
@@ -245,10 +249,10 @@ export const App: Component<RouteSectionProps> = (props) => {
 							{(item) => (
 								<button
 									onClick={() => navigate(item.path)}
-									class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+									class="instrument-microcaps rounded-none px-2.5 py-1 text-[10px] transition border-b-2"
 									classList={{
-										"text-primary bg-surface-muted": isNavActive(item, location.pathname, location.search),
-										"text-muted hover:text-secondary hover:bg-surface-hover": !isNavActive(item, location.pathname, location.search),
+										"text-primary border-brand-500": isNavActive(item, location.pathname, location.search),
+										"text-muted border-transparent hover:text-secondary": !isNavActive(item, location.pathname, location.search),
 									}}
 								>
 									{item.label}
@@ -268,19 +272,19 @@ export const App: Component<RouteSectionProps> = (props) => {
 						/>
 					</nav>
 
-					<div class="flex items-center gap-1 ml-1" title="Live updates via SSE">
-						<span class="relative flex h-2 w-2">
-							<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-							<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+					<div class="flex items-center gap-1.5 ml-1" title="Live updates via SSE">
+						<span class="relative flex">
+							<span class="absolute inline-flex h-full w-full animate-ping bg-brand-500 opacity-60 instrument-led" />
+							<span class="instrument-led instrument-led--live relative inline-block bg-brand-500" />
 						</span>
-						<span class="text-[10px] text-muted">Live</span>
+						<span class="instrument-microcaps text-[9px] text-brand-500">Live</span>
 					</div>
 
 					<div class="mx-2 h-5 w-px bg-clens" />
 
 					<button
 						onClick={toggleTheme}
-						class="rounded-md p-1.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
+						class="rounded-none p-1.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title={`Switch to ${theme() === "dark" ? "light" : "dark"} mode`}
 					>
 						<Show when={theme() === "dark"} fallback={<MoonIcon />}>
@@ -289,7 +293,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 					</button>
 					<button
 						onClick={() => navigate("/settings")}
-						class="rounded-md p-1.5 transition"
+						class="rounded-none p-1.5 transition"
 						classList={{
 							"text-primary bg-surface-muted": location.pathname === "/settings",
 							"text-muted hover:bg-surface-hover hover:text-secondary": location.pathname !== "/settings",
@@ -300,13 +304,15 @@ export const App: Component<RouteSectionProps> = (props) => {
 					</button>
 					<button
 						onClick={() => toggleHelp()}
-						class="rounded-md px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
+						class="rounded-none px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title="Keyboard shortcuts"
 					>
 						<kbd class="font-mono">?</kbd>
 					</button>
 				</div>
 			</header>
+			{/* Tick-mark ruler motif — oscilloscope graticule under the header */}
+			<div class="instrument-ruler" aria-hidden="true" />
 			<ErrorBoundary
 					fallback={(err, reset) => (
 						<main class="flex-1">

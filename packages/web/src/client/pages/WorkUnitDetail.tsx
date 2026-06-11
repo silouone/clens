@@ -61,7 +61,7 @@ const AgentTreeItem: Component<{
 				ariaLabel={`Agent: ${props.agent.agent_name ?? props.agent.agent_type}`}
 				topRow={
 					<>
-						<span class={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${getTypeBadgeClass(props.agent.agent_type)}`}>
+						<span class={`shrink-0 rounded-none px-1.5 py-0.5 text-[10px] font-medium leading-none ${getTypeBadgeClass(props.agent.agent_type)}`}>
 							{props.agent.agent_type}
 						</span>
 						<span class="flex-1 truncate font-medium text-secondary">
@@ -121,7 +121,7 @@ const SessionTreeItem: Component<{
 			ariaLabel={`Session: ${props.session.session_name ?? props.session.session_id.slice(0, 8)}`}
 			topRow={
 				<>
-					<span class="w-14 shrink-0 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+					<span class="instrument-microcaps w-14 shrink-0 text-[10px] text-muted">
 						{props.session.phase}
 					</span>
 					<span class="flex-1 truncate font-medium text-secondary">
@@ -131,12 +131,12 @@ const SessionTreeItem: Component<{
 			}
 			bottomRow={
 				<>
-					<span class="text-[10px] text-gray-400">{props.session.role}</span>
+					<span class="instrument-microcaps text-[10px] text-muted">{props.session.role}</span>
 					<Show when={props.session.distilled}>
 						<span class="ml-auto">{formatDuration(props.session.distilled?.stats.duration_ms ?? 0)}</span>
 					</Show>
 					<Show when={!props.session.distilled}>
-						<span class="ml-auto text-amber-500">not analyzed</span>
+						<span class="instrument-microcaps ml-auto text-[10px] text-warning">not analyzed</span>
 					</Show>
 				</>
 			}
@@ -166,7 +166,7 @@ const WorkUnitHeader: Component<{
 
 	return (
 		<DetailHeader title={props.unit.spec_path ?? props.unit.git_branch ?? "Unknown"}>
-			<span class={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${LIFECYCLE_COLORS[props.unit.lifecycle]}`}>
+			<span class={`instrument-microcaps inline-flex items-center rounded-none px-2 py-0.5 text-[10px] ${LIFECYCLE_COLORS[props.unit.lifecycle]}`}>
 				{LIFECYCLE_LABELS[props.unit.lifecycle]}
 			</span>
 			<div class="flex flex-wrap items-center gap-1.5">
@@ -204,8 +204,8 @@ const WorkUnitOverview: Component<{
 			{/* Responsive grid: timeline + agents side by side on wider screens */}
 			<div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
 				{/* Session phase timeline visualization */}
-				<div class="rounded-lg border border-clens bg-surface-raised p-3 shadow-card">
-					<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+				<div class="rounded-none border border-clens bg-surface-raised p-3">
+					<h3 class="instrument-microcaps mb-2 text-[11px] text-muted">
 						Session Timeline
 					</h3>
 					<div class="space-y-1.5">
@@ -227,14 +227,14 @@ const WorkUnitOverview: Component<{
 										<span class="w-20 shrink-0 truncate text-[10px] text-muted">
 											{session.session_name ?? session.session_id.slice(0, 8)}
 										</span>
-										<div class="relative flex-1 h-4 rounded bg-surface-muted">
+										<div class="relative flex-1 h-4 rounded-none border border-clens bg-surface-inset">
 											<div
-												class={`absolute top-0.5 bottom-0.5 rounded ${PHASE_COLORS[session.phase] ?? PHASE_COLORS.other}`}
+												class={`absolute top-0.5 bottom-0.5 rounded-none ${PHASE_COLORS[session.phase] ?? PHASE_COLORS.other}`}
 												style={{ left: `${startOffset()}%`, width: `${widthPct()}%` }}
 												title={`${session.phase} - ${formatDuration(session.distilled?.stats.duration_ms ?? 0)}`}
 											/>
 										</div>
-										<span class="w-10 shrink-0 text-right text-[10px] text-gray-400">
+										<span class="instrument-microcaps w-10 shrink-0 text-right text-[10px] text-muted">
 											{session.phase}
 										</span>
 									</div>
@@ -246,15 +246,15 @@ const WorkUnitOverview: Component<{
 
 				{/* Agent breakdown */}
 				<Show when={allAgents().length > 0}>
-					<div class="rounded-lg border border-clens bg-surface-raised p-3 shadow-card">
-						<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+					<div class="rounded-none border border-clens bg-surface-raised p-3">
+						<h3 class="instrument-microcaps mb-2 text-[11px] text-muted">
 							Agents ({allAgents().length})
 						</h3>
 						<div class="space-y-1">
 							<For each={allAgents()}>
 								{(agent) => (
-									<div class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-hover transition-colors">
-										<span class={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${getTypeBadgeClass(agent.agent_type)}`}>
+									<div class="flex items-center gap-2 rounded-none px-2 py-1.5 hover:bg-surface-hover transition-colors">
+										<span class={`shrink-0 rounded-none px-1.5 py-0.5 text-[10px] font-medium leading-none ${getTypeBadgeClass(agent.agent_type)}`}>
 											{agent.agent_type}
 										</span>
 										<span class="flex-1 truncate text-xs text-secondary">
@@ -267,7 +267,7 @@ const WorkUnitOverview: Component<{
 												</span>
 											)}
 										</Show>
-										<span class="text-[10px] tabular-nums text-gray-400">
+										<span class="text-[10px] tabular-nums text-muted">
 											{formatDuration(agent.duration_ms)}
 										</span>
 									</div>
@@ -280,14 +280,14 @@ const WorkUnitOverview: Component<{
 
 			{/* File list */}
 			<Show when={fileList().length > 0}>
-				<div class="rounded-lg border border-clens bg-surface-raised p-3 shadow-card">
-					<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+				<div class="rounded-none border border-clens bg-surface-raised p-3">
+					<h3 class="instrument-microcaps mb-2 text-[11px] text-muted">
 						Files Modified ({fileList().length})
 					</h3>
 					<div class="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
 						<For each={fileList()}>
 							{(file) => (
-								<div class="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-hover transition-colors">
+								<div class="flex items-center gap-2 rounded-none px-2 py-1 hover:bg-surface-hover transition-colors">
 									<span class="flex-1 truncate font-mono text-[11px] text-secondary" title={file.file_path}>
 										{file.file_path.split("/").slice(-1)[0]}
 									</span>

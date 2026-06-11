@@ -3,15 +3,16 @@ import { A } from "@solidjs/router";
 import { FileText, GitBranch, Clock, ChevronRight, ChevronDown, Hash } from "lucide-solid";
 import type { WorkUnit } from "../../shared/types";
 import { formatDuration } from "../lib/format";
-import { LIFECYCLE_LABELS, LIFECYCLE_COLORS } from "../lib/work-unit-constants";
+import { LIFECYCLE_LABELS } from "../lib/work-unit-constants";
 import { isGlobalMode, projectColor } from "../lib/project-store";
 
 // ── Pure helpers ─────────────────────────────────────────────────────
 
+// Role LED traces — signal-green for creator, graphite ramp otherwise.
 const ROLE_COLORS: Readonly<Record<string, string>> = {
-	creator: "bg-violet-500",
-	consumer: "bg-blue-500",
-	modifier: "bg-gray-400",
+	creator: "bg-brand-500",
+	consumer: "bg-[var(--clens-info)]",
+	modifier: "bg-[var(--clens-tick)]",
 } as const;
 
 const formatDateRange = (start: number, end: number): string => {
@@ -75,7 +76,7 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 						when={unit().spec_path}
 						fallback={<GitBranch class="h-4 w-4 flex-shrink-0 text-muted" />}
 					>
-						<FileText class="h-4 w-4 flex-shrink-0 text-violet-500 dark:text-violet-400" />
+						<FileText class="h-4 w-4 flex-shrink-0 text-brand-500" />
 					</Show>
 
 					{/* Name */}
@@ -89,34 +90,34 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 							const pid = getWorkUnitProjectId(unit());
 							const pname = getWorkUnitProjectName(unit());
 							return pid && pname
-								? <span class="inline-flex items-center gap-1 flex-shrink-0 text-xs text-muted">
+								? <span class="inline-flex items-center gap-1.5 flex-shrink-0 text-xs text-muted">
 									<span
-										class="inline-block w-1.5 h-1.5 rounded-full"
+										class="instrument-led"
 										style={{ "background-color": projectColor(pid) }}
 									/>
-									<span class="truncate max-w-[100px]">{pname}</span>
+									<span class="truncate max-w-[100px] font-mono">{pname}</span>
 								</span>
 								: null;
 						})()}
 					</Show>
 
-					{/* Lifecycle badge */}
-					<span class={`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${LIFECYCLE_COLORS[unit().lifecycle]}`}>
+					{/* Lifecycle label */}
+					<span class="instrument-microcaps flex-shrink-0 rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-muted">
 						{LIFECYCLE_LABELS[unit().lifecycle]}
 					</span>
 
 					{/* KPI pills */}
-					<span class="hidden sm:inline-flex items-center gap-1 flex-shrink-0 text-xs text-muted tabular-nums">
+					<span class="hidden sm:inline-flex items-center gap-1 flex-shrink-0 font-mono text-xs text-muted tabular-nums">
 						<Clock class="h-3 w-3" />
 						{formatDuration(unit().total_duration_ms)}
 					</span>
 
-					<span class="hidden sm:inline-flex items-center gap-1 flex-shrink-0 text-xs text-muted tabular-nums">
+					<span class="hidden sm:inline-flex items-center gap-1 flex-shrink-0 font-mono text-xs text-muted tabular-nums">
 						<Hash class="h-3 w-3" />
 						{sessionLabel()}
 					</span>
 
-					<span class="hidden md:inline-flex flex-shrink-0 text-xs text-muted">
+					<span class="hidden md:inline-flex flex-shrink-0 font-mono text-xs tabular-nums text-muted">
 						{formatDateRange(unit().date_range.start, unit().date_range.end)}
 					</span>
 				</A>
@@ -125,7 +126,7 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 				<button
 					type="button"
 					onClick={toggleExpand}
-					class="ml-1 flex-shrink-0 rounded p-0.5 text-muted transition hover:bg-surface-muted hover:text-secondary"
+					class="ml-1 flex-shrink-0 rounded-none p-0.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
 					aria-label={expanded() ? "Collapse sessions" : "Expand sessions"}
 				>
 					<Show
@@ -139,17 +140,17 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 
 			{/* Expanded session list */}
 			<Show when={expanded()}>
-				<div class="border-t border-clens/50 bg-surface-inset/30">
+				<div class="border-t border-clens bg-surface-inset">
 					<For each={unit().sessions}>
 						{(session) => (
 							<A
 								href={`/session/${session.session_id}`}
 								class="group flex items-center gap-2 py-1.5 pl-8 pr-4 transition hover:bg-surface-hover"
 							>
-								{/* Role dot */}
-								<span class={`h-2 w-2 flex-shrink-0 rounded-full ${ROLE_COLORS[session.role] ?? "bg-gray-400"}`} />
+								{/* Role LED */}
+								<span class={`instrument-led flex-shrink-0 ${ROLE_COLORS[session.role] ?? "bg-[var(--clens-tick)]"}`} />
 								{/* Phase label */}
-								<span class="w-14 flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted">
+								<span class="instrument-microcaps w-14 flex-shrink-0 text-[10px] text-muted">
 									{session.phase}
 								</span>
 								{/* Session name */}
@@ -157,7 +158,7 @@ export const WorkUnitCard: Component<WorkUnitCardProps> = (props) => {
 									{session.session_name ?? session.session_id.slice(0, 8)}
 								</span>
 								{/* Role badge */}
-								<span class="flex-shrink-0 text-[10px] text-muted">
+								<span class="instrument-microcaps flex-shrink-0 text-[10px] text-muted">
 									{session.role}
 								</span>
 								<ChevronRight class="h-3 w-3 flex-shrink-0 text-muted transition group-hover:translate-x-0.5" />

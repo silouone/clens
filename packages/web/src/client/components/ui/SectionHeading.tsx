@@ -16,11 +16,11 @@ export const SectionHeading: Component<SectionHeadingProps> = (props) => (
 			<Show when={props.icon}>
 				{(Icon) => {
 					const IconComp = Icon();
-					return <IconComp class="h-4 w-4 text-muted" />;
+					return <IconComp class="h-3.5 w-3.5 text-muted" />;
 				}}
 			</Show>
 			<h3
-			class="text-xs font-semibold uppercase tracking-wider"
+			class="instrument-microcaps text-[11px]"
 			classList={{
 				"text-secondary": (props.variant ?? "default") === "default",
 				"text-muted": props.variant === "muted",
@@ -29,7 +29,7 @@ export const SectionHeading: Component<SectionHeadingProps> = (props) => (
 				{props.title}
 			</h3>
 			<Show when={props.count !== undefined}>
-				<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted">
+				<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-muted">
 					{props.count}
 				</span>
 			</Show>

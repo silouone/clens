@@ -27,13 +27,13 @@ export const SystemPromptPanel: Component<SystemPromptPanelProps> = (props) => {
 	return (
 		<div class="flex flex-col h-full">
 			<div class="flex items-center justify-between px-4 py-2 border-b border-clens">
-				<h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+				<h3 class="instrument-microcaps text-[11px] text-muted">
 					System Prompt
 				</h3>
 				<Show when={props.prompt}>
 					<button
 						onClick={handleCopy}
-						class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-400 transition hover:bg-surface-hover hover:text-secondary text-muted"
+						class="flex items-center gap-1 rounded-none border border-clens px-1.5 py-0.5 text-[11px] text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title="Copy to clipboard"
 					>
 						<Show when={copied()} fallback={<Clipboard class="h-3.5 w-3.5" />}>

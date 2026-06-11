@@ -30,5 +30,7 @@ export const DetailHeader: Component<DetailHeaderProps> = (props) => (
 				{props.bottomRow}
 			</div>
 		</Show>
+		{/* Instrument graticule tick strip beneath the header */}
+		<div class="instrument-ruler mt-2 -mx-3" />
 	</div>
 );

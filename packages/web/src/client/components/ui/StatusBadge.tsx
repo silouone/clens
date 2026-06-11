@@ -1,5 +1,4 @@
 import { Match, Switch, type Component } from "solid-js";
-import { CheckCircle, Clock } from "lucide-solid";
 import type { SessionStatus } from "../../../shared/types";
 
 /**
@@ -25,18 +24,19 @@ const resolveStatus = (props: StatusBadgeProps): SessionStatus => {
 	return "idle";
 };
 
-const FULL_CLS: Record<SessionStatus, string> = {
-	complete:
-		"bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-700/50",
-	active:
-		"bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50",
-	idle: "bg-surface-muted text-muted border-clens",
+// Instrument: square hairline chip, LED square + microcaps word — no pill, no
+// colored badge wash. Signal-green = complete/ok, amber warning trace = active
+// (lit, --live glow), graphite = idle (unlit).
+const TEXT_CLS: Record<SessionStatus, string> = {
+	complete: "text-[var(--clens-success)]",
+	active: "text-[var(--clens-warning)]",
+	idle: "text-muted",
 };
 
-const DOT_CLS: Record<SessionStatus, string> = {
-	complete: "bg-emerald-500 dark:bg-emerald-400",
-	active: "bg-amber-500 dark:bg-amber-400 animate-pulse",
-	idle: "bg-gray-400 dark:bg-gray-500",
+const LED_CLS: Record<SessionStatus, string> = {
+	complete: "bg-[var(--clens-success)]",
+	active: "bg-[var(--clens-warning)] instrument-led--live animate-pulse",
+	idle: "bg-[var(--clens-tick)]",
 };
 
 const FULL_LABEL: Record<SessionStatus, string> = {
@@ -57,16 +57,16 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
 	return (
 		<Switch>
 			<Match when={props.compact}>
-				<span class="inline-flex items-center gap-1 text-[10px] font-medium text-muted">
-					<span class={`inline-block h-1.5 w-1.5 rounded-full ${DOT_CLS[status()]}`} />
+				<span class={`instrument-microcaps inline-flex items-center gap-1.5 text-[9px] ${TEXT_CLS[status()]}`}>
+					<span class={`instrument-led ${LED_CLS[status()]}`} />
 					{COMPACT_LABEL[status()]}
 				</span>
 			</Match>
 			<Match when={!props.compact}>
 				<span
-					class={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${FULL_CLS[status()]}`}
+					class={`instrument-microcaps inline-flex items-center gap-1.5 rounded-none border border-clens px-1.5 py-0.5 text-[9px] ${TEXT_CLS[status()]}`}
 				>
-					{status() === "complete" ? <CheckCircle class="h-3 w-3" /> : <Clock class="h-3 w-3" />}
+					<span class={`instrument-led ${LED_CLS[status()]}`} />
 					{FULL_LABEL[status()]}
 				</span>
 			</Match>

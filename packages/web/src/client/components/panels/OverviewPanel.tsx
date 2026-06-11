@@ -59,15 +59,15 @@ const FileListCard: Component<{
 	return (
 		<Card>
 			<div class="flex items-center gap-3 border-b border-clens px-3 py-2">
-				<Files class="h-4 w-4 text-emerald-500" />
-				<h3 class="text-sm font-semibold text-secondary">
+				<Files class="h-3.5 w-3.5 text-muted" />
+				<h3 class="instrument-microcaps text-[11px] text-muted">
 					Modified Files
 				</h3>
 				<Show when={totalAdditions() > 0}>
-					<span class="text-xs text-emerald-500">+{totalAdditions()}</span>
+					<span class="font-mono text-xs tabular-nums text-[var(--clens-success)]">+{totalAdditions()}</span>
 				</Show>
 				<Show when={totalDeletions() > 0}>
-					<span class="text-xs text-red-500">-{totalDeletions()}</span>
+					<span class="font-mono text-xs tabular-nums text-[var(--clens-danger)]">-{totalDeletions()}</span>
 				</Show>
 			</div>
 			<FileList rows={fileRows()} />

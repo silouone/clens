@@ -44,7 +44,7 @@ const FilterDropdown = (props: {
 			<select
 				value={props.value}
 				onChange={(e) => props.onChange(e.currentTarget.value)}
-				class="appearance-none rounded-md border border-clens bg-surface-raised py-1 pl-2.5 pr-7 text-xs font-medium text-primary transition focus:border-brand-500 focus:outline-none cursor-pointer hover:bg-surface-hover"
+				class="appearance-none rounded-none border border-clens bg-surface-raised py-1 pl-2.5 pr-7 text-xs font-medium text-primary transition focus:border-brand-500 focus:outline-none cursor-pointer hover:bg-surface-hover"
 			>
 				<For each={props.options}>
 					{(opt) => (
@@ -71,7 +71,7 @@ export const FilterBar = (props: FilterBarProps) => (
 				placeholder={props.searchPlaceholder}
 				value={props.searchValue}
 				onInput={(e) => props.onSearch(e.currentTarget.value)}
-				class="w-64 rounded-md border border-clens bg-surface-raised py-1.5 pl-8 pr-3 text-sm text-primary placeholder-gray-400 focus:border-brand-500 focus:outline-none"
+				class="w-64 rounded-none border border-clens bg-surface-raised py-1.5 pl-8 pr-3 text-sm font-mono text-primary placeholder:font-sans placeholder:text-muted focus:border-brand-500 focus:outline-none"
 			/>
 		</div>
 		<For each={props.filters}>
@@ -95,12 +95,13 @@ export const FilterBar = (props: FilterBarProps) => (
 				</Show>
 			)}
 		</For>
-		<span class="text-sm text-gray-500">
-			{props.resultCount} {props.resultLabel}
+		<span class="instrument-microcaps flex items-baseline gap-1 text-[10px] text-muted">
+			<span class="font-mono text-xs tabular-nums text-secondary">{props.resultCount}</span>
+			{props.resultLabel}
 		</span>
 		<button
 			onClick={() => props.onRefresh()}
-			class="ml-auto flex items-center gap-1 rounded border border-clens px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
+			class="ml-auto flex items-center gap-1 rounded-none border border-clens px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:border-brand-500 hover:text-secondary"
 			title="Refresh"
 		>
 			<RefreshCw class="h-3 w-3" />

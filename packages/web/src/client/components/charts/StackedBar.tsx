@@ -1,7 +1,8 @@
-import { createMemo, createSignal, For, onCleanup, onMount, type Component } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
 import type { BaseChartProps } from "./shared";
-import { CHART_PADDING, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
+import { CHART_HAIRLINE, CHART_PADDING, MAX_BAND, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
 import { hideTooltip, showTooltip } from "./ChartTooltip";
+import { ChartEmpty } from "./ChartEmpty";
 
 interface SeriesConfig {
 	readonly key: string;
@@ -49,29 +50,40 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 	const ticks = createMemo(() => generateTicks(maxY()));
 	const yScale = createMemo(() => linearScale([0, maxY()], [ch(), 0]));
 
+	const slot = createMemo(() => {
+		const n = props.data.length;
+		if (n === 0) return 0;
+		const gap = Math.max(2, cw() / n * 0.2);
+		return (cw() - gap * (n - 1)) / n + gap;
+	});
+
+	// Cap a single/sparse column so one datapoint reads as a tick, not a wall.
 	const barWidth = createMemo(() => {
 		const n = props.data.length;
 		if (n === 0) return 0;
 		const gap = Math.max(2, cw() / n * 0.2);
-		return Math.max(2, (cw() - gap * (n - 1)) / n);
+		return Math.max(2, Math.min(MAX_BAND, (cw() - gap * (n - 1)) / n));
 	});
 
 	const barX = (i: number) => {
 		const n = props.data.length;
 		if (n === 0) return 0;
-		const gap = Math.max(2, cw() / n * 0.2);
-		return i * (barWidth() + gap);
+		return i * slot() + (slot() - barWidth()) / 2;
 	};
 
 	return (
-		<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
-			<svg
-				width={width()}
-				height={props.height ?? 200}
-				role="img"
-				aria-label={props.ariaLabel}
-				class="overflow-visible"
-			>
+		<Show
+			when={props.data.length > 0}
+			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+		>
+			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
+				<svg
+					width={width()}
+					height={props.height ?? 200}
+					role="img"
+					aria-label={props.ariaLabel}
+					class="overflow-visible"
+				>
 				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
 					<For each={ticks()}>
 						{(tick) => (
@@ -79,12 +91,12 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 								<line
 									x1={0} y1={yScale()(tick)}
 									x2={cw()} y2={yScale()(tick)}
-									stroke="currentColor" stroke-opacity="0.1"
+									stroke={CHART_HAIRLINE}
 								/>
 								<text
 									x={-8} y={yScale()(tick)}
 									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted text-[10px]"
+									class="fill-muted font-mono text-[10px] tabular-nums"
 								>
 									{formatCompact(tick)}
 								</text>
@@ -122,7 +134,7 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 													width={barWidth()}
 													height={Math.max(0, h())}
 													fill={series.color}
-													rx={si() === props.series.length - 1 ? 2 : 0}
+													rx={0}
 												/>
 											);
 										}}
@@ -142,7 +154,7 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 									x={barX(i()) + barWidth() / 2}
 									y={ch() + 16}
 									text-anchor="middle"
-									class="fill-muted text-[10px]"
+									class="fill-muted font-mono text-[10px] tabular-nums"
 								>
 									{formatShortDate(props.x(d))}
 								</text>
@@ -156,12 +168,13 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 				<For each={props.series}>
 					{(s) => (
 						<div class="flex items-center gap-1">
-							<span class="inline-block h-2.5 w-2.5 rounded-sm" style={{ "background-color": s.color }} />
+							<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": s.color }} />
 							<span>{s.label}</span>
 						</div>
 					)}
 				</For>
 			</div>
-		</div>
+			</div>
+		</Show>
 	);
 };

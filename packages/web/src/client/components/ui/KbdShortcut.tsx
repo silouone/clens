@@ -5,7 +5,7 @@ export type KbdShortcutProps = {
 };
 
 export const KbdShortcut: Component<KbdShortcutProps> = (props) => (
-	<kbd class="ml-auto rounded border border-clens bg-surface-inset px-1 py-0.5 text-[10px] font-mono text-muted">
+	<kbd class="ml-auto rounded-none border border-clens bg-surface-inset px-1 py-0.5 text-[10px] font-mono tabular-nums text-muted">
 		{props.shortcut}
 	</kbd>
 );

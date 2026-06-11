@@ -1,7 +1,8 @@
-import { createMemo, For, type Component } from "solid-js";
+import { createMemo, For, Show, type Component } from "solid-js";
 import type { BaseChartProps } from "./shared";
 import { formatCompact } from "./shared";
 import { hideTooltip, showTooltip } from "./ChartTooltip";
+import { ChartEmpty } from "./ChartEmpty";
 
 interface DonutSegment {
 	readonly label: string;
@@ -69,9 +70,15 @@ export const DonutChart: Component<DonutChartProps> = (props) => {
 	});
 
 	return (
+		<Show
+			when={total() > 0}
+			fallback={<ChartEmpty height={size()} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+		>
 		<div class={`flex items-center gap-4 ${props.class ?? ""}`}>
 			<svg
 				width={size()} height={size()}
+				viewBox={`0 0 ${size()} ${size()}`}
+				class="overflow-visible"
 				role="img" aria-label={props.ariaLabel}
 			>
 				<For each={arcs()}>
@@ -103,14 +110,14 @@ export const DonutChart: Component<DonutChartProps> = (props) => {
 						<text
 							x={cx()} y={cy() - 6}
 							text-anchor="middle" dominant-baseline="middle"
-							class="fill-muted text-[10px]"
+							class="fill-muted instrument-microcaps text-[10px]"
 						>
 							{props.centerLabel}
 						</text>
 						<text
 							x={cx()} y={cy() + 10}
 							text-anchor="middle" dominant-baseline="middle"
-							class="fill-primary text-sm font-semibold"
+							class="fill-primary font-mono text-sm font-semibold tabular-nums"
 						>
 							{props.centerValue ?? ""}
 						</text>
@@ -124,15 +131,16 @@ export const DonutChart: Component<DonutChartProps> = (props) => {
 					{(seg) => (
 						<div class="flex items-center gap-1.5">
 							<span
-								class="inline-block h-2.5 w-2.5 rounded-sm flex-shrink-0"
+								class="inline-block h-2.5 w-2.5 rounded-[2px] flex-shrink-0"
 								style={{ "background-color": seg.color }}
 							/>
-							<span class="text-muted">{seg.label}</span>
-							<span class="ml-auto font-medium text-secondary">{fmtVal()(seg.value)}</span>
+							<span class="instrument-microcaps text-[10px] text-muted">{seg.label}</span>
+							<span class="ml-auto font-mono tabular-nums text-secondary">{fmtVal()(seg.value)}</span>
 						</div>
 					)}
 				</For>
 			</div>
 		</div>
+		</Show>
 	);
 };

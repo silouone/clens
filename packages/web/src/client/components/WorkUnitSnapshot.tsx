@@ -4,7 +4,7 @@ import type { WorkUnitDetailSession } from "../lib/stores";
 import { Card } from "./ui/Card";
 import { MetaRow } from "./ui/MetaRow";
 import { formatDuration, formatCost } from "../lib/format";
-import { LIFECYCLE_LABELS, LIFECYCLE_COLORS } from "../lib/work-unit-constants";
+import { LIFECYCLE_LABELS } from "../lib/work-unit-constants";
 import {
 	distilledSessions,
 	aggregateBacktracks,
@@ -38,9 +38,9 @@ export const WorkUnitSnapshot: Component<WorkUnitSnapshotProps> = (props) => {
 			<Show when={props.unit.spec_path}>
 				{(path) => (
 					<div class="mb-3">
-						<div class="flex items-center gap-2 rounded-md bg-violet-50 px-3 py-1.5 dark:bg-violet-900/20">
-							<span class="text-xs font-medium text-violet-600 dark:text-violet-400">Spec</span>
-							<span class="truncate font-mono text-xs text-violet-700 dark:text-violet-300" title={path()}>
+						<div class="flex items-center gap-2 rounded-none border border-clens bg-surface-inset px-3 py-1.5">
+							<span class="instrument-microcaps text-[10px] text-brand-500">Spec</span>
+							<span class="truncate font-mono text-xs text-secondary" title={path()}>
 								{path()}
 							</span>
 						</div>
@@ -52,11 +52,11 @@ export const WorkUnitSnapshot: Component<WorkUnitSnapshotProps> = (props) => {
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 				{/* Left: Identity */}
 				<div class="space-y-2">
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+					<h3 class="instrument-microcaps text-[10px] text-muted">
 						Work Unit
 					</h3>
 					<div class="flex items-center gap-2">
-						<span class={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${LIFECYCLE_COLORS[props.unit.lifecycle]}`}>
+						<span class="instrument-microcaps inline-flex items-center rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-muted">
 							{LIFECYCLE_LABELS[props.unit.lifecycle]}
 						</span>
 					</div>
@@ -68,7 +68,7 @@ export const WorkUnitSnapshot: Component<WorkUnitSnapshotProps> = (props) => {
 
 				{/* Center: Outcome */}
 				<div class="space-y-2">
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+					<h3 class="instrument-microcaps text-[10px] text-muted">
 						Outcome
 					</h3>
 					<div class="space-y-1">
@@ -80,7 +80,7 @@ export const WorkUnitSnapshot: Component<WorkUnitSnapshotProps> = (props) => {
 
 				{/* Right: Facts */}
 				<div class="space-y-2">
-					<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+					<h3 class="instrument-microcaps text-[10px] text-muted">
 						Facts
 					</h3>
 					<div class="space-y-1">

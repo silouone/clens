@@ -17,7 +17,7 @@ export const ProjectDropdown = () => (
 				onChange={(e) =>
 					setSelectedProjectId(e.currentTarget.value === "all" ? undefined : e.currentTarget.value)
 				}
-				class="appearance-none rounded-md border border-clens bg-surface-raised py-1 pl-2.5 pr-7 text-xs font-medium text-primary transition focus:border-brand-500 focus:outline-none cursor-pointer hover:bg-surface-hover"
+				class="appearance-none rounded-none border border-clens bg-surface-raised py-1 pl-2.5 pr-7 text-xs font-medium text-primary transition focus:border-brand-500 focus:outline-none cursor-pointer hover:bg-surface-hover"
 			>
 				<option value="all">All Projects</option>
 				<For each={projectList() ?? []}>

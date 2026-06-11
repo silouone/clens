@@ -108,7 +108,8 @@ export const SettingsPage: Component = () => {
 		<PageShell>
 			<div class="flex-1 overflow-y-auto scrollbar-hidden">
 				<div class="mx-auto w-full max-w-4xl px-6 py-8 lg:px-8">
-					<h1 class="text-lg font-semibold text-primary mb-8">Settings</h1>
+					<h1 class="text-lg font-semibold text-primary">Settings</h1>
+					<div class="instrument-ruler mt-1.5 mb-8 w-40" />
 
 					<div class="space-y-8">
 						{/* ── Section 1: Appearance ─────────────────────────── */}
@@ -200,7 +201,7 @@ export const SettingsPage: Component = () => {
 											<SettingRow label="Capture enabled" description="Enable or disable hook event capture">
 												<div class="flex items-center gap-3">
 													<Show when={configSaved()}>
-														<span class="text-xs text-green-600 dark:text-green-400 animate-fade-in">Saved</span>
+														<span class="instrument-microcaps text-[10px] text-success animate-fade-in">Saved</span>
 													</Show>
 													<Toggle
 														checked={config().capture}
@@ -224,12 +225,12 @@ export const SettingsPage: Component = () => {
 						{/* ── Section 4: Server Info ─────────────────────────── */}
 						<SettingsSection title="Server Info">
 							<SettingRow label="Server port">
-								<span class="text-sm text-secondary tabular-nums">
+								<span class="font-mono text-sm text-secondary tabular-nums">
 									{window.location.port || "80"}
 								</span>
 							</SettingRow>
 							<SettingRow label="Origin">
-								<span class="text-sm text-secondary truncate max-w-[300px]" title={window.location.origin}>
+								<span class="font-mono text-sm text-secondary truncate max-w-[300px]" title={window.location.origin}>
 									{window.location.origin}
 								</span>
 							</SettingRow>
@@ -238,7 +239,7 @@ export const SettingsPage: Component = () => {
 						{/* ── Section 5: Data Management ────────────────────── */}
 						<SettingsSection title="Data Management">
 							<SettingRow label="Local storage usage" description="Approximate size of stored preferences">
-								<span class="text-sm text-secondary tabular-nums">
+								<span class="font-mono text-sm text-secondary tabular-nums">
 									{getStorageSize()}
 								</span>
 							</SettingRow>
@@ -246,7 +247,7 @@ export const SettingsPage: Component = () => {
 								<Button
 									variant="secondary"
 									size="sm"
-									class="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+									class="text-danger hover:bg-surface-hover"
 									onClick={() => {
 										resetPreferences();
 										setThemeMode("system");

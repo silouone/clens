@@ -8,45 +8,58 @@ export interface BaseChartProps {
 }
 
 // ── Color palette ──────────────────────────────────────────────────
+//
+// INSTRUMENT direction: traces derive from the token palette so light
+// (paper/graphite) and dark (instrument-black/phosphor) modes both work.
+// Signal green is reserved for primary/live series; amber for secondary
+// warnings; danger red strictly for failures. Remaining series fall back
+// to a muted graphite ramp so multi-series charts stay legible without a
+// rainbow. Inline SVG reads these as fill/stroke, so CSS vars are used
+// directly.
 
 export const CHART_COLORS = {
-	blue: "#3B82F6",
-	violet: "#8B5CF6",
-	emerald: "#10B981",
-	amber: "#F59E0B",
-	pink: "#EC4899",
-	red: "#EF4444",
-	orange: "#F97316",
-	gray: "#6B7280",
-	slate: "#94A3B8",
+	// Primary signal trace
+	blue: "var(--clens-brand)",
+	// Secondary graphite traces
+	violet: "var(--clens-text-secondary)",
+	emerald: "var(--clens-brand)",
+	slate: "var(--clens-text-muted)",
+	gray: "var(--clens-tick)",
+	// Status traces
+	amber: "var(--clens-warning)",
+	orange: "var(--clens-warning)",
+	red: "var(--clens-danger)",
+	pink: "var(--clens-text-muted)",
 } as const;
 
+// Distinct graphite/green/amber tones for stacked token series — kept
+// separable without leaving the instrument palette.
 export const TOKEN_COLORS = {
-	input: CHART_COLORS.blue,
-	output: CHART_COLORS.violet,
-	cache_read: CHART_COLORS.emerald,
-	cache_create: CHART_COLORS.amber,
+	input: "var(--clens-brand)",
+	output: "var(--clens-text-secondary)",
+	cache_read: "var(--clens-text-muted)",
+	cache_create: "var(--clens-warning)",
 } as const;
 
 export const BACKTRACK_COLORS = {
-	failure_retry: CHART_COLORS.red,
-	iteration_struggle: CHART_COLORS.amber,
-	debugging_loop: CHART_COLORS.orange,
+	failure_retry: "var(--clens-danger)",
+	iteration_struggle: "var(--clens-warning)",
+	debugging_loop: "var(--clens-text-secondary)",
 } as const;
 
 export const REASONING_COLORS: Readonly<Record<string, string>> = {
-	planning: CHART_COLORS.blue,
-	debugging: CHART_COLORS.red,
-	research: CHART_COLORS.emerald,
-	deciding: CHART_COLORS.violet,
-	general: CHART_COLORS.gray,
-	unclassified: CHART_COLORS.slate,
+	planning: "var(--clens-brand)",
+	debugging: "var(--clens-danger)",
+	research: "var(--clens-text-secondary)",
+	deciding: "var(--clens-text-muted)",
+	general: "var(--clens-tick)",
+	unclassified: "var(--clens-tick)",
 } as const;
 
 export const DRIFT_COLORS = {
-	good: CHART_COLORS.emerald,
-	warn: CHART_COLORS.amber,
-	bad: CHART_COLORS.red,
+	good: "var(--clens-success)",
+	warn: "var(--clens-warning)",
+	bad: "var(--clens-danger)",
 } as const;
 
 // ── Scale helpers ──────────────────────────────────────────────────
@@ -99,3 +112,19 @@ export const CHART_PADDING = {
 } as const;
 
 export type ChartPadding = typeof CHART_PADDING;
+
+// ── Instrument trace tokens (inline SVG) ────────────────────────────
+
+/** Hairline graticule / axis rule color. */
+export const CHART_HAIRLINE = "var(--clens-hairline)";
+/** Trace/series fallback when none supplied. */
+export const CHART_TRACE = "var(--clens-brand)";
+/** Surface a point/line is stroked against (instrument black/paper). */
+export const CHART_SURFACE = "var(--clens-surface-overlay)";
+
+/**
+ * Cap a single/sparse-series band so one datapoint does not fill the whole
+ * plot. Bars/columns are clamped to this max so a lone bar reads as a tick,
+ * not a wall.
+ */
+export const MAX_BAND = 56;

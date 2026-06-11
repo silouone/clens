@@ -13,29 +13,31 @@ const formatTime = (t: number): string => {
 
 // ── Event Config ────────────────────────────────────────────────────
 
+// Instrument palette: graphite/phosphor by default, signal-green for OK/result,
+// amber for warnings/in-progress, danger red strictly for failures.
 const EVENT_CONFIG: Readonly<Record<string, {
 	readonly label: string
 	readonly color: string
 	readonly icon: string
 }>> = {
-	SessionStart:       { label: "Session",    color: "text-blue-500",    icon: "S" },
-	SessionEnd:         { label: "End",        color: "text-gray-500",    icon: "X" },
-	UserPromptSubmit:   { label: "Prompt",     color: "text-violet-500",  icon: "U" },
-	PreToolUse:         { label: "Tool",       color: "text-sky-500",     icon: "T" },
-	PostToolUse:        { label: "Result",     color: "text-emerald-500", icon: "+" },
-	PostToolUseFailure: { label: "Failure",    color: "text-red-500",     icon: "!" },
-	SubagentStart:      { label: "Agent",      color: "text-purple-500",  icon: "A" },
-	SubagentStop:       { label: "Agent End",  color: "text-purple-400",  icon: "a" },
-	PermissionRequest:  { label: "Permission", color: "text-amber-500",   icon: "P" },
-	Stop:               { label: "Stop",       color: "text-red-400",     icon: "X" },
-	PreCompact:         { label: "Compact",    color: "text-gray-400",    icon: "C" },
-	TaskCompleted:      { label: "Task",       color: "text-emerald-400", icon: "D" },
-	TeammateIdle:       { label: "Idle",       color: "text-gray-400",    icon: "I" },
-	InstructionsLoaded: { label: "Config",     color: "text-gray-400",    icon: "L" },
-	ConfigChange:       { label: "Config",     color: "text-gray-400",    icon: "C" },
-	Notification:       { label: "Notice",     color: "text-gray-400",    icon: "N" },
-	WorktreeCreate:     { label: "Worktree",   color: "text-teal-500",    icon: "W" },
-	WorktreeRemove:     { label: "Worktree",   color: "text-teal-400",    icon: "w" },
+	SessionStart:       { label: "Session",    color: "text-secondary",          icon: "S" },
+	SessionEnd:         { label: "End",        color: "text-muted",              icon: "X" },
+	UserPromptSubmit:   { label: "Prompt",     color: "text-secondary",          icon: "U" },
+	PreToolUse:         { label: "Tool",       color: "text-secondary",          icon: "T" },
+	PostToolUse:        { label: "Result",     color: "text-[var(--clens-success)]", icon: "+" },
+	PostToolUseFailure: { label: "Failure",    color: "text-[var(--clens-danger)]",  icon: "!" },
+	SubagentStart:      { label: "Agent",      color: "text-secondary",          icon: "A" },
+	SubagentStop:       { label: "Agent End",  color: "text-muted",              icon: "a" },
+	PermissionRequest:  { label: "Permission", color: "text-[var(--clens-warning)]", icon: "P" },
+	Stop:               { label: "Stop",       color: "text-[var(--clens-danger)]",  icon: "X" },
+	PreCompact:         { label: "Compact",    color: "text-muted",              icon: "C" },
+	TaskCompleted:      { label: "Task",       color: "text-[var(--clens-success)]", icon: "D" },
+	TeammateIdle:       { label: "Idle",       color: "text-muted",              icon: "I" },
+	InstructionsLoaded: { label: "Config",     color: "text-muted",              icon: "L" },
+	ConfigChange:       { label: "Config",     color: "text-muted",              icon: "C" },
+	Notification:       { label: "Notice",     color: "text-muted",              icon: "N" },
+	WorktreeCreate:     { label: "Worktree",   color: "text-secondary",          icon: "W" },
+	WorktreeRemove:     { label: "Worktree",   color: "text-muted",              icon: "w" },
 }
 
 // ── Sub-components ──────────────────────────────────────────────────
@@ -43,32 +45,32 @@ const EVENT_CONFIG: Readonly<Record<string, {
 const KpiChip: Component<{ readonly label: string; readonly value: string; readonly variant?: "danger" }> = (props) => (
 	<div class="flex flex-col items-center">
 		<span
-			class="text-sm font-semibold tabular-nums"
+			class="font-mono text-sm font-semibold tabular-nums"
 			classList={{
 				"text-primary": !props.variant,
-				"text-red-600 dark:text-red-400": props.variant === "danger",
+				"text-[var(--clens-danger)]": props.variant === "danger",
 			}}
 		>
 			{props.value}
 		</span>
-		<span class="text-[10px] text-muted uppercase">{props.label}</span>
+		<span class="instrument-microcaps text-[10px] text-muted">{props.label}</span>
 	</div>
 )
 
 const LiveHeader: Component<{ readonly state: LiveSessionState; readonly elapsed: number }> = (props) => (
-	<div class="flex items-center gap-4 rounded-lg border border-clens bg-surface-raised shadow-card px-4 py-3">
-		{/* Status indicator */}
+	<div class="flex items-center gap-4 rounded-none border border-clens bg-surface-raised px-4 py-3">
+		{/* Status indicator — square phosphor LED, pulsing while live */}
 		<div class="flex items-center gap-2">
 			<Show
 				when={props.state.status !== "complete"}
-				fallback={<span class="h-2 w-2 rounded-full bg-gray-400" />}
+				fallback={<span class="instrument-led bg-muted" />}
 			>
-				<span class="relative flex h-2.5 w-2.5">
-					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-					<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+				<span class="relative flex h-[7px] w-[7px]">
+					<span class="absolute inline-flex h-full w-full animate-ping bg-brand-500" style={{ "border-radius": "1px" }} />
+					<span class="instrument-led instrument-led--live relative bg-brand-500" />
 				</span>
 			</Show>
-			<span class="text-xs font-medium text-muted uppercase">
+			<span class="instrument-microcaps text-xs text-muted">
 				{props.state.status}
 			</span>
 		</div>
@@ -96,27 +98,27 @@ const LiveHeader: Component<{ readonly state: LiveSessionState; readonly elapsed
 )
 
 const AgentTreeSection: Component<{ readonly agents: ReadonlyMap<string, LiveAgentState> }> = (props) => (
-	<div class="rounded-lg border border-clens bg-surface-raised shadow-card p-3">
-		<h3 class="text-xs font-medium text-muted uppercase mb-2">Agents</h3>
+	<div class="rounded-none border border-clens bg-surface-raised p-3">
+		<h3 class="instrument-microcaps text-[10px] text-muted mb-2">Agents</h3>
 		<Show
 			when={props.agents.size > 0}
-			fallback={<span class="text-xs text-gray-400">Solo session</span>}
+			fallback={<span class="text-xs text-muted">Solo session</span>}
 		>
 			<div class="flex flex-col gap-1.5">
 				<For each={[...props.agents.values()]}>
 					{(agent) => (
 						<div class="flex items-center gap-2 text-xs">
 							<span
-								class="h-1.5 w-1.5 rounded-full shrink-0"
+								class="instrument-led shrink-0"
 								classList={{
-									"bg-emerald-500": agent.status === "running",
-									"bg-gray-400": agent.status === "stopped",
+									"bg-brand-500": agent.status === "running",
+									"bg-muted": agent.status === "stopped",
 								}}
 							/>
 							<span class="truncate text-secondary">
 								{agent.agent_name ?? agent.agent_id.slice(0, 8)}
 							</span>
-							<span class="ml-auto text-muted">
+							<span class="ml-auto font-mono text-muted">
 								{agent.agent_type}
 							</span>
 						</div>
@@ -135,8 +137,8 @@ const FilesSection: Component<{ readonly files: ReadonlyMap<string, number> }> =
 	)
 
 	return (
-		<div class="rounded-lg border border-clens bg-surface-raised shadow-card p-3">
-			<h3 class="text-xs font-medium text-muted uppercase mb-2">
+		<div class="rounded-none border border-clens bg-surface-raised p-3">
+			<h3 class="instrument-microcaps text-[10px] text-muted mb-2">
 				Files ({props.files.size})
 			</h3>
 			<div class="flex flex-col gap-1">
@@ -146,7 +148,7 @@ const FilesSection: Component<{ readonly files: ReadonlyMap<string, number> }> =
 							<span class="truncate text-secondary font-mono flex-1" title={path}>
 								{path.split("/").pop()}
 							</span>
-							<span class="text-muted tabular-nums shrink-0">
+							<span class="font-mono text-muted tabular-nums shrink-0">
 								({count})
 							</span>
 						</div>
@@ -182,22 +184,22 @@ const extractDetail = (event: StoredEvent): string => {
 }
 
 const TimelineRow: Component<{ readonly event: StoredEvent }> = (props) => {
-	const cfg = () => EVENT_CONFIG[props.event.event] ?? { label: props.event.event, color: "text-gray-400", icon: "?" }
+	const cfg = () => EVENT_CONFIG[props.event.event] ?? { label: props.event.event, color: "text-muted", icon: "?" }
 
 	return (
 		<div
-			class="flex items-center gap-2 px-2 py-0.5 text-xs rounded hover:bg-surface-hover"
+			class="flex items-center gap-2 px-2 py-0.5 text-xs rounded-none hover:bg-surface-hover"
 			classList={{
-				"bg-red-50 dark:bg-red-950/30": props.event.event === "PostToolUseFailure",
+				"bg-surface-inset": props.event.event === "PostToolUseFailure",
 			}}
 		>
-			<span class="w-16 text-muted tabular-nums shrink-0">
+			<span class="w-16 font-mono text-muted tabular-nums shrink-0">
 				{formatTime(props.event.t)}
 			</span>
 			<span class={`w-4 text-center font-mono font-bold shrink-0 ${cfg().color}`}>
 				{cfg().icon}
 			</span>
-			<span class={`w-16 shrink-0 font-medium ${cfg().color}`}>
+			<span class={`instrument-microcaps w-16 shrink-0 text-[10px] ${cfg().color}`}>
 				{cfg().label}
 			</span>
 			<span class="text-secondary font-mono truncate">
@@ -231,14 +233,14 @@ const LiveTimeline: Component<{
 	}
 
 	return (
-		<div class="flex flex-col h-full rounded-lg border border-clens bg-surface-raised shadow-card">
+		<div class="flex flex-col h-full rounded-none border border-clens bg-surface-raised">
 			<div class="flex items-center justify-between px-3 py-2 border-b border-clens">
-				<h3 class="text-xs font-medium text-muted uppercase">
+				<h3 class="instrument-microcaps text-[10px] text-muted">
 					Live Timeline
 				</h3>
 				<Show when={!autoScroll()}>
 					<button
-						class="text-[10px] text-blue-500 hover:text-blue-600"
+						class="instrument-microcaps text-[10px] text-brand-500 hover:text-brand-600"
 						onClick={() => {
 							setAutoScroll(true)
 							scrollRef?.scrollTo({ top: scrollRef.scrollHeight, behavior: "smooth" })
@@ -263,14 +265,17 @@ const LiveTimeline: Component<{
 
 				<For each={[...props.pendingTools.entries()]}>
 					{([_toolUseId, tool]) => (
-						<div class="flex items-center gap-2 px-2 py-1 text-xs text-amber-600 dark:text-amber-400 animate-pulse">
-							<span class="w-16 text-muted tabular-nums shrink-0">
+						<div class="flex items-center gap-2 px-2 py-1 text-xs text-[var(--clens-warning)] animate-pulse">
+							<span class="w-16 font-mono text-muted tabular-nums shrink-0">
 								{formatTime(tool.started_at)}
 							</span>
-							<span class="h-3 w-3 animate-spin rounded-full border-2 border-amber-400 border-t-transparent shrink-0" />
+							<span
+								class="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent shrink-0"
+								style={{ "border-color": "var(--clens-warning)", "border-top-color": "transparent" }}
+							/>
 							<span class="font-medium">{tool.name}</span>
 							<Show when={tool.file_path}>
-								<span class="text-gray-400 font-mono truncate">{tool.file_path}</span>
+								<span class="text-muted font-mono truncate">{tool.file_path}</span>
 							</Show>
 						</div>
 					)}
@@ -281,8 +286,8 @@ const LiveTimeline: Component<{
 }
 
 const UserPromptsSection: Component<{ readonly prompts: readonly string[] }> = (props) => (
-	<div class="rounded-lg border border-clens bg-surface-raised shadow-card p-3">
-		<h3 class="text-xs font-medium text-muted uppercase mb-2">
+	<div class="rounded-none border border-clens bg-surface-raised p-3">
+		<h3 class="instrument-microcaps text-[10px] text-muted mb-2">
 			User Prompts ({props.prompts.length})
 		</h3>
 		<div class="flex flex-col gap-1.5">

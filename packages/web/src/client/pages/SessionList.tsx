@@ -27,14 +27,14 @@ const formatSize = (bytes: number): string => {
 
 const SkeletonRow: Component = () => (
 	<tr class="animate-pulse">
-		<td class="px-4 py-2"><div class="h-4 w-40 rounded bg-surface-muted" /></td>
-		<td class="px-4 py-2"><div class="h-4 w-16 rounded bg-surface-muted" /></td>
-		<td class="px-4 py-2"><div class="h-4 w-12 rounded bg-surface-muted" /></td>
-		<td class="px-4 py-2"><div class="h-4 w-10 rounded bg-surface-muted" /></td>
-		<td class="px-4 py-2"><div class="h-4 w-10 rounded bg-surface-muted" /></td>
-		<td class="px-4 py-2"><div class="h-4 w-14 rounded bg-surface-muted" /></td>
-		<td class="px-4 py-2"><div class="h-4 w-20 rounded bg-surface-muted" /></td>
-		<td class="px-4 py-2"><div class="h-4 w-16 rounded bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-40 rounded-none bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-16 rounded-none bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-12 rounded-none bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-10 rounded-none bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-10 rounded-none bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-14 rounded-none bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-20 rounded-none bg-surface-muted" /></td>
+		<td class="px-4 py-2"><div class="h-4 w-16 rounded-none bg-surface-muted" /></td>
 		<td class="w-8 px-2 py-2" />
 	</tr>
 );
@@ -53,11 +53,11 @@ const LoadingSkeleton: Component = () => (
 
 const EmptyState: Component = () => (
 	<tr>
-		<td colspan="9" class="px-4 py-12 text-center text-gray-500">
+		<td colspan="9" class="px-4 py-12 text-center text-muted">
 			<div class="flex flex-col items-center gap-2">
 				<TelescopeIllustration class="h-12 w-12 text-muted" />
-				<p class="text-lg font-medium">No sessions found</p>
-				<p class="text-sm">
+				<p class="instrument-microcaps text-sm text-secondary">No sessions found</p>
+				<p class="text-xs">
 					Run a Claude Code session with cLens hooks to capture data.
 				</p>
 			</div>
@@ -196,17 +196,17 @@ const SortableHeader: Component<{
 
 	return (
 		<th
-			class={`px-4 py-3 font-medium cursor-pointer select-none transition hover:text-secondary ${alignClass()} ${
+			class={`instrument-microcaps px-4 py-2.5 cursor-pointer select-none transition hover:text-secondary ${alignClass()} ${
 				isActive() ? "text-primary" : ""
 			}`}
 			onClick={() => props.onSort(props.field)}
 		>
 			{props.label}
 			<Show when={isAsc()}>
-				<ArrowUp class="ml-0.5 inline h-3 w-3 text-brand-500 dark:text-brand-400" />
+				<ArrowUp class="ml-0.5 inline h-3 w-3 text-brand-500" />
 			</Show>
 			<Show when={isDesc()}>
-				<ArrowDown class="ml-0.5 inline h-3 w-3 text-brand-500 dark:text-brand-400" />
+				<ArrowDown class="ml-0.5 inline h-3 w-3 text-brand-500" />
 			</Show>
 		</th>
 	);
@@ -470,9 +470,9 @@ export const SessionList: Component = () => {
 			{/* Error banner */}
 			<Show when={globalError()}>
 				{(err) => (
-					<div class="mt-3 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-600 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400">
-						<span>{err().message}</span>
-						<button onClick={clearError} class="ml-4 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300">
+					<div class="mt-3 flex items-center justify-between rounded-none border-l-2 border-[var(--clens-danger)] bg-surface-inset px-3 py-1.5 text-xs text-[var(--clens-danger)]">
+						<span class="font-mono">{err().message}</span>
+						<button onClick={clearError} class="instrument-microcaps ml-4 text-[10px] text-muted hover:text-[var(--clens-danger)]">
 							Dismiss
 						</button>
 					</div>
@@ -509,12 +509,12 @@ export const SessionList: Component = () => {
 				/>
 				<Show when={dateFilter()}>
 					<div class="flex items-center gap-2 border-b border-clens bg-surface-inset px-4 py-1.5 text-xs text-secondary">
-						<span>
-							Showing sessions from <span class="font-mono font-medium">{dateFilter()}</span>
+						<span class="instrument-microcaps text-[10px] text-muted">
+							Showing sessions from <span class="font-mono text-xs tabular-nums normal-case text-secondary">{dateFilter()}</span>
 						</span>
 						<button
 							type="button"
-							class="rounded border border-clens px-1.5 py-0.5 text-muted hover:text-primary"
+							class="instrument-microcaps rounded-none border border-clens px-1.5 py-0.5 text-[10px] text-muted transition hover:border-brand-500 hover:text-primary"
 							onClick={() => { setDateFilter(undefined); setPage(1); setSelectedRow(-1); }}
 						>
 							Clear ✕
@@ -544,14 +544,14 @@ export const SessionList: Component = () => {
 					<Show
 						when={filteredWorkUnits().length > 0}
 						fallback={
-							<div class="flex flex-col items-center gap-2 py-12 text-gray-500">
+							<div class="flex flex-col items-center gap-2 py-12 text-muted">
 								<Layers class="h-8 w-8 text-muted" />
-								<p class="text-lg font-medium">No work units found</p>
-								<p class="text-sm">Distill sessions with spec files to generate work units.</p>
+								<p class="instrument-microcaps text-sm text-secondary">No work units found</p>
+								<p class="text-xs">Distill sessions with spec files to generate work units.</p>
 							</div>
 						}
 					>
-						<div class="overflow-hidden rounded-lg border border-clens">
+						<div class="overflow-hidden rounded-none border border-clens">
 							<For each={filteredWorkUnits()}>
 								{(unit) => <WorkUnitCard unit={unit} />}
 							</For>
@@ -562,22 +562,22 @@ export const SessionList: Component = () => {
 
 			{/* Sessions Table */}
 			<Show when={viewMode() === "sessions"}>
-			<div class="mt-3 overflow-x-auto rounded-lg border border-clens">
+			<div class="mt-3 overflow-x-auto rounded-none border border-clens">
 				<table class="w-full text-left text-sm">
-					<thead class="border-b border-clens bg-surface-inset text-xs uppercase text-muted">
+					<thead class="border-b border-clens bg-surface-inset text-[10px] text-muted">
 						<tr>
 							<SortableHeader label="Name" field="session_name" sort={sortState()} onSort={handleSort} />
 							<Show when={isGlobalMode()}>
-								<th class="px-4 py-3 font-medium">Project</th>
+								<th class="instrument-microcaps px-4 py-2.5">Project</th>
 							</Show>
-							<th class="px-4 py-3 font-medium">Status</th>
+							<th class="instrument-microcaps px-4 py-2.5">Status</th>
 							<SortableHeader label="Duration" field="duration_ms" sort={sortState()} onSort={handleSort} align="right" />
 							<SortableHeader label="Events" field="event_count" sort={sortState()} onSort={handleSort} align="right" />
 							<SortableHeader label="Agents" field="agent_count" sort={sortState()} onSort={handleSort} align="right" />
 							<SortableHeader label="Size" field="file_size_bytes" sort={sortState()} onSort={handleSort} align="right" />
-							<th class="px-4 py-3 font-medium">Branch</th>
+							<th class="instrument-microcaps px-4 py-2.5">Branch</th>
 							<SortableHeader label="When" field="start_time" sort={sortState()} onSort={handleSort} />
-							<th class="w-8 px-2 py-3"><span class="sr-only">Open</span></th>
+							<th class="w-8 px-2 py-2.5"><span class="sr-only">Open</span></th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-clens">
@@ -594,9 +594,9 @@ export const SessionList: Component = () => {
 												}
 											}}
 											tabIndex={0}
-											class={`cursor-pointer transition even:bg-surface-muted/30 ${
+											class={`cursor-pointer transition ${
 												selectedRow() === idx()
-													? "bg-brand-50 dark:bg-brand-900/20"
+													? "bg-surface-selected shadow-[inset_2px_0_0_0_var(--clens-brand)]"
 													: "hover:bg-surface-hover"
 											}`}
 										>
@@ -604,13 +604,13 @@ export const SessionList: Component = () => {
 												<div class="flex items-center gap-2">
 													<A
 														href={`/session/${session.session_id}`}
-														class="font-mono hover:underline"
+														class="font-mono text-secondary hover:text-brand-500 hover:underline"
 														onClick={(e: MouseEvent) => e.stopPropagation()}
 													>
 														{session.session_name ?? session.session_id.slice(0, 8)}
 													</A>
 													<Show when={session.is_distilled}>
-														<span class="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-400" title="Distilled">
+														<span class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-brand-500" title="Distilled"><span class="instrument-led bg-brand-500" />
 															analyzed
 														</span>
 													</Show>
@@ -631,17 +631,17 @@ export const SessionList: Component = () => {
 										<td class="px-4 py-2">
 												<StatusBadge status={session.status} compact />
 											</td>
-											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-secondary">
 												{formatDuration(session.duration_ms)}
 											</td>
-											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">{session.event_count}</td>
-											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-secondary">{session.event_count}</td>
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-secondary">
 												<div class="flex items-center justify-end gap-1.5">
 													{session.agent_count ?? 1}
 													<Show when={(session.agent_count ?? 0) > 1}>
 														<A
 															href={`/session/${session.session_id}?view=overview`}
-															class="inline-flex items-center gap-0.5 rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted transition hover:bg-surface-hover"
+															class="instrument-microcaps inline-flex items-center gap-0.5 rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-muted transition hover:border-brand-500 hover:text-brand-500"
 															onClick={(e: MouseEvent) => e.stopPropagation()}
 															title="View multi-agent session"
 														>
@@ -651,17 +651,17 @@ export const SessionList: Component = () => {
 													</Show>
 												</div>
 											</td>
-											<td class="px-4 py-2 text-right font-mono tabular-nums text-muted">
+											<td class="px-4 py-2 text-right font-mono tabular-nums text-secondary">
 												{formatSize(session.file_size_bytes)}
 											</td>
 											<td class="px-4 py-2">
-												<Show when={session.git_branch} fallback={<span class="text-muted">-</span>}>
-													<span class="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-xs text-muted">
+												<Show when={session.git_branch} fallback={<span class="text-muted">—</span>}>
+													<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-xs text-secondary">
 														{session.git_branch}
 													</span>
 												</Show>
 											</td>
-											<td class="px-4 py-2 font-mono text-muted">
+											<td class="px-4 py-2 font-mono tabular-nums text-muted">
 												{formatDate(session.start_time, preferences().showTimestamps)}
 											</td>
 											<td class="w-8 px-2 py-2 text-muted">
@@ -680,8 +680,8 @@ export const SessionList: Component = () => {
 			{/* Pagination */}
 			<Show when={viewMode() === "sessions" && totalPages() > 1}>
 				<div class="mt-4 flex items-center justify-between text-sm">
-					<span class="text-gray-500">
-						Page {page()} of {totalPages()}
+					<span class="instrument-microcaps flex items-baseline gap-1 text-[10px] text-muted">
+						Page <span class="font-mono text-xs tabular-nums text-secondary">{page()}</span> of <span class="font-mono text-xs tabular-nums text-secondary">{totalPages()}</span>
 					</span>
 					<div class="flex gap-2">
 						<button
@@ -690,7 +690,7 @@ export const SessionList: Component = () => {
 								setPage((p) => p - 1);
 								setSelectedRow(-1);
 							}}
-							class="rounded-md bg-surface-muted px-3 py-1 text-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+							class="instrument-microcaps rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-brand-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-clens"
 						>
 							Previous
 						</button>
@@ -700,7 +700,7 @@ export const SessionList: Component = () => {
 								setPage((p) => p + 1);
 								setSelectedRow(-1);
 							}}
-							class="rounded-md bg-surface-muted px-3 py-1 text-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+							class="instrument-microcaps rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-brand-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-clens"
 						>
 							Next
 						</button>

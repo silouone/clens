@@ -102,47 +102,47 @@ const NotDistilledState: Component<{
 
 	return (
 		<div class="flex h-full items-center justify-center">
-			<div class="max-w-md rounded-lg border border-clens bg-surface-inset p-8 text-center">
+			<div class="max-w-md rounded-none border border-clens bg-surface-inset p-8 text-center">
 				<div class="mx-auto mb-4">
-					<FlaskIllustration class="h-14 w-14 text-amber-500 dark:text-amber-400" />
+					<FlaskIllustration class="h-14 w-14 text-warning" />
 				</div>
-				<h2 class="text-sm font-semibold text-primary">Session not yet analyzed</h2>
+				<h2 class="instrument-microcaps text-sm text-secondary">Session not yet analyzed</h2>
 				<p class="mt-2 text-xs text-muted">
 					Run distillation to unlock conversation view, diffs, backtracks, and more.
 				</p>
 				<div class="mt-4 flex items-center justify-center gap-3">
-					<div class="rounded-md bg-surface-muted px-4 py-3">
-						<code class="font-mono text-xs text-emerald-600 dark:text-emerald-400">
+					<div class="rounded-none border border-clens bg-surface-inset px-4 py-3">
+						<code class="font-mono text-xs text-brand-500">
 							clens distill {props.sessionId.slice(0, 8)}
 						</code>
 					</div>
-					<span class="text-xs text-gray-400">or</span>
+					<span class="instrument-microcaps text-[10px] text-muted">or</span>
 					<button
 						onClick={handleDistill}
 						disabled={distilling()}
-						class="rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-emerald-500 dark:hover:bg-emerald-600"
+						class="instrument-microcaps rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface transition hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						{distilling() ? "Distilling..." : "Distill now"}
 					</button>
 				</div>
 				<Show when={distilling()}>
-					<div class="mt-3 flex items-center justify-center gap-2 text-xs text-gray-500">
+					<div class="mt-3 flex items-center justify-center gap-2 text-xs text-muted">
 						<Spinner size="sm" />
 						<span>Analyzing session...</span>
 					</div>
 				</Show>
 				<Show when={error()}>
 					{(e) => (
-						<p class="mt-3 text-xs text-red-500">{e()}</p>
+						<p class="mt-3 font-mono text-xs text-[var(--clens-danger)]">{e()}</p>
 					)}
 				</Show>
 				<Show when={summary()}>
 					{(s) => (
-						<div class="mt-5 flex justify-center gap-6 text-xs text-gray-500">
+						<div class="mt-5 flex justify-center gap-6 text-xs text-muted">
 							<span>{s().event_count} events</span>
 							<span>{formatDuration(s().duration_ms)}</span>
 							<Show when={s().git_branch}>
-								<span class="rounded bg-surface-muted px-1.5 py-0.5 font-mono">{s().git_branch}</span>
+								<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono">{s().git_branch}</span>
 							</Show>
 						</div>
 					)}
@@ -165,7 +165,7 @@ const AgentNotFound: Component<{
 			</p>
 			<button
 				onClick={props.onGoOverview}
-				class="mt-3 rounded-md bg-surface-muted px-3 py-1 text-xs font-medium text-secondary transition hover:bg-surface-hover"
+				class="instrument-microcaps mt-3 rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-brand-500"
 			>
 				Go to Overview
 			</button>
@@ -194,7 +194,7 @@ const StaleDistillBanner: Component<{
 			? `Analysis covers ${props.analyzedEvents} of ${props.rawEvents} events (analyzed ${formatDate(props.distilledAt, "relative")}).`
 			: `Costs were computed under a different pricing tier than the current setting.`;
 	return (
-		<div class="mx-4 mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-300">
+		<div class="mx-4 mt-3 flex items-center justify-between gap-3 rounded-none border-l-2 border-[var(--clens-warning)] bg-surface-inset px-3 py-2 text-xs text-[var(--clens-warning)]">
 			<span>
 				{message()}
 				{props.tierStale && props.rawEvents > props.analyzedEvents
@@ -209,7 +209,7 @@ const StaleDistillBanner: Component<{
 					finally { setRefreshing(false); }
 				}}
 				disabled={refreshing()}
-				class="shrink-0 rounded-md bg-amber-200 px-2 py-1 font-medium text-amber-900 transition hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700/50 dark:text-amber-100 dark:hover:bg-amber-700"
+				class="instrument-microcaps shrink-0 rounded-none border border-[var(--clens-warning)] px-2 py-1 text-[10px] text-[var(--clens-warning)] transition hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed"
 			>
 				{refreshing() ? "Re-analyzing..." : "Re-analyze"}
 			</button>
@@ -431,7 +431,7 @@ export const SessionDetail: Component = () => {
 								<Show when={liveState().status === "complete"}>
 									<div class="flex justify-center py-3">
 										<button
-											class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+											class="instrument-microcaps px-4 py-2 text-[10px] rounded-none border border-brand-500 bg-brand-500 text-surface hover:bg-brand-600 transition"
 											onClick={handleRedistill}
 										>
 											Analyze Session

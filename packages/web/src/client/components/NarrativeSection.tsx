@@ -27,8 +27,8 @@ export const NarrativeSection: Component<NarrativeSectionProps> = (props) => {
 		<Show when={hasContent()}>
 			<Card class="p-3">
 				<div class="flex items-center gap-2">
-					<BookOpen class="h-4 w-4 text-sky-500" />
-					<h3 class="text-sm font-semibold text-secondary">
+					<BookOpen class="h-4 w-4 text-muted" />
+					<h3 class="instrument-microcaps text-[11px] text-muted">
 						What Happened
 					</h3>
 				</div>

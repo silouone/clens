@@ -132,14 +132,14 @@ export const FileList: Component<FileListProps> = (props) => {
 			{/* Header row with expand/collapse toggle */}
 			<div class="flex items-center justify-between px-4 py-2.5 border-b border-clens">
 				<div class="flex items-center gap-3">
-					<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted">
+					<span class="rounded-none border border-clens bg-surface-muted px-2 py-0.5 font-mono text-[11px] tabular-nums text-muted">
 						{props.rows.length}
 					</span>
 				</div>
 				<Show when={props.rows.length > 0}>
 					<button
 						onClick={toggleAll}
-						class="rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-surface-hover hover:text-secondary text-muted"
+						class="instrument-microcaps rounded-none border border-clens px-2 py-0.5 text-[10px] text-muted transition hover:bg-surface-hover hover:text-secondary"
 					>
 						{allExpanded() ? "Collapse all" : "Expand all"}
 					</button>
@@ -150,8 +150,9 @@ export const FileList: Component<FileListProps> = (props) => {
 			<Show
 				when={props.rows.length > 0}
 				fallback={
-					<div class="py-8 text-center text-sm text-muted">
-						{props.emptyMessage ?? "No file changes detected"}
+					<div class="flex flex-col items-center gap-1 py-8 text-center">
+						<span class="instrument-microcaps text-[10px] text-muted">No data</span>
+						<span class="text-xs text-muted">{props.emptyMessage ?? "No file changes detected"}</span>
 					</div>
 				}
 			>
@@ -170,14 +171,14 @@ export const FileList: Component<FileListProps> = (props) => {
 								<div class="border-b border-clens last:border-0 overflow-hidden">
 									<button
 										onClick={() => toggleFile(row.filePath)}
-										class="flex w-full items-center gap-2 px-4 py-1.5 text-xs text-left transition hover:bg-surface-hover/30"
+										class="flex w-full items-center gap-2 px-4 py-1.5 text-xs text-left transition hover:bg-surface-hover"
 									>
 										<ChevronRight
-											class={`h-3 w-3 text-gray-400 transition-transform ${expanded() ? "rotate-90" : ""}`}
+											class={`h-3 w-3 text-muted transition-transform ${expanded() ? "rotate-90" : ""}`}
 										/>
 										<Show when={row.riskLevel && row.riskLevel !== "low"}>
 											<span
-												class={`inline-block h-2 w-2 shrink-0 rounded-full ${riskBadgeClass(row.riskLevel!)}`}
+												class={`instrument-led shrink-0 ${riskBadgeClass(row.riskLevel!)}`}
 												title={`${row.riskLevel} risk`}
 											/>
 										</Show>
@@ -188,35 +189,35 @@ export const FileList: Component<FileListProps> = (props) => {
 											{truncatePath(row.filePath)}
 										</span>
 										<Show when={row.reads > 0}>
-											<span class="font-mono text-gray-400 tabular-nums" title="files read">
+											<span class="font-mono text-muted tabular-nums" title="files read">
 												{row.reads}r
 											</span>
 										</Show>
 										<Show when={row.edits > 0}>
-											<span class="font-mono text-blue-500 tabular-nums" title="files edited">
+											<span class="font-mono text-brand-500 tabular-nums" title="files edited">
 												{row.edits}e
 											</span>
 										</Show>
 										<Show when={row.additions > 0}>
-											<span class="font-mono text-emerald-500 tabular-nums" title="lines added">
+											<span class="font-mono text-[var(--clens-success)] tabular-nums" title="lines added">
 												+{row.additions}
 											</span>
 										</Show>
 										<Show when={row.deletions > 0}>
-											<span class="font-mono text-red-500 tabular-nums" title="lines removed">
+											<span class="font-mono text-[var(--clens-danger)] tabular-nums" title="lines removed">
 												-{row.deletions}
 											</span>
 										</Show>
 										<Show when={row.additions === 0 && row.deletions === 0 && row.edits > 0}>
-											<span class="text-gray-400 text-xs">N/A</span>
+											<span class="text-muted text-xs">N/A</span>
 										</Show>
 									</button>
 									<Show when={expanded()}>
-										<div class="border-t border-clens/50 overflow-hidden">
+										<div class="border-t border-clens overflow-hidden">
 											<Show
 												when={row.diffLines.length > 0}
 												fallback={
-													<div class="px-4 py-4 text-center text-xs text-gray-400">
+													<div class="px-4 py-4 text-center text-xs text-muted">
 														{row.edits > 0
 															? "Diff not captured"
 															: "Read only \u2014 no changes"}

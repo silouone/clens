@@ -11,7 +11,7 @@ type CardProps = {
 
 export const Card: Component<CardProps> = (props) => (
 	<div
-		class={`animate-fade-in rounded-lg border border-clens bg-surface-raised shadow-card ${props.class ?? ""}`}
+		class={`animate-fade-in rounded-none border border-clens bg-surface-raised ${props.class ?? ""}`}
 		style={props.colorAccent ? { "border-left": `3px solid ${props.colorAccent}` } : undefined}
 	>
 		<Show when={props.title}>
@@ -20,10 +20,10 @@ export const Card: Component<CardProps> = (props) => (
 					<Show when={props.icon}>
 						{(Icon) => {
 							const IconComp = Icon();
-							return <IconComp class="h-4 w-4 text-muted" />;
+							return <IconComp class="h-3.5 w-3.5 text-muted" />;
 						}}
 					</Show>
-					<h3 class="text-sm font-semibold text-secondary">
+					<h3 class="instrument-microcaps text-[11px] text-muted">
 						{props.title}
 					</h3>
 				</div>

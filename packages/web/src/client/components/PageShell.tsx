@@ -8,9 +8,12 @@ export const ErrorBanner: Component<{
 	readonly message: string;
 	readonly onDismiss: () => void;
 }> = (props) => (
-	<div class="flex items-center justify-between border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400">
-		<span>{props.message}</span>
-		<button onClick={props.onDismiss} class="ml-4 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300">
+	<div class="flex items-center justify-between border-b border-clens bg-surface-raised px-4 py-2 text-sm text-[var(--clens-danger)]">
+		<span class="flex items-center gap-2">
+			<span class="instrument-led bg-[var(--clens-danger)]" aria-hidden="true" />
+			{props.message}
+		</span>
+		<button onClick={props.onDismiss} class="instrument-microcaps ml-4 text-[10px] text-muted transition hover:text-secondary">
 			Dismiss
 		</button>
 	</div>
@@ -24,7 +27,7 @@ export const LoadingSkeleton: Component<{
 	<div class="flex h-full items-center justify-center">
 		<div class="flex flex-col items-center gap-3">
 			<Spinner size="md" />
-			<span class="text-sm text-gray-500">{props.label ?? "Loading..."}</span>
+			<span class="instrument-microcaps text-[11px] text-muted">{props.label ?? "Loading…"}</span>
 		</div>
 	</div>
 );
@@ -32,7 +35,7 @@ export const LoadingSkeleton: Component<{
 // ── Skeleton block (shimmer placeholder) ─────────────────────────────
 
 export const SkeletonBlock: Component<{ readonly class?: string }> = (props) => (
-	<div class={`relative overflow-hidden rounded-md bg-surface-muted ${props.class ?? ""}`}>
+	<div class={`relative overflow-hidden rounded-none bg-surface-muted ${props.class ?? ""}`}>
 		<div class="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 	</div>
 );

@@ -13,16 +13,16 @@ type TaskListSectionProps = {
 
 const statusIcon = (status: TaskRecord["status"]) => {
 	if (status === "completed")
-		return <Check class="h-3.5 w-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />;
+		return <Check class="h-3.5 w-3.5 shrink-0 text-[var(--clens-success)]" />;
 	if (status === "in_progress")
-		return <Clock class="h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-blue-400" />;
+		return <Clock class="h-3.5 w-3.5 shrink-0 text-[var(--clens-warning)]" />;
 	return <Circle class="h-3.5 w-3.5 shrink-0 text-muted" />;
 };
 
 const completionBadgeClass = (rate: number): string => {
-	if (rate >= 1) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400";
-	if (rate >= 0.5) return "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400";
-	return "bg-surface-muted text-muted";
+	if (rate >= 1) return "border-clens bg-surface-raised text-[var(--clens-success)]";
+	if (rate >= 0.5) return "border-clens bg-surface-raised text-[var(--clens-warning)]";
+	return "border-clens bg-surface-muted text-muted";
 };
 
 // -- Task Row -------------------------------------------------------------
@@ -36,7 +36,7 @@ const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 	return (
 		<div class="group">
 			<div
-				class={`flex items-center gap-2 rounded px-1.5 py-1 text-sm ${hasDetails() ? "cursor-pointer hover:bg-surface-hover" : ""}`}
+				class={`flex items-center gap-2 rounded-none px-1.5 py-1 text-sm ${hasDetails() ? "cursor-pointer hover:bg-surface-hover" : ""}`}
 				onClick={() => hasDetails() && setExpanded((prev) => !prev)}
 			>
 				{statusIcon(props.task.status)}
@@ -54,7 +54,7 @@ const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 
 				<Show when={props.task.owner}>
 					{(owner) => (
-						<span class="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+						<span class="shrink-0 rounded-none border border-clens bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-secondary">
 							{owner()}
 						</span>
 					)}
@@ -80,7 +80,8 @@ const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 						<div class="flex flex-wrap gap-1">
 							<For each={props.task.blocked_by ?? []}>
 								{(dep) => (
-									<span class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
+									<span class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens bg-surface-raised px-1.5 py-0.5 text-[10px] text-[var(--clens-warning)]">
+										<span class="instrument-led bg-[var(--clens-warning)]" />
 										blocked by {dep}
 									</span>
 								)}
@@ -106,21 +107,21 @@ export const TaskListSection: Component<TaskListSectionProps> = (props) => {
 		<Card class="p-3">
 			{/* Header */}
 			<div class="mb-2 flex items-center gap-2">
-				<ListTodo class="h-4 w-4 text-blue-500" />
-				<h3 class="text-sm font-semibold text-secondary">
+				<ListTodo class="h-3.5 w-3.5 text-muted" />
+				<h3 class="instrument-microcaps text-[11px] text-muted">
 					Task Plan
 				</h3>
 				<span
-					class={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${completionBadgeClass(completionRate())}`}
+					class={`instrument-microcaps rounded-none border px-1.5 py-0.5 font-mono text-[10px] tabular-nums ${completionBadgeClass(completionRate())}`}
 				>
 					{completedCount()}/{totalCount()} completed
 				</span>
 			</div>
 
 			{/* Progress bar */}
-			<div class="mb-3 h-1.5 overflow-hidden rounded-full bg-surface-muted">
+			<div class="mb-3 h-1.5 overflow-hidden rounded-none border border-clens bg-surface-muted">
 				<div
-					class="h-full rounded-full bg-emerald-500 transition-all dark:bg-emerald-400"
+					class="h-full rounded-none bg-[var(--clens-success)] transition-all"
 					style={{ width: progressPct() }}
 				/>
 			</div>

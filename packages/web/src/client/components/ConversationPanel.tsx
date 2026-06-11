@@ -150,63 +150,57 @@ const parseUserPromptSegments = (raw: string): readonly TextSegment[] => {
 	return tail ? [...segments, { kind: "text" as const, value: tail }] : segments;
 };
 
-const COLOR_MAP: Readonly<Record<string, string>> = {
-	orange: "border-orange-400/50 bg-orange-950/20",
-	pink: "border-pink-400/50 bg-pink-950/20",
-	blue: "border-blue-400/50 bg-blue-950/20",
-	green: "border-emerald-400/50 bg-emerald-950/20",
-	purple: "border-violet-400/50 bg-violet-950/20",
-	red: "border-red-400/50 bg-red-950/20",
+// Teammate accent — a single restrained left-rail tick per harness color.
+// Instrument language: hairline frame + faint colored rail, never a saturated wash.
+const RAIL_COLOR_MAP: Readonly<Record<string, string>> = {
+	orange: "var(--clens-warning)",
+	pink: "var(--clens-danger)",
+	blue: "var(--clens-brand)",
+	green: "var(--clens-success)",
+	purple: "var(--clens-text-secondary)",
+	red: "var(--clens-danger)",
 };
 
-const LABEL_COLOR_MAP: Readonly<Record<string, string>> = {
-	orange: "text-orange-400",
-	pink: "text-pink-400",
-	blue: "text-blue-400",
-	green: "text-emerald-400",
-	purple: "text-violet-400",
-	red: "text-red-400",
-};
+const railColor = (color: string): string =>
+	RAIL_COLOR_MAP[color] ?? "var(--clens-tick)";
 
 const isJsonContent = (s: string): boolean =>
 	s.startsWith("{") || s.startsWith("[");
 
-const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => {
-	const borderClass = () => COLOR_MAP[props.msg.color] ?? "border-gray-500/50 bg-gray-950/20";
-	const labelClass = () => LABEL_COLOR_MAP[props.msg.color] ?? "text-gray-400";
-
-	return (
-		<div class={`rounded-lg border px-3 py-2 ${borderClass()}`}>
-			<div class="mb-1 flex items-center gap-2">
-				<span class={`text-[10px] font-semibold uppercase tracking-wider ${labelClass()}`}>
-					{props.msg.teammate_id}
-				</span>
-				<Show when={props.msg.summary}>
-					{(s) => (
-						<span class="text-[11px] text-gray-300">{s()}</span>
-					)}
-				</Show>
-			</div>
-			<Show
-				when={!isJsonContent(props.msg.content)}
-				fallback={
-					<pre class="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-gray-500">
-						{truncate(props.msg.content, 200)}
-					</pre>
-				}
-			>
-				<div class="prose-sm-dark whitespace-pre-wrap text-xs leading-relaxed text-gray-300" innerHTML={renderMd(props.msg.content)} />
+const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => (
+	<div
+		class="rounded-none border border-clens border-l-2 bg-surface-raised px-3 py-2"
+		style={{ "border-left-color": railColor(props.msg.color) }}
+	>
+		<div class="mb-1 flex items-center gap-2">
+			<span class="instrument-microcaps text-[10px] text-secondary">
+				{props.msg.teammate_id}
+			</span>
+			<Show when={props.msg.summary}>
+				{(s) => (
+					<span class="text-[11px] text-muted">{s()}</span>
+				)}
 			</Show>
 		</div>
-	);
-};
+		<Show
+			when={!isJsonContent(props.msg.content)}
+			fallback={
+				<pre class="whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted">
+					{truncate(props.msg.content, 200)}
+				</pre>
+			}
+		>
+			<div class="prose-sm-dark whitespace-pre-wrap text-xs leading-relaxed text-secondary" innerHTML={renderMd(props.msg.content)} />
+		</Show>
+	</div>
+);
 
 const CommandCard: Component<{ readonly cmd: CommandInvocation }> = (props) => (
-	<div class="flex items-center gap-2 rounded-lg border border-gray-600/40 bg-gray-900/40 px-3 py-1.5">
-		<Terminal class="h-3 w-3 shrink-0 text-gray-400" />
-		<span class="font-mono text-[11px] font-medium text-gray-300">{props.cmd.command_name.startsWith("/") ? props.cmd.command_name : `/${props.cmd.command_name}`}</span>
+	<div class="flex items-center gap-2 rounded-none border border-clens bg-surface-inset px-3 py-1.5">
+		<Terminal class="h-3 w-3 shrink-0 text-muted" />
+		<span class="font-mono text-[11px] font-medium text-secondary">{props.cmd.command_name.startsWith("/") ? props.cmd.command_name : `/${props.cmd.command_name}`}</span>
 		<Show when={props.cmd.command_args}>
-			<span class="truncate font-mono text-[11px] text-gray-500">{props.cmd.command_args}</span>
+			<span class="truncate font-mono text-[11px] text-muted">{props.cmd.command_args}</span>
 		</Show>
 	</div>
 );
@@ -218,20 +212,20 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 	const hasStructured = () => segments().some((s) => s.kind !== "text");
 
 	return (
-		<div class="flex gap-3 py-3 ml-4 pl-4 border-l-2 border-l-blue-400 dark:border-l-blue-500">
-			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40">
-				<User class="h-3 w-3 text-blue-600 dark:text-blue-400" />
+		<div class="flex gap-3 py-3 ml-4 pl-4 border-l-2 border-l-[var(--clens-text-secondary)]">
+			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-clens bg-surface-muted">
+				<User class="h-3 w-3 text-secondary" />
 			</div>
 			<div class="min-w-0 flex-1">
 				<div class="mb-1 flex items-center gap-2">
-					<span class="text-xs font-semibold text-blue-700 dark:text-blue-300">User</span>
-					<span class="font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+					<span class="instrument-microcaps text-[11px] text-secondary">User</span>
+					<span class="font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
 				</div>
 				<Show
 					when={hasStructured()}
 					fallback={
 						/* Raw user input — verbatim, never markdown (bug B16) */
-						<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderPlainText(props.entry.text)} />
+						<div class="prose-sm-dark whitespace-pre-wrap rounded-none border border-clens bg-surface-inset px-3 py-2 text-xs leading-relaxed text-secondary" innerHTML={renderPlainText(props.entry.text)} />
 					}
 				>
 					<div class="flex flex-col gap-2">
@@ -241,7 +235,7 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 									<Match when={seg.kind === "text" && seg}>
 										{(s) => (
 											/* Raw user input — verbatim, never markdown (bug B16) */
-											<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderPlainText((s() as TextSegment & { kind: "text" }).value)} />
+											<div class="prose-sm-dark whitespace-pre-wrap rounded-none border border-clens bg-surface-inset px-3 py-2 text-xs leading-relaxed text-secondary" innerHTML={renderPlainText((s() as TextSegment & { kind: "text" }).value)} />
 										)}
 									</Match>
 									<Match when={seg.kind === "teammate" && seg}>
@@ -269,8 +263,8 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 	const hasText = () => props.entry.text.trim().length > 0;
 
 	return (
-		<div class="flex gap-3 py-2 ml-4 pl-4 border-l-2 border-l-gray-300 dark:border-l-gray-700">
-			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-muted">
+		<div class="flex gap-3 py-2 ml-4 pl-4 border-l-2 border-l-clens">
+			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-clens bg-surface-muted">
 				<Brain class="h-3 w-3 text-muted" />
 			</div>
 			<div class="min-w-0 flex-1">
@@ -306,12 +300,12 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 };
 
 const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool_call" } }> = (props) => (
-	<div class="flex items-center gap-3 py-1.5 ml-8 pl-4 border-l-2 border-l-emerald-400 dark:border-l-emerald-600">
-		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
-			<Terminal class="h-3 w-3 text-violet-600 dark:text-violet-400" />
+	<div class="flex items-center gap-3 py-1.5 ml-8 pl-4 border-l-2 border-l-clens">
+		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-clens bg-surface-muted">
+			<Terminal class="h-3 w-3 text-secondary" />
 		</div>
 		<div class="flex min-w-0 flex-1 items-center gap-2">
-			<span class="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+			<span class="shrink-0 rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-[11px] font-medium text-secondary">
 				{props.entry.tool_name}
 			</span>
 			<Show when={props.entry.file_path}>
@@ -321,7 +315,7 @@ const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool
 					</span>
 				)}
 			</Show>
-			<span class="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+			<span class="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
 		</div>
 	</div>
 );
@@ -330,19 +324,19 @@ const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "to
 	const isSuccess = () => props.entry.outcome === "success";
 
 	return (
-		<div class="flex items-center gap-3 py-1 ml-8 pl-4 border-l-2 border-l-emerald-400 dark:border-l-emerald-600">
+		<div class="flex items-center gap-3 py-1 ml-8 pl-4 border-l-2 border-l-clens">
 			<Show
 				when={isSuccess()}
 				fallback={
-					<X class="h-3.5 w-3.5 shrink-0 text-red-500 dark:text-red-400" />
+					<X class="h-3.5 w-3.5 shrink-0 text-[var(--clens-danger)]" />
 				}
 			>
-				<Check class="h-3.5 w-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />
+				<Check class="h-3.5 w-3.5 shrink-0 text-[var(--clens-success)]" />
 			</Show>
 			<span class="font-mono text-[11px] text-muted">{props.entry.tool_name}</span>
 			<Show when={props.entry.error}>
 				{(err) => (
-					<span class="truncate text-[11px] text-red-500 dark:text-red-400">
+					<span class="truncate text-[11px] text-[var(--clens-danger)]">
 						{truncate(err(), 80)}
 					</span>
 				)}
@@ -352,33 +346,33 @@ const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "to
 };
 
 const BacktrackRow: Component<{ readonly entry: ConversationEntry & { type: "backtrack" } }> = (props) => (
-	<div class="flex items-center gap-3 py-2 ml-4 pl-4 border-l-2 border-l-amber-400">
-		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-			<AlertTriangle class="h-3 w-3 text-amber-600 dark:text-amber-400" />
+	<div class="flex items-center gap-3 py-2 ml-4 pl-4 border-l-2 border-l-[var(--clens-warning)]">
+		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-clens bg-surface-raised">
+			<AlertTriangle class="h-3 w-3 text-[var(--clens-warning)]" />
 		</div>
 		<Badge variant="warning">{props.entry.backtrack_type}</Badge>
 		<span class="text-xs text-muted">
 			Attempt {props.entry.attempt}
 		</span>
 		<Show when={props.entry.reverted_tool_ids.length > 0}>
-			<span class="text-[10px] text-gray-400">
+			<span class="text-[10px] text-muted">
 				({props.entry.reverted_tool_ids.length} reverted)
 			</span>
 		</Show>
-		<span class="ml-auto font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+		<span class="ml-auto font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
 	</div>
 );
 
 const PhaseBoundaryRow: Component<{ readonly entry: ConversationEntry & { type: "phase_boundary" } }> = (props) => (
-	<div class="flex items-center gap-3 py-3 ml-4 pl-4 border-l-2 border-l-amber-400">
-		<div class="h-px flex-1 bg-surface-muted" />
+	<div class="flex items-center gap-3 py-3 ml-4 pl-4 border-l-2 border-l-clens">
+		<div class="h-px flex-1 bg-[var(--clens-border)]" />
 		<div class="flex items-center gap-1.5">
-			<Milestone class="h-3 w-3 text-gray-400" />
-			<span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+			<Milestone class="h-3 w-3 text-muted" />
+			<span class="instrument-microcaps text-[10px] text-muted">
 				{props.entry.phase_name}
 			</span>
 		</div>
-		<div class="h-px flex-1 bg-surface-muted" />
+		<div class="h-px flex-1 bg-[var(--clens-border)]" />
 	</div>
 );
 
@@ -386,9 +380,9 @@ const AgentMessageRow: Component<{ readonly entry: ConversationEntry & { type: "
 	const isSent = () => props.entry.direction === "sent";
 
 	return (
-		<div class="flex items-center gap-3 py-1.5 ml-4 pl-4 border-l-2 border-l-gray-300 dark:border-l-gray-700">
-			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30">
-				<Send class="h-3 w-3 text-teal-600 dark:text-teal-400" classList={{ "rotate-180": !isSent() }} />
+		<div class="flex items-center gap-3 py-1.5 ml-4 pl-4 border-l-2 border-l-clens">
+			<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-clens bg-surface-muted">
+				<Send class="h-3 w-3 text-brand-500" classList={{ "rotate-180": !isSent() }} />
 			</div>
 			<span class="text-xs text-muted">
 				{isSent() ? "Sent to" : "Received from"}{" "}
@@ -397,7 +391,7 @@ const AgentMessageRow: Component<{ readonly entry: ConversationEntry & { type: "
 			<Show when={props.entry.summary}>
 				{(s) => <span class="truncate text-[11px] text-muted">{s()}</span>}
 			</Show>
-			<span class="ml-auto font-mono text-[10px] tabular-nums text-gray-400">{formatTimestamp(props.entry.t)}</span>
+			<span class="ml-auto font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
 		</div>
 	);
 };
@@ -461,9 +455,9 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 		<div class="flex h-full flex-col overflow-hidden">
 			{/* Header bar */}
 			<div class="flex items-center gap-2 border-b border-clens px-4 py-2">
-				<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Conversation</h2>
+				<h2 class="instrument-microcaps text-[11px] text-muted">Conversation</h2>
 				<Show when={store.total() > 0}>
-					<span class="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted">
+					<span class="rounded-none border border-clens bg-surface-muted px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted">
 						{store.total()} entries
 					</span>
 				</Show>
@@ -481,8 +475,9 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 					when={store.entries().length > 0}
 					fallback={
 						<Show when={!store.loading()}>
-							<div class="flex h-32 items-center justify-center text-xs text-gray-400">
-								No conversation data available
+							<div class="flex h-32 flex-col items-center justify-center gap-1">
+								<span class="instrument-microcaps text-[10px] text-muted">No data</span>
+								<span class="text-xs text-muted">No conversation data available</span>
 							</div>
 						</Show>
 					}

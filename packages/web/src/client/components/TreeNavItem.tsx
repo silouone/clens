@@ -36,9 +36,9 @@ export const TreeNavItem: Component<TreeNavItemProps> = (props) => {
 		>
 			<button
 				onClick={props.onClick}
-				class="group flex w-full flex-col rounded-md mx-1.5 mb-0.5 text-left text-xs transition-colors duration-150 hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
+				class="group flex w-full flex-col rounded-none mx-1.5 mb-0.5 text-left text-xs transition-colors duration-150 hover:bg-surface-hover focus:outline-none focus:ring-1 focus:ring-brand-500"
 				classList={{
-					"bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800/40": props.selected,
+					"bg-surface-selected ring-1 ring-inset ring-[var(--clens-border)] border-l-2 border-l-brand-500": props.selected,
 				}}
 				style={{ "margin-left": `${6 + props.depth * 12}px` }}
 				aria-label={props.ariaLabel}

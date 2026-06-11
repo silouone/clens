@@ -20,9 +20,9 @@ const alignmentScore = (
 };
 
 const alignmentColorClass = (score: number): string => {
-	if (score > 80) return "text-emerald-500 dark:text-emerald-400";
-	if (score >= 50) return "text-amber-500 dark:text-amber-400";
-	return "text-red-500 dark:text-red-400";
+	if (score > 80) return "text-[var(--clens-success)]";
+	if (score >= 50) return "text-[var(--clens-warning)]";
+	return "text-[var(--clens-danger)]";
 };
 
 // ── Component ────────────────────────────────────────────────────────
@@ -49,8 +49,8 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 					<div class="mb-3 flex items-start justify-between gap-3">
 						<div class="min-w-0">
 							<div class="flex items-center gap-2">
-								<GitBranch class="h-4 w-4 text-amber-500" />
-								<h3 class="text-sm font-semibold text-secondary">
+								<GitBranch class="h-3.5 w-3.5 text-muted" />
+								<h3 class="instrument-microcaps text-[11px] text-muted">
 									Plan Fidelity
 								</h3>
 							</div>
@@ -75,7 +75,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 
 					{/* Expected files */}
 					<div class="mb-2">
-						<div class="mb-1 text-xs font-medium text-muted">
+						<div class="instrument-microcaps mb-1 text-[10px] text-muted">
 							Expected files ({d().expected_files.length})
 						</div>
 						<div class="space-y-0.5">
@@ -87,15 +87,15 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 											<Show
 												when={isMissing()}
 												fallback={
-													<Check class="h-3 w-3 shrink-0 text-emerald-500 dark:text-emerald-400" />
+													<Check class="h-3 w-3 shrink-0 text-[var(--clens-success)]" />
 												}
 											>
-												<X class="h-3 w-3 shrink-0 text-red-500 dark:text-red-400" />
+												<X class="h-3 w-3 shrink-0 text-[var(--clens-danger)]" />
 											</Show>
 											<span
 												class={`truncate font-mono text-xs ${
 													isMissing()
-														? "text-red-500 line-through dark:text-red-400"
+														? "text-[var(--clens-danger)] line-through"
 														: "text-secondary"
 												}`}
 												title={file}
@@ -112,15 +112,15 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 					{/* Unexpected files */}
 					<Show when={d().unexpected_files.length > 0}>
 						<div>
-							<div class="mb-1 text-xs font-medium text-muted">
+							<div class="instrument-microcaps mb-1 text-[10px] text-muted">
 								Unexpected files ({d().unexpected_files.length})
 							</div>
 							<div class="space-y-0.5">
 								<For each={d().unexpected_files}>
 									{(file) => (
 										<div class="flex items-center gap-1.5 min-w-0">
-											<PlusCircle class="h-3 w-3 shrink-0 text-amber-500 dark:text-amber-400" />
-											<span class="truncate font-mono text-xs text-amber-600 dark:text-amber-400" title={file}>
+											<PlusCircle class="h-3 w-3 shrink-0 text-[var(--clens-warning)]" />
+											<span class="truncate font-mono text-xs text-[var(--clens-warning)]" title={file}>
 												{file}
 											</span>
 										</div>

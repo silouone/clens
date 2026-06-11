@@ -6,5 +6,6 @@ export { ScatterPlot } from "./ScatterPlot";
 export { StackedArea } from "./StackedArea";
 export { StackedBar } from "./StackedBar";
 export { ChartTooltip } from "./ChartTooltip";
+export { ChartEmpty } from "./ChartEmpty";
 export { CHART_COLORS, TOKEN_COLORS, BACKTRACK_COLORS, REASONING_COLORS, DRIFT_COLORS, formatCompact, formatShortDate } from "./shared";
 export type { BaseChartProps } from "./shared";

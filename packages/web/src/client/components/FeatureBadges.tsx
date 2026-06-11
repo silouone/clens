@@ -4,20 +4,22 @@ import type { FeatureFlag } from "../../shared/types";
 
 // ── Feature badges (loop / goal / workflow) ─────────────────────────
 
+// Instrument style: square hairline tags, monochrome graphite/phosphor.
+// No colored pills — the tag reads like a panel-mounted label.
 const BADGE_STYLES: Record<FeatureFlag, { readonly label: string; readonly classes: string; readonly title: string }> = {
 	loop: {
 		label: "loop",
-		classes: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400",
+		classes: "border border-clens text-secondary bg-surface-inset",
 		title: "Used /loop — recurring or self-paced wakeups",
 	},
 	goal: {
 		label: "goal",
-		classes: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
+		classes: "border border-clens text-secondary bg-surface-inset",
 		title: "Used /goal — completion-condition driven session",
 	},
 	workflow: {
 		label: "workflow",
-		classes: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400",
+		classes: "border border-clens text-secondary bg-surface-inset",
 		title: "Used Workflow — multi-agent orchestration",
 	},
 };
@@ -32,7 +34,7 @@ const BadgeIcon: Component<{ readonly flag: FeatureFlag }> = (props) => (
 
 export const FeatureBadge: Component<{ readonly flag: FeatureFlag }> = (props) => (
 	<span
-		class={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${BADGE_STYLES[props.flag].classes}`}
+		class={`instrument-microcaps inline-flex items-center gap-0.5 rounded-none px-1.5 py-0.5 text-[9px] ${BADGE_STYLES[props.flag].classes}`}
 		title={BADGE_STYLES[props.flag].title}
 	>
 		<BadgeIcon flag={props.flag} />

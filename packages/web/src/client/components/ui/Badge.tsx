@@ -9,24 +9,21 @@ type BadgeProps = {
 	readonly dot?: boolean;
 };
 
+// Instrument: square hairline chip, microcaps, token-derived colors.
 const VARIANT_CLASSES: Readonly<Record<BadgeVariant, string>> = {
-	default:
-		"bg-surface-muted text-secondary border-clens",
-	success:
-		"bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-700/50",
-	warning:
-		"bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50",
-	danger:
-		"bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-400 dark:border-red-700/50",
-	info:
-		"bg-brand-100 text-brand-700 border-brand-200 dark:bg-brand-900/50 dark:text-brand-400 dark:border-brand-700/50",
+	default: "bg-surface-muted text-secondary border-clens",
+	success: "bg-surface-raised text-[var(--clens-success)] border-clens",
+	warning: "bg-surface-raised text-[var(--clens-warning)] border-clens",
+	danger: "bg-surface-raised text-[var(--clens-danger)] border-clens",
+	info: "bg-surface-raised text-brand-500 border-clens",
 } as const;
 
+// LED square indicator color per variant.
 const DOT_CLASSES: Readonly<Record<BadgeVariant, string>> = {
-	default: "bg-gray-500",
-	success: "bg-emerald-500",
-	warning: "bg-amber-500",
-	danger: "bg-red-500",
+	default: "bg-muted",
+	success: "bg-[var(--clens-success)]",
+	warning: "bg-[var(--clens-warning)]",
+	danger: "bg-[var(--clens-danger)]",
 	info: "bg-brand-500",
 } as const;
 
@@ -35,10 +32,10 @@ export const Badge: Component<BadgeProps> = (props) => {
 
 	return (
 		<span
-			class={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${VARIANT_CLASSES[variant()]} ${props.class ?? ""}`}
+			class={`instrument-microcaps inline-flex items-center gap-1.5 rounded-none border px-1.5 py-0.5 text-[10px] ${VARIANT_CLASSES[variant()]} ${props.class ?? ""}`}
 		>
 			<Show when={props.dot}>
-				<span class={`inline-block h-1.5 w-1.5 rounded-full ${DOT_CLASSES[variant()]}`} />
+				<span class={`instrument-led ${DOT_CLASSES[variant()]}`} />
 			</Show>
 			{props.children}
 		</span>

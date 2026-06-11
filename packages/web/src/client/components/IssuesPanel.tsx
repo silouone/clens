@@ -64,8 +64,8 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 	return (
 		<Card class="p-3">
 			<div class="flex items-center gap-2">
-				<AlertTriangle class="h-4 w-4 text-red-500" />
-				<h3 class="text-sm font-semibold text-secondary">
+				<AlertTriangle class="h-4 w-4 text-muted" />
+				<h3 class="instrument-microcaps text-[11px] text-muted">
 					Issues &amp; Errors
 				</h3>
 			</div>
@@ -74,8 +74,8 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 				when={hasContent()}
 				fallback={
 					<div class="mt-3 flex items-center gap-2">
-						<span class="inline-block h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-						<span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+						<span class="instrument-led instrument-led--live bg-[var(--clens-success)]" />
+						<span class="text-xs font-medium text-[var(--clens-success)]">
 							Clean session — no backtracks or errors
 						</span>
 					</div>
@@ -84,7 +84,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 				{/* Backtracks section */}
 				<div class="mt-3">
 					<div class="flex items-center gap-2">
-						<span class="text-xs font-medium text-muted">
+						<span class="instrument-microcaps text-[10px] text-muted">
 							Backtracks ({backtrackCount()})
 						</span>
 						<span class={`text-xs font-medium ${severity().color}`}>
@@ -95,7 +95,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 					<Show
 						when={backtrackCount() > 0}
 						fallback={
-							<p class="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+							<p class="mt-1.5 text-xs text-[var(--clens-success)]">
 								No backtracks — clean session
 							</p>
 						}
@@ -105,12 +105,12 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 								{(group) => (
 									<div class="flex items-start gap-2 text-xs">
 										<Show when={group.count > 1}>
-											<span class="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted">
+											<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-muted">
 												{group.count}x
 											</span>
 										</Show>
 										<span
-											class={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${getBacktrackBadgeClass(group.type)}`}
+											class={`inline-flex shrink-0 items-center rounded-none px-1.5 py-0.5 text-[10px] font-medium ${getBacktrackBadgeClass(group.type)}`}
 										>
 											{formatBacktrackType(group.type)}
 										</span>
@@ -134,7 +134,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 				{/* Top Errors section */}
 				<Show when={topErrors().length > 0}>
 					<div class="mt-4">
-						<span class="text-xs font-medium text-muted">
+						<span class="instrument-microcaps text-[10px] text-muted">
 							Top Errors
 						</span>
 						<div class="mt-2 space-y-1.5">
@@ -144,7 +144,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 										<span class="font-mono text-muted">
 											{err.tool_name}
 										</span>
-										<span class="rounded-full bg-surface-muted px-1.5 py-0.5 text-xs tabular-nums text-muted">
+										<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 text-xs font-mono tabular-nums text-muted">
 											{err.count}
 										</span>
 										<Show when={err.sample_message}>

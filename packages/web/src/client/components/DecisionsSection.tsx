@@ -23,10 +23,10 @@ const gapClassificationColor = (
 ): string => {
 	const colors: Readonly<Record<string, string>> = {
 		user_idle: "text-muted",
-		session_pause: "text-amber-600 dark:text-amber-400",
-		agent_thinking: "text-blue-600 dark:text-blue-400",
+		session_pause: "text-[var(--clens-warning)]",
+		agent_thinking: "text-brand-500",
 	};
-	return colors[classification] ?? "text-gray-500";
+	return colors[classification] ?? "text-muted";
 };
 
 const formatClassification = (c: string): string =>
@@ -48,11 +48,11 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 	return (
 		<Card class="p-3">
 			<div class="flex items-center gap-2">
-				<GitBranch class="h-4 w-4 text-blue-500" />
-				<h3 class="text-sm font-semibold text-secondary">
+				<GitBranch class="h-3.5 w-3.5 text-muted" />
+				<h3 class="instrument-microcaps text-[11px] text-muted">
 					Decision Points
 				</h3>
-				<span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/50 dark:text-blue-400">
+				<span class="rounded-none border border-clens bg-surface-muted px-2 py-0.5 font-mono text-[11px] tabular-nums text-muted">
 					{props.decisions.length}
 				</span>
 			</div>
@@ -61,7 +61,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 				{/* Tool Pivots */}
 				<Show when={toolPivots().length > 0}>
 					<div>
-						<div class="flex items-center gap-1.5 text-xs font-medium text-muted">
+						<div class="instrument-microcaps flex items-center gap-1.5 text-[10px] text-muted">
 							<GitBranch class="h-3 w-3" />
 							Changed approach ({toolPivots().length})
 						</div>
@@ -72,12 +72,13 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 										<span class="font-mono text-muted">
 											{d.from_tool}
 										</span>
-										<span class="text-gray-400">&rarr;</span>
+										<span class="text-muted">&rarr;</span>
 										<span class="font-mono text-secondary">
 											{d.to_tool}
 										</span>
 										<Show when={d.after_failure}>
-											<span class="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] text-red-600 dark:bg-red-900/40 dark:text-red-400">
+											<span class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens bg-surface-raised px-1.5 py-0.5 text-[10px] text-[var(--clens-danger)]">
+												<span class="instrument-led bg-[var(--clens-danger)]" />
 												after failure
 											</span>
 										</Show>
@@ -91,7 +92,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 				{/* Timing Gaps */}
 				<Show when={timingGaps().length > 0}>
 					<div>
-						<div class="flex items-center gap-1.5 text-xs font-medium text-muted">
+						<div class="instrument-microcaps flex items-center gap-1.5 text-[10px] text-muted">
 							<Clock class="h-3 w-3" />
 							Timing gaps ({timingGaps().length})
 						</div>
@@ -115,7 +116,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 				{/* Task Delegations */}
 				<Show when={taskDelegations().length > 0}>
 					<div>
-						<div class="flex items-center gap-1.5 text-xs font-medium text-muted">
+						<div class="instrument-microcaps flex items-center gap-1.5 text-[10px] text-muted">
 							<Users class="h-3 w-3" />
 							Task delegations ({taskDelegations().length})
 						</div>
@@ -123,7 +124,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 							<For each={taskDelegations()}>
 								{(d) => (
 									<div class="flex items-center gap-2 text-xs">
-										<span class="font-mono text-blue-600 dark:text-blue-400">
+										<span class="font-mono text-brand-500">
 											{d.agent_name}
 										</span>
 										<Show when={d.subject}>
@@ -141,7 +142,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 				{/* Phase Boundaries */}
 				<Show when={phaseBoundaries().length > 0}>
 					<div>
-						<div class="flex items-center gap-1.5 text-xs font-medium text-muted">
+						<div class="instrument-microcaps flex items-center gap-1.5 text-[10px] text-muted">
 							<Layers class="h-3 w-3" />
 							Phase boundaries ({phaseBoundaries().length})
 						</div>
@@ -149,7 +150,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 							<For each={phaseBoundaries()}>
 								{(d) => (
 									<div class="flex items-center gap-2 text-xs">
-										<span class="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted">
+										<span class="instrument-microcaps rounded-none border border-clens bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted">
 											Phase {d.phase_index + 1}
 										</span>
 										<span class="text-secondary">

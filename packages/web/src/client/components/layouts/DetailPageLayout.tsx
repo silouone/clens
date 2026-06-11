@@ -31,7 +31,7 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 				{/* Mobile sidebar toggle */}
 				<button
 					onClick={() => setSidebarOpen((prev) => !prev)}
-					class="rounded p-1 text-gray-500 transition hover:bg-surface-hover text-muted md:hidden"
+					class="rounded-none p-1 text-muted transition hover:bg-surface-hover hover:text-secondary md:hidden"
 					aria-label="Toggle sidebar"
 				>
 					<Show when={sidebarOpen()} fallback={<Menu class="h-4 w-4" />}>
@@ -40,13 +40,13 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 				</button>
 				<button
 					onClick={() => navigate(props.backHref)}
-					class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 transition hover:bg-surface-hover hover:text-secondary focus:outline-none focus:ring-2 focus:ring-brand-500 text-muted"
+					class="instrument-microcaps flex items-center gap-1 rounded-none px-2 py-1 text-[10px] text-muted transition hover:bg-surface-hover hover:text-secondary focus:outline-none focus:ring-2 focus:ring-brand-500"
 					aria-label={`Back to ${props.backLabel}`}
 				>
 					<ArrowLeft class="h-3 w-3" />
 					{props.backLabel}
 				</button>
-				<span class="font-mono text-xs text-muted">{props.id}</span>
+				<span class="font-mono text-xs tabular-nums text-muted">{props.id}</span>
 				{props.badge}
 			</div>
 

@@ -1,7 +1,8 @@
-import { createMemo, createSignal, For, onCleanup, onMount, type Component } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
 import type { BaseChartProps } from "./shared";
-import { CHART_PADDING, DRIFT_COLORS, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
+import { CHART_HAIRLINE, CHART_PADDING, CHART_SURFACE, DRIFT_COLORS, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
 import { hideTooltip, showTooltip } from "./ChartTooltip";
+import { ChartEmpty } from "./ChartEmpty";
 
 interface ScatterPlotProps<T> extends BaseChartProps {
 	readonly data: readonly T[];
@@ -57,14 +58,18 @@ export const ScatterPlot = <T,>(props: ScatterPlotProps<T>): ReturnType<Componen
 	};
 
 	return (
-		<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
-			<svg
-				width={width()}
-				height={props.height ?? 200}
-				role="img"
-				aria-label={props.ariaLabel}
-				class="overflow-visible"
-			>
+		<Show
+			when={props.data.length > 0}
+			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+		>
+			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
+				<svg
+					width={width()}
+					height={props.height ?? 200}
+					role="img"
+					aria-label={props.ariaLabel}
+					class="overflow-visible"
+				>
 				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
 					<For each={ticks()}>
 						{(tick) => (
@@ -72,12 +77,12 @@ export const ScatterPlot = <T,>(props: ScatterPlotProps<T>): ReturnType<Componen
 								<line
 									x1={0} y1={yScale()(tick)}
 									x2={cw()} y2={yScale()(tick)}
-									stroke="currentColor" stroke-opacity="0.1"
+									stroke={CHART_HAIRLINE}
 								/>
 								<text
 									x={-8} y={yScale()(tick)}
 									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted text-[10px]"
+									class="fill-muted font-mono text-[10px] tabular-nums"
 								>
 									{fmtY()(tick)}
 								</text>
@@ -131,7 +136,7 @@ export const ScatterPlot = <T,>(props: ScatterPlotProps<T>): ReturnType<Componen
 											x={xScale()(date)}
 											y={ch() + 16}
 											text-anchor="middle"
-											class="fill-muted text-[10px]"
+											class="fill-muted font-mono text-[10px] tabular-nums"
 										>
 											{formatShortDate(date)}
 										</text>
@@ -146,18 +151,19 @@ export const ScatterPlot = <T,>(props: ScatterPlotProps<T>): ReturnType<Componen
 			{/* Legend for drift colors */}
 			<div class="mt-2 flex gap-3 px-2 text-xs text-muted">
 				<div class="flex items-center gap-1">
-					<span class="inline-block h-2.5 w-2.5 rounded-full" style={{ "background-color": DRIFT_COLORS.good }} />
+					<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": DRIFT_COLORS.good }} />
 					<span>Low (&lt;0.2)</span>
 				</div>
 				<div class="flex items-center gap-1">
-					<span class="inline-block h-2.5 w-2.5 rounded-full" style={{ "background-color": DRIFT_COLORS.warn }} />
+					<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": DRIFT_COLORS.warn }} />
 					<span>Medium (0.2-0.5)</span>
 				</div>
 				<div class="flex items-center gap-1">
-					<span class="inline-block h-2.5 w-2.5 rounded-full" style={{ "background-color": DRIFT_COLORS.bad }} />
+					<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": DRIFT_COLORS.bad }} />
 					<span>High (&gt;0.5)</span>
 				</div>
+				</div>
 			</div>
-		</div>
+		</Show>
 	);
 };

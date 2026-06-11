@@ -7,8 +7,8 @@ type MetaRowProps = {
 
 export const MetaRow: Component<MetaRowProps> = (props) => (
 	<div class="flex items-center justify-between text-xs">
-		<span class="text-muted">{props.label}</span>
-		<span class="font-medium tabular-nums text-secondary">
+		<span class="instrument-microcaps text-[10px] text-muted">{props.label}</span>
+		<span class="text-right font-mono tabular-nums text-secondary">
 			{props.value}
 		</span>
 	</div>

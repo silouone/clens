@@ -51,7 +51,7 @@ const formatTokenCount = (tokens: number): string => {
 	return String(tokens);
 };
 
-const SECTION_HEADING = "text-[10px] font-semibold uppercase tracking-wider text-muted mb-1.5";
+const SECTION_HEADING = "instrument-microcaps text-[10px] text-muted mb-1.5";
 
 // -- Component ------------------------------------------------------------
 
@@ -123,9 +123,9 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 				<div class="mb-3 flex flex-wrap items-center justify-end gap-2">
 					<Show when={specPath()}>
 						{(path) => (
-							<div class="inline-flex items-center gap-2 rounded-md bg-violet-50 px-3 py-1.5 dark:bg-violet-900/20">
-								<span class="text-xs font-medium text-violet-600 dark:text-violet-400">Spec</span>
-								<span class="truncate font-mono text-xs text-violet-700 dark:text-violet-300" title={path()}>
+							<div class="inline-flex items-center gap-2 rounded-none border border-clens bg-surface-inset px-3 py-1.5">
+								<span class="instrument-microcaps text-[10px] text-muted">Spec</span>
+								<span class="truncate font-mono text-xs text-secondary" title={path()}>
 									{path()}
 								</span>
 							</div>
@@ -135,7 +135,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 						{(wuId) => (
 							<A
 								href={`/work-unit/${wuId()}`}
-								class="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-600 transition hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+								class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens bg-surface-inset px-2.5 py-1 text-[10px] text-secondary transition hover:bg-surface-hover"
 							>
 								View Work Unit
 								<ExternalLink class="h-2.5 w-2.5" />
@@ -160,7 +160,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 				<Show
 					when={rawPrompt()}
 					fallback={
-						<p class="text-sm text-gray-400 italic text-muted">
+						<p class="text-sm italic text-muted">
 							No prompt captured
 						</p>
 					}
@@ -177,7 +177,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 					<Show when={truncated().truncated}>
 						<button
 							onClick={() => setExpanded((prev) => !prev)}
-							class="text-xs font-medium text-blue-600 transition hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+							class="instrument-microcaps text-[10px] text-brand-500 transition hover:text-brand-600 dark:text-brand-400"
 						>
 							{expanded() ? "Show less" : "Show more"}
 						</button>

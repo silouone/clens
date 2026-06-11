@@ -27,7 +27,7 @@ const TokenRow: Component<{
 }> = (props) => (
 	<div class="flex items-center justify-between text-xs">
 		<span class="text-muted">{props.label}</span>
-		<span class="font-medium tabular-nums text-secondary">
+		<span class="font-mono font-medium tabular-nums text-secondary">
 			{fmt(props.value)}
 		</span>
 	</div>
@@ -56,10 +56,11 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 			<div class="fixed inset-0 z-40" onClick={props.onClose} />
 
 			{/* Popover */}
-			<div class="absolute top-full left-0 z-50 mt-1 w-72 rounded-lg border border-clens bg-surface-raised p-3 shadow-lg">
-				{/* Estimated banner */}
+			<div class="absolute top-full left-0 z-50 mt-1 w-72 rounded-none border border-clens bg-surface-overlay p-3">
+				{/* Estimated banner — token warning, square hairline */}
 				<Show when={cost()?.is_estimated}>
-					<div class="mb-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+					<div class="mb-2 flex items-center gap-1.5 rounded-none border border-clens bg-surface-inset px-2.5 py-1.5 text-[11px] text-[var(--clens-warning)]">
+						<span class="instrument-led bg-[var(--clens-warning)]" />
 						Rough estimate — real token data unavailable
 					</div>
 				</Show>
@@ -84,7 +85,7 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 							<div class="mt-2 border-t border-clens pt-2">
 								<div class="flex items-center justify-between text-xs">
 									<span class="text-muted">Cache hit rate</span>
-									<span class="font-medium text-emerald-600 dark:text-emerald-400">
+									<span class="font-mono font-medium tabular-nums text-[var(--clens-success)]">
 										{cacheEfficiency(tu().input_tokens, tu().cache_read_tokens)}
 									</span>
 								</div>

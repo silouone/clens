@@ -1,7 +1,8 @@
-import { createMemo, createSignal, For, onCleanup, onMount, type Component } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
 import type { BaseChartProps } from "./shared";
-import { CHART_COLORS, CHART_PADDING, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
+import { CHART_COLORS, CHART_HAIRLINE, CHART_PADDING, CHART_SURFACE, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
 import { hideTooltip, showTooltip } from "./ChartTooltip";
+import { ChartEmpty } from "./ChartEmpty";
 
 interface LineChartProps<T> extends BaseChartProps {
 	readonly data: readonly T[];
@@ -57,14 +58,18 @@ export const LineChart = <T,>(props: LineChartProps<T>): ReturnType<Component> =
 	const fmtY = () => props.formatY ?? formatCompact;
 
 	return (
-		<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
-			<svg
-				width={width()}
-				height={props.height ?? 200}
-				role="img"
-				aria-label={props.ariaLabel}
-				class="overflow-visible"
-			>
+		<Show
+			when={props.data.length > 0}
+			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+		>
+			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
+				<svg
+					width={width()}
+					height={props.height ?? 200}
+					role="img"
+					aria-label={props.ariaLabel}
+					class="overflow-visible"
+				>
 				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
 					<For each={ticks()}>
 						{(tick) => (
@@ -72,12 +77,12 @@ export const LineChart = <T,>(props: LineChartProps<T>): ReturnType<Component> =
 								<line
 									x1={0} y1={yScale()(tick)}
 									x2={cw()} y2={yScale()(tick)}
-									stroke="currentColor" stroke-opacity="0.1"
+									stroke={CHART_HAIRLINE}
 								/>
 								<text
 									x={-8} y={yScale()(tick)}
 									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted text-[10px]"
+									class="fill-muted font-mono text-[10px] tabular-nums"
 								>
 									{fmtY()(tick)}
 								</text>
@@ -101,7 +106,7 @@ export const LineChart = <T,>(props: LineChartProps<T>): ReturnType<Component> =
 							return (
 								<circle
 									cx={px()} cy={py()} r={3}
-									fill={color()} stroke="white" stroke-width="1.5"
+									fill={color()} stroke={CHART_SURFACE} stroke-width="1.5"
 									class="cursor-pointer"
 									onClick={(e) => {
 										e.stopPropagation();
@@ -129,7 +134,7 @@ export const LineChart = <T,>(props: LineChartProps<T>): ReturnType<Component> =
 									x={i() * xStep()}
 									y={ch() + 16}
 									text-anchor="middle"
-									class="fill-muted text-[10px]"
+									class="fill-muted font-mono text-[10px] tabular-nums"
 								>
 									{formatShortDate(props.x(d))}
 								</text>
@@ -137,7 +142,8 @@ export const LineChart = <T,>(props: LineChartProps<T>): ReturnType<Component> =
 						}}
 					</For>
 				</g>
-			</svg>
-		</div>
+				</svg>
+			</div>
+		</Show>
 	);
 };

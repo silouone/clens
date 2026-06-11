@@ -31,7 +31,7 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 							finally { setDistilling(false); }
 						}}
 						disabled={distilling()}
-						class="rounded-md bg-surface-muted px-2 py-1 text-xs font-medium text-secondary transition hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed"
+						class="instrument-microcaps rounded-none border border-clens bg-surface-inset px-2 py-1 text-[10px] text-secondary transition hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						{distilling() ? "Re-analyzing..." : "Re-analyze"}
 					</button>

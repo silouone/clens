@@ -74,6 +74,14 @@ export const ContextChart: Component<{
 	return (
 		<Card title="Context Consumption">
 			<div class="px-4 py-3">
+				<Show
+					when={points().length > 0}
+					fallback={
+						<div class="flex h-[120px] w-full items-center justify-center border border-clens bg-surface-inset">
+							<span class="instrument-microcaps text-[10px] text-muted">No data</span>
+						</div>
+					}
+				>
 				<svg
 					viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
 					class="w-full"
@@ -81,17 +89,17 @@ export const ContextChart: Component<{
 				>
 					<defs>
 						<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-							<stop offset={`${yellowStop}%`} stop-color="#ef4444" stop-opacity="0.5" />
-							<stop offset={`${yellowStop}%`} stop-color="#f59e0b" stop-opacity="0.4" />
-							<stop offset={`${greenStop}%`} stop-color="#f59e0b" stop-opacity="0.4" />
-							<stop offset={`${greenStop}%`} stop-color="#10b981" stop-opacity="0.3" />
-							<stop offset="100%" stop-color="#10b981" stop-opacity="0.1" />
+							<stop offset={`${yellowStop}%`} stop-color="var(--clens-danger)" stop-opacity="0.5" />
+							<stop offset={`${yellowStop}%`} stop-color="var(--clens-warning)" stop-opacity="0.4" />
+							<stop offset={`${greenStop}%`} stop-color="var(--clens-warning)" stop-opacity="0.4" />
+							<stop offset={`${greenStop}%`} stop-color="var(--clens-success)" stop-opacity="0.3" />
+							<stop offset="100%" stop-color="var(--clens-success)" stop-opacity="0.1" />
 						</linearGradient>
 						<linearGradient id={lineGradientId} x1="0" y1="0" x2="0" y2="1">
-							<stop offset={`${yellowStop}%`} stop-color="#ef4444" />
-							<stop offset={`${yellowStop}%`} stop-color="#f59e0b" />
-							<stop offset={`${greenStop}%`} stop-color="#f59e0b" />
-							<stop offset={`${greenStop}%`} stop-color="#10b981" />
+							<stop offset={`${yellowStop}%`} stop-color="var(--clens-danger)" />
+							<stop offset={`${yellowStop}%`} stop-color="var(--clens-warning)" />
+							<stop offset={`${greenStop}%`} stop-color="var(--clens-warning)" />
+							<stop offset={`${greenStop}%`} stop-color="var(--clens-success)" />
 						</linearGradient>
 					</defs>
 
@@ -127,13 +135,14 @@ export const ContextChart: Component<{
 								cx={scaleX(p.turn_index, maxTurn())}
 								cy={scaleY(p.context_pct)}
 								r="3"
-								fill="#ef4444"
-								stroke="#fff"
+								fill="var(--clens-danger)"
+								stroke="var(--clens-surface-overlay)"
 								stroke-width="1"
 							/>
 						)}
 					</For>
 				</svg>
+				</Show>
 
 				{/* Summary stats */}
 				<div class="mt-2 flex items-center gap-4 text-xs">

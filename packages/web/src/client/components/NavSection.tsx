@@ -11,11 +11,11 @@ export const NavSection: Component<NavSectionProps> = (props) => (
 	<>
 		<div class="border-t border-clens" />
 		<div class="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
-			<h3 class="text-[10px] font-semibold uppercase tracking-wider text-muted">
+			<h3 class="instrument-microcaps text-[10px] text-muted">
 				{props.title}
 			</h3>
 			<Show when={props.count !== undefined}>
-				<span class="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted">
+				<span class="rounded-none border border-clens px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted">
 					{props.count}
 				</span>
 			</Show>

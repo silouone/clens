@@ -2,38 +2,29 @@ import { createSignal, For, Show, type Component } from "solid-js";
 import type { PhaseInfo } from "../../shared/types";
 
 // ── Phase color palette ──────────────────────────────────────────────
+//
+// INSTRUMENT: phase traces derive from the token ramp (signal green for
+// active/build, amber for validation/warnings, danger for debugging,
+// graphite for neutral phases). Returned as CSS vars so segments/LED dots
+// are styled via inline background-color and track both modes.
 
 const PHASE_COLORS: Readonly<Record<string, string>> = {
 	// Single-agent phases
-	"file exploration": "bg-sky-500",
-	"code modification": "bg-emerald-500",
-	research: "bg-blue-500",
-	debugging: "bg-red-500",
-	general: "bg-gray-400",
+	"file exploration": "var(--clens-text-secondary)",
+	"code modification": "var(--clens-brand)",
+	research: "var(--clens-text-muted)",
+	debugging: "var(--clens-danger)",
+	general: "var(--clens-tick)",
 	// Team phases
-	planning: "bg-violet-500",
-	build: "bg-emerald-500",
-	validation: "bg-amber-500",
+	planning: "var(--clens-text-secondary)",
+	build: "var(--clens-brand)",
+	validation: "var(--clens-warning)",
 };
 
-const PHASE_DOT_COLORS: Readonly<Record<string, string>> = {
-	"file exploration": "bg-sky-400",
-	"code modification": "bg-emerald-400",
-	research: "bg-blue-400",
-	debugging: "bg-red-400",
-	general: "bg-gray-400",
-	planning: "bg-violet-400",
-	build: "bg-emerald-400",
-	validation: "bg-amber-400",
-};
-
-const DEFAULT_COLOR = "bg-gray-500";
+const DEFAULT_COLOR = "var(--clens-tick)";
 
 const getPhaseColor = (name: string): string =>
 	PHASE_COLORS[name.toLowerCase()] ?? DEFAULT_COLOR;
-
-const getPhaseDotColor = (name: string): string =>
-	PHASE_DOT_COLORS[name.toLowerCase()] ?? DEFAULT_COLOR;
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -65,7 +56,7 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 			<div class="flex items-center gap-2">
 				{/* Compact segmented bar */}
 				<div
-					class="flex h-3 w-48 overflow-hidden rounded-full"
+					class="flex h-3 w-48 overflow-hidden rounded-none border border-clens"
 					role="img"
 					aria-label={`Timeline: ${props.phases.map((p) => p.name).join(", ")}`}
 					onMouseLeave={() => setHoveredIndex(null)}
@@ -73,10 +64,13 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 					<For each={props.phases}>
 						{(phase, i) => (
 							<button
-								class={`relative transition-opacity ${getPhaseColor(phase.name)} ${
-									hoveredIndex() !== null && hoveredIndex() !== i() ? "opacity-40" : "opacity-80"
+								class={`relative transition-opacity ${
+									hoveredIndex() !== null && hoveredIndex() !== i() ? "opacity-40" : "opacity-90"
 								}`}
-								style={{ width: `${segmentWidth(phase)}%` }}
+								style={{
+									width: `${segmentWidth(phase)}%`,
+									"background-color": getPhaseColor(phase.name),
+								}}
 								onClick={() => props.onPhaseClick?.(i())}
 								onMouseEnter={() => setHoveredIndex(i())}
 								title={`${phase.name}: ${phase.description}`}
@@ -94,8 +88,11 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 							<For each={props.phases}>
 								{(phase) => (
 									<div class="flex items-center gap-0.5">
-										<span class={`inline-block h-1.5 w-1.5 rounded-full ${getPhaseDotColor(phase.name)}`} />
-										<span class="text-[11px] text-gray-400 capitalize">{phase.name}</span>
+										<span
+											class="instrument-led"
+											style={{ "background-color": getPhaseColor(phase.name) }}
+										/>
+										<span class="instrument-microcaps text-[10px] text-muted">{phase.name}</span>
 									</div>
 								)}
 							</For>
@@ -104,8 +101,11 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 				>
 					{(phase) => (
 						<div class="flex items-center gap-1">
-							<span class={`inline-block h-1.5 w-1.5 rounded-full ${getPhaseDotColor(phase().name)}`} />
-							<span class="text-[10px] font-medium text-gray-500 capitalize text-muted">
+							<span
+								class="instrument-led"
+								style={{ "background-color": getPhaseColor(phase().name) }}
+							/>
+							<span class="instrument-microcaps text-[10px] text-muted">
 								{phase().name}
 							</span>
 							<span class="text-[10px] text-muted">

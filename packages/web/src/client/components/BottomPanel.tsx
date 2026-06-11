@@ -46,13 +46,13 @@ const BacktracksTab: Component<{
 				{(bt) => (
 					<button
 						onClick={() => props.onBacktrackClick?.(bt.start_t)}
-						class="flex w-full items-center gap-3 px-3 py-1.5 text-left text-xs transition hover:bg-surface-hover/30"
+						class="flex w-full items-center gap-3 px-3 py-1.5 text-left text-xs transition hover:bg-surface-hover"
 					>
-						<span class="text-[10px] tabular-nums w-12 text-muted">
+						<span class="font-mono text-[10px] tabular-nums w-12 text-muted">
 							{formatRelTime(bt.start_t, props.startTime)}
 						</span>
 						<span
-							class={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${getSeverityStyle(bt.type)}`}
+							class={`instrument-microcaps rounded-none border px-1.5 py-0.5 text-[9px] ${getSeverityStyle(bt.type)}`}
 						>
 							{bt.type.replaceAll("_", " ")}
 						</span>
@@ -81,20 +81,20 @@ const TIMELINE_TYPES = [
 ] as const;
 
 const TIMELINE_TYPE_COLORS: Readonly<Record<string, string>> = {
-	user_prompt: "text-blue-400",
-	thinking: "text-gray-400",
-	tool_call: "text-gray-300",
-	tool_result: "text-gray-500",
-	failure: "text-red-400",
-	backtrack: "text-amber-400",
-	phase_boundary: "text-violet-400",
-	agent_spawn: "text-emerald-400",
-	agent_stop: "text-emerald-600",
-	task_create: "text-sky-400",
-	task_assign: "text-sky-300",
-	task_complete: "text-emerald-300",
-	teammate_idle: "text-gray-600",
-	msg_send: "text-blue-400",
+	user_prompt: "text-secondary",
+	thinking: "text-muted",
+	tool_call: "text-secondary",
+	tool_result: "text-muted",
+	failure: "text-[var(--clens-danger)]",
+	backtrack: "text-[var(--clens-warning)]",
+	phase_boundary: "text-secondary",
+	agent_spawn: "text-[var(--clens-success)]",
+	agent_stop: "text-[var(--clens-success)]",
+	task_create: "text-secondary",
+	task_assign: "text-secondary",
+	task_complete: "text-[var(--clens-success)]",
+	teammate_idle: "text-muted",
+	msg_send: "text-secondary",
 };
 
 const TimelineTab: Component<{
@@ -133,9 +133,9 @@ const TimelineTab: Component<{
 						{(type) => (
 							<button
 								onClick={() => toggleFilter(type)}
-								class="rounded px-1.5 py-0.5 text-[11px] font-medium transition border"
+								class="instrument-microcaps rounded-none px-1.5 py-0.5 text-[10px] transition border"
 								classList={{
-									"border-clens bg-surface-muted ": activeFilters().has(type),
+									"border-clens bg-surface-muted text-secondary": activeFilters().has(type),
 									"border-transparent text-muted hover:text-secondary": !activeFilters().has(type),
 								}}
 							>
@@ -143,7 +143,7 @@ const TimelineTab: Component<{
 							</button>
 						)}
 					</For>
-					<span class="ml-auto text-[11px] text-muted">{filtered().length} events</span>
+					<span class="ml-auto font-mono text-[11px] tabular-nums text-muted">{filtered().length} events</span>
 				</div>
 
 				{/* Event list */}
@@ -151,10 +151,10 @@ const TimelineTab: Component<{
 					<For each={filtered()}>
 						{(entry) => (
 							<div class="flex items-center gap-3 px-3 py-1 text-xs">
-								<span class="text-[10px] tabular-nums w-12 text-muted">
+								<span class="font-mono text-[10px] tabular-nums w-12 text-muted">
 									{formatRelTime(entry.t, props.startTime)}
 								</span>
-								<span class={`font-medium ${TIMELINE_TYPE_COLORS[entry.type] ?? "text-gray-500"}`}>
+								<span class={`font-medium ${TIMELINE_TYPE_COLORS[entry.type] ?? "text-muted"}`}>
 									{entry.type.replaceAll("_", " ")}
 								</span>
 								<Show when={entry.tool_name}>
@@ -218,14 +218,14 @@ const EditsTab: Component<{
 								<span class="font-mono text-xs text-secondary truncate flex-1">
 									{chain.file_path}
 								</span>
-								<span class="text-[10px] text-muted">
+								<span class="font-mono text-[10px] tabular-nums text-muted">
 									{chain.total_edits} edit{chain.total_edits !== 1 ? "s" : ""}
 								</span>
-								<span class="text-[10px] text-muted">
+								<span class="font-mono text-[10px] tabular-nums text-muted">
 									{chain.total_reads} read{chain.total_reads !== 1 ? "s" : ""}
 								</span>
 								<Show when={chain.has_backtrack}>
-									<span class="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[11px] text-amber-600 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-400">
+									<span class="instrument-microcaps rounded-none border border-clens px-1 py-0.5 text-[9px] text-[var(--clens-warning)]">
 										backtrack
 									</span>
 								</Show>
@@ -243,27 +243,27 @@ const EditsTab: Component<{
 											<div class="inline-flex flex-col">
 												<button
 													onClick={() => hasThinking() ? toggleStep(step.tool_use_id) : undefined}
-													class="rounded px-1 py-0.5 text-[11px] inline-flex items-center gap-0.5"
+													class="font-mono rounded-none border px-1 py-0.5 text-[11px] inline-flex items-center gap-0.5"
 													classList={{
-														"bg-emerald-900/30 text-emerald-500": step.outcome === "success" && !isAbandoned,
-														"bg-red-900/30 text-red-400": step.outcome === "failure",
-														"bg-gray-800/30 text-gray-500": step.outcome === "info",
+														"border-clens bg-surface-raised text-[var(--clens-success)]": step.outcome === "success" && !isAbandoned,
+														"border-clens bg-surface-raised text-[var(--clens-danger)]": step.outcome === "failure",
+														"border-clens bg-surface-raised text-muted": step.outcome === "info",
 														"line-through opacity-50": isAbandoned,
-														"cursor-pointer hover:ring-1 hover:ring-gray-500": hasThinking(),
+														"cursor-pointer hover:bg-surface-hover": hasThinking(),
 														"cursor-default": !hasThinking(),
 													}}
 												>
 													{step.tool_name}
 													{isAbandoned ? " (abandoned)" : ""}
 													<Show when={hasThinking()}>
-														<span class="text-violet-400 text-[11px]" title="Has thinking context">
+														<span class="text-brand-500 text-[11px]" title="Has thinking context">
 															&#x1D4D5;
 														</span>
 													</Show>
 												</button>
 												<Show when={isExpanded() && reasoningMap().get(step.tool_use_id)}>
 													{(r) => (
-														<div class="mt-0.5 rounded bg-gray-800/50 px-2 py-1 text-[10px] text-gray-400 max-w-xs whitespace-pre-wrap">
+														<div class="mt-0.5 rounded-none border border-clens bg-surface-inset px-2 py-1 text-[10px] text-secondary max-w-xs whitespace-pre-wrap">
 															{truncateText(r().thinking, 200)}
 														</div>
 													)}
@@ -276,7 +276,7 @@ const EditsTab: Component<{
 
 							{/* Abandoned count */}
 							<Show when={chain.abandoned_edit_ids.length > 0}>
-								<div class="mt-1 text-[11px] text-amber-600/70 dark:text-amber-500/70">
+								<div class="mt-1 text-[11px] text-[var(--clens-warning)]">
 									{chain.abandoned_edit_ids.length} abandoned edit{chain.abandoned_edit_ids.length !== 1 ? "s" : ""}
 								</div>
 							</Show>
@@ -291,8 +291,10 @@ const EditsTab: Component<{
 // ── Empty tab state ──────────────────────────────────────────────────
 
 const EmptyTab: Component<{ readonly message: string }> = (props) => (
-	<div class="flex h-full items-center justify-center text-sm text-muted py-8">
-		{props.message}
+	<div class="flex h-full items-center justify-center py-8">
+		<span class="instrument-microcaps border border-clens px-3 py-1.5 text-[10px] text-muted">
+			{props.message}
+		</span>
 	</div>
 );
 

@@ -44,10 +44,10 @@ const RangeSelector: Component = () => (
 			{(r) => (
 				<button
 					onClick={() => setAnalyticsRange(r)}
-					class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+					class="instrument-microcaps rounded-none border px-2.5 py-1 text-[10px] transition"
 					classList={{
-						"text-primary bg-surface-muted": analyticsRange() === r,
-						"text-muted hover:text-secondary hover:bg-surface-hover": analyticsRange() !== r,
+						"text-primary bg-surface-muted border-brand-500": analyticsRange() === r,
+						"text-muted border-clens hover:text-secondary hover:bg-surface-hover": analyticsRange() !== r,
 					}}
 				>
 					{r === "all" ? "All" : r}
@@ -69,19 +69,19 @@ type KpiCardProps = {
 };
 
 const KpiCard: Component<KpiCardProps> = (props) => (
-	<div class="rounded-lg border border-clens bg-surface p-4">
-		<div class="text-xs text-muted">{props.label}</div>
-		<div class="mt-1 text-2xl font-semibold text-primary">{props.value}</div>
+	<div class="rounded-none border border-clens bg-surface p-4">
+		<div class="instrument-microcaps text-[10px] text-muted">{props.label}</div>
+		<div class="mt-1 font-mono tabular-nums text-2xl font-semibold text-primary">{props.value}</div>
 		<Show when={props.subtitle}>
 			<div class="mt-0.5 text-xs text-muted">{props.subtitle}</div>
 		</Show>
 		<Show when={props.delta && props.delta.direction !== "flat"}>
 			<div class="mt-1 flex items-center gap-1 text-xs">
 				<span classList={{
-					"text-emerald-500": (props.invertColor
+					"text-success": (props.invertColor
 						? props.delta?.direction === "down"
 						: props.delta?.direction === "up"),
-					"text-red-500": (props.invertColor
+					"text-danger": (props.invertColor
 						? props.delta?.direction === "up"
 						: props.delta?.direction === "down"),
 				}}>
@@ -89,7 +89,7 @@ const KpiCard: Component<KpiCardProps> = (props) => (
 					{props.delta?.value.toFixed(1)}
 					{props.deltaLabel ?? "%"}
 				</span>
-				<span class="text-muted">vs prev</span>
+				<span class="instrument-microcaps text-[10px] text-muted">vs prev</span>
 			</div>
 		</Show>
 	</div>
@@ -98,7 +98,7 @@ const KpiCard: Component<KpiCardProps> = (props) => (
 // ── Section header ──────────────────────────────────────────────────
 
 const SectionHeader: Component<{ readonly title: string }> = (props) => (
-	<h3 class="text-sm font-semibold text-secondary mb-2">{props.title}</h3>
+	<h3 class="instrument-microcaps text-[11px] text-muted mb-2">{props.title}</h3>
 );
 
 // ── Highlights ──────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ const Highlights: Component = () => {
 
 	return (
 		<Show when={sentences().length > 0}>
-			<div class="mb-6 rounded-lg border border-clens bg-surface-muted p-4 text-sm text-secondary italic">
+			<div class="mb-6 rounded-none border-l-2 border-brand-500 bg-surface-inset p-4 text-sm text-secondary italic">
 				{sentences().join(" ")}
 			</div>
 		</Show>
@@ -156,19 +156,19 @@ const Highlights: Component = () => {
 const EmptyState: Component = () => (
 	<div class="flex flex-col items-center justify-center py-20 text-center">
 		<TelescopeIllustration class="h-16 w-16 text-muted mb-4" />
-		<h2 class="text-lg font-medium text-primary">No analytics data yet</h2>
+		<h2 class="instrument-microcaps text-sm text-secondary">No analytics data yet</h2>
 		<p class="mt-2 text-sm text-muted max-w-md">
 			If you have distilled sessions, click rebuild to extract analytics data.
 		</p>
 		<button
 			onClick={() => rebuildAnalytics()}
 			disabled={isRebuilding()}
-			class="mt-4 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition disabled:opacity-50"
+			class="instrument-microcaps mt-4 rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface hover:bg-brand-600 transition disabled:opacity-50"
 		>
 			{isRebuilding() ? "Rebuilding..." : "Rebuild Analytics"}
 		</button>
 		<p class="mt-3 text-xs text-muted">
-			Or run <code class="rounded bg-surface-muted px-1.5 py-0.5 text-xs">clens distill --all</code> to distill and generate analytics.
+			Or run <code class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-xs">clens distill --all</code> to distill and generate analytics.
 		</p>
 	</div>
 );
@@ -307,20 +307,21 @@ export const InsightsPage: Component = () => {
 			{/* Header */}
 			<div class="flex items-center justify-between mb-6">
 				<h1 class="text-xl font-semibold text-primary">Insights</h1>
+					<div class="instrument-ruler mt-1.5 w-40" />
 				<div class="flex items-center gap-3">
 					<ProjectDropdown />
 					<RangeSelector />
 					<button
 						onClick={() => rebuildAnalytics()}
 						disabled={isRebuilding()}
-						class="rounded-md p-1.5 text-muted hover:text-secondary hover:bg-surface-hover transition disabled:opacity-50"
+						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-brand-500 transition disabled:opacity-50"
 						title="Rebuild analytics from distilled sessions"
 					>
 						<RotateCcw class="h-4 w-4" classList={{ "animate-spin": isRebuilding() }} />
 					</button>
 					<button
 						onClick={() => refetchInsights()}
-						class="rounded-md p-1.5 text-muted hover:text-secondary hover:bg-surface-hover transition"
+						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-brand-500 transition"
 						title="Refresh"
 					>
 						<RefreshCw class="h-4 w-4" />
@@ -331,7 +332,7 @@ export const InsightsPage: Component = () => {
 			{/* Loading */}
 			<Show when={isLoading()}>
 				<div class="flex items-center justify-center py-20">
-					<div class="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+					<div class="h-6 w-6 animate-spin rounded-none border-2 border-brand-500 border-t-transparent" />
 				</div>
 			</Show>
 
@@ -372,7 +373,7 @@ export const InsightsPage: Component = () => {
 
 				{/* Edit Efficiency (only when edit chains exist) */}
 				<Show when={hasEditChains()}>
-					<div class="mb-6 rounded-lg border border-clens bg-surface p-4">
+					<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Edit Efficiency" />
 						<div class="mb-2 text-xs text-muted">
 							{editSurvival()}% of edits survive to final state
@@ -393,7 +394,7 @@ export const InsightsPage: Component = () => {
 
 				{/* Plan Drift (only when 5+ data points) */}
 				<Show when={planDriftPoints().length >= 5}>
-					<div class="mb-6 rounded-lg border border-clens bg-surface p-4">
+					<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Plan Drift" />
 						<ScatterPlot
 							data={planDriftPoints()}
@@ -414,7 +415,7 @@ export const InsightsPage: Component = () => {
 				</Show>
 
 				{/* Backtrack Trends */}
-				<div class="mb-6 rounded-lg border border-clens bg-surface p-4">
+				<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 					<SectionHeader title="Backtrack Trends" />
 					<StackedArea
 						data={dailyInsights()}
@@ -438,7 +439,7 @@ export const InsightsPage: Component = () => {
 
 				{/* Reasoning Distribution + Decision Patterns (side by side) */}
 				<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div class="rounded-lg border border-clens bg-surface p-4">
+					<div class="rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Reasoning Distribution" />
 						<Show when={reasoningSegments().length > 0} fallback={
 							<div class="text-xs text-muted py-4 text-center">No reasoning data available</div>
@@ -454,7 +455,7 @@ export const InsightsPage: Component = () => {
 							</Show>
 						</Show>
 					</div>
-					<div class="rounded-lg border border-clens bg-surface p-4">
+					<div class="rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Decision Patterns" />
 						<Show when={decisionBuckets().length > 0} fallback={
 							<div class="text-xs text-muted py-4 text-center">No decision data available</div>
@@ -488,15 +489,15 @@ export const InsightsPage: Component = () => {
 				<Show when={toolErrors().length > 0 || topErrorPatterns().length > 0}>
 					<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
 						<Show when={toolErrors().length > 0}>
-							<div class="rounded-lg border border-clens bg-surface p-4">
+							<div class="rounded-none border border-clens bg-surface p-4">
 								<SectionHeader title="Tool Errors" />
 								<div class="overflow-x-auto">
 									<table class="w-full text-xs">
 										<thead>
 											<tr class="text-left text-muted border-b border-clens">
-												<th class="py-2 pr-4 font-medium">Tool</th>
-												<th class="py-2 pr-4 font-medium text-right">Failures</th>
-												<th class="py-2 font-medium text-right">Rate</th>
+												<th class="instrument-microcaps py-2 pr-4 text-[10px]">Tool</th>
+												<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Failures</th>
+												<th class="instrument-microcaps py-2 text-[10px] text-right">Rate</th>
 											</tr>
 										</thead>
 										<tbody>
@@ -504,7 +505,7 @@ export const InsightsPage: Component = () => {
 												{(te) => (
 													<tr class="border-b border-clens/50">
 														<td class="py-2 pr-4 font-medium text-primary">{te.tool_name}</td>
-														<td class="py-2 pr-4 text-right text-secondary">{te.total_failures}</td>
+														<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{te.total_failures}</td>
 														<td class="py-2 text-right text-secondary">
 															{te.failure_rate > 0 ? `${(te.failure_rate * 100).toFixed(1)}%` : "n/a"}
 														</td>
@@ -517,15 +518,15 @@ export const InsightsPage: Component = () => {
 							</div>
 						</Show>
 						<Show when={topErrorPatterns().length > 0}>
-							<div class="rounded-lg border border-clens bg-surface p-4">
+							<div class="rounded-none border border-clens bg-surface p-4">
 								<SectionHeader title="Error Patterns" />
 								<div class="overflow-x-auto">
 									<table class="w-full text-xs">
 										<thead>
 											<tr class="text-left text-muted border-b border-clens">
-												<th class="py-2 pr-4 font-medium">Pattern</th>
-												<th class="py-2 pr-4 font-medium text-right">Count</th>
-												<th class="py-2 font-medium">Tools</th>
+												<th class="instrument-microcaps py-2 pr-4 text-[10px]">Pattern</th>
+												<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Count</th>
+												<th class="instrument-microcaps py-2 text-[10px]">Tools</th>
 											</tr>
 										</thead>
 										<tbody>
@@ -535,7 +536,7 @@ export const InsightsPage: Component = () => {
 														<td class="py-2 pr-4 text-primary truncate max-w-48" title={ep.pattern}>
 															{ep.pattern.slice(0, 50)}{ep.pattern.length > 50 ? "..." : ""}
 														</td>
-														<td class="py-2 pr-4 text-right text-secondary">{ep.count}</td>
+														<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{ep.count}</td>
 														<td class="py-2 text-muted">{ep.tools.join(", ")}</td>
 													</tr>
 												)}
@@ -551,16 +552,16 @@ export const InsightsPage: Component = () => {
 				{/* Worst Sessions + Hotspot Files (side by side) */}
 				<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
 					<Show when={worstSessions().length > 0}>
-						<div class="rounded-lg border border-clens bg-surface p-4">
+						<div class="rounded-none border border-clens bg-surface p-4">
 							<SectionHeader title="Worst Sessions" />
 							<div class="overflow-x-auto">
 								<table class="w-full text-xs">
 									<thead>
 										<tr class="text-left text-muted border-b border-clens">
-											<th class="py-2 pr-4 font-medium">Session</th>
-											<th class="py-2 pr-4 font-medium text-right">Backtracks</th>
-											<th class="py-2 pr-4 font-medium text-right">Cost</th>
-											<th class="py-2 font-medium text-right">Duration</th>
+											<th class="instrument-microcaps py-2 pr-4 text-[10px]">Session</th>
+											<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Backtracks</th>
+											<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Cost</th>
+											<th class="instrument-microcaps py-2 text-[10px] text-right">Duration</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -570,16 +571,16 @@ export const InsightsPage: Component = () => {
 													class="border-b border-clens/50 hover:bg-surface-hover cursor-pointer transition"
 													onClick={() => navigate(`/session/${ws.session_id}`)}
 												>
-													<td class="py-2 pr-4 font-medium text-brand-500">
+													<td class="py-2 pr-4 font-mono font-medium text-brand-500">
 														{ws.session_id.slice(0, 8)}
 													</td>
-													<td class="py-2 pr-4 text-right text-red-500 font-medium">
+													<td class="py-2 pr-4 text-right font-mono tabular-nums text-danger font-medium">
 														{ws.backtrack_count}
 													</td>
-													<td class="py-2 pr-4 text-right text-secondary">
+													<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">
 														${ws.cost_usd.toFixed(2)}
 													</td>
-													<td class="py-2 text-right text-secondary">
+													<td class="py-2 text-right font-mono tabular-nums text-secondary">
 														{formatDuration(ws.duration_ms)}
 													</td>
 												</tr>
@@ -591,14 +592,14 @@ export const InsightsPage: Component = () => {
 						</div>
 					</Show>
 					<Show when={topBacktrackFiles().length > 0}>
-						<div class="rounded-lg border border-clens bg-surface p-4">
+						<div class="rounded-none border border-clens bg-surface p-4">
 							<SectionHeader title="Hotspot Files" />
 							<div class="overflow-x-auto">
 								<table class="w-full text-xs">
 									<thead>
 										<tr class="text-left text-muted border-b border-clens">
-											<th class="py-2 pr-4 font-medium">File Path</th>
-											<th class="py-2 font-medium text-right">Backtracks</th>
+											<th class="instrument-microcaps py-2 pr-4 text-[10px]">File Path</th>
+											<th class="instrument-microcaps py-2 text-[10px] text-right">Backtracks</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -608,7 +609,7 @@ export const InsightsPage: Component = () => {
 													<td class="py-2 pr-4 text-primary truncate max-w-64" title={f.file}>
 														{f.file.split("/").slice(-2).join("/")}
 													</td>
-													<td class="py-2 text-right text-secondary">{f.count}</td>
+													<td class="py-2 text-right font-mono tabular-nums text-secondary">{f.count}</td>
 												</tr>
 											)}
 										</For>

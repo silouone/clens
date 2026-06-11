@@ -78,20 +78,20 @@ export const KeyboardHelp: Component = () => {
 						onClick={() => setShowHelp(false)}
 					>
 						<div
-							class="w-full max-w-md rounded-xl border border-clens bg-surface-raised p-6 shadow-card"
+							class="w-full max-w-md rounded-none border border-clens bg-surface-raised p-6"
 							onClick={(e) => e.stopPropagation()}
 						>
-							<div class="flex items-center justify-between">
+							<div class="flex items-center justify-between border-b border-clens pb-3">
 								<h2
 									id="keyboard-help-title"
-									class="flex items-center gap-2 text-lg font-semibold text-primary"
+									class="instrument-microcaps flex items-center gap-2 text-[12px] text-primary"
 								>
-									<Keyboard class="h-5 w-5" /> Keyboard Shortcuts
+									<Keyboard class="h-4 w-4" /> Keyboard Shortcuts
 								</h2>
 								<button
 									ref={closeButtonRef}
 									onClick={() => setShowHelp(false)}
-									class="rounded p-1 text-muted transition hover:bg-surface-hover hover:text-secondary"
+									class="rounded-none border border-clens px-1.5 py-0.5 font-mono text-[10px] text-muted transition hover:bg-surface-hover hover:text-secondary"
 								>
 									Esc
 								</button>
@@ -100,15 +100,15 @@ export const KeyboardHelp: Component = () => {
 								<For each={grouped()}>
 									{(group) => (
 										<div>
-											<h3 class="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
+											<h3 class="instrument-microcaps mb-1 text-[10px] text-muted">
 												{group.context}
 											</h3>
-											<div class="space-y-0.5">
+											<div class="divide-y divide-clens">
 												<For each={group.entries}>
 													{(shortcut) => (
 														<div class="flex items-center justify-between py-1.5">
 															<span class="text-sm text-secondary">{shortcut.label}</span>
-															<kbd class="rounded border border-clens bg-surface-muted px-2 py-0.5 font-mono text-xs text-secondary">
+															<kbd class="rounded-none border border-clens bg-surface-muted px-2 py-0.5 font-mono text-xs tabular-nums text-secondary">
 																{shortcut.key}
 															</kbd>
 														</div>
