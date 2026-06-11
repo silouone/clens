@@ -288,8 +288,15 @@ const WorkUnitOverview: Component<{
 						<For each={fileList()}>
 							{(file) => (
 								<div class="flex items-center gap-2 rounded-none px-2 py-1 hover:bg-surface-hover transition-colors">
-									<span class="flex-1 truncate font-mono text-[11px] text-secondary" title={file.file_path}>
-										{file.file_path.split("/").slice(-1)[0]}
+									{/* Full repo-relative path, truncated from the LEFT so the filename
+									    stays visible — basenames alone made distinct files with the same
+									    name (root vs packages/web package.json) look like duplicates */}
+									<span
+										class="flex-1 truncate font-mono text-[11px] text-secondary"
+										style={{ direction: "rtl", "text-align": "left" }}
+										title={file.file_path}
+									>
+										{file.file_path}
 									</span>
 									<span class="shrink-0 text-[10px] tabular-nums text-muted">
 										{file.edits > 0 ? `${file.edits}e` : ""}{file.writes > 0 ? ` ${file.writes}w` : ""}
