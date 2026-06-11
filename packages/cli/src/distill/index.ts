@@ -432,12 +432,18 @@ export const distill = async (
 	const effectiveBacktracks = aggregated?.backtracks ?? backtracks;
 	const effectiveReasoning = aggregated?.reasoning ?? reasoning;
 
-	// Active duration computation (uses raw unfiltered timing gaps, not noise-filtered decisions)
+	// Active duration computation (uses raw unfiltered timing gaps, not noise-filtered decisions).
+	// Gaps must be subtracted from the WALL span: stats.duration_ms is already
+	// idle-trimmed, so subtracting the same gaps from it zeroed Active for any
+	// session containing a >5min pause (bug B3, double subtraction).
+	const wallDurationMs =
+		effectiveStats.wall_duration_ms ??
+		(events.length > 1 ? events[events.length - 1].t - events[0].t : 0);
 	const rawTimingGaps = extractRawTimingGaps(events);
-	const rawActiveDuration = computeActiveDuration(rawTimingGaps, effectiveStats.duration_ms);
+	const rawActiveDuration = computeActiveDuration(rawTimingGaps, wallDurationMs);
 
 	// For multi-agent sessions, parent timing gaps alone may show 0 active time.
-	// Fallback: use wall duration when agents exist but raw computation yields 0.
+	// Fallback: use the idle-trimmed duration when agents exist but raw computation yields 0.
 	const activeDuration =
 		rawActiveDuration.active_ms === 0 && agents && agents.length > 0
 			? { ...rawActiveDuration, active_ms: effectiveStats.duration_ms }
@@ -472,6 +478,8 @@ export const distill = async (
 		...(transcriptData.session_name ? { session_name: transcriptData.session_name } : {}),
 		start_time: events[0]?.t,
 		stats: effectiveStats,
+		// Top-level mirror of stats.cost_estimate — the web UI reads it here (bug B9)
+		...(effectiveStats.cost_estimate ? { cost_estimate: effectiveStats.cost_estimate } : {}),
 		backtracks: [...effectiveBacktracks],
 		decisions,
 		file_map: effectiveFileMap,

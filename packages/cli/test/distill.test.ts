@@ -1000,8 +1000,9 @@ describe("extractStats - model prefix matching", () => {
 		const stats = extractStats(events, [], transcriptTokenUsage);
 		expect(stats.cost_estimate).toBeDefined();
 		expect(stats.cost_estimate?.model).toBe("claude-opus-4-6");
-		// Opus pricing: $15/M input + $75/M output = $90 for 1M each
-		expect(stats.cost_estimate?.estimated_cost_usd).toBe(90);
+		// Opus 4.6 pricing: $5/M input + $25/M output = $30 for 1M each
+		// (regression for bug B8 — 4.6 was billed at Opus 4.0's $15/$75 rates)
+		expect(stats.cost_estimate?.estimated_cost_usd).toBe(30);
 		expect(stats.cost_estimate?.is_estimated).toBe(false);
 	});
 
@@ -1026,13 +1027,31 @@ describe("extractStats - model prefix matching", () => {
 		expect(stats.cost_estimate?.is_estimated).toBe(false);
 	});
 
-	test("estimateCostFromTokens with claude-opus-4-6 uses opus pricing", () => {
+	test("estimateCostFromTokens with claude-opus-4-6 uses opus 4.6 pricing", () => {
 		const result = estimateCostFromTokens("claude-opus-4-6", 1_000_000, 1_000_000);
 		expect(result).toBeDefined();
 		expect(result?.model).toBe("claude-opus-4-6");
+		// $5/M input + $25/M output = $30 (longest-prefix match beats claude-opus-4)
+		expect(result?.estimated_cost_usd).toBe(30);
+		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("claude-opus-4-0 keeps legacy opus pricing (family fallback)", () => {
+		const result = estimateCostFromTokens("claude-opus-4-20250514", 1_000_000, 1_000_000);
 		// $15/M input + $75/M output = $90
 		expect(result?.estimated_cost_usd).toBe(90);
-		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("claude-fable-5 is priced ($10/$50)", () => {
+		const result = estimateCostFromTokens("claude-fable-5[1m]", 1_000_000, 1_000_000);
+		// Regression for bug B8: the current model had no pricing entry → $0.00 shown as fact
+		expect(result?.estimated_cost_usd).toBe(60);
+	});
+
+	test("claude-haiku-4-5 is priced at haiku 4.5 rates, not haiku 3.5", () => {
+		const result = estimateCostFromTokens("claude-haiku-4-5-20251001", 1_000_000, 1_000_000);
+		// $1/M input + $5/M output = $6 (was $0.80/$4 via the claude-haiku-4 fallback)
+		expect(result?.estimated_cost_usd).toBe(6);
 	});
 
 	test("estimateCostFromTokens with claude-sonnet-4-6 uses sonnet pricing", () => {

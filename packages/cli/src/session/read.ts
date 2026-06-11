@@ -76,7 +76,9 @@ export const listSessions = (projectDir: string): SessionSummary[] => {
 						session_id: sessionId,
 						start_time: startTime,
 						end_time: isComplete ? endTime : undefined,
-						duration_ms: effectiveDuration.effective_duration_ms,
+						// Wall-clock span — must agree with the web list (bug B2: same field
+						// carried wall in the API but idle-trimmed here, so list views disagreed)
+						duration_ms: effectiveDuration.wall_duration_ms,
 						event_count: lines.length,
 						git_branch: firstEvent.context?.git_branch || undefined,
 						team_name: firstEvent.context?.team_name || undefined,

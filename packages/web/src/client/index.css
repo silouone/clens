@@ -10,7 +10,7 @@ html {
 
 :root {
 	--clens-brand: #0891b2;
-	--clens-surface: é#fafaf9;
+	--clens-surface: #fafaf9;
 	--clens-surface-raised: #ffffff;
 	--clens-surface-overlay: theme("colors.white");
 	--clens-muted: theme("colors.gray.500");

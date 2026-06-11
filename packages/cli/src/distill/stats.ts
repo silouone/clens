@@ -1,20 +1,40 @@
 import type { CostEstimate, PricingTier, StatsResult, StoredEvent, TokenUsage, TranscriptReasoning } from "../types";
 import { computeEffectiveDuration, findLastMeaningfulEvent } from "../utils";
 
+// Per-MTok API rates (platform.claude.com pricing, verified 2026-06-11).
+// Longest matching prefix wins, so version-specific entries override the
+// family fallbacks (e.g. Opus 4.5+ at $5/$25 vs Opus 4.0/4.1 at $15/$75).
+// Cache rates: read = 0.1x input, write = 1.25x input (5-minute TTL).
 const API_PRICING = {
+	"claude-fable-5": { input: 10, output: 50, cache_read: 1.0, cache_write: 12.5 },
+	"claude-opus-4-8": { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 },
+	"claude-opus-4-7": { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 },
+	"claude-opus-4-6": { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 },
+	"claude-opus-4-5": { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 },
 	"claude-opus-4": { input: 15, output: 75, cache_read: 1.5, cache_write: 18.75 },
 	"claude-sonnet-4": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
+	"claude-haiku-4-5": { input: 1, output: 5, cache_read: 0.1, cache_write: 1.25 },
 	"claude-haiku-4": { input: 0.8, output: 4, cache_read: 0.08, cache_write: 1.0 },
 } as const;
 
 export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
-	"claude-opus-4": 1_000_000,
+	"claude-fable-5": 1_000_000,
+	"claude-opus-4-8": 1_000_000,
+	"claude-opus-4-7": 1_000_000,
+	"claude-opus-4-6": 1_000_000,
+	"claude-opus-4": 200_000,
+	"claude-sonnet-4-6": 1_000_000,
 	"claude-sonnet-4": 200_000,
 	"claude-haiku-4": 200_000,
 };
 
+/** Longest prefix first so version-specific entries beat family fallbacks. */
+const byLengthDesc = (a: string, b: string): number => b.length - a.length;
+
+const CONTEXT_WINDOW_PREFIXES = Object.keys(MODEL_CONTEXT_WINDOWS).sort(byLengthDesc);
+
 export const getModelContextWindow = (model: string): number | undefined => {
-	const matchedPrefix = Object.keys(MODEL_CONTEXT_WINDOWS).find((prefix) => model.startsWith(prefix));
+	const matchedPrefix = CONTEXT_WINDOW_PREFIXES.find((prefix) => model.startsWith(prefix));
 	return matchedPrefix ? MODEL_CONTEXT_WINDOWS[matchedPrefix] : undefined;
 };
 
@@ -23,7 +43,7 @@ const SUBSCRIPTION_MULTIPLIER = 1 / 3;
 
 type ModelPrefix = keyof typeof API_PRICING;
 
-const MODEL_PREFIXES = Object.keys(API_PRICING) as ModelPrefix[];
+const MODEL_PREFIXES = (Object.keys(API_PRICING) as ModelPrefix[]).sort(byLengthDesc);
 
 interface ModelRates {
 	readonly input: number;
@@ -286,6 +306,7 @@ export const extractStats = (
 	return {
 		total_events: events.length,
 		duration_ms: effectiveDuration.effective_duration_ms,
+		wall_duration_ms: effectiveDuration.wall_duration_ms,
 		events_by_type: eventsByType,
 		tools_by_name: toolsByName,
 		tool_call_count: toolCallCount,

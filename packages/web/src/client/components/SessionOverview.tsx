@@ -70,15 +70,25 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 	const displayText = () => (expanded() ? rawPrompt() ?? "" : truncated().text);
 
 	// -- Duration ---------------------------------------------------------
-	const totalMs = createMemo(() => session().stats.duration_ms);
+	// Wall-clock span so the detail page agrees with the session list (bug B2);
+	// older distills without wall_duration_ms fall back to the idle-trimmed value.
+	const totalMs = createMemo(
+		() => session().stats.wall_duration_ms ?? session().stats.duration_ms,
+	);
 	const activeMs = createMemo(
 		() => session().summary?.key_metrics.active_duration_ms,
 	);
 
 	// -- Cost -------------------------------------------------------------
-	const cost = createMemo(() => session().cost_estimate?.estimated_cost_usd);
-	const costIsEstimated = createMemo(() => session().cost_estimate?.is_estimated);
-	const pricingTier = createMemo(() => session().cost_estimate?.pricing_tier);
+	const cost = createMemo(
+		() => (session().cost_estimate ?? session().stats.cost_estimate)?.estimated_cost_usd,
+	);
+	const costIsEstimated = createMemo(
+		() => (session().cost_estimate ?? session().stats.cost_estimate)?.is_estimated,
+	);
+	const pricingTier = createMemo(
+		() => (session().cost_estimate ?? session().stats.cost_estimate)?.pricing_tier,
+	);
 
 	// -- Quality ----------------------------------------------------------
 	const toolCallCount = createMemo(

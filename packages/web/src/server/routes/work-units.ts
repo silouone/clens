@@ -19,7 +19,9 @@ const buildSessionSummary = (
 	session_id: sessionId,
 	session_name: distilled?.session_name ?? undefined,
 	is_distilled: distilled !== undefined,
-	duration_ms: distilled?.stats.duration_ms ?? 0,
+	// Wall span: work-unit date ranges treat start_time + duration_ms as the
+	// session end, so the idle-trimmed value put ends hours early (bug B14)
+	duration_ms: distilled?.stats.wall_duration_ms ?? distilled?.stats.duration_ms ?? 0,
 })
 
 // ── Work Units route factory ────────────────────────────────────────

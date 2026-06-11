@@ -252,15 +252,27 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 		clearLiveEvents()
 		clearLiveLinks()
 
-		// Hydrate from existing events via REST (raw fetch — events endpoint uses query params not typed in Hono)
+		// Hydrate from existing events via REST (raw fetch — events endpoint uses query params not typed in Hono).
+		// The endpoint caps limit at 1000, so page until has_next is false; a single
+		// oversized request used to 400 and silently skip hydration (bug B7).
 		;(async () => {
 			try {
 				const token = getToken()
 				const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-				const res = await fetch(`/api/sessions/${id}/events?offset=0&limit=10000`, { headers })
-				if (!res.ok) return
-				const body = (await res.json()) as Record<string, unknown>
-				const events = Array.isArray(body.data) ? (body.data as readonly StoredEvent[]) : []
+				const PAGE_LIMIT = 1000
+				const MAX_EVENTS = 100_000
+				const events: StoredEvent[] = []
+				let offset = 0
+				while (offset < MAX_EVENTS) {
+					const res = await fetch(`/api/sessions/${id}/events?offset=${offset}&limit=${PAGE_LIMIT}`, { headers })
+					if (!res.ok) break
+					const body = (await res.json()) as Record<string, unknown>
+					const page = Array.isArray(body.data) ? (body.data as readonly StoredEvent[]) : []
+					events.push(...page)
+					const pagination = body.pagination as { readonly has_next?: boolean } | undefined
+					if (page.length === 0 || !pagination?.has_next) break
+					offset += page.length
+				}
 
 				const hydrated = events.reduce(
 					(acc, event) => processEvent(acc, event),

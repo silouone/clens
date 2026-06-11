@@ -5,6 +5,8 @@ import type { TranscriptReasoning, TranscriptUserMessage } from "./transcript";
 export interface StatsResult {
 	readonly total_events: number;
 	readonly duration_ms: number;
+	/** Wall-clock span (last event t - first event t); duration_ms is idle-trimmed. */
+	readonly wall_duration_ms?: number;
 	readonly events_by_type: Readonly<Record<string, number>>;
 	readonly tools_by_name: Readonly<Record<string, number>>;
 	readonly tool_call_count: number;

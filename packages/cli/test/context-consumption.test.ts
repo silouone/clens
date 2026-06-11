@@ -252,7 +252,7 @@ describe("extractContextConsumption", () => {
 		expect(r.turn_count).toBe(1);
 	});
 
-	test("works with claude-opus-4 model (1M context)", () => {
+	test("works with claude-opus-4-6 model (1M context)", () => {
 		const entries = [
 			mockEntry({
 				message: {
@@ -263,7 +263,7 @@ describe("extractContextConsumption", () => {
 			}),
 		];
 
-		const r = defined(extractContextConsumption(entries, "claude-opus-4-20250514"));
+		const r = defined(extractContextConsumption(entries, "claude-opus-4-6"));
 		expect(r.model_context_window).toBe(1_000_000);
 		// total = 170000, pct = 170000/1000000 * 100 = 17
 		expect(r.points[0].context_pct).toBe(17);
@@ -271,11 +271,23 @@ describe("extractContextConsumption", () => {
 });
 
 describe("getModelContextWindow", () => {
-	test("resolves claude-opus-4 prefix", () => {
-		expect(getModelContextWindow("claude-opus-4-20250514")).toBe(1_000_000);
+	// Regression for bug B8: every Opus variant resolved to 1M; only 4.6+ are 1M.
+	test("claude-opus-4-0 (legacy) resolves to 200K", () => {
+		expect(getModelContextWindow("claude-opus-4-20250514")).toBe(200_000);
 	});
 
-	test("resolves claude-sonnet-4 prefix", () => {
+	test("claude-opus-4-6 and later resolve to 1M", () => {
+		expect(getModelContextWindow("claude-opus-4-6")).toBe(1_000_000);
+		expect(getModelContextWindow("claude-opus-4-7")).toBe(1_000_000);
+		expect(getModelContextWindow("claude-opus-4-8")).toBe(1_000_000);
+	});
+
+	test("claude-fable-5 resolves to 1M", () => {
+		expect(getModelContextWindow("claude-fable-5[1m]")).toBe(1_000_000);
+	});
+
+	test("claude-sonnet-4-6 resolves to 1M, older sonnet to 200K", () => {
+		expect(getModelContextWindow("claude-sonnet-4-6")).toBe(1_000_000);
 		expect(getModelContextWindow("claude-sonnet-4-20250514")).toBe(200_000);
 	});
 
@@ -288,6 +300,6 @@ describe("getModelContextWindow", () => {
 	});
 
 	test("matches exact prefix", () => {
-		expect(getModelContextWindow("claude-opus-4")).toBe(1_000_000);
+		expect(getModelContextWindow("claude-opus-4")).toBe(200_000);
 	});
 });

@@ -94,7 +94,9 @@ const readDistilledSessions = (projectDir: string): readonly DistilledSessionSum
 				file_map: session.file_map,
 				plan_drift: session.plan_drift,
 				user_messages: session.user_messages,
-				duration_ms: session.stats.duration_ms,
+				// Wall span: work-unit grouping and date ranges treat
+				// start_time + duration_ms as the session end (bug B14)
+				duration_ms: session.stats.wall_duration_ms ?? session.stats.duration_ms,
 				git_branch: gitBranch,
 				tool_call_count: session.stats.tool_call_count,
 				summary_phases: session.summary?.phases,

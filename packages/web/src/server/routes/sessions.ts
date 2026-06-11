@@ -36,7 +36,38 @@ const tryParseJson = (line: string): ParsedEvent | undefined => {
 	}
 }
 
-/** Read only the first and last lines of a file without loading the entire content. */
+// Exact line counts are required (estimated counts shipped wrong numbers to the
+// UI — see specs/revive/bug-register.md B1). Counting scans the whole file, so
+// results are cached per path and invalidated by (size, mtimeMs).
+const lineCountCache = new Map<string, { size: number; mtimeMs: number; count: number }>()
+
+/** Count non-empty lines exactly, streaming the fd in chunks (no full-file string alloc). */
+const countNonEmptyLines = (fd: number, size: number): number => {
+	const CHUNK = 262144
+	const buf = Buffer.alloc(Math.min(CHUNK, size))
+	let count = 0
+	let lineHasContent = false
+	let offset = 0
+	while (offset < size) {
+		const bytesRead = readSync(fd, buf, 0, Math.min(CHUNK, size - offset), offset)
+		if (bytesRead <= 0) break
+		for (let i = 0; i < bytesRead; ) {
+			const nl = buf.indexOf(0x0a, i)
+			if (nl === -1 || nl >= bytesRead) {
+				if (bytesRead - i > 0) lineHasContent = true
+				break
+			}
+			if (lineHasContent || nl > i) count++
+			lineHasContent = false
+			i = nl + 1
+		}
+		offset += bytesRead
+	}
+	if (lineHasContent) count++
+	return count
+}
+
+/** Read the first and last lines plus an exact (cached) line count. */
 const readFirstLastLines = (filePath: string): { first: string; last: string; lineCount: number } | undefined => {
 	const fd = openSync(filePath, "r")
 	try {
@@ -45,6 +76,16 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 
 		const CHUNK = 16384
 
+		const cached = lineCountCache.get(filePath)
+		const lineCount =
+			cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs
+				? cached.count
+				: countNonEmptyLines(fd, stat.size)
+		if (!cached || cached.size !== stat.size || cached.mtimeMs !== stat.mtimeMs) {
+			lineCountCache.set(filePath, { size: stat.size, mtimeMs: stat.mtimeMs, count: lineCount })
+		}
+		if (lineCount === 0) return undefined
+
 		// For small files (fits in one chunk), read exactly
 		if (stat.size <= CHUNK) {
 			const buf = Buffer.alloc(stat.size)
@@ -52,15 +93,15 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 			const text = buf.toString("utf-8")
 			const lines = text.split("\n").filter(Boolean)
 			if (lines.length === 0) return undefined
-			return { first: lines[0], last: lines[lines.length - 1], lineCount: lines.length }
+			return { first: lines[0], last: lines[lines.length - 1], lineCount }
 		}
 
-		// Large file: read head + tail chunks only
+		// Large file: read head + tail chunks for first/last lines only
 		const headBuf = Buffer.alloc(CHUNK)
 		readSync(fd, headBuf, 0, CHUNK, 0)
 		const headStr = headBuf.toString("utf-8")
 		const firstNewline = headStr.indexOf("\n")
-		if (firstNewline === -1) return { first: headStr.trim(), last: headStr.trim(), lineCount: 1 }
+		if (firstNewline === -1) return { first: headStr.trim(), last: headStr.trim(), lineCount }
 		const first = headStr.slice(0, firstNewline)
 
 		// Read last line from tail
@@ -69,11 +110,6 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 		const tailStr = tailBuf.toString("utf-8")
 		const tailLines = tailStr.split("\n").filter(Boolean)
 		const last = tailLines.length > 0 ? tailLines[tailLines.length - 1] : first
-
-		// Count newlines in head chunk to estimate average line length
-		const headLines = headStr.split("\n").filter(Boolean)
-		const avgLineLen = headLines.length > 0 ? CHUNK / headLines.length : first.length + 1
-		const lineCount = Math.max(1, Math.round(stat.size / avgLineLen))
 
 		return { first, last, lineCount }
 	} finally {
