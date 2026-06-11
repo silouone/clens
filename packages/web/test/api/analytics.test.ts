@@ -247,3 +247,84 @@ describe("analytics API", () => {
 		rmSync(dir, { recursive: true, force: true })
 	})
 })
+
+// ── Global analytics: unknown project filter must not fall back to wrong data ──
+//
+// Bug global-analytics-unknown-project-falls-back-to-wrong-data: effectiveDirsFor
+// returned [fallbackDir] when a ?project= id matched no registered project, serving
+// the unfiltered/wrong project's analytics instead of an empty result.
+
+describe("global analytics — unknown project filter", () => {
+	const ROOT = "/tmp/clens-analytics-global-test"
+	const PROJ_A = `${ROOT}/project-alpha`
+	const PROJ_B = `${ROOT}/project-beta`
+	const A_ID = "aaaa1111-1111-1111-1111-111111111111"
+
+	let app: ReturnType<typeof createApp>
+
+	beforeAll(() => {
+		rmSync(ROOT, { recursive: true, force: true })
+		for (const dir of [PROJ_A, PROJ_B]) {
+			mkdirSync(`${dir}/.clens/sessions`, { recursive: true })
+			mkdirSync(`${dir}/.clens/distilled`, { recursive: true })
+		}
+
+		const ts = noonDaysAgo(1)
+		// One priced, distilled session ONLY in project-alpha.
+		writeFileSync(
+			`${PROJ_A}/.clens/sessions/${A_ID}.jsonl`,
+			[
+				JSON.stringify({ event: "SessionStart", t: ts, sid: A_ID, data: { source: "cli" }, context: {} }),
+				JSON.stringify({ event: "Stop", t: ts + 1000, sid: A_ID, data: { reason: "done" }, context: {} }),
+			].join("\n") + "\n",
+		)
+		writeFileSync(
+			`${PROJ_A}/.clens/distilled/${A_ID}.json`,
+			JSON.stringify({
+				session_id: A_ID,
+				start_time: ts,
+				stats: {
+					total_events: 2, duration_ms: 1000, events_by_type: {}, tools_by_name: {},
+					tool_call_count: 0, failure_count: 0, failure_rate: 0, unique_files: [],
+					cost_estimate: { model: "claude-fable-5", estimated_input_tokens: 100, estimated_output_tokens: 50, estimated_cost_usd: 9.99, is_estimated: false },
+				},
+				backtracks: [], decisions: [], file_map: { files: [] }, git_diff: { commits: [], hunks: [] },
+				edit_chains: { chains: [] }, reasoning: [], user_messages: [], complete: true,
+			}),
+		)
+
+		const projects = [
+			{ id: "project-alpha", path: PROJ_A, name: "project-alpha", added_at: Date.now() },
+			{ id: "project-beta", path: PROJ_B, name: "project-beta", added_at: Date.now() },
+		]
+		app = createApp({ token: "test", mode: "development", projectDir: PROJ_A, projects })
+	})
+
+	afterAll(() => {
+		rmSync(ROOT, { recursive: true, force: true })
+	})
+
+	test("known project filter returns that project's data", async () => {
+		const res = await app.request("/api/analytics/usage?range=7d&project=project-alpha")
+		expect(res.status).toBe(200)
+		const { data } = await res.json()
+		expect(data.totals.sessions).toBe(1)
+		expect(data.totals.cost_usd).toBeCloseTo(9.99)
+	})
+
+	test("unknown project filter returns EMPTY analytics, not fallback data", async () => {
+		const res = await app.request("/api/analytics/usage?range=7d&project=does-not-exist")
+		expect(res.status).toBe(200)
+		const { data } = await res.json()
+		// No registered project matched → no rows. Must NOT leak project-alpha's data.
+		expect(data.totals.sessions).toBe(0)
+		expect(data.totals.cost_usd).toBe(0)
+	})
+
+	test("unknown project filter on insights is also empty", async () => {
+		const res = await app.request("/api/analytics/insights?range=7d&project=nope")
+		expect(res.status).toBe(200)
+		const { data } = await res.json()
+		expect(data.population.total).toBe(0)
+	})
+})

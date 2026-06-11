@@ -772,8 +772,9 @@ describe("mergeCostEstimates", () => {
 		const result = mergeCostEstimates(parent, agentCosts);
 		expect(result).toBeDefined();
 
-		// Model comes from parent
-		expect(result?.model).toBe("claude-opus-4-20250514");
+		// Parent (opus) and agents (sonnet) use different models, so the merged label is
+		// "mixed" rather than mislabeling the multi-model sum as the parent's model.
+		expect(result?.model).toBe("mixed");
 
 		// Tokens summed: 5000 + 3000 + 2000 = 10000
 		expect(result?.estimated_input_tokens).toBe(10000);
@@ -864,6 +865,49 @@ describe("mergeCostEstimates", () => {
 		expect(result).toBeDefined();
 		expect(result?.cache_read_tokens).toBe(300);
 		expect(result?.cache_creation_tokens).toBe(125);
+	});
+
+	// Regression: merge-cost-estimates-drops-tier-and-mislabels-model.
+	test("preserves pricing_tier from the parent cost", () => {
+		const parent = makeCostEstimate({ pricing_tier: "max", estimated_cost_usd: 0.5 });
+		const agent = makeCostEstimate({ pricing_tier: "max", estimated_cost_usd: 0.3 });
+
+		const result = mergeCostEstimates(parent, [agent]);
+		expect(result?.pricing_tier).toBe("max");
+	});
+
+	test("preserves pricing_tier from an agent when the parent cost lacks it", () => {
+		const parent = makeCostEstimate({ estimated_cost_usd: 0.5 }); // no pricing_tier
+		const agent = makeCostEstimate({ pricing_tier: "max", estimated_cost_usd: 0.3 });
+
+		const result = mergeCostEstimates(parent, [agent]);
+		expect(result?.pricing_tier).toBe("max");
+	});
+
+	test("omits pricing_tier when no contributing cost carries one", () => {
+		const parent = makeCostEstimate({ estimated_cost_usd: 0.5 });
+		const agent = makeCostEstimate({ estimated_cost_usd: 0.3 });
+
+		const result = mergeCostEstimates(parent, [agent]);
+		expect(result?.pricing_tier).toBeUndefined();
+	});
+
+	test("labels model 'mixed' when contributing costs use different models", () => {
+		const parent = makeCostEstimate({ model: "claude-opus-4-8", estimated_cost_usd: 0.5 });
+		const agent1 = makeCostEstimate({ model: "claude-sonnet-4-6", estimated_cost_usd: 0.3 });
+		const agent2 = makeCostEstimate({ model: "claude-haiku-4-5", estimated_cost_usd: 0.2 });
+
+		const result = mergeCostEstimates(parent, [agent1, agent2]);
+		// A single model label would mislabel a multi-model merge.
+		expect(result?.model).toBe("mixed");
+	});
+
+	test("keeps the shared model label when every contributing cost agrees", () => {
+		const parent = makeCostEstimate({ model: "claude-opus-4-8", estimated_cost_usd: 0.5 });
+		const agent = makeCostEstimate({ model: "claude-opus-4-8", estimated_cost_usd: 0.3 });
+
+		const result = mergeCostEstimates(parent, [agent]);
+		expect(result?.model).toBe("claude-opus-4-8");
 	});
 });
 
@@ -1086,8 +1130,9 @@ describe("aggregateTeamData", () => {
 		expect(result.cost_estimate?.estimated_output_tokens).toBe(8500);
 		// 1.0 + 0.3 + 0.15 = 1.45
 		expect(result.cost_estimate?.estimated_cost_usd).toBe(1.45);
-		// Model from parent
-		expect(result.cost_estimate?.model).toBe("claude-opus-4-20250514");
+		// Parent (opus) and agents (sonnet) differ, so the merged cost is labeled "mixed"
+		// rather than mislabeling the multi-model sum as the parent's model.
+		expect(result.cost_estimate?.model).toBe("mixed");
 	});
 
 	test("agents with missing optional fields still aggregate correctly", () => {

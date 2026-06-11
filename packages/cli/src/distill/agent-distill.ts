@@ -161,7 +161,7 @@ export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: 
 	if (entries.length === 0) return undefined;
 
 	const events = transcriptToEvents(entries);
-	const statsResult = extractStats(events);
+	const statsResult = extractStats(events, [], undefined, tier);
 	const file_map = extractFileMap(events);
 	const token_usage = extractTokenUsage(entries);
 	const model = extractAgentModel(entries);

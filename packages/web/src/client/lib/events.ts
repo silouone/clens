@@ -1,6 +1,7 @@
 import { createSignal, onCleanup } from "solid-js";
 import { getToken } from "./api";
 import { refetchSessions } from "./stores";
+import { debounce } from "./debounce";
 
 const LOG_PREFIX = "[cLens:sse]";
 
@@ -34,21 +35,13 @@ type SSEEventHandler = {
 
 // ── Debounce ────────────────────────────────────────────────────────
 
-// Pragmatic exception: `let` is required here for closure-based timer state management.
-// Same pattern as simpleHash — timers inherently need mutable references within closures.
-const debounce = <T extends (...args: readonly unknown[]) => void>(
-	fn: T,
-	ms: number,
-): ((...args: Parameters<T>) => void) => {
-	// eslint-disable-next-line -- mutable timer ref required for debounce semantics
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	return (...args: Parameters<T>) => {
-		if (timer) clearTimeout(timer);
-		timer = setTimeout(() => fn(...args), ms);
-	};
-};
+// `debounce` (trailing-edge with a max-wait starvation cap) lives in the
+// SolidJS-free leaf module ./debounce so its timer logic is unit-testable.
 
 const REFETCH_DEBOUNCE_MS = 10_000;
+// Max time a refetch may be starved by sustained SSE activity before a forced
+// trailing flush. Bounds list staleness during a busy live session.
+const REFETCH_MAX_WAIT_MS = 30_000;
 const guardedRefetch = (() => {
 	const [inFlight, setInFlight] = createSignal(false);
 	return () => {
@@ -61,7 +54,7 @@ const guardedRefetch = (() => {
 		Promise.resolve(refetchSessions()).finally(() => setInFlight(false));
 	};
 })();
-const debouncedRefetch = debounce(guardedRefetch, REFETCH_DEBOUNCE_MS);
+const debouncedRefetch = debounce(guardedRefetch, REFETCH_DEBOUNCE_MS, REFETCH_MAX_WAIT_MS);
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -222,8 +215,17 @@ const clearLiveLinks = () => setLiveLinks([]);
 /**
  * Signal set when a distill_complete SSE event arrives.
  * SessionDetail watches this to refetch detail when the active session finishes distilling.
+ *
+ * `equals: false` is required: re-distilling the SAME session twice writes the
+ * identical session_id, and Solid's default `===` equality would suppress the
+ * second notification — so a manual Re-analyze of an already-viewed session
+ * would never refetch the detail. Disabling equality makes every
+ * distill_complete event re-fire subscribers regardless of value.
  */
-const [lastDistilledSessionId, setLastDistilledSessionId] = createSignal<string | undefined>();
+const [lastDistilledSessionId, setLastDistilledSessionId] = createSignal<string | undefined>(
+	undefined,
+	{ equals: false },
+);
 
 /**
  * Create the global SSE connection with default handlers.

@@ -121,7 +121,7 @@ const mergeSpawnAndInferredAgents = ({
 
 		const agentEvents = readAgentEvents(node.session_id);
 		const fromEvents = agentEvents.length > 0
-			? enrichNodeFromSessionEvents(node, agentEvents)
+			? enrichNodeFromSessionEvents(node, agentEvents, tier)
 			: node;
 
 		const transcriptPath = resolveTranscriptPath(agentEvents);
@@ -499,6 +499,9 @@ export const distill = async (
 		...(task_list && task_list.tasks.length > 0 ? { task_list } : {}),
 		...(context_consumption ? { context_consumption } : {}),
 		...(feature_usage ? { feature_usage } : {}),
+		// Record the tier this distill was priced at so a staleness check can detect when
+		// the configured tier changed since (tier-change-never-recomputes-stale-tier-mixing).
+		pricing_tier: resolvedTier,
 		complete: true,
 	};
 

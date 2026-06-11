@@ -186,8 +186,10 @@ describe("parseSpecExpectedFiles", () => {
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/real/path.ts"]);
 	});
 
-	test("extracts paths from table rows", () => {
+	test("extracts paths from table rows inside a files section", () => {
 		const content = [
+			"## Files",
+			"",
 			"| File | Description |",
 			"|------|-------------|",
 			"| src/distill/stats.ts | Statistics extraction |",
@@ -199,8 +201,22 @@ describe("parseSpecExpectedFiles", () => {
 		]);
 	});
 
-	test("extracts backtick-wrapped paths from table rows", () => {
+	test("does not extract table paths outside a files section (over-extraction)", () => {
+		// A table under a non-files heading is prose context, not a deliverables list.
 		const content = [
+			"## Background",
+			"",
+			"| File | Description |",
+			"|------|-------------|",
+			"| src/distill/stats.ts | Statistics extraction |",
+		].join("\n");
+		expect(parseSpecExpectedFiles(content)).toEqual([]);
+	});
+
+	test("extracts backtick-wrapped paths from table rows inside a files section", () => {
+		const content = [
+			"## Files to Modify",
+			"",
 			"| File | Action |",
 			"|------|--------|",
 			"| `src/distill/index.ts` | Modify |",
@@ -212,9 +228,9 @@ describe("parseSpecExpectedFiles", () => {
 		]);
 	});
 
-	test("extracts inline backtick paths from non-bullet text", () => {
+	test("extracts inline backtick paths from non-bullet text inside a files section", () => {
 		const content = [
-			"# Overview",
+			"## Files",
 			"",
 			"We need to modify `src/distill/plan-drift.ts` and also update `src/types/distill.ts` accordingly.",
 		].join("\n");
@@ -222,6 +238,16 @@ describe("parseSpecExpectedFiles", () => {
 			"src/distill/plan-drift.ts",
 			"src/types/distill.ts",
 		]);
+	});
+
+	test("ignores inline backtick prose mentions outside a files section (over-extraction)", () => {
+		// Prose code-references and placeholder paths must NOT inflate the expected set.
+		const content = [
+			"# Overview",
+			"",
+			"While debugging we touched `src/distill/plan-drift.ts`; see `path/to/file.ts` for the pattern.",
+		].join("\n");
+		expect(parseSpecExpectedFiles(content)).toEqual([]);
 	});
 
 	test("does not double-extract backtick paths from bullet lines", () => {
@@ -233,8 +259,9 @@ describe("parseSpecExpectedFiles", () => {
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/new-file.ts"]);
 	});
 
-	test("skips command-like strings in inline backticks", () => {
+	test("skips command-like strings in inline backticks inside a files section", () => {
 		const content = [
+			"## Files",
 			"Run `bun test` and `npm install` then check `src/app.ts`.",
 		].join("\n");
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/app.ts"]);
@@ -252,10 +279,12 @@ describe("parseSpecExpectedFiles", () => {
 	});
 
 	test("handles mixed code blocks, tables, and inline backticks", () => {
+		// `src/distill/index.ts` is declared via an explicit Modify: prefix (honored
+		// anywhere). The table path is inside a files section; code-block paths are global.
 		const content = [
 			"# Implementation Plan",
 			"",
-			"Modify `src/distill/index.ts` as the main orchestrator.",
+			"Modify: `src/distill/index.ts`",
 			"",
 			"## Files",
 			"",
@@ -276,8 +305,9 @@ describe("parseSpecExpectedFiles", () => {
 		]);
 	});
 
-	test("inline backtick extraction requires / in path", () => {
+	test("inline backtick extraction requires / in path inside a files section", () => {
 		const content = [
+			"## Files",
 			"Check `README.md` and `src/app.ts` for details.",
 		].join("\n");
 		// README.md has no /, so only src/app.ts is extracted

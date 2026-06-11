@@ -588,6 +588,79 @@ describe("buildAgentTree", () => {
 		// Then the outer logic checks: enriched.tool_call_count === 0? No (it's 1), so uses enriched as-is
 		expect(result[0].tool_call_count).toBe(1);
 	});
+
+	// Regression: agent-tree-ignores-event-agent-id-ghost-zeroing.
+	// Raw hook events carry data.agent_id; the per-event tag must be the source of
+	// truth for tool-call attribution, and a tagged agent must NOT be ghost-zeroed.
+	test("attributes tool calls by data.agent_id and does not ghost-zero a tagged agent", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
+			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session" }),
+		];
+		const events = [
+			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Read", agent_id: "agent-1" } }),
+			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Edit", agent_id: "agent-1" } }),
+			makeEvent({ t: 3500, event: "PreToolUse", data: { tool_name: "Bash", agent_id: "agent-1" } }),
+		];
+
+		// No transcript path → enrichment unavailable; pre-fix this agent would be ghost-zeroed to 0.
+		const result = buildAgentTree("root-session", links, events, noopReadTranscript);
+		expect(result[0].tool_call_count).toBe(3);
+	});
+
+	test("data.agent_id tags override the spawn→stop time window (tags outside window still count)", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
+			// Naive window stops at t=2000, but the agent's tagged calls happen later.
+			makeStop({ t: 2000, agent_id: "agent-1", parent_session: "root-session" }),
+		];
+		const events = [
+			makeEvent({ t: 4000, event: "PreToolUse", data: { tool_name: "Read", agent_id: "agent-1" } }),
+			makeEvent({ t: 6000, event: "PreToolUse", data: { tool_name: "Edit", agent_id: "agent-1" } }),
+		];
+
+		const result = buildAgentTree("root-session", links, events, noopReadTranscript);
+		// Tagged attribution finds both, even though both fall after the naive stop time.
+		expect(result[0].tool_call_count).toBe(2);
+	});
+
+	test("only counts the agent's own tagged events, not sibling agents' tagged events", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session", agent_name: "builder-1" }),
+			makeSpawn({ t: 1000, agent_id: "agent-2", parent_session: "root-session", agent_name: "builder-2" }),
+			makeStop({ t: 9000, agent_id: "agent-1", parent_session: "root-session" }),
+			makeStop({ t: 9000, agent_id: "agent-2", parent_session: "root-session" }),
+		];
+		// Overlapping intervals: pure time-window attribution would count all 5 for each agent.
+		const events = [
+			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Read", agent_id: "agent-1" } }),
+			makeEvent({ t: 2500, event: "PreToolUse", data: { tool_name: "Edit", agent_id: "agent-1" } }),
+			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Bash", agent_id: "agent-2" } }),
+			makeEvent({ t: 3500, event: "PreToolUse", data: { tool_name: "Grep", agent_id: "agent-2" } }),
+			makeEvent({ t: 4000, event: "PreToolUse", data: { tool_name: "Glob", agent_id: "agent-2" } }),
+		];
+
+		const result = buildAgentTree("root-session", links, events, noopReadTranscript);
+		const agent1 = result.find((n) => n.session_id === "agent-1");
+		const agent2 = result.find((n) => n.session_id === "agent-2");
+		expect(agent1?.tool_call_count).toBe(2);
+		expect(agent2?.tool_call_count).toBe(3);
+	});
+
+	test("falls back to time window for fully untagged sessions (legacy behavior preserved)", () => {
+		const links: readonly LinkEvent[] = [
+			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
+			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session" }),
+		];
+		// No agent_id tags → still ghost-zeroed without enrichment (unchanged behavior).
+		const events = [
+			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Read" } }),
+			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Edit" } }),
+		];
+
+		const result = buildAgentTree("root-session", links, events, noopReadTranscript);
+		expect(result[0].tool_call_count).toBe(0); // ghost agent: untagged + no enrichment
+	});
 });
 
 // -- inferAgentsFromComms --
@@ -848,6 +921,48 @@ describe("enrichNodeFromSessionEvents", () => {
 		];
 		const result = enrichNodeFromSessionEvents(baseNode, events);
 		expect(result.tool_call_count).toBe(0);
+	});
+
+	// Regression: agent-fallback-costs-ignore-pricing-tier.
+	// The fallback cost path must honor the resolved tier, not silently default to "api".
+	test("threads pricing tier into fallback cost estimate (max ≈ 1/3 of api)", () => {
+		const baseNode: AgentNode = {
+			session_id: "agent-1",
+			agent_type: "builder",
+			agent_name: "builder-1",
+			duration_ms: 5000,
+			tool_call_count: 0,
+			children: [],
+		};
+		const events: readonly StoredEvent[] = [
+			makeStoredEvent({
+				t: 1000,
+				event: "SessionStart",
+				data: {},
+				context: { ...makeSessionStartContext(), model: "claude-opus-4-8" },
+			}),
+			makeStoredEvent({
+				t: 2000,
+				event: "PreToolUse",
+				data: {
+					tool_name: "Read",
+					file_path: "/src/foo.ts",
+					usage: { input_tokens: 100000, output_tokens: 20000 },
+				},
+			}),
+		];
+
+		const apiNode = enrichNodeFromSessionEvents(baseNode, events, "api");
+		const maxNode = enrichNodeFromSessionEvents(baseNode, events, "max");
+
+		const apiCost = apiNode.cost_estimate?.estimated_cost_usd ?? 0;
+		const maxCost = maxNode.cost_estimate?.estimated_cost_usd ?? 0;
+		expect(apiCost).toBeGreaterThan(0);
+		expect(maxCost).toBeGreaterThan(0);
+		// max tier applies the ~1/3 subscription multiplier.
+		expect(maxCost).toBeCloseTo(apiCost / 3, 4);
+		expect(maxNode.cost_estimate?.pricing_tier).toBe("max");
+		expect(apiNode.cost_estimate?.pricing_tier).toBe("api");
 	});
 });
 

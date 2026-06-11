@@ -3,7 +3,9 @@ import type { TranscriptEntry, TranscriptUserMessage } from "../types";
 const classifyMessageType = (content: string): TranscriptUserMessage["message_type"] => {
 	if (content.includes("<command-name>") || content.includes("<command-message>")) return "command";
 	if (content.includes("<teammate-message")) return "teammate";
-	if (content.includes("[Image:") || content.includes("screenshot")) return "image";
+	// Only the real attachment marker indicates an image. The bare word "screenshot"
+	// appears in ordinary prompts and skill/system text and must not classify as image.
+	if (content.includes("[Image:")) return "image";
 	if (content.includes("<local-command") || content.includes("<system-reminder")) return "system";
 	return "prompt";
 };

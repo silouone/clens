@@ -150,22 +150,24 @@ export const parseSpecExpectedFiles = (specContent: string): readonly string[] =
 				return { ...acc, paths: [...acc.paths, ...extractCodeBlockPaths(line)] };
 			}
 
-			// Check for prefix paths anywhere in the doc
+			// Explicit declarations (Create:/Modify:/File:) are unambiguous deliverables
+			// and are honored anywhere in the doc.
 			const prefixPath = extractPrefixPath(line);
 			const prefixPaths = prefixPath ? [normalizePath(prefixPath)] : [];
 
-			// Extract inline backtick paths from anywhere (non-bullet lines)
-			const inlinePaths = extractInlineBacktickPaths(line);
-
-			// Extract table row paths
-			const tablePaths = extractTablePaths(line);
+			// Inline backtick and table paths are extracted ONLY inside a files section.
+			// Outside one they are prose code-references (e.g. "modify `src/foo.ts`",
+			// placeholder paths like `path/to/file.ts`) that inflate the expected set and
+			// distort drift. Gating mirrors the bullet-path handling below.
+			const inlinePaths = acc.inFilesSection ? extractInlineBacktickPaths(line) : [];
+			const tablePaths = acc.inFilesSection ? extractTablePaths(line) : [];
 
 			// Track section context
 			if (isFilesSectionHeading(line)) {
 				return {
 					inFilesSection: true,
 					inCodeBlock: false,
-					paths: [...acc.paths, ...prefixPaths, ...inlinePaths, ...tablePaths],
+					paths: [...acc.paths, ...prefixPaths],
 				};
 			}
 
@@ -173,7 +175,7 @@ export const parseSpecExpectedFiles = (specContent: string): readonly string[] =
 				return {
 					inFilesSection: false,
 					inCodeBlock: false,
-					paths: [...acc.paths, ...prefixPaths, ...inlinePaths, ...tablePaths],
+					paths: [...acc.paths, ...prefixPaths],
 				};
 			}
 

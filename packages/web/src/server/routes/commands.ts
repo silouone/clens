@@ -2,8 +2,10 @@ import { Hono } from "hono"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { distill } from "@clens/cli/src/distill"
 import { rebuildWorkUnitIndex } from "@clens/cli/src/session/work-units"
+import { writeAnalyticsSummary } from "@clens/cli/src/distill/analytics-summary"
 import type { ProjectEntry } from "@clens/cli"
 import { broadcastSSE } from "./events"
+import { invalidateAnalyticsCache } from "./analytics"
 import { createLogger } from "../logger"
 
 const log = createLogger("commands")
@@ -58,6 +60,15 @@ const createCommandsRoute = (projectDir: string, projects: readonly ProjectEntry
 						JSON.stringify(result, null, 2),
 					)
 					log.info(`Distill complete: ${sessionId.slice(0, 8)}`)
+					// Refresh the analytics summary row like the CLI distill does, then
+					// invalidate the analytics cache so the dashboard reflects the new row
+					// immediately (bug web-distill-skips-analytics-summary).
+					try {
+						writeAnalyticsSummary(result, ownerDir)
+						invalidateAnalyticsCache()
+					} catch (err) {
+						log.warn(`Analytics summary update failed: ${sessionId.slice(0, 8)}`, err instanceof Error ? err.message : String(err))
+					}
 					try { rebuildWorkUnitIndex(ownerDir) } catch { /* best-effort */ }
 					broadcastSSE({
 						type: "distill_complete",

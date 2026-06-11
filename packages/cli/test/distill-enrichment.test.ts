@@ -211,10 +211,12 @@ describe("extractUserMessages", () => {
 			expect(result[0].message_type).toBe("image");
 		});
 
-		test("classifies image messages with screenshot keyword", () => {
+		test("does NOT classify a prompt merely mentioning 'screenshot' as image", () => {
+			// Regression: the screenshot keyword misclassified text prompts as image
+			// messages (confirmed finding user-messages-screenshot-keyword-image-misclassification)
 			const entries = [makeUserEntry("Please look at this screenshot of the error")];
 			const result = extractUserMessages(entries);
-			expect(result[0].message_type).toBe("image");
+			expect(result[0].message_type).toBe("prompt");
 		});
 
 		test("classifies system messages with local-command", () => {
@@ -269,7 +271,8 @@ describe("extractUserMessages", () => {
 		test("does not set image_path for screenshot keyword without Image tag", () => {
 			const entries = [makeUserEntry("Look at the screenshot I shared")];
 			const result = extractUserMessages(entries);
-			expect(result[0].message_type).toBe("image");
+			// Keyword alone is a plain prompt (no Image tag — see regression above)
+			expect(result[0].message_type).toBe("prompt");
 			expect(result[0].image_path).toBeUndefined();
 		});
 	});

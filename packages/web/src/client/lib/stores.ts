@@ -2,6 +2,7 @@ import { createResource, createSignal } from "solid-js";
 import type { ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
 import { api } from "./api";
 import { preferences } from "./settings";
+import { isStaleConversationFetch } from "./fetch-guard";
 
 const LOG_PREFIX = "[cLens:api]";
 
@@ -168,18 +169,26 @@ const createConversationStore = (sessionId: () => string | undefined): Conversat
 	const fetchPage = async (id: string, pageOffset: number): Promise<void> => {
 		console.debug(LOG_PREFIX, `Fetching conversation: ${id.slice(0, 8)} offset=${pageOffset}`);
 		setLoading(true);
+		// Stale-response guard: the request id `id` is the session in flight; if
+		// the user navigates to another session while this fetch is awaiting, the
+		// resolution must NOT clobber the new session's store. Every state write
+		// below is gated on this still matching the current `sessionId()`.
+		const isStale = (): boolean => isStaleConversationFetch(id, sessionId());
 		try {
 			const res = await api.api.sessions[":sessionId"].conversation.$get({
 				param: { sessionId: id },
 			});
+			if (isStale()) return;
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({ error: "Unknown error" }));
+				if (isStale()) return;
 				const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
 				console.error(LOG_PREFIX, `Conversation error (${id.slice(0, 8)}):`, msg);
 				setGlobalError({ message: msg, code: String(res.status) });
 				return;
 			}
 			const body = await res.json();
+			if (isStale()) return;
 			if ("error" in body) {
 				console.error(LOG_PREFIX, `Conversation error (${id.slice(0, 8)}):`, body.error);
 				setGlobalError({ message: String(body.error), code: String(body.code) });
@@ -199,7 +208,9 @@ const createConversationStore = (sessionId: () => string | undefined): Conversat
 			}
 			setOffset(pageOffset + pageData.length);
 		} finally {
-			setLoading(false);
+			// Only clear our own loading flag while still the active session; a
+			// stale resolution must not flip loading for the new session's fetch.
+			if (!isStale()) setLoading(false);
 		}
 	};
 

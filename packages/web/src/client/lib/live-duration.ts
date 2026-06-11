@@ -38,3 +38,37 @@ export const computeLiveElapsed = (args: LiveElapsedArgs): number => {
 	const sinceLastEvent = Math.max(0, localNow - lastEventReceivedAt)
 	return Math.max(0, span + sinceLastEvent)
 }
+
+/**
+ * A live session whose last event is older than this is "idle", not "active".
+ * Mirrors the server's ACTIVE_THRESHOLD_MS (@clens/cli deriveSessionStatus) so
+ * the live detail view and the session list agree on the active/idle boundary —
+ * a quiet live session must not show "active" forever while the list says
+ * "idle". Kept as a local literal so this leaf module imports nothing.
+ */
+export const LIVE_ACTIVE_THRESHOLD_MS = 600_000 // 10 minutes
+
+export type LiveStatus = "active" | "idle" | "complete"
+
+/**
+ * Derive the DISPLAY status of a live session, aligned with the server's
+ * deriveSessionStatus semantics. The reducer can only ever produce "active" (or
+ * "complete" on a terminal event) because it has no notion of "now"; this
+ * overlay downgrades a still-running session to "idle" once its most recent
+ * event is older than the active threshold.
+ *
+ * - "complete" is terminal and never reverts.
+ * - With no events yet (lastEventTime === 0) the session is treated as active
+ *   (it just mounted; nothing has gone quiet).
+ * - Otherwise active iff `now - lastEventTime <= LIVE_ACTIVE_THRESHOLD_MS`,
+ *   else idle.
+ */
+export const deriveLiveStatus = (
+	rawStatus: LiveStatus,
+	lastEventTime: number,
+	now: number,
+): LiveStatus => {
+	if (rawStatus === "complete") return "complete"
+	if (lastEventTime === 0) return "active"
+	return now - lastEventTime <= LIVE_ACTIVE_THRESHOLD_MS ? "active" : "idle"
+}

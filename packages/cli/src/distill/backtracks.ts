@@ -1,6 +1,21 @@
 import type { BacktrackResult, StoredEvent } from "../types";
 
-export const extractBacktracks = (events: readonly StoredEvent[]): BacktrackResult[] => {
+/** Normalized agent key for an event. Parent-session events use "" (no agent_id). */
+const agentKeyOf = (event: StoredEvent): string =>
+	typeof event.data.agent_id === "string" ? event.data.agent_id : "";
+
+/** Partition events by their agent_id so backtrack sequences never cross agent boundaries. */
+const partitionByAgent = (events: readonly StoredEvent[]): readonly (readonly StoredEvent[])[] => {
+	const grouped = events.reduce<ReadonlyMap<string, readonly StoredEvent[]>>((acc, event) => {
+		const key = agentKeyOf(event);
+		const existing = acc.get(key) ?? [];
+		return new Map(acc).set(key, [...existing, event]);
+	}, new Map());
+	return [...grouped.values()];
+};
+
+/** Detect all three backtrack patterns within a single agent's event stream. */
+const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult[] => {
 	// Pattern 1: failure_retry — PostToolUseFailure followed by PreToolUse with same tool_name
 	const failureRetries = events.flatMap((failEvent, i): BacktrackResult[] => {
 		if (failEvent.event !== "PostToolUseFailure") return [];
@@ -97,11 +112,15 @@ export const extractBacktracks = (events: readonly StoredEvent[]): BacktrackResu
 		const MAX_CHAIN = 50;
 		const MAX_GAP_MS = 5 * 60 * 1000;
 		const subsequent = bashEvents.slice(i + 1);
-		const consecutiveBash = subsequent.reduce<{
+		const walk = subsequent.reduce<{
 			readonly items: typeof subsequent;
 			readonly stopped: boolean;
 			readonly lastT: number;
 			readonly lastIndex: number;
+			// Timestamp of the most recent in-chain bash event (PreToolUse OR PostToolUseFailure),
+			// so a loop that ends in a failure reports its true extent rather than truncating
+			// at the last successful retry. (Real loops keep failing — see "requires no subsequent failures".)
+			readonly endT: number;
 		}>(
 			(acc, entry) => {
 				if (acc.stopped) return acc;
@@ -113,13 +132,16 @@ export const extractBacktracks = (events: readonly StoredEvent[]): BacktrackResu
 					.some((e) => e.event === "PreToolUse" && e.data.tool_name !== "Bash");
 				if (hasNonBashInterleave) return { ...acc, stopped: true };
 
-				// Include PreToolUse in chain, skip PostToolUseFailure (update tracking either way)
+				// Each retry is one attempt, counted from its PreToolUse. Subsequent
+				// PostToolUseFailure events still belong to the loop (they advance endT and
+				// tracking) but are not double-counted as separate attempts.
 				return entry.event.event === "PreToolUse"
-					? { items: [...acc.items, entry], stopped: false, lastT: entry.event.t, lastIndex: entry.index }
-					: { ...acc, lastT: entry.event.t, lastIndex: entry.index };
+					? { items: [...acc.items, entry], stopped: false, lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t }
+					: { ...acc, lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t };
 			},
-			{ items: [], stopped: false, lastT: bashEntry.event.t, lastIndex: bashEntry.index },
-		).items;
+			{ items: [], stopped: false, lastT: bashEntry.event.t, lastIndex: bashEntry.index, endT: bashEntry.event.t },
+		);
+		const consecutiveBash = walk.items;
 
 		const debugAttempts = [
 			typeof bashEntry.event.data.tool_use_id === "string" ? bashEntry.event.data.tool_use_id : "",
@@ -135,7 +157,7 @@ export const extractBacktracks = (events: readonly StoredEvent[]): BacktrackResu
 				tool_name: "Bash",
 				attempts: debugAttempts.length,
 				start_t: initialFailEvent.t,
-				end_t: consecutiveBash[consecutiveBash.length - 1].event.t,
+				end_t: walk.endT,
 				tool_use_ids: debugAttempts,
 				error_message: extractErrorMessage(initialFailEvent),
 				command: extractCommand(initialFailEvent),
@@ -168,6 +190,16 @@ export const extractBacktracks = (events: readonly StoredEvent[]): BacktrackResu
 
 	return [...dedupedRetries, ...dedupedStruggles, ...dedupedDebugLoops];
 };
+
+/**
+ * Detect backtrack patterns across a session. Events are partitioned by agent_id
+ * first so a failure in one agent is never matched against a retry in another
+ * (cross-agent false retries). Results are sorted by start time.
+ */
+export const extractBacktracks = (events: readonly StoredEvent[]): BacktrackResult[] =>
+	partitionByAgent(events)
+		.flatMap(extractAgentBacktracks)
+		.sort((a, b) => a.start_t - b.start_t);
 
 const extractFilePath = (event: StoredEvent): string | undefined => {
 	const toolInput = event.data.tool_input;

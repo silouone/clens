@@ -316,6 +316,70 @@ describe("extractTaskList", () => {
 		expect(result.tasks[0].status).toBe("completed");
 	});
 
+	test("status_change to completed marks task completed with completed_at (B12)", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "task-1", subject: "Build feature" }),
+			mkTaskUpdate({
+				t: 4200,
+				task_id: "task-1",
+				action: "status_change",
+				status: "completed",
+			}),
+		];
+
+		const result = extractTaskList(links);
+
+		expect(result.tasks).toHaveLength(1);
+		const task = result.tasks[0];
+		expect(task.status).toBe("completed");
+		expect(task.completed_at).toBe(4200);
+		expect(result.completed_count).toBe(1);
+		expect(result.completion_rate).toBe(1);
+	});
+
+	test("status_change to completed counts toward completion_rate (B12)", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "t1", subject: "Task 1" }),
+			mkTaskCreate({ t: 1100, task_id: "t2", subject: "Task 2" }),
+			// t1 completed via status_change (no task_complete link emitted)
+			mkTaskUpdate({ t: 2000, task_id: "t1", action: "status_change", status: "completed" }),
+		];
+
+		const result = extractTaskList(links);
+
+		expect(result.total_count).toBe(2);
+		expect(result.completed_count).toBe(1);
+		expect(result.completion_rate).toBe(0.5);
+		expect(result.tasks.find((t) => t.task_id === "t1")?.status).toBe("completed");
+		expect(result.tasks.find((t) => t.task_id === "t2")?.status).toBe("pending");
+	});
+
+	test("status_change to deleted removes the task (B12)", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "t1", subject: "Keep" }),
+			mkTaskCreate({ t: 1100, task_id: "t2", subject: "Remove" }),
+			mkTaskUpdate({ t: 2000, task_id: "t2", action: "status_change", status: "deleted" }),
+		];
+
+		const result = extractTaskList(links);
+
+		expect(result.tasks).toHaveLength(1);
+		expect(result.tasks[0].task_id).toBe("t1");
+		expect(result.total_count).toBe(1);
+	});
+
+	test("status_change deleted via reconciled ordinal id removes the task (B12)", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "", subject: "Only task" }),
+			mkTaskUpdate({ t: 2000, task_id: "1", action: "status_change", status: "deleted" }),
+		];
+
+		const result = extractTaskList(links);
+
+		expect(result.tasks).toHaveLength(0);
+		expect(result.total_count).toBe(0);
+	});
+
 	test("update for non-existent task is ignored", () => {
 		const links: readonly LinkEvent[] = [
 			mkTaskCreate({ t: 1000, task_id: "task-1", subject: "Real task" }),

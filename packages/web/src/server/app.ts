@@ -102,17 +102,21 @@ const createApp = (options: AppOptions) => {
 
 	// ── Static assets (production only) ──
 	if (options.mode === "production") {
-		// Fingerprinted assets — immutable cache (1 year)
-		app.use(
-			"/assets/*",
-			serveStatic({ root: DIST_DIR }),
-		)
+		// Fingerprinted assets — immutable cache (1 year). The Cache-Control middleware
+		// MUST be registered BEFORE serveStatic: hono's serveStatic returns the response
+		// on a hit without calling next(), so a header middleware registered after it
+		// never runs (bug assets-cache-header-middleware-unreachable). Registered first,
+		// it runs, awaits serveStatic via next(), then stamps the header on the response.
 		app.use(
 			"/assets/*",
 			async (c, next) => {
 				await next()
 				c.header("Cache-Control", "public, max-age=31536000, immutable")
 			},
+		)
+		app.use(
+			"/assets/*",
+			serveStatic({ root: DIST_DIR }),
 		)
 		// All other paths — serve index.html for SPA routing
 		app.get(

@@ -1511,6 +1511,28 @@ describe("distill - session-scoped link filtering", () => {
 		expect(agentIds).not.toContain("agent-b1");
 		expect(agentIds).not.toContain("agent-b2");
 	});
+
+	// Regression: tier-change-never-recomputes-stale-tier-mixing.
+	// The distilled output must record the resolved tier it was priced at so a
+	// staleness layer can detect when the configured tier changed since distill.
+	test("records resolved pricing_tier (defaults to api with no config/override)", async () => {
+		const result = await distill(SESSION_A, TEST_DIR);
+		expect(result.pricing_tier).toBe("api");
+	});
+
+	test("records the CLI-override pricing tier in the distilled output", async () => {
+		const result = await distill(SESSION_A, TEST_DIR, { pricingTier: "max" });
+		expect(result.pricing_tier).toBe("max");
+	});
+
+	test("records the config-file pricing tier when no CLI override", async () => {
+		const clensDir = `${TEST_DIR}/.clens`;
+		writeFileSync(`${clensDir}/config.json`, JSON.stringify({ capture: true, pricing: "max" }));
+		const result = await distill(SESSION_A, TEST_DIR);
+		expect(result.pricing_tier).toBe("max");
+		// Cleanup so other tests in this describe see no config file.
+		rmSync(`${clensDir}/config.json`, { force: true });
+	});
 });
 
 // ---------------------------------------------------------------------------

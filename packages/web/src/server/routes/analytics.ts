@@ -714,9 +714,14 @@ export const createGlobalAnalyticsRoute = (projects: readonly ProjectEntry[], fa
 	const app = new Hono()
 
 	const effectiveDirsFor = (projectFilter?: string): readonly string[] => {
-		const dirs = projectFilter
-			? projects.filter((p) => p.id === projectFilter).map((p) => p.path)
-			: projects.map((p) => p.path)
+		// An explicit ?project= filter that matches no registered project must yield
+		// NO data — never silently fall back to every project's data (bug
+		// global-analytics-unknown-project-falls-back-to-wrong-data). The fallbackDir
+		// is only a safety net for the unfiltered case when the registry is empty.
+		if (projectFilter) {
+			return projects.filter((p) => p.id === projectFilter).map((p) => p.path)
+		}
+		const dirs = projects.map((p) => p.path)
 		return dirs.length > 0 ? dirs : [fallbackDir]
 	}
 

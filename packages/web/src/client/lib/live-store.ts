@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onCleanup, createMemo } from "solid-js"
 import { liveEvents, clearLiveEvents, setActiveSessionId, liveLinks, clearLiveLinks } from "./events"
 import { getToken } from "./api"
-import { computeLiveElapsed } from "./live-duration"
+import { computeLiveElapsed, deriveLiveStatus } from "./live-duration"
 import type { StoredEvent } from "../../shared/types"
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -193,8 +193,15 @@ const processEvent = (
 		}
 
 		case "UserPromptSubmit": {
-			const text = typeof event.data.text === "string" ? event.data.text : ""
-			return { ...base, user_prompts: [...state.user_prompts, text] }
+			// Real capture data stores the prompt under `data.prompt` (verified
+			// across all UserPromptSubmit events in .clens/sessions). Fall back to
+			// the legacy `data.text` key only if `prompt` is absent.
+			const prompt = typeof event.data.prompt === "string"
+				? event.data.prompt
+				: typeof event.data.text === "string"
+					? event.data.text
+					: ""
+			return { ...base, user_prompts: [...state.user_prompts, prompt] }
 		}
 
 		case "SessionEnd":
@@ -256,8 +263,23 @@ const processLink = (
 // ── SolidJS store factory ───────────────────────────────────────────
 
 const createLiveSessionStore = (sessionId: () => string | undefined) => {
-	const [state, setState] = createSignal<LiveSessionState | undefined>(undefined)
+	// `rawState` is the reducer output (status can only be "active"/"complete" —
+	// the reducer has no notion of "now"). `state` (below) overlays the
+	// server-aligned active/idle derivation onto it for consumers.
+	const [rawState, setState] = createSignal<LiveSessionState | undefined>(undefined)
 	const [elapsed, setElapsed] = createSignal(0)
+	// Wall-clock tick driving the active→idle transition for a quiet session.
+	// Advanced once per second by the duration effect's interval below.
+	const [now, setNow] = createSignal(Date.now())
+
+	// Consumer-facing state: rawState with the active/idle overlay applied, so a
+	// quiet live session reads "idle" exactly like the session list does (B6).
+	const state = createMemo<LiveSessionState | undefined>(() => {
+		const s = rawState()
+		if (!s) return undefined
+		const display = deriveLiveStatus(s.status, s.last_event_time, now())
+		return display === s.status ? s : { ...s, status: display }
+	})
 
 	// Initialize state when sessionId changes
 	createEffect(() => {
@@ -315,10 +337,11 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 		})
 	})
 
-	// Process incoming live events
+	// Process incoming live events (reduce from rawState — reducing from the
+	// overlay would persist a derived "idle" status back into the raw store)
 	createEffect(() => {
 		const events = liveEvents()
-		const current = state()
+		const current = rawState()
 		if (!current || events.length === 0) return
 
 		const isStoredEvent = (raw: unknown): raw is StoredEvent =>
@@ -338,10 +361,10 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 		clearLiveEvents()
 	})
 
-	// Process incoming link events
+	// Process incoming link events (reduce from rawState, as above)
 	createEffect(() => {
 		const links = liveLinks()
-		const current = state()
+		const current = rawState()
 		if (!current || links.length === 0) return
 
 		const validLinks = links.filter(
@@ -374,7 +397,9 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 		const status = s.status
 		const lastEventReceivedAt = Date.now()
 
-		const tick = () =>
+		const tick = () => {
+			// Advance the shared clock so the active→idle overlay re-evaluates
+			setNow(Date.now())
 			setElapsed(
 				computeLiveElapsed({
 					firstEventTime,
@@ -384,6 +409,7 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 					localNow: Date.now(),
 				}),
 			)
+		}
 
 		tick()
 		if (status === "complete") return

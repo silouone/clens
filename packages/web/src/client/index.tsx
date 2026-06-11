@@ -9,8 +9,9 @@ import { WorkUnitDetail } from "./pages/WorkUnitDetail";
 import { SettingsPage } from "./pages/SettingsPage";
 import { UsagePage } from "./pages/UsagePage";
 import { InsightsPage } from "./pages/InsightsPage";
-import "@fontsource-variable/inter";
-import "@fontsource-variable/jetbrains-mono";
+import "@fontsource-variable/ibm-plex-sans";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
 import "diff2html/bundles/css/diff2html.min.css";
 import "./index.css";
 

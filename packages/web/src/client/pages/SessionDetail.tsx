@@ -274,7 +274,13 @@ export const SessionDetail: Component = () => {
 	});
 
 	// ── Auto-distill when preference is enabled ──────────────
-	const [autoDistillTriggered, setAutoDistillTriggered] = createSignal(false);
+	// Track the session id we last auto-distilled, NOT a bare boolean. A single
+	// SessionDetail instance is reused across navigations (params.id changes
+	// without remount), so a boolean flag set once would suppress auto-distill
+	// for every subsequent session forever. Deriving `alreadyTriggered` from
+	// whether the triggered id still matches the current params.id resets the
+	// guard automatically on navigation.
+	const [autoDistilledId, setAutoDistilledId] = createSignal<string | undefined>(undefined);
 
 	// B17/D13: skip auto-distill for LIVE (active/idle) sessions — auto-distilling
 	// a running session freezes a stale "complete" snapshot. Only complete-but-
@@ -284,12 +290,12 @@ export const SessionDetail: Component = () => {
 		const guard = shouldAutoDistill({
 			autoDistillEnabled: preferences().autoDistill,
 			isNotDistilled: isNotDistilled(),
-			alreadyTriggered: autoDistillTriggered(),
+			alreadyTriggered: autoDistilledId() === params.id,
 			detailLoading: sessionDetail.loading,
 			summaryStatus: notDistilledSummary()?.status,
 		});
 		if (guard) {
-			setAutoDistillTriggered(true);
+			setAutoDistilledId(params.id);
 			api.api.commands.sessions[":sessionId"].distill.$post({
 				param: { sessionId: params.id },
 			}).catch(() => { /* distill error handled by SSE / polling */ });

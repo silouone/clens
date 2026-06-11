@@ -8,56 +8,135 @@ html {
 	font-size: 13px;
 }
 
+/* ── INSTRUMENT direction ──────────────────────────────────────────
+   Precision laboratory instrument / oscilloscope heritage.
+   Light = paper white + graphite ink + ONE accent (signal green).
+   Dark  = true instrument black + phosphor text + green/amber traces.
+   Square corners, hairline rules, NO shadows — separation by lines only. */
+
 :root {
-	--clens-brand: #0891b2;
-	--clens-surface: #fafaf9;
-	--clens-surface-raised: #ffffff;
-	--clens-surface-overlay: theme("colors.white");
-	--clens-muted: theme("colors.gray.500");
-	--clens-accent: #0891b2;
-	--clens-success: theme("colors.emerald.500");
-	--clens-warning: theme("colors.amber.500");
-	--clens-danger: theme("colors.red.500");
-	--clens-info: theme("colors.sky.500");
-	--clens-text-primary: theme("colors.gray.900");
-	--clens-text-secondary: theme("colors.gray.700");
-	--clens-text-muted: theme("colors.gray.500");
-	--clens-border: theme("colors.gray.200");
-	--clens-surface-hover: theme("colors.gray.100");
-	--clens-surface-selected: #ecfeff;
-	--clens-surface-muted: theme("colors.gray.100");
-	--clens-surface-inset: theme("colors.gray.50");
-	--clens-shadow-card: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+	/* Signal green — the single accent, reserved for live / active states */
+	--clens-brand: #0A8754;
+	/* Paper-white instrument surfaces */
+	--clens-surface: #F7F7F5;
+	--clens-surface-raised: #FCFCFB;
+	--clens-surface-overlay: #FFFFFF;
+	--clens-muted: #6B6F6C;
+	--clens-accent: #0A8754;
+	/* Status — restrained, LED-like */
+	--clens-success: #0A8754;
+	--clens-warning: #9A6700;
+	--clens-danger: #B42318;
+	--clens-info: #1A1C1B;
+	/* Graphite ink on paper */
+	--clens-text-primary: #1A1C1B;
+	--clens-text-secondary: #3D413F;
+	--clens-text-muted: #767A77;
+	/* Hairline rules */
+	--clens-border: #D8D8D4;
+	--clens-surface-hover: #EFEFEC;
+	--clens-surface-selected: #E6F2EC;
+	--clens-surface-muted: #EDEDEA;
+	--clens-surface-inset: #F1F1EE;
+	/* No shadows — separation by hairlines only */
+	--clens-shadow-card: none;
 	--clens-ring-card: none;
+	/* Hairline + tick-mark motif colors */
+	--clens-hairline: #D8D8D4;
+	--clens-tick: #C4C4BF;
+	--clens-live: #0A8754;
+	--clens-grain: rgba(26, 28, 27, 0.015);
 	--app-header-height: 37px;
 }
 
 .dark {
-	--clens-brand: #22d3ee;
-	--clens-surface: #0f0f1a;
-	--clens-surface-raised: #1a1a2e;
-	--clens-surface-overlay: #252540;
-	--clens-muted: theme("colors.gray.400");
-	--clens-accent: #22d3ee;
-	--clens-success: theme("colors.emerald.400");
-	--clens-warning: theme("colors.amber.400");
-	--clens-danger: theme("colors.red.400");
-	--clens-info: theme("colors.sky.400");
-	--clens-text-primary: theme("colors.gray.100");
-	--clens-text-secondary: theme("colors.gray.300");
-	--clens-text-muted: theme("colors.gray.400");
-	--clens-border: rgba(255, 255, 255, 0.08);
-	--clens-surface-hover: rgba(55, 65, 81, 0.5);
-	--clens-surface-selected: rgba(6, 182, 212, 0.15);
-	--clens-surface-muted: theme("colors.gray.800");
-	--clens-surface-inset: rgba(17, 24, 39, 0.5);
-	--clens-shadow-card: 0 2px 12px rgba(0,0,0,0.4);
-	--clens-ring-card: 0 0 0 1px rgba(255,255,255,0.08);
+	/* Phosphor green trace — sparingly */
+	--clens-brand: #33FF99;
+	/* True instrument black */
+	--clens-surface: #0A0C0B;
+	--clens-surface-raised: #0F1211;
+	--clens-surface-overlay: #141816;
+	--clens-muted: #7E8A84;
+	--clens-accent: #33FF99;
+	/* Status — phosphor green + amber warnings */
+	--clens-success: #33FF99;
+	--clens-warning: #FFB000;
+	--clens-danger: #FF6B5E;
+	--clens-info: #C8D1CC;
+	/* Phosphor text */
+	--clens-text-primary: #C8D1CC;
+	--clens-text-secondary: #9BA7A1;
+	--clens-text-muted: #6E7A74;
+	/* Hairlines */
+	--clens-border: #1E2220;
+	--clens-surface-hover: #161A18;
+	--clens-surface-selected: #0E2A1E;
+	--clens-surface-muted: #131715;
+	--clens-surface-inset: #0D100F;
+	--clens-shadow-card: none;
+	--clens-ring-card: none;
+	--clens-hairline: #1E2220;
+	--clens-tick: #232826;
+	--clens-live: #33FF99;
+	--clens-grain: rgba(200, 209, 204, 0.012);
 }
 
 body {
 	@apply bg-surface text-primary antialiased;
-	font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+	font-family: "IBM Plex Sans Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+	font-feature-settings: "tnum", "cv02";
+	/* Subtle scanline + grain on the page background — nearly invisible.
+	   Pure CSS: a 3px horizontal scanline grid + a faint diagonal grain. */
+	background-image:
+		repeating-linear-gradient(
+			0deg,
+			var(--clens-grain) 0px,
+			var(--clens-grain) 1px,
+			transparent 1px,
+			transparent 3px
+		);
+	background-attachment: fixed;
+}
+
+/* ── Instrument typography helpers ─────────────────────────────────── */
+
+/* Monospaced numerals for all data / ids — tabular, right-aligned in tables */
+.font-mono,
+.tabular-nums {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum", "zero";
+}
+
+/* Microcaps uppercase labels — column headers & section titles */
+.instrument-microcaps {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-weight: 500;
+}
+
+/* Tick-mark ruler motif — a row of hairline ticks under the page header.
+   Repeating vertical ticks every 8px, like an oscilloscope graticule. */
+.instrument-ruler {
+	height: 6px;
+	background-image: repeating-linear-gradient(
+		90deg,
+		var(--clens-tick) 0px,
+		var(--clens-tick) 1px,
+		transparent 1px,
+		transparent 8px
+	);
+	opacity: 0.9;
+}
+
+/* LED-like square status indicator */
+.instrument-led {
+	width: 7px;
+	height: 7px;
+	border-radius: 1px;
+	flex-shrink: 0;
+}
+.instrument-led--live {
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--clens-live) 35%, transparent);
 }
 
 /* ── Invisible scrollbar ───────────────────────────────────────── */
@@ -135,22 +214,22 @@ body {
 /* ── Bidirectional link flash animation ─────────────────────────── */
 @keyframes clens-glow {
 	0% {
-		box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+		box-shadow: 0 0 0 0 rgba(10, 135, 84, 0);
 		background-color: transparent;
 	}
 	15% {
-		box-shadow: 0 0 8px 2px rgba(6, 182, 212, 0.4);
-		background-color: rgba(6, 182, 212, 0.08);
+		box-shadow: 0 0 0 1px var(--clens-live);
+		background-color: var(--clens-surface-selected);
 	}
 	100% {
-		box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+		box-shadow: 0 0 0 0 rgba(10, 135, 84, 0);
 		background-color: transparent;
 	}
 }
 
 .clens-flash {
 	animation: clens-glow 1.2s ease-out;
-	border-radius: 0.5rem;
+	border-radius: 1px;
 }
 
 /* ── Thin scrollbar styling ─────────────────────────────────────── */
@@ -165,12 +244,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-	background: rgba(128, 128, 128, 0.3);
-	border-radius: 3px;
+	background: var(--clens-tick);
+	border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: rgba(128, 128, 128, 0.5);
+	background: var(--clens-muted);
 }
 
 /* ── Lightweight prose for markdown in conversation ────────────── */

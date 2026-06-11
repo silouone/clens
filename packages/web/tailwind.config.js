@@ -7,8 +7,8 @@ export default {
 	theme: {
 		extend: {
 			fontFamily: {
-				sans: ["'Inter Variable'", ...defaultTheme.fontFamily.sans],
-				mono: ["'JetBrains Mono Variable'", ...defaultTheme.fontFamily.mono],
+				sans: ["'IBM Plex Sans Variable'", "'IBM Plex Sans'", ...defaultTheme.fontFamily.sans],
+				mono: ["'IBM Plex Mono'", ...defaultTheme.fontFamily.mono],
 			},
 			animation: {
 				"fade-in": "fadeIn 200ms ease-out",
@@ -46,18 +46,20 @@ export default {
 				clens: "var(--clens-border)",
 			},
 			colors: {
+				// Signal-green ramp (light) → phosphor-green (dark) — the one accent.
+				// 400/500 are the live trace tones; 50/900 the faint wash tints.
 				brand: {
-					50: "#ecfeff",
-					100: "#cffafe",
-					200: "#a5f3fc",
-					300: "#67e8f9",
-					400: "#22d3ee",
-					500: "#06b6d4",
-					600: "#0891b2",
-					700: "#0e7490",
-					800: "#155e75",
-					900: "#164e63",
-					950: "#083344",
+					50: "#E6F2EC",
+					100: "#CFE8DB",
+					200: "#A7D6BF",
+					300: "#6CBF98",
+					400: "#33FF99",
+					500: "#0A8754",
+					600: "#097A4C",
+					700: "#086B43",
+					800: "#0E2A1E",
+					900: "#0E2A1E",
+					950: "#08160F",
 				},
 				surface: {
 					DEFAULT: "var(--clens-surface)",

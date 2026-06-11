@@ -214,4 +214,31 @@ describe("extractDecisions with links", () => {
 		);
 		expect(agentTypes).toHaveLength(0);
 	});
+
+	test("phase boundaries use team-aware detection when task links exist (consistent boundaries)", () => {
+		// Events have NO large timing gaps, so the gap-based fallback would yield a
+		// single phase (zero phase_boundary decisions). Team-aware detection splits
+		// Planning -> Build at the first task assignment (t=3000), producing one
+		// phase_boundary. The bug passed events without links here, forcing the fallback.
+		const events: readonly StoredEvent[] = [
+			makeEvent({ t: 1000, event: "PreToolUse", data: { tool_name: "Read" } }),
+			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Read" } }),
+			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Edit" } }),
+			makeEvent({ t: 4000, event: "PreToolUse", data: { tool_name: "Edit" } }),
+		];
+		const links: readonly LinkEvent[] = [
+			makeTaskAssignLink({ t: 3000, subject: "Build it" }),
+		];
+
+		const decisions = extractDecisions(events, links);
+		const phaseBoundaries = decisions.filter((d) => d.type === "phase_boundary");
+
+		// Team-aware: Planning ends and Build starts at the assignment -> one boundary at 3000.
+		expect(phaseBoundaries).toHaveLength(1);
+		expect(phaseBoundaries[0].t).toBe(3000);
+
+		// Without links the same events yield no phase boundary (gap-based fallback).
+		const fallback = extractDecisions(events).filter((d) => d.type === "phase_boundary");
+		expect(fallback).toHaveLength(0);
+	});
 });

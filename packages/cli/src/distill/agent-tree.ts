@@ -7,6 +7,40 @@ import { extractStats } from "./stats";
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
 const isStopLink = (link: LinkEvent): link is StopLink => link.type === "stop";
 
+/** Minimal event shape needed for tool-call attribution. */
+type AttributableEvent = { readonly t: number; readonly event: string; readonly data: Record<string, unknown> };
+
+/** Read a string `data.agent_id` tag from an event, if present (untrusted JSON — narrow, never cast). */
+const eventAgentId = (event: AttributableEvent): string | undefined => {
+	const raw = event.data.agent_id;
+	return typeof raw === "string" && raw.length > 0 ? raw : undefined;
+};
+
+/**
+ * Count PreToolUse calls attributable to an agent.
+ *
+ * Preferred: raw hook events carry `data.agent_id` tagging which agent issued each
+ * tool call. When the agent has any tagged events, that count is authoritative — pure
+ * time-window attribution mis-assigns calls across overlapping/nested agent intervals
+ * and zeroes agents whose tagged events fall outside the naive spawn→stop window (ghost
+ * zeroing). Fall back to the spawn→stop time window only for fully-untagged sessions.
+ */
+const countAgentToolCalls = (
+	agentId: string,
+	spawnT: number,
+	stopT: number | undefined,
+	events: readonly AttributableEvent[],
+): { readonly count: number; readonly tagged: boolean } => {
+	const preEvents = events.filter((e) => e.event === "PreToolUse");
+	const tagged = preEvents.filter((e) => eventAgentId(e) === agentId);
+	if (tagged.length > 0) return { count: tagged.length, tagged: true };
+
+	const windowCount = preEvents.filter(
+		(e) => eventAgentId(e) === undefined && e.t >= spawnT && (stopT !== undefined ? e.t <= stopT : true),
+	).length;
+	return { count: windowCount, tagged: false };
+};
+
 /** Agent interval for event attribution. */
 interface AgentInterval {
 	readonly agentId: string;
@@ -129,10 +163,11 @@ export const enrichNodeWithTranscript = (
 export const enrichNodeFromSessionEvents = (
 	node: AgentNode,
 	agentEvents: readonly StoredEvent[],
+	tier: PricingTier = "api",
 ): AgentNode => {
 	if (agentEvents.length === 0) return node;
 
-	const statsResult = extractStats(agentEvents);
+	const statsResult = extractStats(agentEvents, [], undefined, tier);
 	const file_map = extractFileMap(agentEvents);
 
 	if (statsResult.tool_call_count === 0 && file_map.files.length === 0) return node;
@@ -194,11 +229,10 @@ export const buildAgentTree = (
 		const childSpawns = spawns.filter((s) => s.parent_session === spawn.agent_id);
 		const children = childSpawns.map(buildNode);
 
-		// Estimate tool calls from the spawn's events (rough: count PreToolUse in events matching time range)
-		const toolCallCount = events.filter(
-			(e) =>
-				e.event === "PreToolUse" && e.t >= spawn.t && (matchingStop ? e.t <= matchingStop.t : true),
-		).length;
+		// Attribute tool calls by data.agent_id when raw events carry it (authoritative);
+		// fall back to the spawn→stop time window only for untagged sessions.
+		const toolCalls = countAgentToolCalls(spawn.agent_id, spawn.t, matchingStop?.t, events);
+		const toolCallCount = toolCalls.count;
 
 		const baseNode: AgentNode = {
 			session_id: spawn.agent_id,
@@ -225,11 +259,15 @@ export const buildAgentTree = (
 		// Fallback: read agent's own session events when transcript enrichment didn't produce stats
 		if (readAgentEventsFn && baseNode.tool_call_count === 0) {
 			const agentSessionEvents = readAgentEventsFn(spawn.agent_id);
-			const fromEvents = enrichNodeFromSessionEvents(baseNode, agentSessionEvents);
+			const fromEvents = enrichNodeFromSessionEvents(baseNode, agentSessionEvents, tier);
 			if (fromEvents.tool_call_count > 0) return fromEvents;
 		}
 
-		// Ghost agent: enrichment failed and tool_call_count was estimated from event attribution — reset to 0
+		// When the count came from per-event data.agent_id tags it is authoritative — keep it,
+		// even without transcript/session-event stats (these are real tool calls, not a ghost estimate).
+		if (toolCalls.tagged && baseNode.tool_call_count > 0) return baseNode;
+
+		// Ghost agent: enrichment failed and tool_call_count was estimated from the time window — reset to 0
 		return baseNode.tool_call_count > 0 && !baseNode.stats
 			? { ...baseNode, tool_call_count: 0 }
 			: baseNode;

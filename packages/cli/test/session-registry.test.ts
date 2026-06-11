@@ -127,6 +127,32 @@ describe("session-registry", () => {
 	});
 
 	describe("resolveProjectEntries", () => {
+		test("keeps repository-mode entries whose .clens is nested below the git root", () => {
+			// Repository mode registers path=gitRoot, but a monorepo may capture into a
+			// nested package (gitRoot/packages/web/.clens/sessions). The old existsSync
+			// check on `${path}/.clens` dropped these (bug repo-mode-nested-clens-projects-dropped).
+			const gitRoot = join(tempDir, "nested-repo");
+			const nestedClens = join(gitRoot, "packages", "web", ".clens", "sessions");
+			mkdirSync(nestedClens, { recursive: true });
+			// Deliberately NO `.clens` directly at gitRoot.
+			expect(existsSync(join(gitRoot, ".clens"))).toBe(false);
+
+			const registry = readRegistry();
+			writeRegistry({
+				...registry,
+				projects: [
+					...registry.projects,
+					{ id: "nested-repo", path: gitRoot, name: "nested-repo", added_at: Date.now() },
+				],
+			});
+
+			const entries = resolveProjectEntries();
+			expect(entries.find((e) => e.path === gitRoot)).toBeDefined();
+
+			// Cleanup
+			unregisterProject(gitRoot);
+		});
+
 		test("filters out entries whose .clens dir no longer exists", () => {
 			const goodProject = join(tempDir, "good-project");
 			mkdirSync(join(goodProject, ".clens"), { recursive: true });

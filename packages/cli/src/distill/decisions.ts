@@ -264,7 +264,9 @@ export const extractDecisions = (
 ): readonly DecisionPoint[] => {
 	const timingGaps = extractTimingGaps(events);
 	const toolPivots = extractToolPivots(events);
-	const phases = extractPhases(events);
+	// Pass links so phase boundaries use the same team-aware detection as the
+	// standalone phase extractor (consistent boundaries; was gap-based fallback only).
+	const phases = extractPhases(events, links);
 	const phaseBoundaries = phaseBoundaryDecisions(phases);
 	const agentDecisions = links && links.length > 0 ? extractAgentDecisions(links) : [];
 

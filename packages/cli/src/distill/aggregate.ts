@@ -194,7 +194,16 @@ export const mergeBacktracks = (
 
 // --- mergeCostEstimates ---
 
-/** Sum estimated_input_tokens, estimated_output_tokens, estimated_cost_usd, and cache tokens. Use parent's model or first available. */
+/**
+ * Sum estimated tokens, cost, and cache tokens across the parent and its agents.
+ *
+ * model: a merged cost spans every contributor. Labeling it with one arbitrary model
+ * (e.g. the first agent's) is a mislabel when agents ran different models. Only assert a
+ * single model when every contributing cost agrees on it; otherwise report "mixed".
+ *
+ * pricing_tier: preserved from the parent (or first available) so the merged estimate
+ * keeps reporting the tier it was priced at instead of silently dropping it.
+ */
 export const mergeCostEstimates = (
 	parentCost: CostEstimate | undefined,
 	agentCosts: readonly (CostEstimate | undefined)[],
@@ -203,7 +212,10 @@ export const mergeCostEstimates = (
 
 	if (allCosts.length === 0) return undefined;
 
-	const model = parentCost?.model ?? allCosts[0].model;
+	const distinctModels = [...new Set(allCosts.map((c) => c.model))];
+	const model = distinctModels.length === 1 ? distinctModels[0] : "mixed";
+
+	const pricingTier = parentCost?.pricing_tier ?? allCosts.find((c) => c.pricing_tier !== undefined)?.pricing_tier;
 
 	const totalInputTokens = allCosts.reduce((acc, c) => acc + c.estimated_input_tokens, 0);
 	const totalOutputTokens = allCosts.reduce((acc, c) => acc + c.estimated_output_tokens, 0);
@@ -220,6 +232,7 @@ export const mergeCostEstimates = (
 		...(totalCacheRead > 0 ? { cache_read_tokens: totalCacheRead } : {}),
 		...(totalCacheCreation > 0 ? { cache_creation_tokens: totalCacheCreation } : {}),
 		is_estimated: isEstimated,
+		...(pricingTier !== undefined ? { pricing_tier: pricingTier } : {}),
 	};
 };
 

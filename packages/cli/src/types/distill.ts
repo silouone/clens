@@ -592,6 +592,13 @@ export interface DistilledSession {
 	readonly task_list?: TaskListResult;
 	readonly context_consumption?: ContextConsumption;
 	readonly feature_usage?: FeatureUsage;
+	/**
+	 * Resolved pricing tier this session was distilled (and priced) with. Surfaced so a
+	 * cache/staleness layer can detect when the configured tier has changed since distill
+	 * and the cached cost figures are stale (tier-change-never-recomputes). "auto" is
+	 * resolved to a concrete "api"/"max" at distill time, so only those two appear here.
+	 */
+	readonly pricing_tier?: "api" | "max";
 }
 
 // --- Global Mode Types ---

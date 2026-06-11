@@ -8,6 +8,11 @@ const SESSION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 const DISTILLED_SESSION_ID = "11111111-2222-3333-4444-555555555555"
 const DISTILL_CMD_SESSION_ID = "cccccccc-dddd-eeee-ffff-000000000000"
 const AGENT_ID = "22222222-3333-4444-5555-666666666666"
+// Broadcast-only ghost session (single Notification) — must be hidden from the list.
+const GHOST_SESSION_ID = "99999999-9999-9999-9999-999999999999"
+// Session whose final JSONL line is torn (live write) — duration must use the last
+// PARSEABLE line, not collapse to the first event.
+const TRUNCATED_SESSION_ID = "77777777-7777-7777-7777-777777777777"
 
 const makeEvent = (event: string, t: number, data: Record<string, unknown> = {}, sid: string = SESSION_ID) =>
 	JSON.stringify({ event, t, sid, data, context: {} })
@@ -94,6 +99,28 @@ describe("Session API endpoints", () => {
 		]
 		writeFileSync(`${TEST_DIR}/.clens/sessions/${AGENT_ID}.jsonl`, agentEvents.join("\n") + "\n")
 
+		// Ghost session: only broadcast events (Notification). Claude Code broadcasts
+		// these to every open session file, so a file containing nothing else is a
+		// ghost that must not appear in the list (bug sessions-list-ghost-sessions-shown).
+		writeFileSync(
+			`${TEST_DIR}/.clens/sessions/${GHOST_SESSION_ID}.jsonl`,
+			makeEvent("Notification", 9000, { message: "broadcast noise" }, GHOST_SESSION_ID) + "\n",
+		)
+
+		// Truncated session: a real first event, a real second event, then a torn
+		// final line (live write left it half-flushed). Duration must be derived from
+		// the last PARSEABLE line (10000) not collapse to the first event
+		// (bug web-truncated-last-line-falls-back-to-first-event-duration-zero).
+		const truncatedLines = [
+			makeEvent("SessionStart", 8000, { source: "cli" }, TRUNCATED_SESSION_ID),
+			makeEvent("Stop", 10000, { reason: "user" }, TRUNCATED_SESSION_ID),
+			'{"event":"PostToolUse","t":11000,"sid":"' + TRUNCATED_SESSION_ID + '","data":{"tool_nam', // torn line
+		]
+		writeFileSync(
+			`${TEST_DIR}/.clens/sessions/${TRUNCATED_SESSION_ID}.jsonl`,
+			truncatedLines.join("\n") + "\n",
+		)
+
 		app = createApp({ token: TEST_TOKEN, mode: "development", projectDir: TEST_DIR })
 	})
 
@@ -156,6 +183,33 @@ describe("Session API endpoints", () => {
 		expect(body.pagination.limit).toBe(1)
 		// We have multiple sessions, so page 1 with limit 1 should have has_next=true
 		expect(body.pagination.has_next).toBe(true)
+	})
+
+	// ── Ghost-session filtering (sessions-list-ghost-sessions-shown) ─
+
+	test("GET /api/sessions hides broadcast-only ghost sessions", async () => {
+		const res = await req("/api/sessions?limit=5000")
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		const ids = body.data.map((s: { session_id: string }) => s.session_id)
+		expect(ids).not.toContain(GHOST_SESSION_ID)
+		// Real sessions still appear.
+		expect(ids).toContain(SESSION_ID)
+	})
+
+	// ── Torn final line (web-truncated-last-line-falls-back-to-first…) ─
+
+	test("GET /api/sessions derives duration from last PARSEABLE line, not first event", async () => {
+		const res = await req("/api/sessions?limit=5000")
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		const truncated = body.data.find((s: { session_id: string }) => s.session_id === TRUNCATED_SESSION_ID)
+		expect(truncated).toBeDefined()
+		// Last parseable event is the Stop at t=10000; first event is t=8000 → 2000ms.
+		// The bug collapsed this to 0 by falling back to the first event.
+		expect(truncated.duration_ms).toBe(2000)
+		expect(truncated.duration_ms).toBeGreaterThan(0)
+		expect(truncated.end_reason).toBe("user")
 	})
 
 	// ── GET /api/sessions/:id ──────────────────────────────────────

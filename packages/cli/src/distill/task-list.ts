@@ -17,8 +17,14 @@ const applyUpdate = (existing: TaskRecord, link: TaskLink): TaskRecord => ({
 	...existing,
 	...(link.owner ? { owner: link.owner } : {}),
 	...(link.status === "in_progress" ? { status: "in_progress" as const } : {}),
+	...(link.status === "completed"
+		? { status: "completed" as const, completed_at: link.t }
+		: {}),
 	...(link.blocked_by && link.blocked_by.length > 0 ? { blocked_by: link.blocked_by } : {}),
 });
+
+/** A status_change carrying status "deleted" removes the task entirely. */
+const isDeletion = (link: TaskLink): boolean => link.status === "deleted";
 
 const applyCompletion = (existing: TaskRecord, link: TaskCompleteLink): TaskRecord => ({
 	...existing,
@@ -82,6 +88,12 @@ export const extractTaskList = (links: readonly LinkEvent[]): TaskListResult => 
 	const updatedMap = updateLinks.reduce<ReadonlyMap<string, TaskRecord>>((acc, link) => {
 		const { record: existing, map: reconciled } = resolveTask(acc, link.task_id);
 		if (!existing) return acc;
+		// A status_change to "deleted" removes the task from the list.
+		if (isDeletion(link)) {
+			const withoutDeleted = new Map([...reconciled]);
+			withoutDeleted.delete(existing.task_id);
+			return withoutDeleted;
+		}
 		return new Map([...reconciled, [existing.task_id, applyUpdate(existing, link)]]);
 	}, seedMap);
 

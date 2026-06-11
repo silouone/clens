@@ -113,10 +113,47 @@ export const unregisterProject = (projectDir: string): boolean => {
 	return true;
 };
 
-/** Read registry and filter to entries whose `.clens/` directory still exists. */
+/**
+ * Whether a registered project still has a `.clens/` directory reachable from its path.
+ *
+ * The original check was `existsSync(${path}/.clens)`. In repository mode a project's
+ * `path` is the git root, but its `.clens/` may live in a nested package (e.g.
+ * `gitRoot/packages/web/.clens/sessions`), so that check dropped every repo whose
+ * capture dir was nested (bug repo-mode-nested-clens-projects-dropped). We keep the
+ * cheap depth-0 check for project-mode entries and otherwise mirror global-read's
+ * findAllClensDirs: accept the project if a nested `.clens/sessions/` exists within a
+ * bounded depth below the path.
+ */
+const hasReachableClensDir = (projectDir: string, maxDepth = 3): boolean => {
+	// Fast path — `.clens` directly at the registered path (project mode / root capture).
+	if (existsSync(`${projectDir}/.clens`)) return true;
+
+	// Repository mode — `.clens/sessions/` may be nested below the git root.
+	const scan = (dir: string, depth: number): boolean => {
+		if (depth > maxDepth) return false;
+		const entries = (() => {
+			try {
+				return readdirSync(dir, { withFileTypes: true });
+			} catch {
+				return [];
+			}
+		})();
+		return entries.some((entry) => {
+			if (!entry.isDirectory()) return false;
+			if (entry.name === "node_modules" || entry.name === ".git") return false;
+			const fullPath = resolve(dir, entry.name);
+			if (entry.name === ".clens") return existsSync(resolve(fullPath, "sessions"));
+			if (entry.name.startsWith(".")) return false;
+			return scan(fullPath, depth + 1);
+		});
+	};
+	return scan(projectDir, 0);
+};
+
+/** Read registry and filter to entries whose `.clens/` directory is still reachable. */
 export const resolveProjectEntries = (): readonly ProjectEntry[] => {
 	const registry = readRegistry();
-	return registry.projects.filter((p) => existsSync(`${p.path}/.clens`));
+	return registry.projects.filter((p) => hasReachableClensDir(p.path));
 };
 
 // ── Discovery ────────────────────────────────────────────────────

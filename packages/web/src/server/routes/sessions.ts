@@ -3,7 +3,7 @@ import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, close
 import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions, readFeatureIndex } from "@clens/cli/src/session"
 import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified, deduplicateSpawns } from "@clens/cli/src/utils"
-import { deriveSessionStatus, SESSION_STATUSES } from "@clens/cli/src/types"
+import { deriveSessionStatus, SESSION_STATUSES, BROADCAST_EVENTS } from "@clens/cli/src/types"
 import type { AgentNode, SessionSummary, SessionStatus, StoredEvent, LinkEvent, SpawnLink, ProjectEntry } from "@clens/cli"
 import { getCachedEvents, setCachedEvents } from "../cache"
 import { createLogger } from "../logger"
@@ -36,6 +36,11 @@ const tryParseJson = (line: string): ParsedEvent | undefined => {
 		return undefined
 	}
 }
+
+// ParsedEvent.event is a plain string (lightweight listing never validates the full
+// hook-event union), so read BROADCAST_EVENTS through a string-typed view for membership.
+const broadcastEventNames: ReadonlySet<string> = BROADCAST_EVENTS
+const isBroadcastEvent = (event: string): boolean => broadcastEventNames.has(event)
 
 // Exact line counts are required (estimated counts shipped wrong numbers to the
 // UI — see specs/revive/bug-register.md B1). Counting scans the whole file, so
@@ -73,6 +78,15 @@ const countNonEmptyLines = (fd: number, size: number): number => {
 	return count
 }
 
+/**
+ * Pick the last line that parses as an event. A live write can leave the final
+ * JSONL line torn (non-empty but unparseable); falling back to the last PARSEABLE
+ * line keeps duration/end-reason honest instead of collapsing to the first event
+ * (bug web-truncated-last-line-falls-back-to-first-event-duration-zero).
+ */
+const lastParseableLine = (lines: readonly string[]): string | undefined =>
+	lines.findLast((l) => tryParseJson(l) !== undefined)
+
 /** Read the first and last lines plus an exact (cached) line count. */
 const readFirstLastLines = (filePath: string): { first: string; last: string; lineCount: number } | undefined => {
 	const fd = openSync(filePath, "r")
@@ -99,7 +113,10 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 			const text = buf.toString("utf-8")
 			const lines = text.split("\n").filter(Boolean)
 			if (lines.length === 0) return undefined
-			return { first: lines[0], last: lines[lines.length - 1], lineCount }
+			// Fall back to the last PARSEABLE line so a torn trailing line (live write)
+			// does not collapse the session to its first event.
+			const last = lastParseableLine(lines) ?? lines[lines.length - 1]
+			return { first: lines[0], last, lineCount }
 		}
 
 		// Large file: read head + tail chunks for first/last lines only
@@ -115,12 +132,44 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 		readSync(fd, tailBuf, 0, CHUNK, stat.size - CHUNK)
 		const tailStr = tailBuf.toString("utf-8")
 		const tailLines = tailStr.split("\n").filter(Boolean)
-		const last = tailLines.length > 0 ? tailLines[tailLines.length - 1] : first
+		// Last PARSEABLE tail line — a torn final line must not become `last`.
+		const last = lastParseableLine(tailLines) ?? (tailLines.length > 0 ? tailLines[tailLines.length - 1] : first)
 
 		return { first, last, lineCount }
 	} finally {
 		closeSync(fd)
 	}
+}
+
+/**
+ * Ghost-session check for the lightweight listing — matches the CLI's listSessions
+ * filter (read.ts:47-54 via isGhostSession). Claude Code broadcasts ConfigChange /
+ * Notification events to EVERY open session file, so a file whose only events are
+ * broadcasts is a ghost that must not appear in the list.
+ *
+ * The CLI parses every line, but the web list deliberately avoids full parsing for
+ * speed. We mirror the CLI's own optimization: a session can only be a ghost if its
+ * FIRST event is a broadcast (otherwise the leading non-broadcast event already
+ * proves it real). Only for those rare ghost-candidates do we read the whole file
+ * to confirm every event is a broadcast — the hot path stays first/last-only.
+ */
+const isGhostSessionFile = (filePath: string, firstEvent: ParsedEvent): boolean => {
+	if (!isBroadcastEvent(firstEvent.event)) return false
+	const content = (() => {
+		try {
+			return readFileSync(filePath, "utf-8")
+		} catch {
+			return ""
+		}
+	})()
+	const lines = content.split("\n").filter(Boolean)
+	if (lines.length === 0) return false
+	return lines.every((l) => {
+		const parsed = tryParseJson(l)
+		// A torn/unparseable line is not a known broadcast event — treat the session
+		// as real rather than hide it.
+		return parsed !== undefined && isBroadcastEvent(parsed.event)
+	})
 }
 
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn"
@@ -245,6 +294,10 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 
 				const firstEvent = tryParseJson(result.first)
 				if (!firstEvent) return []
+
+				// Drop broadcast-only ghost sessions — matches CLI listSessions (bug
+				// sessions-list-ghost-sessions-shown). Cheap unless first event is a broadcast.
+				if (isGhostSessionFile(filePath, firstEvent)) return []
 
 				const lastEvent = tryParseJson(result.last) ?? firstEvent
 				// SessionEnd ⇒ complete. A trailing Stop no longer means complete (it
