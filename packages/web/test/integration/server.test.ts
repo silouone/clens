@@ -174,6 +174,41 @@ describe("Integration: Full server lifecycle", () => {
 		expect(body.staleness.distill_stale).toBe(true)
 	})
 
+	test("GET /api/sessions/:id reports tier_stale when the distill was priced under a different explicit tier", async () => {
+		const tierId = "aabbccdd-1122-3344-5566-77889900aabb"
+		const tierEvents = [
+			makeEvent("SessionStart", 1000, { source: "cli" }),
+			makeEvent("SessionEnd", 2000, {}),
+		]
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${tierId}.jsonl`, tierEvents.join("\n") + "\n")
+		writeFileSync(
+			`${TEST_DIR}/.clens/distilled/${tierId}.json`,
+			JSON.stringify({
+				session_id: tierId,
+				stats: {
+					total_events: 2, duration_ms: 1000, events_by_type: {}, tools_by_name: {},
+					tool_call_count: 0, failure_count: 0, failure_rate: 0, unique_files: [],
+					cost_estimate: { model: "claude-fable-5", estimated_input_tokens: 1, estimated_output_tokens: 1, estimated_cost_usd: 0.01, is_estimated: false, pricing_tier: "api" },
+				},
+				backtracks: [], decisions: [], file_map: { files: [] },
+				git_diff: { commits: [], hunks: [] }, reasoning: [], user_messages: [],
+				complete: true,
+			}),
+		)
+		// Explicit config tier differs from the tier the distill was priced under
+		writeFileSync(`${TEST_DIR}/.clens/config.json`, JSON.stringify({ capture: true, pricing: "max" }))
+
+		const res = await authFetch(`/api/sessions/${tierId}`)
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		expect(body.staleness).toBeDefined()
+		expect(body.staleness.tier_stale).toBe(true)
+		// Event coverage itself is current — only the tier is stale
+		expect(body.staleness.distill_stale).toBe(false)
+
+		rmSync(`${TEST_DIR}/.clens/config.json`, { force: true })
+	})
+
 	// ── Live status thresholds (bug B6) ────────────────────────────
 
 	test("a session whose last event is recent lists as active (bug B6)", async () => {

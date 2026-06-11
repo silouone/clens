@@ -6,6 +6,7 @@ import type {
 	SpawnLink,
 	StopLink,
 	TaskCompleteLink,
+	TaskLink,
 	TeamLink,
 	TeammateIdleLink,
 } from "../src/types";
@@ -33,6 +34,16 @@ const mkTaskComplete = (overrides: Partial<TaskCompleteLink> = {}): TaskComplete
 	type: "task_complete",
 	task_id: "task-1",
 	agent: "builder-1",
+	subject: "Implement feature X",
+	...overrides,
+});
+
+const mkTaskCreate = (overrides: Partial<TaskLink> = {}): TaskLink => ({
+	t: 1000,
+	type: "task",
+	action: "create",
+	task_id: "",
+	session_id: "session-1",
 	subject: "Implement feature X",
 	...overrides,
 });
@@ -390,5 +401,53 @@ describe("extractTeamMetrics - utilization with agent_name=undefined (BUG-12)", 
 		expect(result.teammate_names).toContain("a2");
 		expect(result.utilization_ratio).toBeDefined();
 		expect(result.utilization_ratio ?? -1).toBeLessThan(1.0);
+	});
+});
+
+describe("extractTeamMetrics - task correlation by subject (persistent lists)", () => {
+	test("correlates create→complete by subject when ids are persistent (non-ordinal)", () => {
+		// Regression (team-task-ordinal-correlation-breaks-on-persistent-lists):
+		// TaskCreate links fire at PreToolUse with empty task_id; the real id ("42") only
+		// appears on the complete link. The OLD code keyed creates by 1..N ordinal and
+		// looked up creates[Number(id)-1], so a persistent id like "42" never correlated.
+		// Correlation must run through the stable `subject`, not the ordinal.
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "", subject: "Build the parser" }),
+			mkTaskComplete({ t: 5000, task_id: "42", agent: "builder-1", subject: "Build the parser" }),
+		];
+
+		const result = extractTeamMetrics(links, new Set<string>(), undefined);
+
+		expect(result.tasks).toHaveLength(1);
+		expect(result.tasks[0]).toEqual({
+			task_id: "42",
+			agent: "builder-1",
+			subject: "Build the parser",
+			status: "completed",
+			// creation time comes from the matched create link, not the complete link
+			t: 1000,
+		});
+	});
+
+	test("does not mis-correlate by ordinal when create order differs from id order", () => {
+		// Two creates whose subjects intentionally do NOT line up with their persistent ids
+		// in ordinal order. Ordinal lookup (creates[Number(id)-1]) would pair the wrong
+		// timestamps; subject correlation pairs them correctly.
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "", subject: "Alpha task" }),
+			mkTaskCreate({ t: 2000, task_id: "", subject: "Beta task" }),
+			// ids are 100 and 7 — neither equals an ordinal 1 or 2
+			mkTaskComplete({ t: 9000, task_id: "100", agent: "a", subject: "Beta task" }),
+			mkTaskComplete({ t: 9500, task_id: "7", agent: "b", subject: "Alpha task" }),
+		];
+
+		const result = extractTeamMetrics(links, new Set<string>(), undefined);
+
+		const byId = new Map(result.tasks.map((t) => [t.task_id, t] as const));
+		// "Beta task" was created at t=2000; "Alpha task" at t=1000
+		expect(byId.get("100")?.t).toBe(2000);
+		expect(byId.get("100")?.subject).toBe("Beta task");
+		expect(byId.get("7")?.t).toBe(1000);
+		expect(byId.get("7")?.subject).toBe("Alpha task");
 	});
 });

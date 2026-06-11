@@ -69,6 +69,8 @@ type StalenessData = {
 	readonly distilled_at: number;
 	readonly raw_event_count: number;
 	readonly distill_stale: boolean;
+	/** Distill priced under a different tier than the current explicit config. */
+	readonly tier_stale?: boolean;
 };
 
 /** Response from the session detail endpoint when distilled data exists. */

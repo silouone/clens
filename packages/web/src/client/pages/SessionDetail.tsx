@@ -185,14 +185,22 @@ const StaleDistillBanner: Component<{
 	readonly analyzedEvents: number;
 	readonly rawEvents: number;
 	readonly distilledAt: number;
+	readonly tierStale?: boolean;
 	readonly onRedistill: () => Promise<void>;
 }> = (props) => {
 	const [refreshing, setRefreshing] = createSignal(false);
+	const message = () =>
+		props.rawEvents > props.analyzedEvents
+			? `Analysis covers ${props.analyzedEvents} of ${props.rawEvents} events (analyzed ${formatDate(props.distilledAt, "relative")}).`
+			: `Costs were computed under a different pricing tier than the current setting.`;
 	return (
 		<div class="mx-4 mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-300">
 			<span>
-				Analysis covers {props.analyzedEvents} of {props.rawEvents} events (analyzed{" "}
-				{formatDate(props.distilledAt, "relative")}). Re-analyze to refresh.
+				{message()}
+				{props.tierStale && props.rawEvents > props.analyzedEvents
+					? " Costs also reflect an outdated pricing tier."
+					: ""}{" "}
+				Re-analyze to refresh.
 			</span>
 			<button
 				onClick={async () => {
@@ -458,13 +466,15 @@ export const SessionDetail: Component = () => {
 									/>
 								}
 							>
-								{/* Stale-distill banner (bug B5): raw file grew past the analyzed snapshot */}
-								<Show when={(() => { const st = staleness(); return st && st.distill_stale ? st : undefined; })()}>
+								{/* Stale-distill banner (bug B5 + stale-tier mixing): raw file grew past
+								    the analyzed snapshot, or costs were priced under an outdated tier */}
+								<Show when={(() => { const st = staleness(); return st && (st.distill_stale || st.tier_stale) ? st : undefined; })()}>
 									{(st) => (
 										<StaleDistillBanner
 											analyzedEvents={s().stats.total_events}
 											rawEvents={st().raw_event_count}
 											distilledAt={st().distilled_at}
+											tierStale={st().tier_stale}
 											onRedistill={handleRedistill}
 										/>
 									)}

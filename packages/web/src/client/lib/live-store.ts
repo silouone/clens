@@ -3,6 +3,7 @@ import { liveEvents, clearLiveEvents, setActiveSessionId, liveLinks, clearLiveLi
 import { getToken } from "./api"
 import { computeLiveElapsed, deriveLiveStatus } from "./live-duration"
 import type { StoredEvent } from "../../shared/types"
+import { acceptsLiveEvent, isStoredEvent } from "./live-event-filter"
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -344,12 +345,13 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 		const current = rawState()
 		if (!current || events.length === 0) return
 
-		const isStoredEvent = (raw: unknown): raw is StoredEvent =>
-			typeof raw === "object" && raw !== null && "event" in raw && "t" in raw
-
 		const validEvents = events.filter(isStoredEvent)
 		const next = validEvents.reduce((acc, raw) => {
-			if (raw.sid === current.session_id || current.child_session_ids.has(raw.sid)) {
+			// acceptsLiveEvent gates on raw.sid (the event's OWN session id), so a
+			// child session's events — broadcast under the child's id — are accepted
+			// when their sid is in child_session_ids, even though the SSE forwarder
+			// never matched them against the parent's activeSessionId().
+			if (acceptsLiveEvent(raw, current.session_id, current.child_session_ids)) {
 				return processEvent(acc, raw)
 			}
 			return acc

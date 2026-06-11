@@ -97,13 +97,28 @@ export const extractTeamMetrics = (
 	// Build comprehensive task list by merging task create/assign/complete links
 	const taskLinks = links.filter(isTaskLink);
 
-	// TaskCreate fires at PreToolUse — task_id is empty, but subject is present.
-	// Assign ordinal IDs (1-indexed) by creation order for correlation.
+	// TaskCreate fires at PreToolUse — task_id is empty there, but `subject` is present.
+	// The stable correlation key between a create link and its later update/complete
+	// links is therefore the SUBJECT, not a session-local ordinal: with persistent task
+	// lists (CLAUDE_CODE_TASK_LIST_ID) the real ids are arbitrary (e.g. "42") and never
+	// line up with 1..N creation order. We key creates by subject (earliest wins) and
+	// also by real id when one is present.
 	const creates = taskLinks
 		.filter((tl) => tl.action === "create" && tl.subject)
 		.sort((a, b) => a.t - b.t);
-	const subjectMap = new Map(
-		creates.map((tl, i) => [tl.task_id || String(i + 1), tl.subject ?? ""] as const),
+
+	const createBySubject = creates.reduce<ReadonlyMap<string, TaskLink>>((acc, tl) => {
+		const subject = tl.subject ?? "";
+		return acc.has(subject) ? acc : new Map(acc).set(subject, tl);
+	}, new Map());
+
+	const createById = new Map(
+		creates.filter((tl) => tl.task_id.length > 0).map((tl) => [tl.task_id, tl] as const),
+	);
+
+	// subject-by-id: only real (non-empty) create ids carry a usable subject correlation.
+	const subjectById = new Map(
+		creates.filter((tl) => tl.task_id.length > 0).map((tl) => [tl.task_id, tl.subject ?? ""] as const),
 	);
 
 	const ownerMap = new Map(
@@ -121,12 +136,18 @@ export const extractTeamMetrics = (
 
 	const tasks = allTaskIds.map((id) => {
 		const complete = taskCompletes.find((tc) => tc.task_id === id);
+		// Resolve subject: a real create id wins, else fall back to the complete link's subject.
+		const subject = subjectById.get(id) ?? complete?.subject;
+		// Correlate creation time by id when the create carried one, else by subject —
+		// never by ordinal position, which breaks for persistent (non-1..N) ids.
+		const create =
+			createById.get(id) ?? (subject ? createBySubject.get(subject) : undefined);
 		return {
 			task_id: id,
 			agent: ownerMap.get(id) ?? complete?.agent ?? "",
-			subject: subjectMap.get(id) ?? complete?.subject,
+			subject,
 			status: completedSet.has(id) ? "completed" as const : undefined,
-			t: creates[Number(id) - 1]?.t ?? complete?.t ?? 0,
+			t: create?.t ?? complete?.t ?? 0,
 		};
 	});
 

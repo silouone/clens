@@ -1,5 +1,6 @@
 import { Hono } from "hono"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { distill } from "@clens/cli/src/distill"
 import { rebuildWorkUnitIndex } from "@clens/cli/src/session/work-units"
 import { writeAnalyticsSummary } from "@clens/cli/src/distill/analytics-summary"
@@ -12,18 +13,52 @@ const log = createLogger("commands")
 
 // ── Session directory resolution ─────────────────────────────────
 
-/** Find the project directory that owns a session, checking all registered projects. */
+/**
+ * Find every directory below `projectDir` (bounded depth) that directly holds
+ * a `.clens/sessions/` dir, mirroring the CLI's `findAllClensDirs`. In
+ * repository mode a project's `path` is the git root while the capture dir may
+ * be nested (e.g. `gitRoot/packages/web/.clens/sessions`); without scanning,
+ * distill cannot resolve such sessions (bug repo-mode-nested-clens-projects-dropped).
+ */
+const findClensCaptureDirs = (projectDir: string, maxDepth = 3): readonly string[] => {
+	const scan = (dir: string, depth: number): readonly string[] => {
+		if (depth > maxDepth) return []
+		const entries = (() => {
+			try {
+				return readdirSync(dir, { withFileTypes: true })
+			} catch {
+				return []
+			}
+		})()
+		return entries.flatMap((entry) => {
+			if (!entry.isDirectory()) return []
+			if (entry.name === "node_modules" || entry.name === ".git") return []
+			const fullPath = resolve(dir, entry.name)
+			if (entry.name === ".clens") {
+				return existsSync(resolve(fullPath, "sessions")) ? [dir] : []
+			}
+			if (entry.name.startsWith(".")) return []
+			return scan(fullPath, depth + 1)
+		})
+	}
+	return scan(projectDir, 0)
+}
+
+/**
+ * Find the capture directory that owns a session, checking all registered
+ * projects and any nested `.clens/sessions/` dirs within them. Returns the
+ * directory that directly contains `.clens/sessions/<sid>.jsonl` so that
+ * downstream `${dir}/.clens/...` reads resolve correctly.
+ */
 const resolveSessionDir = (
 	sessionId: string,
 	fallbackDir: string,
 	projects: readonly ProjectEntry[],
 ): string => {
-	for (const project of projects) {
-		if (existsSync(`${project.path}/.clens/sessions/${sessionId}.jsonl`)) {
-			return project.path
-		}
-	}
-	return fallbackDir
+	const match = projects
+		.flatMap((project) => findClensCaptureDirs(project.path))
+		.find((captureDir) => existsSync(`${captureDir}/.clens/sessions/${sessionId}.jsonl`))
+	return match ?? fallbackDir
 }
 
 // ── Commands route factory ─────────────────────────────────────────

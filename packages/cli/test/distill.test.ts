@@ -114,6 +114,18 @@ describe("extractBacktracks", () => {
 					tool_input: { command: "bun run typecheck" },
 				},
 			}),
+			// Loop keeps failing — a genuine debugging_loop requires a subsequent failure,
+			// not just one failure followed by commands that succeed.
+			makeEvent({
+				t: 3500,
+				event: "PostToolUseFailure",
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b3f",
+					error: "type errors remain",
+					tool_input: { command: "bun run typecheck" },
+				},
+			}),
 		];
 
 		const backtracks = extractBacktracks(events);

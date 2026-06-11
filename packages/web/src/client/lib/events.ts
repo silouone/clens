@@ -244,8 +244,23 @@ const initSSE = (): (() => void) => {
 
 	const client = createSSEClient({
 		onLiveEvent: (data) => {
-			// Only track events for the actively viewed session
-			if (data.session_id === activeSessionId()) {
+			// Forward every live event to the store and let it decide acceptance.
+			//
+			// The server broadcasts each JSONL file's events under that file's own
+			// session id (derived from the filename), so a CHILD session's events
+			// arrive with data.session_id === <childSessionId>, which never equals
+			// the actively-viewed PARENT's activeSessionId(). Filtering on
+			// data.session_id === activeSessionId() here would drop all child-session
+			// events before they reach the live store.
+			//
+			// The live store (live-store.ts) is the authoritative filter: it accepts
+			// an event when raw.sid === current.session_id OR
+			// current.child_session_ids.has(raw.sid), and clears the buffer each pass,
+			// so forwarding everything here neither accumulates nor leaks foreign data.
+			//
+			// We still gate on an active session so nothing is buffered when no
+			// SessionDetail is mounted.
+			if (activeSessionId() !== undefined) {
 				setLiveEvents((prev) => [...prev, data.event]);
 			}
 		},

@@ -170,13 +170,26 @@ export const extractFeatureUsage = (events: readonly StoredEvent[]): FeatureUsag
 
 // ── Raw-content fast path (for session listing) ─────────────────────
 
+// Structural markers whose mere presence on a line is a reliable loop signal:
+// they only ever occur as the tool_name / skill of an actual loop tool call,
+// not as free-floating text inside file content being read.
 const RAW_LOOP_MARKERS = [
 	'"tool_name":"ScheduleWakeup"',
-	AUTONOMOUS_SENTINEL,
 	'"skill":"loop"',
 ] as const;
 
 const RAW_WORKFLOW_MARKER = '"tool_name":"Workflow"';
+
+/**
+ * The <<autonomous-loop sentinel is plain text that can appear anywhere — including
+ * inside escaped file-content the agent merely read (e.g. this source file). It is a
+ * loop signal ONLY when it rides inside an actual ScheduleWakeup / CronCreate tool
+ * call, mirroring extractLoop's `autonomous` gate. So require both on the SAME line
+ * (each JSONL line is one event) rather than anywhere in the whole blob.
+ */
+const lineHasAutonomousSentinel = (line: string): boolean =>
+	line.includes(AUTONOMOUS_SENTINEL) &&
+	(line.includes('"tool_name":"ScheduleWakeup"') || line.includes('"tool_name":"CronCreate"'));
 
 /** A line is a goal hit only when it's a UserPromptSubmit whose prompt has the /goal token. */
 const lineHasGoalPrompt = (line: string): boolean => {
@@ -197,7 +210,9 @@ const lineHasGoalPrompt = (line: string): boolean => {
  */
 export const detectFeatureFlags = (rawContent: string): readonly FeatureFlag[] => {
 	const loop = RAW_LOOP_MARKERS.some((m) => rawContent.includes(m))
-		|| /"prompt":"\s*\/loop[ \\"]/.test(rawContent);
+		|| /"prompt":"\s*\/loop[ \\"]/.test(rawContent)
+		|| (rawContent.includes(AUTONOMOUS_SENTINEL)
+			&& rawContent.split("\n").some(lineHasAutonomousSentinel));
 	const workflow = rawContent.includes(RAW_WORKFLOW_MARKER);
 	const goal = rawContent.includes("/goal")
 		&& rawContent.split("\n").some(lineHasGoalPrompt);

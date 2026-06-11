@@ -1,5 +1,6 @@
 import { Hono } from "hono"
 import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions, readFeatureIndex } from "@clens/cli/src/session"
 import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified, deduplicateSpawns } from "@clens/cli/src/utils"
@@ -205,12 +206,30 @@ type StalenessInfo = {
 	readonly distilled_at: number
 	readonly raw_event_count: number
 	readonly distill_stale: boolean
+	/** Distill was priced under a different tier than the current explicit config. */
+	readonly tier_stale: boolean
+}
+
+/**
+ * Current explicit pricing tier from .clens/config.json, or undefined when the
+ * config is absent/auto (auto resolves per-session from transcripts, so a cheap
+ * server-side comparison is only meaningful for explicit api/max).
+ */
+const readExplicitConfigTier = (projectDir: string): "api" | "max" | undefined => {
+	try {
+		const raw: unknown = JSON.parse(readFileSync(`${projectDir}/.clens/config.json`, "utf-8"))
+		const pricing = raw && typeof raw === "object" ? (raw as { pricing?: unknown }).pricing : undefined
+		return pricing === "api" || pricing === "max" ? pricing : undefined
+	} catch {
+		return undefined
+	}
 }
 
 const computeStaleness = (
 	projectDir: string,
 	sessionId: string,
 	distilledTotalEvents: number,
+	distilledTier?: string,
 ): StalenessInfo | undefined => {
 	const rawPath = `${projectDir}/.clens/sessions/${sessionId}.jsonl`
 	const distilledPath = `${projectDir}/.clens/distilled/${sessionId}.json`
@@ -218,10 +237,14 @@ const computeStaleness = (
 		const rawInfo = readFirstLastLines(rawPath)
 		const rawEventCount = rawInfo?.lineCount ?? 0
 		const distilledAt = statSync(distilledPath).mtimeMs
+		const configTier = readExplicitConfigTier(projectDir)
 		return {
 			distilled_at: distilledAt,
 			raw_event_count: rawEventCount,
 			distill_stale: rawEventCount > distilledTotalEvents,
+			// Costs in this distill were computed under a different tier than the
+			// user's current explicit setting (stale-tier mixing) — re-analyze to fix
+			tier_stale: configTier !== undefined && distilledTier !== undefined && distilledTier !== configTier,
 		}
 	} catch (err) {
 		log.warn(`Staleness check failed for ${sessionId.slice(0, 8)}:`, err instanceof Error ? err.message : String(err))
@@ -466,7 +489,7 @@ const createSessionsRoute = (projectDir: string) =>
 				: undefined
 
 			// Staleness: compare distilled coverage against the live raw file (bug B5)
-			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events)
+			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events, (distilled.cost_estimate ?? distilled.stats.cost_estimate)?.pricing_tier)
 
 			return c.json({
 				data: distilled,
@@ -654,19 +677,67 @@ const createSessionsRoute = (projectDir: string) =>
 
 // ── Global multi-project helpers ─────────────────────────────────
 
-/** Build a map from session ID to project entry by scanning all projects. */
-const buildSessionMap = (projects: readonly ProjectEntry[]): ReadonlyMap<string, ProjectEntry> =>
-	new Map(
-		projects.flatMap((project) => {
-			const sessionsDir = `${project.path}/.clens/sessions`
+/**
+ * In repository mode a project's `path` is the git root, but its capture
+ * directory (`.clens/sessions/`) may live in a nested package — e.g.
+ * `gitRoot/packages/web/.clens/sessions`. This finds every directory below
+ * `projectDir` (bounded depth) that directly contains a `.clens/sessions/`
+ * dir, mirroring the CLI's `findAllClensDirs` (global-read.ts). It always
+ * includes `projectDir` itself when it holds the capture dir, so project-mode
+ * entries (where `path` already points at the capture dir) keep working.
+ *
+ * Without this, repos whose only `.clens` is nested survive registry
+ * resolution and appear in /api/projects but list ZERO sessions and cannot
+ * resolve/distill their sessions (bug repo-mode-nested-clens-projects-dropped).
+ */
+const findClensCaptureDirs = (projectDir: string, maxDepth = 3): readonly string[] => {
+	const scan = (dir: string, depth: number): readonly string[] => {
+		if (depth > maxDepth) return []
+		const entries = (() => {
 			try {
-				return readdirSync(sessionsDir)
-					.filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
-					.map((f): readonly [string, ProjectEntry] => [f.replace(".jsonl", ""), project])
+				return readdirSync(dir, { withFileTypes: true })
 			} catch {
 				return []
 			}
-		}),
+		})()
+		return entries.flatMap((entry) => {
+			if (!entry.isDirectory()) return []
+			if (entry.name === "node_modules" || entry.name === ".git") return []
+			const fullPath = resolve(dir, entry.name)
+			if (entry.name === ".clens") {
+				return existsSync(resolve(fullPath, "sessions")) ? [dir] : []
+			}
+			if (entry.name.startsWith(".")) return []
+			return scan(fullPath, depth + 1)
+		})
+	}
+	return scan(projectDir, 0)
+}
+
+/**
+ * Build a map from session ID to the resolvable capture directory + project
+ * metadata. The mapped entry's `path` points at the directory that directly
+ * contains `.clens/sessions/<sid>.jsonl` (which may be a nested package),
+ * while `id`/`name` keep the owning git-root project identity. Detail routes
+ * read `${path}/.clens/...`, so `path` MUST be the capture dir, not the root.
+ */
+const buildSessionMap = (projects: readonly ProjectEntry[]): ReadonlyMap<string, ProjectEntry> =>
+	new Map(
+		projects.flatMap((project) =>
+			findClensCaptureDirs(project.path).flatMap((captureDir) => {
+				const sessionsDir = `${captureDir}/.clens/sessions`
+				try {
+					return readdirSync(sessionsDir)
+						.filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
+						.map((f): readonly [string, ProjectEntry] => [
+							f.replace(".jsonl", ""),
+							{ ...project, path: captureDir },
+						])
+				} catch {
+					return []
+				}
+			}),
+		),
 	)
 
 /** Lightweight listing that tags sessions with project info. */
@@ -675,11 +746,13 @@ const listGlobalSessionsLightweight = (
 ): readonly (SessionSummary & { readonly project_id: string; readonly project_name: string })[] =>
 	projects
 		.flatMap((project) =>
-			listSessionsLightweight(project.path).map((session) => ({
-				...session,
-				project_id: project.id,
-				project_name: project.name,
-			})),
+			findClensCaptureDirs(project.path).flatMap((captureDir) =>
+				listSessionsLightweight(captureDir).map((session) => ({
+					...session,
+					project_id: project.id,
+					project_name: project.name,
+				})),
+			),
 		)
 		.sort((a, b) => b.start_time - a.start_time)
 
@@ -762,7 +835,7 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 				: undefined
 
 			// Staleness: compare distilled coverage against the live raw file (bug B5)
-			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events)
+			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events, (distilled.cost_estimate ?? distilled.stats.cost_estimate)?.pricing_tier)
 
 			return c.json({
 				data: distilled,

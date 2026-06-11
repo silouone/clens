@@ -79,3 +79,44 @@ describe("auto-distill guard resets on params.id change (instance-reuse regressi
 		expect(source).toContain("setAutoDistilledId(params.id)")
 	})
 })
+
+// ── child-session-live-events-prefiltered ───────────────────────────
+// onLiveEvent previously forwarded an SSE live event only when
+// data.session_id === activeSessionId(). The server broadcasts each JSONL
+// file's events under that file's OWN session id, so a CHILD session's events
+// (session_id === childId) never equalled the viewed PARENT's activeSessionId()
+// and were dropped before reaching the live store. The fix forwards every event
+// while a session is active and delegates the sid-based accept/reject (which
+// already understands child_session_ids) to the live store. Behavioral coverage
+// of the predicate lives in test/unit/live-event-filter.test.ts; here we pin
+// that the over-narrow prefilter is gone and the delegation is in place.
+describe("live events are not prefiltered by activeSessionId (child-session regression)", () => {
+	const events = read("lib/events.ts")
+	const liveStore = read("lib/live-store.ts")
+
+	const start = events.indexOf("onLiveEvent: (data) =>")
+	const handlerBody = events.slice(start, events.indexOf("onDistillComplete", start))
+
+	test("the onLiveEvent handler no longer gates on data.session_id === activeSessionId()", () => {
+		expect(start).toBeGreaterThanOrEqual(0)
+		// Pin the executable guard, not the prose: the forwarder now fires whenever
+		// a session is active, rather than only when the broadcast's session_id
+		// matches the parent. Strip comment lines first so explanatory prose that
+		// mentions the old condition can't mask a regression.
+		const code = handlerBody
+			.split("\n")
+			.filter((l) => !l.trim().startsWith("//"))
+			.join("\n")
+		expect(code).not.toContain("data.session_id === activeSessionId()")
+		expect(code).toContain("if (activeSessionId() !== undefined)")
+	})
+
+	test("it still forwards the embedded event into the live store", () => {
+		expect(handlerBody).toContain("setLiveEvents((prev) => [...prev, data.event])")
+	})
+
+	test("the live store delegates acceptance to acceptsLiveEvent (sid + child_session_ids)", () => {
+		expect(liveStore).toContain("acceptsLiveEvent")
+		expect(liveStore).toContain("current.child_session_ids")
+	})
+})

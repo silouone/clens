@@ -160,4 +160,27 @@ describe("detectFeatureFlags", () => {
 		].join("\n");
 		expect(detectFeatureFlags(content)).toEqual(["loop", "goal", "workflow"]);
 	});
+
+	test("autonomous-loop sentinel inside read file content does NOT flag loop", () => {
+		// Regression (feature-flag-substring-false-positive):
+		// The <<autonomous-loop sentinel appears only as escaped text inside a file the
+		// agent read (e.g. this very source). There is no ScheduleWakeup/CronCreate call,
+		// so 'loop' must NOT be flagged.
+		const content = line(
+			preTool("Read", {
+				file_path: "/repo/feature-usage.ts",
+				// Simulated file content that mentions the sentinel as a literal string.
+				content: 'const AUTONOMOUS_SENTINEL = "<<autonomous-loop";',
+			}),
+		);
+		expect(detectFeatureFlags(content)).toEqual([]);
+	});
+
+	test("autonomous-loop sentinel inside a ScheduleWakeup call DOES flag loop", () => {
+		// Counterpart: the sentinel riding inside an actual loop tool call is a real signal.
+		const content = line(
+			preTool("ScheduleWakeup", { delaySeconds: 0, reason: "<<autonomous-loop-dynamic>>" }),
+		);
+		expect(detectFeatureFlags(content)).toEqual(["loop"]);
+	});
 });

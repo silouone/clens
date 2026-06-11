@@ -32,6 +32,12 @@ describe("extractBacktracks - deduplication", () => {
 				event: "PreToolUse",
 				data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "bun run typecheck" } },
 			}),
+			// Trailing failure: the loop keeps failing, so this is a genuine debugging_loop.
+			makeEvent({
+				t: 3500,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b3f", error: "exit 1", tool_input: { command: "bun run typecheck" } },
+			}),
 		];
 
 		const backtracks = extractBacktracks(events);
@@ -74,6 +80,12 @@ describe("extractBacktracks - deduplication", () => {
 				t: 7000,
 				event: "PreToolUse",
 				data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "test3" } },
+			}),
+			// Trailing failure keeps the loop a genuine debugging_loop.
+			makeEvent({
+				t: 7500,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b3f", error: "exit 1", tool_input: { command: "test3" } },
 			}),
 		];
 
@@ -233,6 +245,12 @@ describe("extractBacktracks - deduplication", () => {
 				event: "PreToolUse",
 				data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "test3" } },
 			}),
+			// Trailing failure keeps the chain a genuine debugging_loop (still before the gap).
+			makeEvent({
+				t: 3500,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b3f", error: "exit 1", tool_input: { command: "test3" } },
+			}),
 			// 6-minute gap: agent went to lunch
 			makeEvent({
 				t: 3000 + 6 * 60 * 1000,
@@ -301,6 +319,12 @@ describe("extractBacktracks - deduplication", () => {
 			event: "PostToolUseFailure",
 			data: { tool_name: "Bash", tool_use_id: "b0", error: "exit 1", tool_input: { command: "test" } },
 		});
+		// A second failure early in the chain makes this a genuine debugging_loop.
+		const secondFailure = makeEvent({
+			t: 1500,
+			event: "PostToolUseFailure" as const,
+			data: { tool_name: "Bash", tool_use_id: "b0b", error: "exit 1", tool_input: { command: "test" } },
+		});
 		const bashRetries = Array.from({ length: 60 }, (_, i) =>
 			makeEvent({
 				t: 2000 + i * 1000,
@@ -309,7 +333,7 @@ describe("extractBacktracks - deduplication", () => {
 			}),
 		);
 
-		const events: StoredEvent[] = [initialFailure, ...bashRetries];
+		const events: StoredEvent[] = [initialFailure, secondFailure, ...bashRetries];
 		const backtracks = extractBacktracks(events);
 		const debugLoops = backtracks.filter((b) => b.type === "debugging_loop");
 
@@ -367,6 +391,8 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "a2", agent_id: "A", tool_input: { command: "x2" } } }),
 			makeEvent({ t: 2500, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "b2", agent_id: "B", tool_input: { command: "y2" } } }),
 			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "a3", agent_id: "A", tool_input: { command: "x3" } } }),
+			// Agent A's loop keeps failing — trailing failure makes it a genuine debugging_loop.
+			makeEvent({ t: 3200, event: "PostToolUseFailure", data: { tool_name: "Bash", tool_use_id: "a3f", error: "e", agent_id: "A", tool_input: { command: "x3" } } }),
 		];
 
 		const loops = extractBacktracks(events).filter((b) => b.type === "debugging_loop");
@@ -424,5 +450,63 @@ describe("extractBacktracks - deduplication", () => {
 
 		expect(debugLoops).toHaveLength(0);
 		expect(retries).toHaveLength(2);
+	});
+
+	test("no debugging_loop when one failure is followed only by successful bash commands", () => {
+		// Regression (debugging-loop-requires-no-subsequent-failures):
+		// A single Bash failure followed by two UNRELATED, SUCCESSFUL bash commands
+		// (git status, git add) is recovery, not a loop. With no subsequent failure,
+		// Pattern 3 must NOT fire even though there are 3 bash attempts.
+		const events: StoredEvent[] = [
+			makeEvent({
+				t: 1000,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "bun test" } },
+			}),
+			makeEvent({
+				t: 2000,
+				event: "PreToolUse",
+				data: { tool_name: "Bash", tool_use_id: "b2", tool_input: { command: "git status" } },
+			}),
+			makeEvent({
+				t: 3000,
+				event: "PreToolUse",
+				data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "git add -A" } },
+			}),
+		];
+
+		const debugLoops = extractBacktracks(events).filter((b) => b.type === "debugging_loop");
+		expect(debugLoops).toHaveLength(0);
+	});
+
+	test("debugging_loop still fires when a subsequent bash command also fails", () => {
+		// Counterpart to the regression above: the same shape but with a second failure
+		// IS a genuine debugging_loop.
+		const events: StoredEvent[] = [
+			makeEvent({
+				t: 1000,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "bun test" } },
+			}),
+			makeEvent({
+				t: 2000,
+				event: "PreToolUse",
+				data: { tool_name: "Bash", tool_use_id: "b2", tool_input: { command: "bun test --rerun" } },
+			}),
+			makeEvent({
+				t: 2500,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b2f", error: "exit 1", tool_input: { command: "bun test --rerun" } },
+			}),
+			makeEvent({
+				t: 3000,
+				event: "PreToolUse",
+				data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "bun test --bail" } },
+			}),
+		];
+
+		const debugLoops = extractBacktracks(events).filter((b) => b.type === "debugging_loop");
+		expect(debugLoops).toHaveLength(1);
+		expect(debugLoops[0].tool_use_ids).toEqual(["b1", "b2", "b3"]);
 	});
 });

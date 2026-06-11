@@ -121,6 +121,10 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 			// so a loop that ends in a failure reports its true extent rather than truncating
 			// at the last successful retry. (Real loops keep failing — see "requires no subsequent failures".)
 			readonly endT: number;
+			// Whether any in-chain bash event AFTER the initial failure was itself a
+			// PostToolUseFailure. A debugging loop is repeated *failure*; a single failure
+			// followed only by succeeding (non-failing) bash commands is recovery, not a loop.
+			readonly sawSubsequentFailure: boolean;
 		}>(
 			(acc, entry) => {
 				if (acc.stopped) return acc;
@@ -136,10 +140,10 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 				// PostToolUseFailure events still belong to the loop (they advance endT and
 				// tracking) but are not double-counted as separate attempts.
 				return entry.event.event === "PreToolUse"
-					? { items: [...acc.items, entry], stopped: false, lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t }
-					: { ...acc, lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t };
+					? { ...acc, items: [...acc.items, entry], lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t }
+					: { ...acc, lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t, sawSubsequentFailure: true };
 			},
-			{ items: [], stopped: false, lastT: bashEntry.event.t, lastIndex: bashEntry.index, endT: bashEntry.event.t },
+			{ items: [], stopped: false, lastT: bashEntry.event.t, lastIndex: bashEntry.index, endT: bashEntry.event.t, sawSubsequentFailure: false },
 		);
 		const consecutiveBash = walk.items;
 
@@ -147,6 +151,12 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 			typeof bashEntry.event.data.tool_use_id === "string" ? bashEntry.event.data.tool_use_id : "",
 			...consecutiveBash.map((entry) => typeof entry.event.data.tool_use_id === "string" ? entry.event.data.tool_use_id : ""),
 		];
+
+		// A debugging loop must be a *loop*: the initial failure plus at least one
+		// subsequent bash failure. Without a second failure we only have one failure
+		// followed by bash commands that did not fail (e.g. `git status`, `git add`) —
+		// that is recovery, not looping, and firing here is a false positive.
+		if (!walk.sawSubsequentFailure) return [];
 
 		if (debugAttempts.length < 3) return [];
 

@@ -1,5 +1,6 @@
 import { Hono } from "hono"
-import { closeSync, openSync, readSync, readdirSync } from "node:fs"
+import { closeSync, existsSync, openSync, readSync, readdirSync } from "node:fs"
+import { resolve } from "node:path"
 import { readAnalyticsSummary, rebuildAnalyticsSummary } from "@clens/cli/src/distill/analytics-summary"
 import type { AnalyticsSummaryRow, ProjectEntry } from "@clens/cli"
 import { createLogger } from "../logger"
@@ -710,6 +711,38 @@ export const createAnalyticsRoute = (projectDir: string) => {
 	return app
 }
 
+/**
+ * In repository mode a project's `path` is the git root, but its analytics data
+ * (`.clens/analytics-summary.jsonl` + `.clens/sessions/`) may live in a nested
+ * package (e.g. `gitRoot/packages/web/.clens`). This finds every directory below
+ * `projectDir` (bounded depth) that directly holds a `.clens/sessions/` dir,
+ * mirroring the CLI's `findAllClensDirs`. Without it, analytics for repos whose
+ * only `.clens` is nested would be empty (bug repo-mode-nested-clens-projects-dropped).
+ */
+const findClensCaptureDirs = (projectDir: string, maxDepth = 3): readonly string[] => {
+	const scan = (dir: string, depth: number): readonly string[] => {
+		if (depth > maxDepth) return []
+		const entries = (() => {
+			try {
+				return readdirSync(dir, { withFileTypes: true })
+			} catch {
+				return []
+			}
+		})()
+		return entries.flatMap((entry) => {
+			if (!entry.isDirectory()) return []
+			if (entry.name === "node_modules" || entry.name === ".git") return []
+			const fullPath = resolve(dir, entry.name)
+			if (entry.name === ".clens") {
+				return existsSync(resolve(fullPath, "sessions")) ? [dir] : []
+			}
+			if (entry.name.startsWith(".")) return []
+			return scan(fullPath, depth + 1)
+		})
+	}
+	return scan(projectDir, 0)
+}
+
 export const createGlobalAnalyticsRoute = (projects: readonly ProjectEntry[], fallbackDir: string) => {
 	const app = new Hono()
 
@@ -718,10 +751,12 @@ export const createGlobalAnalyticsRoute = (projects: readonly ProjectEntry[], fa
 		// NO data — never silently fall back to every project's data (bug
 		// global-analytics-unknown-project-falls-back-to-wrong-data). The fallbackDir
 		// is only a safety net for the unfiltered case when the registry is empty.
+		// Each project path (a git root in repository mode) expands to its nested
+		// capture dirs so analytics covers nested .clens packages too.
 		if (projectFilter) {
-			return projects.filter((p) => p.id === projectFilter).map((p) => p.path)
+			return projects.filter((p) => p.id === projectFilter).flatMap((p) => findClensCaptureDirs(p.path))
 		}
-		const dirs = projects.map((p) => p.path)
+		const dirs = projects.flatMap((p) => findClensCaptureDirs(p.path))
 		return dirs.length > 0 ? dirs : [fallbackDir]
 	}
 
@@ -753,11 +788,10 @@ export const createGlobalAnalyticsRoute = (projects: readonly ProjectEntry[], fa
 	app.post("/rebuild", (c) => {
 		log.info("POST /api/analytics/rebuild (global)")
 		invalidateAnalyticsCache()
-		const dirs = projects.map((p) => p.path)
+		const dirs = projects.flatMap((p) => findClensCaptureDirs(p.path))
 		const effectiveDirs = dirs.length > 0 ? dirs : [fallbackDir]
-		let total = 0
-		effectiveDirs.forEach((dir) => { total += rebuildAnalyticsSummary(dir) })
-		log.info(`Rebuilt analytics summary: ${total} sessions across ${effectiveDirs.length} projects`)
+		const total = effectiveDirs.reduce((sum, dir) => sum + rebuildAnalyticsSummary(dir), 0)
+		log.info(`Rebuilt analytics summary: ${total} sessions across ${effectiveDirs.length} capture dirs`)
 		return c.json({ data: { rebuilt: total } })
 	})
 
