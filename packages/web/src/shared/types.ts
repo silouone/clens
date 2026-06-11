@@ -53,6 +53,15 @@ export type {
 	TranscriptUserMessage,
 
 	// Distill extras
+	ContextConsumption,
+	ContextConsumptionPoint,
+	FeatureFlag,
+	FeatureUsage,
+	LoopUsage,
+	LoopWakeup,
+	GoalUsage,
+	WorkflowRun,
+	WorkflowUsage,
 	DistilledSummary,
 	TeamMetrics,
 	DecisionPoint,
@@ -77,4 +86,7 @@ export type {
 	// Global mode
 	GlobalSessionSummary,
 	GlobalWorkUnit,
+
+	// Analytics
+	AnalyticsSummaryRow,
 } from "@clens/cli";

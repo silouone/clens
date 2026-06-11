@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { ClensConfig, PricingTier } from "../types";
+import { readGlobalConfig, writeGlobalConfig, isValidGlobalMode } from "../session/registry";
 import { bold, cyan, dim } from "./shared";
 
 const VALID_PRICING_TIERS: readonly PricingTier[] = ["api", "max", "auto"] as const;
@@ -32,8 +33,25 @@ const writeConfig = (projectDir: string, config: ClensConfig): void => {
 export const configCommand = (args: {
 	readonly projectDir: string;
 	readonly pricing?: string;
+	readonly globalMode?: string;
 	readonly json: boolean;
 }): void => {
+	// Handle --global-mode: read/write global config (not per-project)
+	if (args.globalMode !== undefined) {
+		if (!isValidGlobalMode(args.globalMode)) {
+			throw new Error(
+				`Invalid global mode "${args.globalMode}". Valid values: repository, project\n` +
+				`  ${dim("repository")} — group sessions by git repo root (default)\n` +
+				`  ${dim("project")}    — every .clens/ directory is its own source`,
+			);
+		}
+		const globalConfig = readGlobalConfig();
+		const updated = { ...globalConfig, global_mode: args.globalMode };
+		writeGlobalConfig(updated);
+		console.log(`Global mode set to ${bold(cyan(args.globalMode))}.`);
+		return;
+	}
+
 	const config = readConfig(args.projectDir);
 
 	// If --pricing is provided, update the pricing tier
@@ -49,18 +67,24 @@ export const configCommand = (args: {
 		return;
 	}
 
-	// Show current config
+	// Show current config (local + global)
+	const globalConfig = readGlobalConfig();
+
 	if (args.json) {
-		console.log(JSON.stringify(config, null, 2));
+		console.log(JSON.stringify({ local: config, global: globalConfig }, null, 2));
 		return;
 	}
 
 	const lines = [
 		bold("clens config"),
 		"",
-		`  ${dim("capture:")}  ${config.capture}`,
-		`  ${dim("pricing:")}  ${config.pricing ?? "api (default)"}`,
-		...(config.events ? [`  ${dim("events:")}   ${config.events.join(", ")}`] : []),
+		`  ${dim("Local (per-project):")}`,
+		`    ${dim("capture:")}      ${config.capture}`,
+		`    ${dim("pricing:")}      ${config.pricing ?? "api (default)"}`,
+		...(config.events ? [`    ${dim("events:")}       ${config.events.join(", ")}`] : []),
+		"",
+		`  ${dim("Global (~/.clens/):")}`,
+		`    ${dim("global_mode:")}  ${globalConfig.global_mode}`,
 	];
 	console.log(lines.join("\n"));
 };

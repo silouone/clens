@@ -14,6 +14,7 @@ export default {
 				"fade-in": "fadeIn 200ms ease-out",
 				"page-fade": "pageFade 150ms ease-out",
 				shimmer: "shimmer 1.5s infinite",
+				dropdown: "dropdown 150ms ease-out",
 			},
 			keyframes: {
 				fadeIn: {
@@ -27,6 +28,10 @@ export default {
 				shimmer: {
 					"0%": { transform: "translateX(-100%)" },
 					"100%": { transform: "translateX(100%)" },
+				},
+				dropdown: {
+					from: { opacity: "0", transform: "scale(0.95) translateY(-4px)" },
+					to: { opacity: "1", transform: "scale(1) translateY(0)" },
 				},
 			},
 			textColor: {

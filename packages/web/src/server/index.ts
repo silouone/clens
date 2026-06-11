@@ -104,14 +104,29 @@ const findProjectDir = (start: string): string => {
 
 // ── Direct execution ───────────────────────────────────────────────
 
-// When run directly: `bun run src/server/index.ts`
+// When run directly: `bun run src/server/index.ts [--global] [--port N]`
 if (import.meta.main) {
-	const projectDir = process.env.CLENS_PROJECT_DIR ?? findProjectDir(process.cwd())
-	const port = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined
+	const args = process.argv.slice(2)
+	const isGlobal = args.includes("--global")
+	const portFlagIdx = args.indexOf("--port")
+	const portArg = portFlagIdx !== -1 ? parseInt(args[portFlagIdx + 1], 10) : undefined
 
-	const handle = startServer({ projectDir, port })
+	const projectDir = process.env.CLENS_PROJECT_DIR ?? findProjectDir(process.cwd())
+	const port = portArg ?? (process.env.PORT ? parseInt(process.env.PORT, 10) : undefined)
+
+	const projects = isGlobal
+		? await (async () => {
+			const { discoverAndRegisterProjects } = await import("@clens/cli/src/session/registry")
+			return discoverAndRegisterProjects()
+		})()
+		: undefined
+
+	const handle = startServer({ projectDir, port, ...(projects && projects.length > 0 ? { projects } : {}) })
 	console.log(`cLens server listening on ${handle.url}`)
+	if (projects && projects.length > 0) {
+		console.log(`Mode: global (${projects.length} project${projects.length === 1 ? "" : "s"})`)
+	}
 	console.log(`Project dir: ${projectDir}`)
 	console.log(`Auth token: ${handle.token}`)
-	console.log(`Open: ${handle.url}/health`)
+	console.log(`Open: ${handle.url}?token=${handle.token}`)
 }

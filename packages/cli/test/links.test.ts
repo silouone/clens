@@ -272,18 +272,31 @@ describe("extractLinkEvent", () => {
 		}
 	});
 
-	test("TaskCompleted produces task_complete link", () => {
+	test("TaskCompleted produces task_complete link with task_subject", () => {
 		const link = extractLinkEvent("TaskCompleted", {
 			session_id: "sess-done",
 			task_id: "task-77",
 			agent_name: "builder-agent",
-			subject: "Fix the tests",
+			task_subject: "Fix the tests",
 		});
 		expect(link.type).toBe("task_complete");
 		if (link.type === "task_complete") {
 			expect(link.task_id).toBe("task-77");
 			expect(link.agent).toBe("builder-agent");
 			expect(link.subject).toBe("Fix the tests");
+		}
+	});
+
+	test("TaskCompleted falls back to subject when task_subject is absent", () => {
+		const link = extractLinkEvent("TaskCompleted", {
+			session_id: "sess-done-legacy",
+			task_id: "task-88",
+			agent_name: "builder-agent",
+			subject: "Legacy subject field",
+		});
+		expect(link.type).toBe("task_complete");
+		if (link.type === "task_complete") {
+			expect(link.subject).toBe("Legacy subject field");
 		}
 	});
 

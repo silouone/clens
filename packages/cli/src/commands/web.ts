@@ -21,11 +21,11 @@ export const webCommand = async (options: WebCommandOptions): Promise<void> => {
 
 	const projectDir = findProjectDir(options.projectDir);
 
-	// In global mode, read project registry and pass all projects to the server
+	// In global mode, discover + register projects, then pass to server
 	const projects = options.global
 		? await (async () => {
-			const { resolveProjectEntries } = await import("../session/registry");
-			return resolveProjectEntries();
+			const { discoverAndRegisterProjects } = await import("../session/registry");
+			return discoverAndRegisterProjects();
 		})()
 		: undefined;
 

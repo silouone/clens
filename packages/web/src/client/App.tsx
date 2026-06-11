@@ -1,15 +1,14 @@
 import type { RouteSectionProps } from "@solidjs/router";
 import { useNavigate, useLocation } from "@solidjs/router";
-import { createEffect, ErrorBoundary, For, onCleanup, onMount, Show, type Component } from "solid-js";
-import { Database, Calendar, Activity, Clock } from "lucide-solid";
+import { createEffect, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, type Component } from "solid-js";
+import { Database, Calendar, Activity, Clock, DollarSign, BarChart3, Lightbulb, ChevronDown } from "lucide-solid";
 import { ErrorFallback } from "./components/ErrorFallback";
 import { KeyboardHelp } from "./components/KeyboardHelp";
-import { StatItem } from "./components/ui/StatItem";
+import { headerStats } from "./lib/analytics-store";
 import { initSSE } from "./lib/events";
 import { formatDuration } from "./lib/format";
 import { toggleHelp, setKeyboardNavigate } from "./lib/keyboard";
 import { preferences } from "./lib/settings";
-import { sessionList } from "./lib/stores";
 import { theme, toggleTheme, initThemeListener } from "./lib/theme";
 
 // ── Icons ───────────────────────────────────────────────────────────
@@ -61,6 +60,9 @@ const isNavActive = (item: NavItem, pathname: string, search: string): boolean =
 	return pathname.startsWith(item.matchPrefix);
 };
 
+const isAnalyticsActive = (pathname: string): boolean =>
+	pathname === "/usage" || pathname === "/insights";
+
 // ── Font size mapping ────────────────────────────────────────────────
 
 const FONT_SIZE_MAP: Readonly<Record<string, string>> = {
@@ -69,6 +71,134 @@ const FONT_SIZE_MAP: Readonly<Record<string, string>> = {
 	lg: "15px",
 } as const;
 
+// ── Analytics Dropdown ───────────────────────────────────────────────
+
+type AnalyticsDropdownProps = {
+	readonly active: boolean;
+	readonly sessionCount: number;
+	readonly todayCount: number;
+	readonly totalEvents: number;
+	readonly avgDuration: number;
+	readonly totalCost: number;
+	readonly loaded: boolean;
+	readonly onNavigate: (path: string) => void;
+};
+
+const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
+	const [open, setOpen] = createSignal(false);
+	let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+	const handleEnter = () => {
+		clearTimeout(closeTimer);
+		setOpen(true);
+	};
+
+	const handleLeave = () => {
+		closeTimer = setTimeout(() => setOpen(false), 150);
+	};
+
+	onCleanup(() => clearTimeout(closeTimer));
+
+	return (
+		<div
+			class="relative"
+			onMouseEnter={handleEnter}
+			onMouseLeave={handleLeave}
+		>
+			{/* Trigger button */}
+			<button
+				onClick={() => props.onNavigate("/usage")}
+				class="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition"
+				classList={{
+					"text-primary bg-surface-muted": props.active,
+					"text-muted hover:text-secondary hover:bg-surface-hover": !props.active,
+				}}
+			>
+				Analytics
+				<ChevronDown
+					class="h-3 w-3 transition-transform duration-200"
+					classList={{ "rotate-180": open() }}
+				/>
+			</button>
+
+			{/* Dropdown panel */}
+			<Show when={open()}>
+				<div class="absolute right-0 top-full z-50 mt-1.5 w-64 origin-top-right animate-dropdown rounded-lg border border-clens bg-surface-raised shadow-lg">
+					{/* KPI quick-view */}
+					<Show when={props.loaded}>
+						<div class="border-b border-clens">
+							<div class="grid grid-cols-2 gap-px bg-clens">
+								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5 rounded-tl-lg">
+									<Database class="h-3.5 w-3.5 text-muted shrink-0" />
+									<div class="min-w-0">
+										<div class="text-[10px] text-muted leading-none">Total</div>
+										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{props.sessionCount}</div>
+									</div>
+								</div>
+								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5 rounded-tr-lg">
+									<Calendar class="h-3.5 w-3.5 text-muted shrink-0" />
+									<div class="min-w-0">
+										<div class="text-[10px] text-muted leading-none">Today</div>
+										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{props.todayCount}</div>
+									</div>
+								</div>
+								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
+									<Activity class="h-3.5 w-3.5 text-muted shrink-0" />
+									<div class="min-w-0">
+										<div class="text-[10px] text-muted leading-none">Tool Calls</div>
+										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{props.totalEvents.toLocaleString()}</div>
+									</div>
+								</div>
+								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
+									<Clock class="h-3.5 w-3.5 text-muted shrink-0" />
+									<div class="min-w-0">
+										<div class="text-[10px] text-muted leading-none">Avg Duration</div>
+										<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">{formatDuration(props.avgDuration)}</div>
+									</div>
+								</div>
+							</div>
+							{/* Cost — full-width row */}
+							<div class="flex items-center gap-2 px-3 py-2.5 border-t border-clens">
+								<DollarSign class="h-3.5 w-3.5 text-muted shrink-0" />
+								<div class="min-w-0">
+									<div class="text-[10px] text-muted leading-none">Total Cost</div>
+									<div class="text-xs font-semibold text-secondary tabular-nums mt-0.5">
+										${props.totalCost < 1 ? props.totalCost.toFixed(2) : props.totalCost.toFixed(2)}
+									</div>
+								</div>
+							</div>
+						</div>
+					</Show>
+
+					{/* Dashboard links */}
+					<div class="p-1.5">
+						<button
+							onClick={() => { props.onNavigate("/usage"); setOpen(false); }}
+							class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
+						>
+							<BarChart3 class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />
+							<div class="text-left">
+								<div class="font-medium text-secondary group-hover:text-primary transition-colors">Usage</div>
+								<div class="text-[10px] text-muted leading-tight mt-0.5">Cost, tokens, models & trends</div>
+							</div>
+						</button>
+						<button
+							onClick={() => { props.onNavigate("/insights"); setOpen(false); }}
+							class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
+						>
+							<Lightbulb class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />
+							<div class="text-left">
+								<div class="font-medium text-secondary group-hover:text-primary transition-colors">Insights</div>
+								<div class="text-[10px] text-muted leading-tight mt-0.5">Backtracks, drift & quality signals</div>
+							</div>
+						</button>
+					</div>
+				</div>
+			</Show>
+		</div>
+	);
+};
+
 // ── App ─────────────────────────────────────────────────────────────
 
 export const App: Component<RouteSectionProps> = (props) => {
@@ -76,20 +206,9 @@ export const App: Component<RouteSectionProps> = (props) => {
 	const location = useLocation();
 	setKeyboardNavigate(navigate);
 
-	// ── KPI derivations ──────────────────────────────────────────────
-	const sessions = () => sessionList() ?? [];
-	const todayCount = () => {
-		const now = new Date();
-		return sessions().filter((s) => {
-			const d = new Date(s.start_time);
-			return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-		}).length;
-	};
-	const totalEvents = () => sessions().reduce((sum, s) => sum + s.event_count, 0);
-	const avgDuration = () => {
-		const s = sessions();
-		return s.length === 0 ? 0 : Math.round(s.reduce((sum, x) => sum + x.duration_ms, 0) / s.length);
-	};
+	// ── KPI derivations (from analytics API — server-aggregated, no limit) ──
+	const stats = () => headerStats() ?? { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0 };
+
 	let disconnectSSE: (() => void) | undefined;
 	let removeThemeListener: (() => void) | undefined;
 
@@ -119,16 +238,6 @@ export const App: Component<RouteSectionProps> = (props) => {
 					<LogoIcon />
 				</button>
 
-				{/* KPIs (center area) */}
-				<Show when={sessionList.state !== "pending"}>
-					<div class="ml-6 flex items-center gap-2">
-						<StatItem variant="pill" bordered icon={Database} label="Total" value={String(sessions().length)} />
-						<StatItem variant="pill" bordered icon={Calendar} label="Today" value={String(todayCount())} />
-						<StatItem variant="pill" bordered icon={Activity} label="Events" value={totalEvents().toLocaleString()} />
-						<StatItem variant="pill" bordered icon={Clock} label="Avg" value={formatDuration(avgDuration())} />
-					</div>
-				</Show>
-
 				{/* Right: Nav + Live + separator + Actions */}
 				<div class="ml-auto flex items-center gap-1">
 					<nav class="flex items-center gap-1">
@@ -146,6 +255,17 @@ export const App: Component<RouteSectionProps> = (props) => {
 								</button>
 							)}
 						</For>
+
+						<AnalyticsDropdown
+							active={isAnalyticsActive(location.pathname)}
+							sessionCount={stats().totalSessions}
+							todayCount={stats().todaySessions}
+							totalEvents={stats().totalEvents}
+							avgDuration={stats().avgDurationMs}
+							totalCost={stats().totalCostUsd}
+							loaded={headerStats.state !== "pending"}
+							onNavigate={navigate}
+						/>
 					</nav>
 
 					<div class="flex items-center gap-1 ml-1" title="Live updates via SSE">

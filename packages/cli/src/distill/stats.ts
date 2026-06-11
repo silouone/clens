@@ -7,6 +7,17 @@ const API_PRICING = {
 	"claude-haiku-4": { input: 0.8, output: 4, cache_read: 0.08, cache_write: 1.0 },
 } as const;
 
+export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
+	"claude-opus-4": 1_000_000,
+	"claude-sonnet-4": 200_000,
+	"claude-haiku-4": 200_000,
+};
+
+export const getModelContextWindow = (model: string): number | undefined => {
+	const matchedPrefix = Object.keys(MODEL_CONTEXT_WINDOWS).find((prefix) => model.startsWith(prefix));
+	return matchedPrefix ? MODEL_CONTEXT_WINDOWS[matchedPrefix] : undefined;
+};
+
 /** Max subscription effective rate is ~1/3 of API pricing. */
 const SUBSCRIPTION_MULTIPLIER = 1 / 3;
 

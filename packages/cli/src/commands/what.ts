@@ -21,6 +21,15 @@ const getOutcomeSection = (distilled: DistilledSession): string => {
 		: `${wtcSummary}, ${statusStr}`;
 };
 
+const getContextSection = (distilled: DistilledSession): string => {
+	const cc = distilled.context_consumption;
+	if (!cc) return "(no context data)";
+	const peak = Math.round(cc.peak_context_pct);
+	const compactions = cc.compaction_count;
+	const velocity = cc.context_velocity_per_min.toFixed(1);
+	return `${peak}% peak (${compactions} compaction${compactions === 1 ? "" : "s"}), velocity: ${velocity}%/min`;
+};
+
 const getCostSection = (distilled: DistilledSession): string => {
 	const cost = distilled.cost_estimate ?? distilled.stats.cost_estimate;
 	if (!cost) return "(no cost data)";
@@ -84,6 +93,13 @@ interface WhatJson {
 			readonly sample_message?: string;
 		}[];
 	};
+	readonly context: {
+		readonly peak_context_pct: number;
+		readonly compaction_count: number;
+		readonly context_velocity_per_min: number;
+		readonly model_context_window: number;
+		readonly turn_count: number;
+	} | null;
 	readonly files_changed: readonly string[];
 }
 
@@ -113,6 +129,15 @@ const buildWhatJson = (distilled: DistilledSession): WhatJson => {
 				...(e.sample_message ? { sample_message: e.sample_message } : {}),
 			})),
 		},
+		context: distilled.context_consumption
+			? {
+					peak_context_pct: distilled.context_consumption.peak_context_pct,
+					compaction_count: distilled.context_consumption.compaction_count,
+					context_velocity_per_min: distilled.context_consumption.context_velocity_per_min,
+					model_context_window: distilled.context_consumption.model_context_window,
+					turn_count: distilled.context_consumption.turn_count,
+				}
+			: null,
 		files_changed: distilled.file_map.files
 			.filter((f) => f.edits > 0 || f.writes > 0)
 			.map((f) => f.file_path)
@@ -130,6 +155,7 @@ const renderWhatDefault = (distilled: DistilledSession): string => {
 		`${bold("Request:")} ${getRequestSection(distilled)}`,
 		`${bold("Outcome:")} ${getOutcomeSection(distilled)}`,
 		`${bold("Cost:")}    ${getCostSection(distilled)}`,
+		`${bold("Context:")} ${getContextSection(distilled)}`,
 		"",
 		bold("Issues:"),
 		...issues,

@@ -118,6 +118,7 @@ export const enrichNodeWithTranscript = (
 		...(result.edit_chains ? { edit_chains: result.edit_chains } : {}),
 		...(result.backtracks ? { backtracks: result.backtracks } : {}),
 		...(result.reasoning ? { reasoning: result.reasoning } : {}),
+		...(result.context_consumption ? { context_consumption: result.context_consumption } : {}),
 	};
 };
 

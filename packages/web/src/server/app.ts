@@ -9,6 +9,7 @@ import { createSessionsRoute, createGlobalSessionsRoute } from "./routes/session
 import { createCommandsRoute } from "./routes/commands"
 import { createWorkUnitsRoute, createGlobalWorkUnitsRoute } from "./routes/work-units"
 import { createConfigRoute } from "./routes/config"
+import { createAnalyticsRoute, createGlobalAnalyticsRoute } from "./routes/analytics"
 import { createLogger } from "./logger"
 
 const httpLog = createLogger("http")
@@ -93,8 +94,11 @@ const createApp = (options: AppOptions) => {
 		.route("/api/work-units", isGlobal
 			? createGlobalWorkUnitsRoute(projects, options.projectDir)
 			: createWorkUnitsRoute(options.projectDir))
-		.route("/api/commands/sessions", createCommandsRoute(options.projectDir))
+		.route("/api/commands/sessions", createCommandsRoute(options.projectDir, projects))
 		.route("/api/config", createConfigRoute(options.projectDir))
+		.route("/api/analytics", isGlobal
+			? createGlobalAnalyticsRoute(projects, options.projectDir)
+			: createAnalyticsRoute(options.projectDir))
 
 	// ── Static assets (production only) ──
 	if (options.mode === "production") {

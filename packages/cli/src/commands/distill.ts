@@ -80,6 +80,9 @@ const buildMetrics = (result: DistilledSession): readonly string[] => {
 		metricLine("Files:", String(result.file_map.files.length)),
 		metricLine("User msgs:", String(result.user_messages.length)),
 		metricLine("Cost:", ce ? formatCost(ce) : "n/a"),
+		metricLine("Context:", result.context_consumption
+			? `${Math.round(result.context_consumption.peak_context_pct)}% peak, ${result.context_consumption.compaction_count} compaction${result.context_consumption.compaction_count === 1 ? "" : "s"}`
+			: "n/a"),
 	];
 
 	const rightCol = [
@@ -131,6 +134,12 @@ export const distillCommand = async (args: {
 	const distilledDir = `${args.projectDir}/.clens/distilled`;
 	mkdirSync(distilledDir, { recursive: true });
 	writeFileSync(`${distilledDir}/${args.sessionId}.json`, JSON.stringify(result, null, 2));
+
+	// Write analytics summary row (best-effort)
+	try {
+		const { writeAnalyticsSummary } = await import("../distill/analytics-summary");
+		writeAnalyticsSummary(result, args.projectDir);
+	} catch { /* best-effort — summary is a derived artifact */ }
 
 	// Rebuild work unit index (best-effort)
 	try {

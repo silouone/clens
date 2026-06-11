@@ -11,6 +11,8 @@
     "test": "bun run test:cli && bun run test:web",
     "typecheck": "bun run --filter @clens/cli typecheck && bun run --filter @clens/web typecheck",
     "dev:api": "bun run --filter @clens/web dev:api",
-    "dev:web": "bun run --filter @clens/web dev:web"
+    "dev:api:global": "bun run --filter @clens/web dev:api:global",
+    "dev:web": "bun run --filter @clens/web dev:web",
+    "dev": "bun run dev:api:global & bun run dev:web"
   }
 }

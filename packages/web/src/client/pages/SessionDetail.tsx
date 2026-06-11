@@ -30,7 +30,7 @@ import { ConversationPanel } from "../components/ConversationPanel";
 import { DetailPageLayout } from "../components/layouts/DetailPageLayout";
 import { DetailHeader } from "../components/DetailHeader";
 import { DetailNav } from "../components/DetailNav";
-import { StatItem } from "../components/ui/StatItem";
+
 import { LiveSessionView } from "../components/LiveSessionView";
 import { createLiveSessionStore } from "../lib/live-store";
 import { preferences } from "../lib/settings";
@@ -402,6 +402,7 @@ export const SessionDetail: Component = () => {
 												sessionId={params.id}
 												isMultiAgent={isMultiAgent()}
 												relatedSessions={relatedSessions()}
+												onRedistill={handleRedistill}
 											/>
 										}>
 											<Match when={currentView() === "overview"}>
@@ -410,6 +411,7 @@ export const SessionDetail: Component = () => {
 													sessionId={params.id}
 													isMultiAgent={isMultiAgent()}
 													relatedSessions={relatedSessions()}
+													onRedistill={handleRedistill}
 												/>
 											</Match>
 											<Match when={currentView() === "agent" && selectedAgentId()}>

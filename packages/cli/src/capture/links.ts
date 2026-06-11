@@ -83,7 +83,7 @@ export const extractLinkEvent = (event: string, input: Record<string, unknown>):
 				task_id: (input.task_id as string) || "",
 				agent: (input.agent_name as string) || sid,
 				session_id: sid,
-				subject: input.subject as string | undefined,
+				subject: (input.task_subject as string) || (input.subject as string) || undefined,
 			} satisfies TaskCompleteLink;
 		}
 		case "ConfigChange": {

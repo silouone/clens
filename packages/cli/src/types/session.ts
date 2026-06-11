@@ -1,3 +1,4 @@
+import type { FeatureFlag } from "./distill";
 import type { HookEventType } from "./events";
 
 // Export types
@@ -55,6 +56,16 @@ export interface SessionSummary {
 	readonly is_distilled?: boolean;  // true if .clens/distilled/{sid}.json exists
 	readonly has_spec?: boolean;      // true if distilled data has plan_drift
 	readonly is_subagent?: boolean;   // true if spawned by another session
+	readonly features?: readonly FeatureFlag[]; // harness features used (loop/goal/workflow)
+}
+
+// --- Global Config Types ---
+
+/** How --global discovers and groups sessions across the filesystem. */
+export type GlobalMode = "repository" | "project";
+
+export interface GlobalConfig {
+	readonly global_mode: GlobalMode;
 }
 
 // --- Project Registry Types ---

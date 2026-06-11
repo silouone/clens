@@ -246,6 +246,76 @@ describe("extractTaskList", () => {
 		expect(result.tasks.find((t) => t.task_id === "t3")?.status).toBe("pending");
 	});
 
+	test("ID reconciliation: task-N created tasks match numeric N completions", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "", subject: "First task" }),
+			mkTaskCreate({ t: 1100, task_id: "", subject: "Second task" }),
+			mkTaskCreate({ t: 1200, task_id: "", subject: "Third task" }),
+			mkTaskComplete({ t: 3000, task_id: "1", subject: "First task" }),
+			mkTaskComplete({ t: 4000, task_id: "2", subject: "Second task" }),
+			mkTaskComplete({ t: 5000, task_id: "3", subject: "Third task" }),
+		];
+
+		const result = extractTaskList(links);
+
+		// Should produce 3 tasks (not 6 duplicates)
+		expect(result.tasks).toHaveLength(3);
+		expect(result.total_count).toBe(3);
+		expect(result.completed_count).toBe(3);
+		expect(result.completion_rate).toBe(1);
+		// All should be completed with proper subjects
+		expect(result.tasks[0].subject).toBe("First task");
+		expect(result.tasks[0].status).toBe("completed");
+		expect(result.tasks[1].subject).toBe("Second task");
+		expect(result.tasks[1].status).toBe("completed");
+		expect(result.tasks[2].subject).toBe("Third task");
+		expect(result.tasks[2].status).toBe("completed");
+	});
+
+	test("ID reconciliation: task-N created tasks match numeric N updates", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "", subject: "Build feature" }),
+			mkTaskUpdate({ t: 2000, task_id: "1", action: "status_change", status: "in_progress" }),
+			mkTaskUpdate({ t: 3000, task_id: "1", action: "assign", owner: "builder-1" }),
+			mkTaskComplete({ t: 5000, task_id: "1", subject: "Build feature" }),
+		];
+
+		const result = extractTaskList(links);
+
+		expect(result.tasks).toHaveLength(1);
+		const task = result.tasks[0];
+		expect(task.task_id).toBe("1");
+		expect(task.subject).toBe("Build feature");
+		expect(task.status).toBe("completed");
+		expect(task.owner).toBe("builder-1");
+	});
+
+	test("ID reconciliation: completion without subject preserves create subject", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "", subject: "Named task" }),
+			mkTaskComplete({ t: 3000, task_id: "1" }), // no subject
+		];
+
+		const result = extractTaskList(links);
+
+		expect(result.tasks).toHaveLength(1);
+		expect(result.tasks[0].subject).toBe("Named task");
+		expect(result.tasks[0].status).toBe("completed");
+	});
+
+	test("ID reconciliation: does not affect tasks with explicit IDs", () => {
+		const links: readonly LinkEvent[] = [
+			mkTaskCreate({ t: 1000, task_id: "custom-id", subject: "Custom task" }),
+			mkTaskComplete({ t: 3000, task_id: "custom-id" }),
+		];
+
+		const result = extractTaskList(links);
+
+		expect(result.tasks).toHaveLength(1);
+		expect(result.tasks[0].task_id).toBe("custom-id");
+		expect(result.tasks[0].status).toBe("completed");
+	});
+
 	test("update for non-existent task is ignored", () => {
 		const links: readonly LinkEvent[] = [
 			mkTaskCreate({ t: 1000, task_id: "task-1", subject: "Real task" }),

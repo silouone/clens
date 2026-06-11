@@ -21,7 +21,7 @@ const clearError = () => setGlobalError(undefined);
 const fetchSessionList = async (): Promise<readonly SessionSummary[]> => {
 	console.debug(LOG_PREFIX, "Fetching session list");
 	const res = await api.api.sessions.$get({
-		query: { sort: "-start_time", limit: "50" },
+		query: { sort: "-start_time", limit: "5000" },
 	});
 	if (!res.ok) {
 		const body = await res.json().catch(() => ({ error: "Unknown error" }));

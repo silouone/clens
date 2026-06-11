@@ -63,7 +63,7 @@ const eventsToEntries = (events: readonly StoredEvent[]): readonly TimelineEntry
 		}
 		if (event.event === "TaskCompleted") {
 			const taskId = typeof event.data.task_id === "string" ? event.data.task_id : undefined;
-			const taskSubject = typeof event.data.subject === "string" ? event.data.subject : undefined;
+			const taskSubject = typeof event.data.task_subject === "string" ? event.data.task_subject : (typeof event.data.subject === "string" ? event.data.subject : undefined);
 			return [
 				{
 					t: event.t,

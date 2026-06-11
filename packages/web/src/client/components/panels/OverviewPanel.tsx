@@ -7,39 +7,30 @@ import {
 } from "solid-js";
 import { Files } from "lucide-solid";
 import type { DistilledSession } from "../../../shared/types";
-import { SessionSnapshot } from "../SessionSnapshot";
+import { SessionOverview, type RelatedSessionsData } from "../SessionOverview";
 import { NarrativeSection } from "../NarrativeSection";
 import { IssuesPanel } from "../IssuesPanel";
 import { ThinkingBreakdown } from "../ThinkingBreakdown";
 import { PlanDriftSection } from "../PlanDriftSection";
 import { TaskListSection } from "../TaskListSection";
 import { Card } from "../ui/Card";
+import { FeatureUsageSection } from "../FeatureUsageSection";
 import { FileList, buildFileRows } from "../FileList";
 import { BottomPanel } from "../BottomPanel";
 import { DecisionsSection } from "../DecisionsSection";
+import { ContextChart } from "../ContextChart";
 import { computeClientRiskScores } from "../../lib/risk";
 import { TabBar } from "../ui/TabBar";
 import { TabButton } from "../ui/TabButton";
 
 // -- Types ----------------------------------------------------------------
 
-type RelatedSessionsData = {
-	readonly work_unit_id: string;
-	readonly spec_path?: string;
-	readonly sessions: readonly {
-		readonly session_id: string;
-		readonly session_name?: string;
-		readonly phase: string;
-		readonly role: string;
-		readonly start_time: number;
-	}[];
-};
-
 type OverviewPanelProps = {
 	readonly session: DistilledSession;
 	readonly sessionId: string;
 	readonly isMultiAgent: boolean;
 	readonly relatedSessions?: RelatedSessionsData;
+	readonly onRedistill?: () => Promise<void>;
 };
 
 type TabId = "overview" | "backtracks" | "timeline" | "edits" | "comms";
@@ -88,15 +79,20 @@ const FileListCard: Component<{
 
 const OverviewContent: Component<OverviewPanelProps> = (props) => (
 	<div class="space-y-3">
-		{/* 1. Session Snapshot */}
-		<SessionSnapshot session={props.session} relatedSessions={props.relatedSessions} />
+		{/* 1. Session Overview */}
+		<SessionOverview session={props.session} relatedSessions={props.relatedSessions} onRedistill={props.onRedistill} />
 
 		{/* 2. Task Plan */}
 		<Show when={props.session.task_list && props.session.task_list.tasks.length > 0 && props.session.task_list}>
 			{(taskList) => <TaskListSection taskList={taskList()} />}
 		</Show>
 
-		{/* 3. Narrative */}
+		{/* 3. Harness Features (loop / goal / workflow) */}
+		<Show when={props.session.feature_usage}>
+			{(usage) => <FeatureUsageSection usage={usage()} />}
+		</Show>
+
+		{/* 4. Narrative */}
 		<Show when={props.session.summary?.narrative}>
 			<NarrativeSection session={props.session} />
 		</Show>
@@ -104,7 +100,12 @@ const OverviewContent: Component<OverviewPanelProps> = (props) => (
 		{/* 4. Issues & Errors */}
 		<IssuesPanel session={props.session} />
 
-		{/* 5. Decision Points */}
+		{/* 5. Context Consumption */}
+		<Show when={props.session.context_consumption}>
+			{(consumption) => <ContextChart consumption={consumption()} />}
+		</Show>
+
+		{/* 6. Decision Points */}
 		<Show when={props.session.decisions.length > 0}>
 			<DecisionsSection decisions={props.session.decisions} />
 		</Show>
@@ -191,6 +192,7 @@ export const OverviewPanel: Component<OverviewPanelProps> = (props) => {
 							sessionId={props.sessionId}
 							isMultiAgent={props.isMultiAgent}
 							relatedSessions={props.relatedSessions}
+							onRedistill={props.onRedistill}
 						/>
 					</div>
 				</Show>

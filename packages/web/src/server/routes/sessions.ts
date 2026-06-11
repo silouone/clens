@@ -1,6 +1,6 @@
 import { Hono } from "hono"
 import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
-import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions } from "@clens/cli/src/session"
+import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions, readFeatureIndex } from "@clens/cli/src/session"
 import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified } from "@clens/cli/src/utils"
 import type { AgentNode, SessionSummary, StoredEvent, LinkEvent, SpawnLink, ProjectEntry } from "@clens/cli"
@@ -125,6 +125,16 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 
 	if (files.length === 0) return []
 
+	// Feature usage flags (loop/goal/workflow) — cached scan, stat-only on hits
+	const featureIndex = (() => {
+		try {
+			return readFeatureIndex(projectDir)
+		} catch (err) {
+			log.warn(`Feature index failed for ${projectDir}:`, err instanceof Error ? err.message : String(err))
+			return new Map<string, readonly ("loop" | "goal" | "workflow")[]>()
+		}
+	})()
+
 	// Read links once for agent counts
 	const links = readLinks(projectDir)
 	const spawns = links.filter(isSpawnLink)
@@ -190,6 +200,7 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 					agent_count: agentCount,
 					is_distilled: isDistilled,
 					is_subagent: subagentIds.has(sessionId),
+					...((featureIndex.get(sessionId)?.length ?? 0) > 0 ? { features: featureIndex.get(sessionId) } : {}),
 				}]
 			} catch (err) {
 				log.warn(`Failed to parse session file ${file}:`, err instanceof Error ? err.message : String(err))
@@ -241,7 +252,7 @@ const createSessionsRoute = (projectDir: string) =>
 		.get("/", (c) => {
 			log.debug("GET /api/sessions", c.req.query())
 			const page = parseIntParam(c.req.query("page"), 1, 1, 1000)
-			const limit = parseIntParam(c.req.query("limit"), 20, 1, 100)
+			const limit = parseIntParam(c.req.query("limit"), 20, 1, 5000)
 			const sort = (c.req.query("sort") ?? "-start_time") as SortField
 			const statusFilter = c.req.query("status")
 
@@ -250,7 +261,7 @@ const createSessionsRoute = (projectDir: string) =>
 				return c.json({ error: "Invalid page", code: "INVALID_PARAM", detail: "page must be 1-1000" }, 400)
 			}
 			if (limit === -1) {
-				return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-100" }, 400)
+				return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-5000" }, 400)
 			}
 			if (!VALID_SORTS.includes(sort)) {
 				return c.json({ error: "Invalid sort", code: "INVALID_PARAM", detail: `sort must be one of: ${VALID_SORTS.join(", ")}` }, 400)
@@ -550,13 +561,13 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 
 			log.debug("GET /api/sessions (global)", c.req.query())
 			const page = parseIntParam(c.req.query("page"), 1, 1, 1000)
-			const limit = parseIntParam(c.req.query("limit"), 20, 1, 100)
+			const limit = parseIntParam(c.req.query("limit"), 20, 1, 5000)
 			const sort = (c.req.query("sort") ?? "-start_time") as SortField
 			const statusFilter = c.req.query("status")
 			const projectFilter = c.req.query("project")
 
 			if (page === -1) return c.json({ error: "Invalid page", code: "INVALID_PARAM", detail: "page must be 1-1000" }, 400)
-			if (limit === -1) return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-100" }, 400)
+			if (limit === -1) return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-5000" }, 400)
 			if (!VALID_SORTS.includes(sort)) return c.json({ error: "Invalid sort", code: "INVALID_PARAM", detail: `sort must be one of: ${VALID_SORTS.join(", ")}` }, 400)
 			if (statusFilter && !VALID_STATUSES.includes(statusFilter)) return c.json({ error: "Invalid status", code: "INVALID_PARAM", detail: "status must be 'complete' or 'incomplete'" }, 400)
 

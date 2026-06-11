@@ -9,6 +9,7 @@ import type {
 	TranscriptEntry,
 } from "../types";
 import { extractBacktracks } from "./backtracks";
+import { extractContextConsumption } from "./context-consumption";
 import { computeToolSourcedDiff } from "./diff-attribution";
 import { extractEditChains } from "./edit-chains";
 import { extractFileMap } from "./file-map";
@@ -198,6 +199,9 @@ export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: 
 		token_usage,
 	};
 
+	// Extract per-agent context consumption from transcript
+	const context_consumption = extractContextConsumption(entries, model);
+
 	return {
 		stats,
 		file_map,
@@ -208,5 +212,6 @@ export const distillAgent = (entries: readonly TranscriptEntry[], diffContext?: 
 		...(reasoning.length > 0 ? { reasoning } : {}),
 		...(backtracks.length > 0 ? { backtracks } : {}),
 		...(fullEditChains ? { edit_chains: fullEditChains } : {}),
+		...(context_consumption ? { context_consumption } : {}),
 	};
 };

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev:api": "bun --watch run src/server/index.ts",
+    "dev:api:global": "bun --watch run src/server/index.ts --global",
     "dev:web": "vite dev",
     "build": "vite build",
     "test": "bun test test/ && vitest run",

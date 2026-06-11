@@ -203,9 +203,14 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		description: "View or update clens configuration",
 		handler: async (ctx) => {
 			const { configCommand } = await import("./commands/config");
+			const gmIdx = ctx.rawArgs.indexOf("--global-mode");
+			const globalMode = gmIdx >= 0 && gmIdx + 1 < ctx.rawArgs.length
+				? ctx.rawArgs[gmIdx + 1]
+				: undefined;
 			configCommand({
 				projectDir: ctx.projectDir,
 				pricing: ctx.flags.pricing,
+				globalMode,
 				json: ctx.flags.json,
 			});
 		},
@@ -261,7 +266,7 @@ const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	distill: new Set(["--last", "--all", "--deep", "--json", "--pricing"]),
 	report: new Set(["--last", "--json", "--detail", "--full", "--intent"]),
 	agents: new Set(["--last", "--json", "--comms"]),
-	config: new Set(["--pricing", "--json"]),
+	config: new Set(["--pricing", "--json", "--global-mode"]),
 	explore: new Set([]),
 	clean: new Set(["--last", "--all", "--force"]),
 	export: new Set(["--last", "--otel"]),
@@ -282,7 +287,7 @@ const validateFlags = (cmd: string, rawArgs: readonly string[]): string | undefi
 
 	const flagArgs = rawArgs.filter((a) => a.startsWith("--") || (a.startsWith("-") && a.length === 2));
 	// Skip values after --intent and --port (they're not flags)
-	const VALUE_FLAGS = new Set(["--intent", "--port", "--pricing"]);
+	const VALUE_FLAGS = new Set(["--intent", "--port", "--pricing", "--global-mode"]);
 	const actualFlags = flagArgs.reduce<readonly string[]>((acc, arg, i) => {
 		if (i > 0 && VALUE_FLAGS.has(rawArgs[rawArgs.indexOf(arg) - 1])) return acc;
 		return [...acc, arg];
@@ -324,6 +329,7 @@ ${bold("Sessions:")}
   ${cyan("clean")}             Remove session data
   ${cyan("export")}            Export session as archive
   ${cyan("config")}            View or update configuration
+  ${cyan("config --global-mode <m>")}  Set global mode: repository or project
 
 ${bold("Analysis:")}
   ${cyan("what")}              Quick summary: request, outcome, cost, issues
@@ -349,6 +355,7 @@ ${bold("Options:")}
   ${dim("--all")}          Distill all sessions
   ${dim("--comms")}        Show communication timeline
   ${dim("--global")}       Global mode: operate across all registered projects
+  ${dim("--global-mode <m>")} Set discovery mode: repository (git root) or project (each .clens/)
   ${dim("--legacy")}       Include legacy hooks in --remove
   ${dim("--port <n>")}     Web dashboard port (default 3700)
   ${dim("--no-open")}      Don't open browser automatically

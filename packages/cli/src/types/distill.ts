@@ -255,6 +255,7 @@ export interface AgentNode {
 	readonly edit_chains?: EditChainsResult;
 	readonly backtracks?: readonly BacktrackResult[];
 	readonly reasoning?: readonly TranscriptReasoning[];
+	readonly context_consumption?: ContextConsumption;
 }
 
 export interface AggregatedTeamData {
@@ -478,6 +479,7 @@ export interface AgentDistillResult {
 	readonly edit_chains?: EditChainsResult;
 	readonly backtracks?: readonly BacktrackResult[];
 	readonly reasoning?: readonly TranscriptReasoning[];
+	readonly context_consumption?: ContextConsumption;
 }
 
 export interface ActiveDurationResult {
@@ -539,6 +541,29 @@ export interface TaskListResult {
 	readonly completion_rate: number;
 }
 
+export interface ContextConsumptionPoint {
+	readonly t: number;
+	readonly turn_index: number;
+	readonly input_tokens: number;
+	readonly output_tokens: number;
+	readonly cache_read_tokens: number;
+	readonly cache_creation_tokens: number;
+	readonly total_context_tokens: number;
+	readonly context_pct: number;
+	readonly is_compaction: boolean;
+}
+
+export interface ContextConsumption {
+	readonly points: readonly ContextConsumptionPoint[];
+	readonly peak_context_pct: number;
+	readonly peak_context_tokens: number;
+	readonly final_context_pct: number;
+	readonly compaction_count: number;
+	readonly context_velocity_per_min: number;
+	readonly model_context_window: number;
+	readonly turn_count: number;
+}
+
 export interface DistilledSession {
 	readonly session_id: string;
 	readonly session_name?: string;
@@ -563,6 +588,8 @@ export interface DistilledSession {
 	readonly agent_lifetimes?: readonly AgentLifetime[];
 	readonly plan_drift?: PlanDriftReport;
 	readonly task_list?: TaskListResult;
+	readonly context_consumption?: ContextConsumption;
+	readonly feature_usage?: FeatureUsage;
 }
 
 // --- Global Mode Types ---
@@ -575,4 +602,86 @@ export interface GlobalSessionSummary extends SessionSummary {
 export interface GlobalWorkUnit extends WorkUnit {
 	readonly project_id: string;
 	readonly project_name: string;
+}
+
+// --- Feature Usage Types (loop / goal / workflow) ---
+
+export type FeatureFlag = "loop" | "goal" | "workflow";
+
+export interface LoopWakeup {
+	readonly t: number;
+	readonly delay_seconds: number;
+	readonly reason?: string;
+}
+
+export interface LoopUsage {
+	readonly wakeup_count: number;
+	readonly total_scheduled_wait_s: number;
+	readonly autonomous: boolean;
+	readonly skill_invocations: number;
+	readonly wakeups: readonly LoopWakeup[];
+}
+
+export interface GoalUsage {
+	readonly goals: readonly string[];
+}
+
+export interface WorkflowRun {
+	readonly t: number;
+	readonly name?: string;
+	readonly description?: string;
+}
+
+export interface WorkflowUsage {
+	readonly invocation_count: number;
+	readonly runs: readonly WorkflowRun[];
+}
+
+export interface FeatureUsage {
+	readonly flags: readonly FeatureFlag[];
+	readonly loop?: LoopUsage;
+	readonly goal?: GoalUsage;
+	readonly workflow?: WorkflowUsage;
+}
+
+// --- Analytics Summary Types ---
+
+export interface AnalyticsSummaryRow {
+	readonly session_id: string;
+	readonly date: string; // "2026-03-15" (UTC)
+	readonly duration_ms: number;
+	readonly model?: string;
+	readonly cost_usd: number;
+	readonly input_tokens: number;
+	readonly output_tokens: number;
+	readonly cache_read_tokens: number;
+	readonly cache_creation_tokens: number;
+	readonly is_estimated: boolean;
+	readonly tool_call_count: number;
+	readonly failure_count: number;
+	readonly failures_by_tool: Readonly<Record<string, number>>;
+	readonly agent_count: number;
+	readonly agent_types: readonly {
+		readonly type: string;
+		readonly count: number;
+		readonly cost: number;
+		readonly duration_ms: number;
+		readonly tool_calls: number;
+		readonly failure_count: number;
+	}[];
+	readonly backtrack_count: number;
+	readonly backtracks_by_type: Readonly<Record<string, number>>;
+	readonly backtrack_files: readonly string[];
+	readonly reasoning_by_intent: Readonly<Record<string, number>>;
+	readonly edit_chain_count: number;
+	readonly abandoned_edits: number;
+	readonly surviving_edits: number;
+	readonly drift_score?: number;
+	readonly unexpected_files?: number;
+	readonly decision_types: Readonly<Record<string, number>>;
+	readonly top_errors: readonly {
+		readonly tool: string;
+		readonly message: string;
+		readonly count: number;
+	}[];
 }

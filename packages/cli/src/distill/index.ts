@@ -30,9 +30,11 @@ import { extractAgentLifetimes, extractCommSequence } from "./comm-sequence";
 import { extractDecisions, extractPhases, extractRawTimingGaps } from "./decisions";
 import { captureMissingDiffs, computeToolSourcedDiff, extractGitDiffAttribution } from "./diff-attribution";
 import { extractEditChains } from "./edit-chains";
+import { extractFeatureUsage } from "./feature-usage";
 import { extractFileMap } from "./file-map";
 import { extractGitDiff, extractNetChanges } from "./git-diff";
 import { computePlanDrift, detectSpecRef } from "./plan-drift";
+import { extractContextConsumption } from "./context-consumption";
 import { extractReasoning } from "./reasoning";
 import { estimateCostFromTokens, extractStats } from "./stats";
 import { extractSummary } from "./summary";
@@ -182,6 +184,7 @@ export const distill = async (
 		transcript_model: string | undefined;
 		session_name: string | undefined;
 		user_type: string | undefined;
+		context_consumption: import("../types").ContextConsumption | undefined;
 	} = (() => {
 		const tPath = resolveTranscriptPath(events);
 		if (!tPath)
@@ -193,6 +196,7 @@ export const distill = async (
 				transcript_model: undefined,
 				session_name: undefined,
 				user_type: undefined,
+				context_consumption: undefined,
 			};
 
 		const sessionName = readSessionName(tPath) ?? undefined;
@@ -206,21 +210,24 @@ export const distill = async (
 				transcript_model: undefined,
 				session_name: sessionName,
 				user_type: undefined,
+				context_consumption: undefined,
 			};
 
 		const usage = extractTokenUsage(entries);
+		const model = extractAgentModel(entries);
 		return {
 			reasoning: extractReasoning(entries),
 			user_messages: extractUserMessages(entries),
 			transcript_path: tPath,
 			token_usage: usage.input_tokens > 0 ? usage : undefined,
-			transcript_model: extractAgentModel(entries),
+			transcript_model: model,
 			session_name: sessionName,
 			user_type: extractUserType(entries),
+			context_consumption: extractContextConsumption(entries, model),
 		};
 	})();
 
-	const { reasoning, user_messages, transcript_path, token_usage, transcript_model } =
+	const { reasoning, user_messages, transcript_path, token_usage, transcript_model, context_consumption } =
 		transcriptData;
 
 	// Resolve pricing tier: CLI override > config file > default "api"
@@ -241,6 +248,7 @@ export const distill = async (
 
 	// Layer 1: Hook-based extractors (stats receives reasoning + transcript token usage for cost)
 	const stats = extractStats(events, reasoning, token_usage, resolvedTier);
+	const feature_usage = extractFeatureUsage(events);
 	const backtracks = extractBacktracks(events);
 	const decisions = extractDecisions(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
 	const file_map = extractFileMap(events);
@@ -481,6 +489,8 @@ export const distill = async (
 		...(agent_lifetimes && agent_lifetimes.length > 0 ? { agent_lifetimes } : {}),
 		...(plan_drift ? { plan_drift } : {}),
 		...(task_list && task_list.tasks.length > 0 ? { task_list } : {}),
+		...(context_consumption ? { context_consumption } : {}),
+		...(feature_usage ? { feature_usage } : {}),
 		complete: true,
 	};
 

@@ -1,5 +1,6 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { ArrowUp, ArrowDown, ChevronRight, Users, Layers } from "lucide-solid";
+import { FeatureBadges } from "../components/FeatureBadges";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
@@ -11,8 +12,8 @@ import { StatusBadge } from "../components/ui/StatusBadge";
 import { WorkUnitCard } from "../components/WorkUnitCard";
 import { FilterBar } from "../components/FilterBar";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
-import { ProjectFilter, ProjectBadge } from "../components/ProjectFilter";
-import { isGlobalMode, selectedProjectId } from "../lib/project-store";
+import { ProjectBadge } from "../components/ProjectFilter";
+import { isGlobalMode, selectedProjectId, setSelectedProjectId, projectList } from "../lib/project-store";
 
 
 const formatSize = (bytes: number): string => {
@@ -72,6 +73,7 @@ type ViewMode = "sessions" | "work_units";
 type StatusFilter = "all" | "complete" | "incomplete";
 type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
 type AgentsFilter = "all" | "top_level" | "multi" | "solo";
+type FeaturesFilter = "all" | "any" | "loop" | "goal" | "workflow";
 type LifecycleFilter = "all" | "prime-plan-build" | "prime-build" | "plan-build" | "plan-build-review" | "multi-build" | "ad-hoc";
 type LinkTypeFilter = "all" | "spec" | "branch_time";
 
@@ -86,6 +88,9 @@ const isValidAnalyzed = (s: string | undefined): s is AnalyzedFilter =>
 
 const isValidAgents = (s: string | undefined): s is AgentsFilter =>
 	s === "all" || s === "top_level" || s === "multi" || s === "solo";
+
+const isValidFeatures = (s: string | undefined): s is FeaturesFilter =>
+	s === "all" || s === "any" || s === "loop" || s === "goal" || s === "workflow";
 
 const isValidLifecycle = (s: string | undefined): s is LifecycleFilter =>
 	s === "all" || s === "prime-plan-build" || s === "prime-build" || s === "plan-build" || s === "plan-build-review" || s === "multi-build" || s === "ad-hoc";
@@ -215,6 +220,7 @@ export const SessionList: Component = () => {
 		status?: string;
 		analyzed?: string;
 		agents?: string;
+		features?: string;
 		sort?: string;
 		page?: string;
 		view?: string;
@@ -234,6 +240,9 @@ export const SessionList: Component = () => {
 	);
 	const [agentsFilter, setAgentsFilter] = createSignal<AgentsFilter>(
 		isValidAgents(searchParams.agents) ? searchParams.agents : "top_level",
+	);
+	const [featuresFilter, setFeaturesFilter] = createSignal<FeaturesFilter>(
+		isValidFeatures(searchParams.features) ? searchParams.features : "all",
 	);
 	const [lifecycleFilter, setLifecycleFilter] = createSignal<LifecycleFilter>(
 		isValidLifecycle(searchParams.lifecycle) ? searchParams.lifecycle : "all",
@@ -257,6 +266,7 @@ export const SessionList: Component = () => {
 		const status = statusFilter();
 		const analyzed = analyzedFilter();
 		const agents = agentsFilter();
+		const features = featuresFilter();
 		const lifecycle = lifecycleFilter();
 		const linkType = linkTypeFilter();
 		const sort = sortState();
@@ -265,6 +275,7 @@ export const SessionList: Component = () => {
 		params.status = status !== "all" ? status : undefined;
 		params.analyzed = analyzed !== "all" ? analyzed : undefined;
 		params.agents = agents !== "top_level" ? agents : undefined;
+		params.features = features !== "all" ? features : undefined;
 		params.lifecycle = lifecycle !== "all" ? lifecycle : undefined;
 		params.link_type = linkType !== "all" ? linkType : undefined;
 		params.sort = serializeSortParam(sort);
@@ -286,6 +297,7 @@ export const SessionList: Component = () => {
 		const status = statusFilter();
 		const analyzed = analyzedFilter();
 		const agents = agentsFilter();
+		const features = featuresFilter();
 		const projectId = selectedProjectId();
 
 		return sessions.filter((s) => {
@@ -298,6 +310,8 @@ export const SessionList: Component = () => {
 			if (agents === "top_level" && s.is_subagent === true) return false;
 			if (agents === "multi" && (s.agent_count ?? 0) <= 1) return false;
 			if (agents === "solo" && (s.agent_count ?? 0) > 1) return false;
+			if (features === "any" && (s.features?.length ?? 0) === 0) return false;
+			if ((features === "loop" || features === "goal" || features === "workflow") && !s.features?.includes(features)) return false;
 			if (q) {
 				const name = (s.session_name ?? s.session_id).toLowerCase();
 				const branch = (s.git_branch ?? "").toLowerCase();
@@ -410,13 +424,6 @@ export const SessionList: Component = () => {
 				)}
 			</Show>
 
-			{/* Project filter (global mode) */}
-			<Show when={isGlobalMode()}>
-				<div class="mt-3">
-					<ProjectFilter />
-				</div>
-			</Show>
-
 			{/* Filters — view-aware */}
 			<Show when={viewMode() === "sessions"}>
 				<FilterBar
@@ -425,9 +432,21 @@ export const SessionList: Component = () => {
 					onSearch={(v) => { setSearch(v); setPage(1); setSelectedRow(-1); }}
 					searchRef={(el) => { searchInputRef = el; }}
 					filters={[
+						...(isGlobalMode() ? [{
+							key: "project",
+							variant: "dropdown" as const,
+							label: "All Projects",
+							options: [
+								{ label: "All Projects", value: "all" },
+								...(projectList() ?? []).map((p) => ({ label: p.name, value: p.id })),
+							],
+							value: selectedProjectId() ?? "all",
+							onChange: (v: string) => { setSelectedProjectId(v === "all" ? undefined : v); setPage(1); setSelectedRow(-1); },
+						}] : []),
 						{ key: "status", options: [{ label: "All", value: "all" }, { label: "Complete", value: "complete" }, { label: "Incomplete", value: "incomplete" }], value: statusFilter(), onChange: (v: string) => { setStatusFilter(v as StatusFilter); setPage(1); setSelectedRow(-1); } },
 						{ key: "analyzed", options: [{ label: "All", value: "all" }, { label: "Analyzed", value: "analyzed" }, { label: "Not analyzed", value: "not_analyzed" }], value: analyzedFilter(), onChange: (v: string) => { setAnalyzedFilter(v as AnalyzedFilter); setPage(1); setSelectedRow(-1); } },
 						{ key: "agents", options: [{ label: "All", value: "all" }, { label: "Top-level", value: "top_level" }, { label: "Multi-agent", value: "multi" }, { label: "Solo", value: "solo" }], value: agentsFilter(), onChange: (v: string) => { setAgentsFilter(v as AgentsFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "features", options: [{ label: "All", value: "all" }, { label: "Any feature", value: "any" }, { label: "Loop", value: "loop" }, { label: "Goal", value: "goal" }, { label: "Workflow", value: "workflow" }], value: featuresFilter(), onChange: (v: string) => { setFeaturesFilter(v as FeaturesFilter); setPage(1); setSelectedRow(-1); } },
 					]}
 					resultCount={filtered().length}
 					resultLabel={`session${filtered().length !== 1 ? "s" : ""}`}
@@ -526,6 +545,7 @@ export const SessionList: Component = () => {
 															analyzed
 														</span>
 													</Show>
+													<FeatureBadges features={session.features} />
 												</div>
 											</td>
 											<Show when={isGlobalMode()}>
