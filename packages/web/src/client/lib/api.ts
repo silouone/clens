@@ -36,4 +36,14 @@ const createApiClient = () => {
 // Singleton client instance — created once, reused across the app
 const api = createApiClient();
 
-export { api, getToken, createApiClient };
+/**
+ * Auth headers for raw fetch() calls that bypass the typed client. Every
+ * /api request must carry the token — in production these endpoints return
+ * 401 without it (dev skips auth, which hid the gap).
+ */
+const authHeaders = (): Readonly<Record<string, string>> => {
+	const token = getToken();
+	return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+export { api, getToken, authHeaders, createApiClient };

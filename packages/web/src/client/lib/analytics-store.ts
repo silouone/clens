@@ -1,6 +1,7 @@
 import { createMemo, createResource, createSignal } from "solid-js";
 import { selectedProjectId } from "./project-store";
 import { localDayKey, matchesLocalDay, isValidDayKey } from "./analytics-day";
+import { authHeaders } from "./api";
 
 // ── Types (matching server response) ──────────────────────────────
 
@@ -155,7 +156,7 @@ const buildQuery = (endpoint: string, params: FetchParams): string => {
 
 const fetchUsage = async (params: FetchParams): Promise<UsageResponse | undefined> => {
 	try {
-		const res = await fetch(buildQuery("usage", params));
+		const res = await fetch(buildQuery("usage", params), { headers: authHeaders() });
 		if (!res.ok) return undefined;
 		const body = await res.json();
 		return body.data as UsageResponse;
@@ -166,7 +167,7 @@ const fetchUsage = async (params: FetchParams): Promise<UsageResponse | undefine
 
 const fetchInsights = async (params: FetchParams): Promise<InsightsResponse | undefined> => {
 	try {
-		const res = await fetch(buildQuery("insights", params));
+		const res = await fetch(buildQuery("insights", params), { headers: authHeaders() });
 		if (!res.ok) return undefined;
 		const body = await res.json();
 		return body.data as InsightsResponse;
@@ -245,7 +246,7 @@ const fetchHeaderStats = async (): Promise<HeaderStats> => {
 	const qs = new URLSearchParams({ range: "all" });
 	if (project) qs.set("project", project);
 	try {
-		const res = await fetch(`/api/analytics/usage?${qs.toString()}`);
+		const res = await fetch(`/api/analytics/usage?${qs.toString()}`, { headers: authHeaders() });
 		if (!res.ok) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0 };
 		const body = await res.json();
 		const t = body.data?.totals as UsageTotals | undefined;
@@ -278,7 +279,7 @@ const [isRebuilding, setIsRebuilding] = createSignal(false);
 const rebuildAnalytics = async (): Promise<number> => {
 	setIsRebuilding(true);
 	try {
-		const res = await fetch("/api/analytics/rebuild", { method: "POST" });
+		const res = await fetch("/api/analytics/rebuild", { method: "POST", headers: authHeaders() });
 		if (!res.ok) return 0;
 		const body = await res.json();
 		// Refetch all stores after rebuild

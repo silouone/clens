@@ -1,5 +1,6 @@
 import { createResource, createSignal } from "solid-js";
 import type { ProjectEntry } from "../../shared/types";
+import { authHeaders } from "./api";
 
 const LOG_PREFIX = "[cLens:projects]";
 
@@ -8,7 +9,7 @@ const LOG_PREFIX = "[cLens:projects]";
 const fetchProjects = async (): Promise<readonly ProjectEntry[]> => {
 	console.debug(LOG_PREFIX, "Fetching projects");
 	try {
-		const res = await fetch("/api/projects");
+		const res = await fetch("/api/projects", { headers: authHeaders() });
 		if (!res.ok) {
 			console.error(LOG_PREFIX, `Projects error: HTTP ${res.status}`);
 			return [];

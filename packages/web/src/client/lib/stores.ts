@@ -1,6 +1,6 @@
 import { createResource, createSignal } from "solid-js";
 import type { ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
-import { api } from "./api";
+import { api, authHeaders } from "./api";
 import { preferences } from "./settings";
 import { isStaleConversationFetch } from "./fetch-guard";
 
@@ -284,7 +284,7 @@ const createAgentConversationResource = (
 const fetchWorkUnits = async (): Promise<readonly WorkUnit[]> => {
 	console.debug(LOG_PREFIX, "Fetching work units");
 	try {
-		const res = await fetch("/api/work-units");
+		const res = await fetch("/api/work-units", { headers: authHeaders() });
 		if (!res.ok) {
 			console.error(LOG_PREFIX, `Work units error: HTTP ${res.status}`);
 			return [];
@@ -337,7 +337,7 @@ const createWorkUnitDetail = (id: () => string | undefined) => {
 	): Promise<WorkUnitDetailResult | undefined> => {
 		console.debug(LOG_PREFIX, `Fetching work unit detail: ${unitId.slice(0, 12)}`);
 		try {
-			const res = await fetch(`/api/work-units/${unitId}/detail`);
+			const res = await fetch(`/api/work-units/${unitId}/detail`, { headers: authHeaders() });
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({ error: "Unknown error" }));
 				const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
