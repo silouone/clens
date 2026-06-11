@@ -124,6 +124,23 @@ export const StackedArea = <T,>(props: StackedAreaProps<T>): ReturnType<Componen
 						)}
 					</For>
 
+					{/* A single data point degenerates the area path to zero width —
+					    render visible square markers per series instead (one per
+					    cumulative level), matching the line charts' point markers */}
+					<Show when={props.data.length === 1}>
+						<For each={props.series}>
+							{(series, si) => (
+								<rect
+									x={-3}
+									y={yScale()(stacked()[0].cumulative[si()]) - 3}
+									width={6}
+									height={6}
+									fill={series.color}
+								/>
+							)}
+						</For>
+					</Show>
+
 					{/* Hover columns */}
 					<For each={props.data}>
 						{(d, i) => (

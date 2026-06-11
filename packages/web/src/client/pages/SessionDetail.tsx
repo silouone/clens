@@ -466,6 +466,10 @@ export const SessionDetail: Component = () => {
 									/>
 								}
 							>
+								{/* Banner + content stack in one column — DetailPageLayout's children
+								    container is a flex ROW, so without this wrapper the banner becomes
+								    a ghost sibling column beside the content panel */}
+								<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
 								{/* Stale-distill banner (bug B5 + stale-tier mixing): raw file grew past
 								    the analyzed snapshot, or costs were priced under an outdated tier */}
 								<Show when={(() => { const st = staleness(); return st && (st.distill_stale || st.tier_stale) ? st : undefined; })()}>
@@ -527,6 +531,7 @@ export const SessionDetail: Component = () => {
 									</div>
 									)}
 								</Show>
+								</div>
 							</DetailPageLayout>
 						)}
 					</Show>
