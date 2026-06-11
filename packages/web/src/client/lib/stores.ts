@@ -59,9 +59,25 @@ type RelatedSessionsData = {
 	}[];
 };
 
+/**
+ * Staleness metadata from the detail route (bug B5): how the distilled snapshot
+ * compares to the live raw session file. `distill_stale` is true when the raw
+ * file has grown past what the distill covered.
+ */
+type StalenessData = {
+	readonly distilled_at: number;
+	readonly raw_event_count: number;
+	readonly distill_stale: boolean;
+};
+
 /** Response from the session detail endpoint when distilled data exists. */
 type SessionDetailResult =
-	| { readonly status: "ready"; readonly data: DistilledSession; readonly relatedSessions?: RelatedSessionsData }
+	| {
+			readonly status: "ready";
+			readonly data: DistilledSession;
+			readonly relatedSessions?: RelatedSessionsData;
+			readonly staleness?: StalenessData;
+	  }
 	| { readonly status: "not_distilled" };
 
 /**
@@ -100,10 +116,24 @@ const createSessionDetail = (sessionId: () => string | undefined) => {
 			raw && typeof raw === "object" && "sessions" in raw && Array.isArray(raw.sessions)
 				? raw as RelatedSessionsData
 				: undefined;
+		const rawStaleness = "staleness" in body ? body.staleness : undefined;
+		// Validate every field the banner renders, not just the flag (untrusted body)
+		const staleness: StalenessData | undefined =
+			rawStaleness &&
+			typeof rawStaleness === "object" &&
+			"distill_stale" in rawStaleness &&
+			typeof rawStaleness.distill_stale === "boolean" &&
+			"distilled_at" in rawStaleness &&
+			typeof rawStaleness.distilled_at === "number" &&
+			"raw_event_count" in rawStaleness &&
+			typeof rawStaleness.raw_event_count === "number"
+				? (rawStaleness as StalenessData)
+				: undefined;
 		return {
 			status: "ready",
 			data: data as DistilledSession,
 			relatedSessions,
+			...(staleness ? { staleness } : {}),
 		};
 	};
 

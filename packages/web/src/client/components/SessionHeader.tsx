@@ -1,5 +1,5 @@
 import { Show, createSignal, type Component } from "solid-js";
-import type { DistilledSession } from "../../shared/types";
+import type { DistilledSession, SessionStatus } from "../../shared/types";
 import { StatusBadge } from "./ui/StatusBadge";
 import { DetailHeader } from "./DetailHeader";
 
@@ -7,6 +7,10 @@ import { DetailHeader } from "./DetailHeader";
 
 type SessionHeaderProps = {
 	readonly session: DistilledSession;
+	// Raw-derived live status from the session list (bug B5/B6). When provided it
+	// is authoritative over the distilled `complete` flag, which is frozen at
+	// distill time and goes stale while a live session keeps running.
+	readonly status?: SessionStatus;
 	readonly onRedistill?: () => Promise<void>;
 };
 
@@ -34,7 +38,12 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 				</Show>
 			}
 		>
-			<StatusBadge complete={props.session.complete} />
+			<Show
+				when={props.status}
+				fallback={<StatusBadge complete={props.session.complete} />}
+			>
+				{(status) => <StatusBadge status={status()} />}
+			</Show>
 		</DetailHeader>
 	);
 };

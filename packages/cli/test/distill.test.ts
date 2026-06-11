@@ -942,7 +942,7 @@ describe("extractStats - 3-tier cost resolution", () => {
 		expect(stats.token_usage).toBeUndefined();
 	});
 
-	test("transcriptTokenUsage with zero tokens still uses transcript tier", () => {
+	test("transcriptTokenUsage with zero tokens: tier-1 path but is_estimated true (B26)", () => {
 		const transcriptTokenUsage: TokenUsage = {
 			input_tokens: 0,
 			output_tokens: 0,
@@ -956,10 +956,12 @@ describe("extractStats - 3-tier cost resolution", () => {
 			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
 		];
 
-		// transcriptTokenUsage is defined (not undefined), so tier 1 applies
+		// transcriptTokenUsage is defined (not undefined), so the tier-1 code path is
+		// taken and the zero tokens are reported back. But zero tokens are NOT real
+		// usage, so the estimate must not claim to be measured (B26): is_estimated true.
 		const stats = extractStats(events, [], transcriptTokenUsage);
 		expect(stats.cost_estimate).toBeDefined();
-		expect(stats.cost_estimate?.is_estimated).toBe(false);
+		expect(stats.cost_estimate?.is_estimated).toBe(true);
 		expect(stats.cost_estimate?.estimated_input_tokens).toBe(0);
 		expect(stats.cost_estimate?.estimated_output_tokens).toBe(0);
 	});

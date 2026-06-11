@@ -6,6 +6,7 @@
 export type {
 	// Session
 	SessionSummary,
+	SessionStatus,
 
 	// Distill results
 	DistilledSession,

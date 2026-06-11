@@ -2,7 +2,7 @@ import { For, Show, createMemo, type Component } from "solid-js";
 import { BookOpen } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatRelTime } from "../lib/format";
-import { renderMarkdown } from "../lib/markdown";
+import { renderPlainText } from "../lib/markdown";
 import { Card } from "./ui/Card";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -33,10 +33,11 @@ export const NarrativeSection: Component<NarrativeSectionProps> = (props) => {
 					</h3>
 				</div>
 
-				{/* Narrative text */}
+				{/* Narrative text — generated prose interpolating raw model ids and
+				    file paths; rendered verbatim, never as markdown (bug B16) */}
 				<div
 					class="mt-2 text-sm leading-relaxed text-muted prose-sm-dark"
-					innerHTML={renderMarkdown(narrative() ?? "")}
+					innerHTML={renderPlainText(narrative() ?? "")}
 				/>
 
 				{/* Phase milestones */}

@@ -142,4 +142,75 @@ describe("hook handler", () => {
 		await proc.exited;
 		expect(existsSync(`${TEST_DIR}/.clens/sessions`)).toBe(true);
 	});
+
+	// B28: a subagent running with cwd inside a subdirectory must NOT fragment
+	// session capture into a nested `.clens/`. The hook walks up to the project
+	// root (nearest `.clens/`) and appends there.
+	test("nested cwd writes to the project-root .clens, not a nested one", async () => {
+		// Seed the project root so resolveProjectRoot can find the marker.
+		mkdirSync(`${TEST_DIR}/.clens/sessions`, { recursive: true });
+		const nestedCwd = `${TEST_DIR}/packages/web/src/client/assets`;
+		mkdirSync(nestedCwd, { recursive: true });
+
+		const payload = JSON.stringify({
+			session_id: "nested-session",
+			cwd: nestedCwd,
+			hook_event_name: "PreToolUse",
+			tool_name: "Edit",
+			tool_input: { file_path: "/foo.ts" },
+			tool_use_id: "t-nested",
+			transcript_path: "/tmp/t.jsonl",
+			permission_mode: "default",
+		});
+
+		const proc = Bun.spawn(["bun", "run", HOOK_SCRIPT, "PreToolUse"], {
+			stdin: new Response(payload),
+			stdout: "pipe",
+			stderr: "pipe",
+			cwd: PKG_ROOT,
+		});
+
+		await proc.exited;
+
+		// Event lands in the project-root .clens.
+		const rootFile = `${TEST_DIR}/.clens/sessions/nested-session.jsonl`;
+		expect(existsSync(rootFile)).toBe(true);
+
+		// And NOT in a fragmented nested .clens under the subdirectory.
+		expect(existsSync(`${nestedCwd}/.clens`)).toBe(false);
+
+		const stored: StoredEvent = JSON.parse(readFileSync(rootFile, "utf-8").trim());
+		expect(stored.sid).toBe("nested-session");
+		expect(stored.event).toBe("PreToolUse");
+	});
+
+	test("nested cwd falls back to .git root when no .clens exists yet", async () => {
+		// Project root has a .git but no .clens yet (first event of a session).
+		mkdirSync(`${TEST_DIR}/.git`, { recursive: true });
+		const nestedCwd = `${TEST_DIR}/packages/cli/src`;
+		mkdirSync(nestedCwd, { recursive: true });
+
+		const payload = JSON.stringify({
+			session_id: "git-root-session",
+			cwd: nestedCwd,
+			hook_event_name: "PreToolUse",
+			tool_name: "Read",
+			tool_input: { file_path: "/bar.ts" },
+			tool_use_id: "t-git",
+			transcript_path: "/tmp/t.jsonl",
+			permission_mode: "default",
+		});
+
+		const proc = Bun.spawn(["bun", "run", HOOK_SCRIPT, "PreToolUse"], {
+			stdin: new Response(payload),
+			stdout: "pipe",
+			stderr: "pipe",
+			cwd: PKG_ROOT,
+		});
+
+		await proc.exited;
+
+		expect(existsSync(`${TEST_DIR}/.clens/sessions/git-root-session.jsonl`)).toBe(true);
+		expect(existsSync(`${nestedCwd}/.clens`)).toBe(false);
+	});
 });

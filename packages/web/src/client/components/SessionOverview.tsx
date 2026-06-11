@@ -3,7 +3,7 @@ import { A } from "@solidjs/router";
 import { ExternalLink } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatPercentage, formatCost, truncateMultiline } from "../lib/format";
-import { renderMarkdown } from "../lib/markdown";
+import { renderPlainText } from "../lib/markdown";
 import { Card } from "./ui/Card";
 import { MetaRow } from "./ui/MetaRow";
 import { CostDrilldown } from "./CostDrilldown";
@@ -165,9 +165,14 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 						</p>
 					}
 				>
+					{/*
+					  The request is the raw user prompt — render it VERBATIM, not as
+					  markdown, so model ids like `claude-fable-5[1m]` and file paths
+					  like `src/_internal_/foo.ts` survive intact (bug B16).
+					*/}
 					<div
-						class="prose-sm-dark text-sm text-secondary"
-						innerHTML={renderMarkdown(displayText())}
+						class="prose-sm-dark text-sm text-secondary whitespace-pre-wrap break-words"
+						innerHTML={renderPlainText(displayText())}
 					/>
 					<Show when={truncated().truncated}>
 						<button

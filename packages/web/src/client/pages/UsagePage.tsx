@@ -15,6 +15,8 @@ import {
 	computePpDelta,
 	rebuildAnalytics,
 	isRebuilding,
+	usagePopulation,
+	isValidDayKey,
 	type AnalyticsRange,
 	type DeltaResult,
 	type DailyUsageMetrics,
@@ -60,12 +62,16 @@ type KpiCardProps = {
 	readonly delta?: DeltaResult;
 	readonly deltaLabel?: string;
 	readonly tooltip?: string;
+	readonly subtitle?: string;
 };
 
 const KpiCard: Component<KpiCardProps> = (props) => (
 	<div class="rounded-lg border border-clens bg-surface p-4" title={props.tooltip}>
 		<div class="text-xs text-muted">{props.label}</div>
 		<div class="mt-1 text-2xl font-semibold text-primary">{props.value}</div>
+		<Show when={props.subtitle}>
+			<div class="mt-0.5 text-xs text-muted">{props.subtitle}</div>
+		</Show>
 		<Show when={props.delta && props.delta.direction !== "flat"}>
 			<div class="mt-1 flex items-center gap-1 text-xs">
 				<span classList={{
@@ -116,29 +122,53 @@ const EmptyState: Component = () => (
 export const UsagePage: Component = () => {
 	const navigate = useNavigate();
 
+	// Navigate to the session list filtered to the clicked day. The list consumes
+	// the `date` query param and keeps only sessions whose start_time falls on that
+	// LOCAL calendar day (B22 — previously this param went nowhere). `agents=all`
+	// is set so single-day drill-downs aren't silently narrowed by the default
+	// top-level-only filter.
 	const navigateToDate = (d: unknown) => {
 		const datum = d as DailyUsageMetrics;
-		navigate(`/?date=${datum.date}`);
+		if (!isValidDayKey(datum.date)) return;
+		navigate(`/?date=${encodeURIComponent(datum.date)}&agents=all`);
 	};
 
 	const totals = usageTotals;
 	const prevTotals = usagePreviousTotals;
+	const population = usagePopulation;
 	const isLoading = () => usageData.loading;
 	const isEmpty = () => !isLoading() && (totals()?.sessions ?? 0) === 0;
 
+	// Comparison deltas are meaningless when the previous window held no sessions —
+	// a "+X vs prev" against an empty baseline misleads (B10). Gate every delta on a
+	// non-empty previous window.
+	const hasPrevBaseline = createMemo(() => (prevTotals()?.sessions ?? 0) > 0);
+
+	// Cost has no signal when nothing in the window is priced — show an em dash, not
+	// a fake "$0.00" (B10).
+	const hasCost = createMemo(() => (totals()?.sessions_with_cost ?? 0) > 0);
+
 	// KPI deltas
 	const costDelta = createMemo(() =>
-		totals() && prevTotals() ? computeDelta(totals()!.cost_usd, prevTotals()!.cost_usd) : undefined,
+		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.cost_usd, prevTotals()!.cost_usd) : undefined,
 	);
 	const sessionDelta = createMemo(() =>
-		totals() && prevTotals() ? computeDelta(totals()!.sessions, prevTotals()!.sessions) : undefined,
+		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.sessions, prevTotals()!.sessions) : undefined,
 	);
 	const cacheDelta = createMemo(() =>
-		totals() && prevTotals() ? computePpDelta(totals()!.cache_hit_rate, prevTotals()!.cache_hit_rate) : undefined,
+		totals() && prevTotals() && hasPrevBaseline() ? computePpDelta(totals()!.cache_hit_rate, prevTotals()!.cache_hit_rate) : undefined,
 	);
 	const durationDelta = createMemo(() =>
-		totals() && prevTotals() ? computeDelta(totals()!.avg_duration_ms, prevTotals()!.avg_duration_ms) : undefined,
+		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.avg_duration_ms, prevTotals()!.avg_duration_ms) : undefined,
 	);
+
+	// "n of m sessions analyzed" — analyzed = distilled (drives every metric),
+	// total = all raw sessions in the window (B10).
+	const coverageLabel = createMemo(() => {
+		const p = population();
+		if (!p) return undefined;
+		return `${p.analyzed} of ${p.total} sessions analyzed`;
+	});
 
 	// Model breakdown donut segments
 	const modelSegments = createMemo(() =>
@@ -195,14 +225,17 @@ export const UsagePage: Component = () => {
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 					<KpiCard
 						label="Total Cost"
-						value={`$${(totals()?.cost_usd ?? 0).toFixed(2)}`}
-						delta={costDelta()}
-						tooltip={`Cost data available for ${totals()?.sessions_with_cost ?? 0}/${totals()?.sessions ?? 0} sessions`}
+						value={hasCost() ? `$${(totals()?.cost_usd ?? 0).toFixed(2)}` : "—"}
+						delta={hasCost() ? costDelta() : undefined}
+						tooltip={hasCost()
+							? `Cost data available for ${totals()?.sessions_with_cost ?? 0}/${totals()?.sessions ?? 0} sessions`
+							: "no priced sessions"}
 					/>
 					<KpiCard
 						label="Total Sessions"
 						value={String(totals()?.sessions ?? 0)}
 						delta={sessionDelta()}
+						subtitle={coverageLabel()}
 					/>
 					<KpiCard
 						label="Cache Hit Rate"

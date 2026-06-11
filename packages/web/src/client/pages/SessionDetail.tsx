@@ -15,10 +15,11 @@ import {
 	globalError,
 	clearError,
 } from "../lib/stores";
+import { shouldAutoDistill } from "../lib/auto-distill";
 import { api } from "../lib/api";
 import { lastDistilledSessionId } from "../lib/events";
 import { useKeyboard } from "../lib/keyboard";
-import { formatDuration } from "../lib/format";
+import { formatDuration, formatDate } from "../lib/format";
 import { findAgentInTree, flattenAgents } from "../lib/agent-utils";
 import { Spinner } from "../components/ui/Spinner";
 import { FlaskIllustration } from "../components/ui/EmptyState";
@@ -34,7 +35,7 @@ import { DetailNav } from "../components/DetailNav";
 import { LiveSessionView } from "../components/LiveSessionView";
 import { createLiveSessionStore } from "../lib/live-store";
 import { preferences } from "../lib/settings";
-import type { SessionSummary } from "../../shared/types";
+import type { SessionStatus, SessionSummary } from "../../shared/types";
 import { isGlobalMode } from "../lib/project-store";
 import { ProjectBadge } from "../components/ProjectFilter";
 
@@ -172,6 +173,42 @@ const AgentNotFound: Component<{
 	</div>
 );
 
+// ── Stale-distill banner (bug B5) ────────────────────────────────────
+
+/**
+ * Shown when the distilled analysis covers fewer events than the live raw
+ * session file — i.e. the session kept running (or was resumed) after it was
+ * analyzed. Makes the staleness explicit instead of presenting an old snapshot
+ * as current truth, and points at the existing Re-analyze button to refresh.
+ */
+const StaleDistillBanner: Component<{
+	readonly analyzedEvents: number;
+	readonly rawEvents: number;
+	readonly distilledAt: number;
+	readonly onRedistill: () => Promise<void>;
+}> = (props) => {
+	const [refreshing, setRefreshing] = createSignal(false);
+	return (
+		<div class="mx-4 mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-300">
+			<span>
+				Analysis covers {props.analyzedEvents} of {props.rawEvents} events (analyzed{" "}
+				{formatDate(props.distilledAt, "relative")}). Re-analyze to refresh.
+			</span>
+			<button
+				onClick={async () => {
+					setRefreshing(true);
+					try { await props.onRedistill(); }
+					finally { setRefreshing(false); }
+				}}
+				disabled={refreshing()}
+				class="shrink-0 rounded-md bg-amber-200 px-2 py-1 font-medium text-amber-900 transition hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700/50 dark:text-amber-100 dark:hover:bg-amber-700"
+			>
+				{refreshing() ? "Re-analyzing..." : "Re-analyze"}
+			</button>
+		</div>
+	);
+};
+
 // ── Main component ──────────────────────────────────────────────────
 
 export const SessionDetail: Component = () => {
@@ -201,6 +238,23 @@ export const SessionDetail: Component = () => {
 		return undefined;
 	});
 
+	// Staleness metadata from the detail route (bug B5). Present only when the
+	// session is distilled and the route could compare against the raw file.
+	const staleness = createMemo(() => {
+		const detail = sessionDetail();
+		return detail?.status === "ready" ? detail.staleness : undefined;
+	});
+
+	// Raw-derived live status from the session list (bug B5/B6). This reflects the
+	// CURRENT session state, unlike the distilled `complete` flag which freezes at
+	// distill time. Used for the header badge so a running session never shows
+	// "complete" just because an early distill said so.
+	const rawStatus = createMemo<SessionStatus | undefined>(() => {
+		const sessions = sessionList();
+		const match = sessions?.find((s) => s.session_id === params.id);
+		return match?.status;
+	});
+
 	const isNotDistilled = createMemo(() => sessionDetail()?.status === "not_distilled");
 
 	/** Project info derived from session list (available in global mode). */
@@ -213,27 +267,33 @@ export const SessionDetail: Component = () => {
 		return { project_id: m.project_id, project_name: m.project_name };
 	});
 
+	/** Summary data for sessions that haven't been distilled yet. */
+	const notDistilledSummary = createMemo(() => {
+		const sessions = sessionList() ?? [];
+		return sessions.find((s) => s.session_id === params.id);
+	});
+
 	// ── Auto-distill when preference is enabled ──────────────
 	const [autoDistillTriggered, setAutoDistillTriggered] = createSignal(false);
 
+	// B17/D13: skip auto-distill for LIVE (active/idle) sessions — auto-distilling
+	// a running session freezes a stale "complete" snapshot. Only complete-but-
+	// unanalyzed sessions auto-distill; the live timeline is shown otherwise, and
+	// manual Re-analyze stays available regardless.
 	createEffect(() => {
-		if (
-			preferences().autoDistill &&
-			isNotDistilled() &&
-			!autoDistillTriggered() &&
-			!sessionDetail.loading
-		) {
+		const guard = shouldAutoDistill({
+			autoDistillEnabled: preferences().autoDistill,
+			isNotDistilled: isNotDistilled(),
+			alreadyTriggered: autoDistillTriggered(),
+			detailLoading: sessionDetail.loading,
+			summaryStatus: notDistilledSummary()?.status,
+		});
+		if (guard) {
 			setAutoDistillTriggered(true);
 			api.api.commands.sessions[":sessionId"].distill.$post({
 				param: { sessionId: params.id },
 			}).catch(() => { /* distill error handled by SSE / polling */ });
 		}
-	});
-
-	/** Summary data for sessions that haven't been distilled yet. */
-	const notDistilledSummary = createMemo(() => {
-		const sessions = sessionList() ?? [];
-		return sessions.find((s) => s.session_id === params.id);
 	});
 
 	const liveStore = createLiveSessionStore(() => {
@@ -374,7 +434,7 @@ export const SessionDetail: Component = () => {
 								backLabel="Sessions"
 								backHref="/"
 								id={params.id.slice(0, 12)}
-								header={<SessionHeader session={s()} onRedistill={handleRedistill} />}
+								header={<SessionHeader session={s()} status={rawStatus()} onRedistill={handleRedistill} />}
 								badge={
 									<Show when={projectInfo()}>
 										{(info) => (
@@ -392,6 +452,17 @@ export const SessionDetail: Component = () => {
 									/>
 								}
 							>
+								{/* Stale-distill banner (bug B5): raw file grew past the analyzed snapshot */}
+								<Show when={(() => { const st = staleness(); return st && st.distill_stale ? st : undefined; })()}>
+									{(st) => (
+										<StaleDistillBanner
+											analyzedEvents={s().stats.total_events}
+											rawEvents={st().raw_event_count}
+											distilledAt={st().distilled_at}
+											onRedistill={handleRedistill}
+										/>
+									)}
+								</Show>
 								{/* Right content panel -- keyed wrapper triggers fade on panel switch */}
 								<Show when={panelKey()} keyed>
 									{(_panelKey) => (

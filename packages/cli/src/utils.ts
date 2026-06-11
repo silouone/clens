@@ -1,8 +1,33 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import type { AgentNode, DiffLine, LinkEvent, MessageLink, SpawnLink, StoredEvent, TeammateIdleLink } from "./types";
 import { BROADCAST_EVENTS } from "./types";
 
 export const IDLE_THRESHOLD_MS = 300_000;
+
+/**
+ * Resolve the project root by walking up from `start` to the nearest directory
+ * containing `.clens/` (preferred — that is where session data already lives),
+ * then falling back to the nearest `.git/` parent, then `start` itself.
+ *
+ * Used at hook time so a subagent running with cwd inside a subdirectory does
+ * not fragment session capture into a nested `.clens/`. Mirrors `findProjectDir`
+ * in `packages/web/src/server/index.ts`, but prefers `.clens/` over `.git/`.
+ *
+ * Performance: a few `existsSync` checks per level, no spawning — stays within
+ * the ~2ms hook budget.
+ */
+export const resolveProjectRoot = (start: string): string => {
+	const walkUp = (
+		dir: string,
+		marker: string,
+	): string | undefined => {
+		if (existsSync(resolve(dir, marker))) return dir;
+		const parent = dirname(dir);
+		return parent === dir ? undefined : walkUp(parent, marker);
+	};
+	return walkUp(start, ".clens") ?? walkUp(start, ".git") ?? start;
+};
 
 export interface EffectiveDuration {
 	readonly effective_duration_ms: number;

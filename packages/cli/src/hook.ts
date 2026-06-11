@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import type { HookEventType, StoredEvent } from "./types";
-import { logError } from "./utils";
+import { logError, resolveProjectRoot } from "./utils";
 
 // Read stdin synchronously for performance
 const raw = await Bun.stdin.text();
@@ -16,7 +16,10 @@ const event = (Bun.argv[2] || "unknown") as HookEventType;
 try {
 	const input = JSON.parse(raw);
 	const sid: string = input.session_id || "unknown";
-	const projectDir: string = input.cwd || process.cwd();
+	// Resolve the project root by walking up from cwd to the nearest `.clens/`
+	// (or `.git/`) — prevents a subagent running in a subdirectory from
+	// fragmenting session capture into a nested `.clens/`.
+	const projectDir: string = resolveProjectRoot(input.cwd || process.cwd());
 
 	const sessionsDir = `${projectDir}/.clens/sessions`;
 	mkdirSync(sessionsDir, { recursive: true });

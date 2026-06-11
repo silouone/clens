@@ -38,6 +38,32 @@ export interface ClensConfig {
 	readonly pricing?: PricingTier;
 }
 
+// A session is "complete" only when it ended cleanly (last meaningful event is
+// SessionEnd). If it didn't end but its last event is recent it's "active";
+// otherwise it's gone quiet and is "idle". See bug B6 (Stop ⇒ complete was wrong).
+export const SESSION_STATUSES = ["complete", "active", "idle"] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
+
+/** A session whose last event is older than this is considered idle, not active. */
+export const ACTIVE_THRESHOLD_MS = 600_000; // 10 minutes
+
+/**
+ * Derive a session's live status from its last event.
+ * @param lastEventIsSessionEnd whether the last *meaningful* event is SessionEnd
+ * @param lastEventTime epoch ms of the last event
+ * @param now epoch ms reference point (injected for testability)
+ */
+export const deriveSessionStatus = (
+	lastEventIsSessionEnd: boolean,
+	lastEventTime: number,
+	now: number = Date.now(),
+): SessionStatus =>
+	lastEventIsSessionEnd
+		? "complete"
+		: now - lastEventTime <= ACTIVE_THRESHOLD_MS
+			? "active"
+			: "idle";
+
 // Session summary for list command
 export interface SessionSummary {
 	readonly session_id: string;
@@ -50,7 +76,10 @@ export interface SessionSummary {
 	readonly team_name?: string;
 	readonly source?: string;
 	readonly end_reason?: string;
-	readonly status: "complete" | "incomplete";
+	// "complete" iff last meaningful event is SessionEnd. Otherwise "active" iff
+	// the last event is within ACTIVE_THRESHOLD_MS of now, else "idle". A Stop
+	// event no longer implies complete — it fires after every turn (bug B6).
+	readonly status: SessionStatus;
 	readonly file_size_bytes: number;
 	readonly agent_count?: number;    // 0 = single-agent, >0 = multi-agent
 	readonly is_distilled?: boolean;  // true if .clens/distilled/{sid}.json exists

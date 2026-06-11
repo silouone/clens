@@ -1,4 +1,5 @@
 import { Hono } from "hono"
+import { closeSync, openSync, readSync, readdirSync } from "node:fs"
 import { readAnalyticsSummary, rebuildAnalyticsSummary } from "@clens/cli/src/distill/analytics-summary"
 import type { AnalyticsSummaryRow, ProjectEntry } from "@clens/cli"
 import { createLogger } from "../logger"
@@ -8,6 +9,17 @@ const log = createLogger("analytics")
 // ── Types ──────────────────────────────────────────────────────────
 
 type Range = "7d" | "30d" | "90d" | "all"
+
+/**
+ * Coverage of the window: how many sessions were actually analyzed (distilled, and
+ * thus reflected in every metric below) vs how many raw sessions exist in the window.
+ * Without this the UI silently aggregates only distilled sessions and presents them
+ * as the whole population (B10).
+ */
+interface Population {
+	readonly analyzed: number
+	readonly total: number
+}
 
 interface DailyUsageMetrics {
 	readonly date: string
@@ -61,6 +73,7 @@ interface AgentTypeBreakdown {
 }
 
 interface UsageResponse {
+	readonly population: Population
 	readonly daily: readonly DailyUsageMetrics[]
 	readonly totals: UsageTotals
 	readonly previous_totals: UsageTotals
@@ -115,6 +128,7 @@ interface WorstSession {
 }
 
 interface InsightsResponse {
+	readonly population: Population
 	readonly daily: readonly DailyInsightsMetrics[]
 	readonly totals: InsightsTotals
 	readonly previous_totals: InsightsTotals
@@ -137,10 +151,20 @@ const RANGE_DAYS: Readonly<Record<Range, number | undefined>> = {
 const parseRange = (value: string | undefined): Range =>
 	value === "7d" || value === "30d" || value === "90d" || value === "all" ? value : "30d"
 
+// Row dates are LOCAL calendar days ("YYYY-MM-DD", see analytics-summary.localDayKey).
+// Window boundaries must therefore also be computed in LOCAL time so comparisons line
+// up with the day a session was actually bucketed under (B18).
+const localDayString = (d: Date): string => {
+	const year = d.getFullYear()
+	const month = `${d.getMonth() + 1}`.padStart(2, "0")
+	const day = `${d.getDate()}`.padStart(2, "0")
+	return `${year}-${month}-${day}`
+}
+
 const dateNDaysAgo = (n: number): string => {
 	const d = new Date()
-	d.setUTCDate(d.getUTCDate() - n)
-	return d.toISOString().slice(0, 10)
+	d.setDate(d.getDate() - n)
+	return localDayString(d)
 }
 
 const median = (values: readonly number[]): number => {
@@ -157,12 +181,37 @@ const filterByRange = (
 	const days = RANGE_DAYS[range]
 	if (!days) return { current: rows, previous: [] }
 
-	const cutoff = dateNDaysAgo(days)
-	const previousCutoff = dateNDaysAgo(days * 2)
+	// Current window is exactly N local days: [today-(N-1) .. today] inclusive.
+	// Previous window is the immediately preceding N days: [today-(2N-1) .. today-N].
+	// Using dateNDaysAgo(days) for the cutoff would include today-N too, yielding an
+	// (N+1)-day current window compared against an N-day previous one (B18).
+	const cutoff = dateNDaysAgo(days - 1)
+	const previousCutoff = dateNDaysAgo(days * 2 - 1)
 	const current = rows.filter((r) => r.date >= cutoff)
 	const previous = rows.filter((r) => r.date >= previousCutoff && r.date < cutoff)
 	return { current, previous }
 }
+
+/**
+ * Count raw session files (the source of truth, not just distilled ones) whose
+ * local start day falls inside the current window. Pairs with the analyzed count
+ * to expose analysis coverage (B10).
+ */
+const countRawSessionsInWindow = (startTimes: readonly number[], range: Range): number => {
+	const days = RANGE_DAYS[range]
+	if (!days) return startTimes.length
+	const cutoff = dateNDaysAgo(days - 1)
+	return startTimes.filter((ms) => localDayString(new Date(ms)) >= cutoff).length
+}
+
+const computePopulation = (
+	rawStartTimes: readonly number[],
+	analyzedRows: readonly AnalyticsSummaryRow[],
+	range: Range,
+): Population => ({
+	analyzed: analyzedRows.length,
+	total: countRawSessionsInWindow(rawStartTimes, range),
+})
 
 // ── Usage metrics computation ──────────────────────────────────────
 
@@ -298,10 +347,15 @@ const computeAgentTypeBreakdown = (rows: readonly AnalyticsSummaryRow[]): readon
 		.sort((a, b) => b.spawn_count - a.spawn_count)
 }
 
-const computeUsageMetrics = (rows: readonly AnalyticsSummaryRow[], range: Range): UsageResponse => {
+const computeUsageMetrics = (
+	rows: readonly AnalyticsSummaryRow[],
+	range: Range,
+	rawStartTimes: readonly number[],
+): UsageResponse => {
 	const { current, previous } = filterByRange(rows, range)
 	const byDate = groupByDate(current)
 	return {
+		population: computePopulation(rawStartTimes, current, range),
 		daily: computeDailyUsage(byDate),
 		totals: computeUsageTotals(current),
 		previous_totals: computeUsageTotals(previous),
@@ -319,6 +373,10 @@ const computeDailyInsights = (byDate: ReadonlyMap<string, readonly AnalyticsSumm
 			const totalToolCalls = rows.reduce((s, r) => s + r.tool_call_count, 0)
 			const totalFailures = rows.reduce((s, r) => s + r.failure_count, 0)
 			const totalChains = rows.reduce((s, r) => s + r.edit_chain_count, 0)
+			// Real mean chain length = total edits across all chains / number of chains.
+			// (edit_chain_links may be absent on summary rows written before B19; fall back
+			// to the chain count so a stale row reports a mean of 1 rather than crashing.)
+			const totalChainLinks = rows.reduce((s, r) => s + (r.edit_chain_links ?? r.edit_chain_count), 0)
 			const totalAbandoned = rows.reduce((s, r) => s + r.abandoned_edits, 0)
 			const totalSurviving = rows.reduce((s, r) => s + r.surviving_edits, 0)
 			const editTotal = totalAbandoned + totalSurviving
@@ -339,7 +397,7 @@ const computeDailyInsights = (byDate: ReadonlyMap<string, readonly AnalyticsSumm
 				backtracks_by_type: mergeRecords("backtracks_by_type"),
 				reasoning_by_intent: mergeRecords("reasoning_by_intent"),
 				decision_types: mergeRecords("decision_types"),
-				avg_edit_chain_length: totalChains > 0 ? rows.reduce((s, r) => s + r.edit_chain_count, 0) / rows.length : 0,
+				avg_edit_chain_length: totalChains > 0 ? totalChainLinks / totalChains : 0,
 				abandoned_edit_rate: editTotal > 0 ? totalAbandoned / editTotal : 0,
 				failure_rate: totalToolCalls > 0 ? totalFailures / totalToolCalls : 0,
 			}
@@ -427,11 +485,16 @@ const computeToolErrors = (rows: readonly AnalyticsSummaryRow[]): readonly ToolE
 	const byTool = new Map<string, { calls: number; failures: number; errors: Set<string> }>()
 
 	rows.forEach((r) => {
+		// Calls come from tools_by_name — without them the per-tool failure_rate
+		// denominator is always 0, so every rate rendered as 0 (B11). Rows written
+		// before B11 lack tools_by_name; those tools simply report calls=0 / rate n/a.
+		Object.entries(r.tools_by_name ?? {}).forEach(([tool, callCount]) => {
+			const existing = byTool.get(tool) ?? { calls: 0, failures: 0, errors: new Set<string>() }
+			byTool.set(tool, { ...existing, calls: existing.calls + callCount })
+		})
 		Object.entries(r.failures_by_tool).forEach(([tool, failCount]) => {
 			const existing = byTool.get(tool) ?? { calls: 0, failures: 0, errors: new Set<string>() }
-			existing.failures += failCount
-			// Estimate total calls from tools_by_name equivalent (use tool_call_count proportionally)
-			byTool.set(tool, existing)
+			byTool.set(tool, { ...existing, failures: existing.failures + failCount })
 		})
 		// Also add top_errors samples
 		r.top_errors.forEach((e) => {
@@ -473,18 +536,25 @@ const computeErrorPatterns = (rows: readonly AnalyticsSummaryRow[]): readonly { 
 		.slice(0, 10)
 }
 
-const computeInsightsMetrics = (rows: readonly AnalyticsSummaryRow[], range: Range): InsightsResponse => {
+const computeInsightsMetrics = (
+	rows: readonly AnalyticsSummaryRow[],
+	range: Range,
+	rawStartTimes: readonly number[],
+): InsightsResponse => {
 	const { current, previous } = filterByRange(rows, range)
 	const byDate = groupByDate(current)
 
 	const planDriftPoints: readonly PlanDriftPoint[] = current
-		.filter((r) => r.drift_score !== undefined)
-		.map((r) => ({
-			session_id: r.session_id,
-			date: r.date,
-			drift_score: r.drift_score!,
-			unexpected_file_count: r.unexpected_files ?? 0,
-		}))
+		.flatMap((r): readonly PlanDriftPoint[] =>
+			r.drift_score === undefined
+				? []
+				: [{
+					session_id: r.session_id,
+					date: r.date,
+					drift_score: r.drift_score,
+					unexpected_file_count: r.unexpected_files ?? 0,
+				}],
+		)
 
 	// Worst sessions by backtrack count
 	const worstSessions: readonly WorstSession[] = [...current]
@@ -511,6 +581,7 @@ const computeInsightsMetrics = (rows: readonly AnalyticsSummaryRow[], range: Ran
 		.slice(0, 10)
 
 	return {
+		population: computePopulation(rawStartTimes, current, range),
 		daily: computeDailyInsights(byDate),
 		totals: computeInsightsTotals(current),
 		previous_totals: computeInsightsTotals(previous),
@@ -560,6 +631,54 @@ const loadRows = (projectDir: string): readonly AnalyticsSummaryRow[] => {
 	return rows
 }
 
+/** First-line `.t` of one session file, reading only the head chunk (cheap). */
+const readFirstEventTime = (filePath: string): number | undefined => {
+	try {
+		const fd = openSync(filePath, "r")
+		try {
+			const buf = Buffer.alloc(16384)
+			const bytesRead = readSync(fd, buf, 0, 16384, 0)
+			const head = buf.toString("utf-8", 0, bytesRead)
+			const firstLine = head.slice(0, head.indexOf("\n") === -1 ? head.length : head.indexOf("\n"))
+			const parsed: unknown = JSON.parse(firstLine)
+			const t = parsed && typeof parsed === "object" ? (parsed as { t?: unknown }).t : undefined
+			return typeof t === "number" ? t : undefined
+		} finally {
+			closeSync(fd)
+		}
+	} catch {
+		return undefined
+	}
+}
+
+/**
+ * Start times of every RAW session (distilled or not). Source of truth for the
+ * population "total" so analytics can report coverage rather than passing off the
+ * distilled subset as the whole (B10). Reads only each file's head chunk — a full
+ * listSessions() parse here made the two analytics endpoints scan every byte of
+ * every session. Cached on the same TTL as the rows; empty results are cached too
+ * (an empty project is a valid answer, not a cache miss).
+ */
+const loadRawStartTimes = (projectDir: string): readonly number[] => {
+	const cacheKey = `rawStarts:${projectDir}`
+	const cached = getCached<readonly number[]>(cacheKey)
+	if (cached) return cached
+	const sessionsDir = `${projectDir}/.clens/sessions`
+	const files = (() => {
+		try {
+			return readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl")
+		} catch {
+			return []
+		}
+	})()
+	const starts = files.flatMap((f) => {
+		const t = readFirstEventTime(`${sessionsDir}/${f}`)
+		return t === undefined ? [] : [t]
+	})
+	setCache(cacheKey, starts)
+	return starts
+}
+
 export const createAnalyticsRoute = (projectDir: string) => {
 	const app = new Hono()
 
@@ -567,7 +686,7 @@ export const createAnalyticsRoute = (projectDir: string) => {
 		const range = parseRange(c.req.query("range"))
 		log.info(`GET /api/analytics/usage range=${range}`)
 		const rows = loadRows(projectDir)
-		const data = computeUsageMetrics(rows, range)
+		const data = computeUsageMetrics(rows, range, loadRawStartTimes(projectDir))
 		return c.json({ data })
 	})
 
@@ -575,7 +694,7 @@ export const createAnalyticsRoute = (projectDir: string) => {
 		const range = parseRange(c.req.query("range"))
 		log.info(`GET /api/analytics/insights range=${range}`)
 		const rows = loadRows(projectDir)
-		const data = computeInsightsMetrics(rows, range)
+		const data = computeInsightsMetrics(rows, range, loadRawStartTimes(projectDir))
 		return c.json({ data })
 	})
 
@@ -594,20 +713,25 @@ export const createAnalyticsRoute = (projectDir: string) => {
 export const createGlobalAnalyticsRoute = (projects: readonly ProjectEntry[], fallbackDir: string) => {
 	const app = new Hono()
 
-	const loadAllRows = (projectFilter?: string): readonly AnalyticsSummaryRow[] => {
+	const effectiveDirsFor = (projectFilter?: string): readonly string[] => {
 		const dirs = projectFilter
 			? projects.filter((p) => p.id === projectFilter).map((p) => p.path)
 			: projects.map((p) => p.path)
-		const effectiveDirs = dirs.length > 0 ? dirs : [fallbackDir]
-		return effectiveDirs.flatMap((dir) => loadRows(dir))
+		return dirs.length > 0 ? dirs : [fallbackDir]
 	}
+
+	const loadAllRows = (projectFilter?: string): readonly AnalyticsSummaryRow[] =>
+		effectiveDirsFor(projectFilter).flatMap((dir) => loadRows(dir))
+
+	const loadAllRawStartTimes = (projectFilter?: string): readonly number[] =>
+		effectiveDirsFor(projectFilter).flatMap((dir) => loadRawStartTimes(dir))
 
 	app.get("/usage", (c) => {
 		const range = parseRange(c.req.query("range"))
 		const project = c.req.query("project")
 		log.info(`GET /api/analytics/usage range=${range} project=${project ?? "all"}`)
 		const rows = loadAllRows(project)
-		const data = computeUsageMetrics(rows, range)
+		const data = computeUsageMetrics(rows, range, loadAllRawStartTimes(project))
 		return c.json({ data })
 	})
 
@@ -616,7 +740,7 @@ export const createGlobalAnalyticsRoute = (projects: readonly ProjectEntry[], fa
 		const project = c.req.query("project")
 		log.info(`GET /api/analytics/insights range=${range} project=${project ?? "all"}`)
 		const rows = loadAllRows(project)
-		const data = computeInsightsMetrics(rows, range)
+		const data = computeInsightsMetrics(rows, range, loadAllRawStartTimes(project))
 		return c.json({ data })
 	})
 

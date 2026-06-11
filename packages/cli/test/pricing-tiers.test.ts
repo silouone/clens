@@ -252,6 +252,45 @@ describe("estimateCostFromTokens with tier", () => {
 });
 
 // ---------------------------------------------------------------------------
+// B26: is_estimated reflects whether real token usage backed the estimate
+// ---------------------------------------------------------------------------
+
+describe("estimateCostFromTokens — is_estimated flag (B26)", () => {
+	test("real input+output tokens → is_estimated false", () => {
+		const result = estimateCostFromTokens("claude-sonnet-4-20250514", 1000, 500);
+		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("real input only (output 0) → is_estimated false", () => {
+		const result = estimateCostFromTokens("claude-sonnet-4-20250514", 1000, 0);
+		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("real output only (input 0) → is_estimated false", () => {
+		const result = estimateCostFromTokens("claude-sonnet-4-20250514", 0, 500);
+		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("only cache tokens present → is_estimated false (cache usage is real)", () => {
+		const result = estimateCostFromTokens("claude-sonnet-4-20250514", 0, 0, 1000, 0);
+		expect(result?.is_estimated).toBe(false);
+	});
+
+	test("zero tokens across the board → is_estimated true (no real usage)", () => {
+		const result = estimateCostFromTokens("claude-sonnet-4-20250514", 0, 0, 0, 0);
+		expect(result).toBeDefined();
+		// Not grounded in real usage: must not claim to be measured.
+		expect(result?.is_estimated).toBe(true);
+		expect(result?.estimated_cost_usd).toBe(0);
+	});
+
+	test("zero tokens with no cache args → is_estimated true", () => {
+		const result = estimateCostFromTokens("claude-sonnet-4-20250514", 0, 0);
+		expect(result?.is_estimated).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
 // extractUserType
 // ---------------------------------------------------------------------------
 

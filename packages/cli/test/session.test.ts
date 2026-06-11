@@ -63,7 +63,8 @@ describe("listSessions", () => {
 		expect(sessions[0].event_count).toBe(2);
 	});
 
-	test("marks incomplete sessions", () => {
+	test("marks non-ended sessions with an old last event as idle (bug B6)", () => {
+		// Last event is ancient (epoch 3000ms), so well past the 10-minute active window.
 		const events = [
 			JSON.stringify(makeStoredEvent({ t: 1000, event: "SessionStart", sid: "sess-2" })),
 			JSON.stringify(makeStoredEvent({ t: 3000, event: "PreToolUse", sid: "sess-2" })),
@@ -71,7 +72,19 @@ describe("listSessions", () => {
 		writeFileSync(`${TEST_DIR}/.clens/sessions/sess-2.jsonl`, `${events}\n`);
 
 		const sessions = listSessions(TEST_DIR);
-		expect(sessions[0].status).toBe("incomplete");
+		expect(sessions[0].status).toBe("idle");
+	});
+
+	test("marks non-ended sessions with a recent last event as active (bug B6)", () => {
+		const now = Date.now();
+		const events = [
+			JSON.stringify(makeStoredEvent({ t: now - 60_000, event: "SessionStart", sid: "sess-2b" })),
+			JSON.stringify(makeStoredEvent({ t: now - 30_000, event: "PreToolUse", sid: "sess-2b" })),
+		].join("\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/sess-2b.jsonl`, `${events}\n`);
+
+		const sessions = listSessions(TEST_DIR);
+		expect(sessions[0].status).toBe("active");
 	});
 
 	test("excludes _links.jsonl", () => {
@@ -173,7 +186,10 @@ describe("listSessions", () => {
 		expect(sessions[2].session_id).toBe("sess-old");
 	});
 
-	test("marks session complete when last event is Stop", () => {
+	test("does NOT mark complete on trailing Stop — Stop fires every turn (bug B6)", () => {
+		// A Stop event used to be treated as session completion, freezing dead
+		// sessions as "complete". Stop now only ends a turn; without SessionEnd the
+		// session is idle (old timestamp here) or active (recent).
 		const events = [
 			JSON.stringify(makeStoredEvent({ t: 1000, event: "SessionStart", sid: "sess-stop" })),
 			JSON.stringify(makeStoredEvent({ t: 5000, event: "Stop", sid: "sess-stop" })),
@@ -181,7 +197,20 @@ describe("listSessions", () => {
 		writeFileSync(`${TEST_DIR}/.clens/sessions/sess-stop.jsonl`, `${events}\n`);
 
 		const sessions = listSessions(TEST_DIR);
+		expect(sessions[0].status).toBe("idle");
+		expect(sessions[0].end_time).toBeUndefined();
+	});
+
+	test("marks complete only on SessionEnd", () => {
+		const events = [
+			JSON.stringify(makeStoredEvent({ t: 1000, event: "SessionStart", sid: "sess-end" })),
+			JSON.stringify(makeStoredEvent({ t: 5000, event: "SessionEnd", sid: "sess-end" })),
+		].join("\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/sess-end.jsonl`, `${events}\n`);
+
+		const sessions = listSessions(TEST_DIR);
 		expect(sessions[0].status).toBe("complete");
+		expect(sessions[0].end_time).toBe(5000);
 	});
 });
 
@@ -257,6 +286,53 @@ describe("enrichSessionSummaries", () => {
 		const enriched = enrichSessionSummaries(sessions, TEST_DIR);
 		expect(enriched.length).toBe(1);
 		expect(enriched[0].agent_count).toBe(2);
+	});
+
+	test("deduplicates spawn links by agent_id (bug B15: resumed agents count once)", () => {
+		const { enrichSessionSummaries } = require("../src/session/read");
+		const sid = "sess-enrich-dedup";
+		const events = [
+			JSON.stringify(makeStoredEvent({ t: 1000, event: "SessionStart", sid })),
+			JSON.stringify(makeStoredEvent({ t: 5000, event: "SessionEnd", sid })),
+		].join("\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${sid}.jsonl`, `${events}\n`);
+
+		// child-1 was spawned twice (resumed) — must count as ONE agent.
+		const links = [
+			JSON.stringify({ t: 2000, type: "spawn", parent_session: sid, agent_id: "child-1", agent_type: "builder" }),
+			JSON.stringify({ t: 2500, type: "spawn", parent_session: sid, agent_id: "child-1", agent_type: "builder" }),
+			JSON.stringify({ t: 3000, type: "spawn", parent_session: sid, agent_id: "child-2", agent_type: "builder" }),
+		].join("\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, `${links}\n`);
+
+		const sessions = listSessions(TEST_DIR);
+		const enriched = enrichSessionSummaries(sessions, TEST_DIR);
+		expect(enriched[0].agent_count).toBe(2);
+	});
+
+	test("distilled agent count is authoritative over spawn links (bug B15)", () => {
+		const { enrichSessionSummaries } = require("../src/session/read");
+		const sid = "sess-enrich-distilled-count";
+		const events = [
+			JSON.stringify(makeStoredEvent({ t: 1000, event: "SessionStart", sid })),
+			JSON.stringify(makeStoredEvent({ t: 5000, event: "SessionEnd", sid })),
+		].join("\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${sid}.jsonl`, `${events}\n`);
+
+		// One spawn link, but the distilled tree records 3 agents (incl. nesting).
+		const links = JSON.stringify({ t: 2000, type: "spawn", parent_session: sid, agent_id: "child-1", agent_type: "builder" });
+		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, `${links}\n`);
+		writeFileSync(`${TEST_DIR}/.clens/distilled/${sid}.json`, JSON.stringify({
+			session_id: sid,
+			agents: [
+				{ session_id: "a1", children: [{ session_id: "a2", children: [] }] },
+				{ session_id: "a3", children: [] },
+			],
+		}));
+
+		const sessions = listSessions(TEST_DIR);
+		const enriched = enrichSessionSummaries(sessions, TEST_DIR);
+		expect(enriched[0].agent_count).toBe(3);
 	});
 
 	test("returns 0 agent_count for sessions with no spawn links", () => {

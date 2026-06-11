@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
-import { formatBytes, formatDuration, isUuidLike, sanitizeAgentName } from "../src/utils";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync } from "node:fs";
+import { formatBytes, formatDuration, isUuidLike, resolveProjectRoot, sanitizeAgentName } from "../src/utils";
 
 describe("formatDuration", () => {
 	test("0ms", () => {
@@ -94,5 +95,44 @@ describe("sanitizeAgentName", () => {
 
 	test("empty rawName returns truncated id", () => {
 		expect(sanitizeAgentName("", "a28e35948fb8bc659")).toBe("a28e3594");
+	});
+});
+
+describe("resolveProjectRoot", () => {
+	const ROOT = `/tmp/clens-test-resolve-root-${process.pid}`;
+
+	beforeEach(() => {
+		rmSync(ROOT, { recursive: true, force: true });
+		mkdirSync(`${ROOT}/.clens/sessions`, { recursive: true });
+		mkdirSync(`${ROOT}/packages/web/src/client/assets`, { recursive: true });
+	});
+
+	afterEach(() => {
+		rmSync(ROOT, { recursive: true, force: true });
+	});
+
+	test("walks up from a nested cwd to the .clens project root", () => {
+		expect(resolveProjectRoot(`${ROOT}/packages/web/src/client/assets`)).toBe(ROOT);
+	});
+
+	test("returns the start dir when it already contains .clens", () => {
+		expect(resolveProjectRoot(ROOT)).toBe(ROOT);
+	});
+
+	test("prefers a nearer .clens over a farther .clens parent", () => {
+		mkdirSync(`${ROOT}/packages/web/.clens`, { recursive: true });
+		expect(resolveProjectRoot(`${ROOT}/packages/web/src/client/assets`)).toBe(`${ROOT}/packages/web`);
+	});
+
+	test("falls back to .git when no .clens exists on the path", () => {
+		rmSync(`${ROOT}/.clens`, { recursive: true, force: true });
+		mkdirSync(`${ROOT}/.git`, { recursive: true });
+		expect(resolveProjectRoot(`${ROOT}/packages/web/src/client/assets`)).toBe(ROOT);
+	});
+
+	test("falls back to the start dir when neither .clens nor .git is found", () => {
+		const orphan = `${ROOT}/packages/web/src/client/assets`;
+		rmSync(`${ROOT}/.clens`, { recursive: true, force: true });
+		expect(resolveProjectRoot(orphan)).toBe(orphan);
 	});
 });

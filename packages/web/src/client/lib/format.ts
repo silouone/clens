@@ -37,8 +37,25 @@ export const truncateMultiline = (text: string, maxLines: number): { readonly te
 	return { text: lines.slice(0, maxLines).join("\n"), truncated: true };
 };
 
+/**
+ * Number of LOCAL calendar days between two timestamps (bug B21).
+ *
+ * Counts midnight boundaries crossed in the local timezone, NOT elapsed 24h
+ * buckets — so an event at "yesterday 23:00" is 1 day ago even if it is under
+ * 24h ago, and an event from "today 00:30" is 0 days ago. Both timestamps are
+ * normalized to local midnight before differencing, sidestepping DST drift.
+ */
+export const calendarDaysBetween = (laterTs: number, earlierTs: number): number => {
+	const startOfLocalDay = (ts: number): number => {
+		const d = new Date(ts);
+		return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+	};
+	const diff = startOfLocalDay(laterTs) - startOfLocalDay(earlierTs);
+	return Math.round(diff / 86_400_000);
+};
+
 /** Format a timestamp as either relative ("2d ago") or absolute ("Mar 5, 14:32") based on mode. */
-export const formatDate = (ts: number, mode: "relative" | "absolute"): string => {
+export const formatDate = (ts: number, mode: "relative" | "absolute", now: number = Date.now()): string => {
 	const d = new Date(ts);
 	if (mode === "absolute") {
 		return d.toLocaleDateString(undefined, {
@@ -48,17 +65,18 @@ export const formatDate = (ts: number, mode: "relative" | "absolute"): string =>
 			minute: "2-digit",
 		});
 	}
-	const now = new Date();
-	const diffMs = now.getTime() - d.getTime();
-	const diffDays = Math.floor(diffMs / 86_400_000);
-	if (diffDays === 0) {
+	// Relative mode buckets by LOCAL calendar day, not 24h windows (bug B21):
+	// today -> HH:MM, yesterday -> "Yesterday", within a week -> "Nd ago",
+	// otherwise an absolute month/day.
+	const daysAgo = calendarDaysBetween(now, ts);
+	if (daysAgo <= 0) {
 		return d.toLocaleTimeString(undefined, {
 			hour: "2-digit",
 			minute: "2-digit",
 		});
 	}
-	if (diffDays === 1) return "Yesterday";
-	if (diffDays < 7) return `${diffDays}d ago`;
+	if (daysAgo === 1) return "Yesterday";
+	if (daysAgo < 7) return `${daysAgo}d ago`;
 	return d.toLocaleDateString(undefined, {
 		month: "short",
 		day: "numeric",

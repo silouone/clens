@@ -1,9 +1,16 @@
 import { createMemo, createResource, createSignal } from "solid-js";
 import { selectedProjectId } from "./project-store";
+import { localDayKey, matchesLocalDay, isValidDayKey } from "./analytics-day";
 
 // ── Types (matching server response) ──────────────────────────────
 
 export type AnalyticsRange = "7d" | "30d" | "90d" | "all";
+
+/** Analysis coverage for the window: distilled (analyzed) vs all raw sessions (B10). */
+export interface Population {
+	readonly analyzed: number;
+	readonly total: number;
+}
 
 export interface DailyUsageMetrics {
 	readonly date: string;
@@ -57,6 +64,7 @@ export interface AgentTypeBreakdown {
 }
 
 export interface UsageResponse {
+	readonly population: Population;
 	readonly daily: readonly DailyUsageMetrics[];
 	readonly totals: UsageTotals;
 	readonly previous_totals: UsageTotals;
@@ -111,6 +119,7 @@ export interface WorstSession {
 }
 
 export interface InsightsResponse {
+	readonly population: Population;
 	readonly daily: readonly DailyInsightsMetrics[];
 	readonly totals: InsightsTotals;
 	readonly previous_totals: InsightsTotals;
@@ -125,6 +134,9 @@ export interface InsightsResponse {
 
 const [analyticsRange, setAnalyticsRange] = createSignal<AnalyticsRange>("30d");
 const [focusedDate, setFocusedDate] = createSignal<string | undefined>();
+
+// Local-day filter helpers (B22) live in ./analytics-day so they can be unit-tested
+// without loading this store's module-level Solid resources. Re-exported below.
 
 // ── Fetchers ──────────────────────────────────────────────────────
 
@@ -173,12 +185,14 @@ const [insightsData, { refetch: refetchInsights }] = createResource(analyticsPar
 const dailyUsage = () => usageData()?.daily ?? [];
 const usageTotals = () => usageData()?.totals;
 const usagePreviousTotals = () => usageData()?.previous_totals;
+const usagePopulation = () => usageData()?.population;
 const modelBreakdown = () => usageData()?.by_model ?? [];
 const agentTypeBreakdown = () => usageData()?.by_agent_type ?? [];
 
 const dailyInsights = () => insightsData()?.daily ?? [];
 const insightsTotals = () => insightsData()?.totals;
 const insightsPreviousTotals = () => insightsData()?.previous_totals;
+const insightsPopulation = () => insightsData()?.population;
 const toolErrors = () => insightsData()?.tool_errors ?? [];
 const topBacktrackFiles = () => insightsData()?.top_backtrack_files ?? [];
 const topErrorPatterns = () => insightsData()?.top_error_patterns ?? [];
@@ -292,11 +306,13 @@ export {
 	dailyUsage,
 	usageTotals,
 	usagePreviousTotals,
+	usagePopulation,
 	modelBreakdown,
 	agentTypeBreakdown,
 	dailyInsights,
 	insightsTotals,
 	insightsPreviousTotals,
+	insightsPopulation,
 	toolErrors,
 	topBacktrackFiles,
 	topErrorPatterns,
@@ -308,4 +324,7 @@ export {
 	isRebuilding,
 	headerStats,
 	refetchHeaderStats,
+	matchesLocalDay,
+	isValidDayKey,
+	localDayKey,
 };

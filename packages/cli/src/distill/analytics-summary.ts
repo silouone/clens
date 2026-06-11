@@ -1,6 +1,22 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import type { DistilledSession, AnalyticsSummaryRow } from "../types";
 
+/**
+ * Format a timestamp as a LOCAL calendar day "YYYY-MM-DD".
+ *
+ * Day bucketing previously used `toISOString().slice(0,10)` which buckets by UTC
+ * day — a session at 23:30 local on the 14th (in a negative-offset zone) landed
+ * on the 15th, and vice versa. Analytics must bucket by the user's local day so
+ * sessions appear under the date they actually worked (see B18).
+ */
+export const localDayKey = (ms: number): string => {
+	const d = new Date(ms);
+	const year = d.getFullYear();
+	const month = `${d.getMonth() + 1}`.padStart(2, "0");
+	const day = `${d.getDate()}`.padStart(2, "0");
+	return `${year}-${month}-${day}`;
+};
+
 /** Extract an analytics summary row from a distilled session. */
 const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 	const stats = d.stats;
@@ -38,10 +54,12 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 		{},
 	);
 
-	// Edit chain stats
+	// Edit chain stats. edit_chain_links is the total number of edits across all
+	// chains; dividing by edit_chain_count yields the real mean chain length (B19).
 	const chains = d.edit_chains?.chains ?? [];
 	const abandonedEdits = chains.reduce((sum, c) => sum + c.abandoned_edit_ids.length, 0);
 	const survivingEdits = chains.reduce((sum, c) => sum + c.surviving_edit_ids.length, 0);
+	const editChainLinks = chains.reduce((sum, c) => sum + c.total_edits, 0);
 
 	// Top errors from summary
 	const topErrors = (d.summary?.top_errors ?? []).map((e) => ({
@@ -59,13 +77,12 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 		{},
 	);
 
-	// Failures by tool
+	// Per-tool call counts (denominator for tool failure rates; see B11) and failures
+	const toolsByName = stats.tools_by_name ?? {};
 	const failuresByTool = stats.failures_by_tool ?? {};
 
-	// Date: use start_time, fallback to now
-	const dateStr = d.start_time
-		? new Date(d.start_time).toISOString().slice(0, 10)
-		: new Date().toISOString().slice(0, 10);
+	// Date: use start_time, fallback to now — bucketed by LOCAL calendar day (B18)
+	const dateStr = localDayKey(d.start_time ?? Date.now());
 
 	return {
 		session_id: d.session_id,
@@ -80,6 +97,7 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 		is_estimated: ce?.is_estimated ?? true,
 		tool_call_count: stats.tool_call_count,
 		failure_count: stats.failure_count,
+		tools_by_name: toolsByName,
 		failures_by_tool: failuresByTool,
 		agent_count: d.agents?.length ?? 0,
 		agent_types: agentTypes,
@@ -88,6 +106,7 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 		backtrack_files: backtrackFiles,
 		reasoning_by_intent: reasoningByIntent,
 		edit_chain_count: chains.length,
+		edit_chain_links: editChainLinks,
 		abandoned_edits: abandonedEdits,
 		surviving_edits: survivingEdits,
 		drift_score: d.plan_drift?.drift_score,

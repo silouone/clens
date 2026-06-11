@@ -21,11 +21,11 @@ import {
 } from "lucide-solid";
 import { createConversationStore } from "../lib/stores";
 import type { ConversationEntry } from "../../shared/types";
-import { renderMarkdown } from "../lib/markdown";
+import { renderMarkdown, renderPlainText } from "../lib/markdown";
 import { Badge } from "./ui/Badge";
 import { Spinner } from "./ui/Spinner";
 
-/** Render markdown string to sanitized HTML */
+/** Render markdown string to sanitized HTML (agent/assistant prose only) */
 const renderMd = renderMarkdown;
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -230,7 +230,8 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 				<Show
 					when={hasStructured()}
 					fallback={
-						<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderMd(props.entry.text)} />
+						/* Raw user input — verbatim, never markdown (bug B16) */
+						<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderPlainText(props.entry.text)} />
 					}
 				>
 					<div class="flex flex-col gap-2">
@@ -239,7 +240,8 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 								<Switch>
 									<Match when={seg.kind === "text" && seg}>
 										{(s) => (
-											<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderMd((s() as TextSegment & { kind: "text" }).value)} />
+											/* Raw user input — verbatim, never markdown (bug B16) */
+											<div class="prose-sm-dark whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-gray-800 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-gray-200" innerHTML={renderPlainText((s() as TextSegment & { kind: "text" }).value)} />
 										)}
 									</Match>
 									<Match when={seg.kind === "teammate" && seg}>

@@ -110,7 +110,9 @@ describe("Integration: Full server lifecycle", () => {
 
 		const session = body.data.find((s: { session_id: string }) => s.session_id === SESSION_ID)
 		expect(session).toBeDefined()
-		expect(session.status).toBe("complete")
+		// Last event is a Stop at an ancient timestamp — under bug B6 this is NOT
+		// "complete" (only SessionEnd is) and is well past the active window → idle.
+		expect(session.status).toBe("idle")
 		expect(session.event_count).toBe(6)
 	})
 
@@ -123,6 +125,106 @@ describe("Integration: Full server lifecycle", () => {
 		expect(body.data.session_id).toBe(SESSION_ID)
 		expect(body.data.stats.tool_call_count).toBe(2)
 		expect(body.data.complete).toBe(true)
+	})
+
+	// ── Staleness metadata (bug B5) ────────────────────────────────
+
+	test("GET /api/sessions/:id includes non-stale staleness when distill covers all events", async () => {
+		const res = await authFetch(`/api/sessions/${SESSION_ID}`)
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		expect(body.staleness).toBeDefined()
+		// Raw file has 6 events; the distill covered total_events=6 → not stale.
+		expect(body.staleness.raw_event_count).toBe(6)
+		expect(body.staleness.distill_stale).toBe(false)
+		expect(typeof body.staleness.distilled_at).toBe("number")
+		expect(body.staleness.distilled_at).toBeGreaterThan(0)
+	})
+
+	test("GET /api/sessions/:id reports distill_stale when raw file outgrew the distill (bug B5)", async () => {
+		// A distinct session whose distill only covered the first 2 of 4 events.
+		const staleId = "ffeeddcc-9988-7766-5544-332211ffeedd"
+		const staleEvents = [
+			makeEvent("SessionStart", 1000, { source: "cli" }),
+			makeEvent("PreToolUse", 1200, { tool_name: "Read", tool_use_id: "s1" }),
+			makeEvent("PreToolUse", 1400, { tool_name: "Edit", tool_use_id: "s2" }),
+			makeEvent("PreToolUse", 1600, { tool_name: "Bash", tool_use_id: "s3" }),
+		]
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${staleId}.jsonl`, staleEvents.join("\n") + "\n")
+		writeFileSync(
+			`${TEST_DIR}/.clens/distilled/${staleId}.json`,
+			JSON.stringify({
+				session_id: staleId,
+				stats: { total_events: 2, duration_ms: 200, events_by_type: {}, tools_by_name: {}, tool_call_count: 1, failure_count: 0, failure_rate: 0, unique_files: [] },
+				backtracks: [],
+				decisions: [],
+				file_map: { files: [] },
+				git_diff: { commits: [], hunks: [] },
+				reasoning: [],
+				user_messages: [],
+				complete: false,
+			}),
+		)
+
+		const res = await authFetch(`/api/sessions/${staleId}`)
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		expect(body.staleness).toBeDefined()
+		expect(body.staleness.raw_event_count).toBe(4)
+		expect(body.staleness.distill_stale).toBe(true)
+	})
+
+	// ── Live status thresholds (bug B6) ────────────────────────────
+
+	test("a session whose last event is recent lists as active (bug B6)", async () => {
+		const liveId = "11112222-3333-4444-5555-666677778888"
+		const now = Date.now()
+		const liveEvents = [
+			JSON.stringify({ event: "SessionStart", t: now - 120_000, sid: liveId, data: { source: "cli" }, context: { git_branch: "main" } }),
+			JSON.stringify({ event: "PreToolUse", t: now - 30_000, sid: liveId, data: { tool_name: "Read" }, context: { git_branch: "main" } }),
+		]
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${liveId}.jsonl`, liveEvents.join("\n") + "\n")
+
+		const res = await authFetch("/api/sessions")
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		const session = body.data.find((s: { session_id: string }) => s.session_id === liveId)
+		expect(session).toBeDefined()
+		expect(session.status).toBe("active")
+		expect(session.end_time).toBeUndefined()
+	})
+
+	test("status filter 'incomplete' returns active + idle but not complete (backward compat)", async () => {
+		const res = await authFetch("/api/sessions?status=incomplete&limit=5000")
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		const statuses = new Set(body.data.map((s: { status: string }) => s.status))
+		expect(statuses.has("complete")).toBe(false)
+	})
+
+	// ── agent_count parity (bug B15) ───────────────────────────────
+
+	test("agent_count from deduplicated spawn links matches the CLI rule (bug B15)", async () => {
+		const parentId = "aaaa1111-bbbb-2222-cccc-3333dddd4444"
+		const parentEvents = [
+			JSON.stringify({ event: "SessionStart", t: 1000, sid: parentId, data: { source: "cli" }, context: { git_branch: "main" } }),
+			JSON.stringify({ event: "SessionEnd", t: 9000, sid: parentId, data: {}, context: { git_branch: "main" } }),
+		]
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${parentId}.jsonl`, parentEvents.join("\n") + "\n")
+		// child-a spawned twice (resume) + child-b once → 2 distinct agents.
+		const links = [
+			JSON.stringify({ t: 2000, type: "spawn", parent_session: parentId, agent_id: "child-a", agent_type: "builder" }),
+			JSON.stringify({ t: 2500, type: "spawn", parent_session: parentId, agent_id: "child-a", agent_type: "builder" }),
+			JSON.stringify({ t: 3000, type: "spawn", parent_session: parentId, agent_id: "child-b", agent_type: "builder" }),
+		]
+		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, links.join("\n") + "\n")
+
+		const res = await authFetch("/api/sessions?limit=5000")
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		const session = body.data.find((s: { session_id: string }) => s.session_id === parentId)
+		expect(session).toBeDefined()
+		expect(session.agent_count).toBe(2)
 	})
 
 	// ── Events with real session data ──────────────────────────────

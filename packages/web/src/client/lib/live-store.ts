@@ -1,6 +1,7 @@
 import { createSignal, createEffect, onCleanup, createMemo } from "solid-js"
 import { liveEvents, clearLiveEvents, setActiveSessionId, liveLinks, clearLiveLinks } from "./events"
 import { getToken } from "./api"
+import { computeLiveElapsed } from "./live-duration"
 import type { StoredEvent } from "../../shared/types"
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -26,6 +27,12 @@ type LiveSessionState = {
 	readonly model: string | undefined
 	readonly git_branch: string | undefined
 	readonly start_time: number
+	// Server-timestamp bounds of the live session. first_event_time is the t of
+	// the earliest event seen; last_event_time is the t of the most recent. The
+	// live duration is last_event_time - first_event_time (bug B20) — never
+	// page-relative wall clock. Both are 0 until the first event arrives.
+	readonly first_event_time: number
+	readonly last_event_time: number
 	readonly event_count: number
 	readonly tool_call_count: number
 	readonly failure_count: number
@@ -45,7 +52,11 @@ const createInitialState = (session_id: string): LiveSessionState => ({
 	session_id,
 	model: undefined,
 	git_branch: undefined,
-	start_time: Date.now(),
+	// start_time mirrors first_event_time once events arrive; 0 until then so the
+	// duration stays 0 rather than counting from page load (bug B20).
+	start_time: 0,
+	first_event_time: 0,
+	last_event_time: 0,
 	event_count: 0,
 	tool_call_count: 0,
 	failure_count: 0,
@@ -96,9 +107,18 @@ const processEvent = (
 	state: LiveSessionState,
 	event: StoredEvent,
 ): LiveSessionState => {
+	// Track the server-timestamp bounds of the session. The first event seen
+	// (whether via hydration or live SSE) sets first_event_time; every event
+	// advances last_event_time. These drive the live duration (bug B20).
+	const firstEventTime = state.first_event_time === 0 ? event.t : state.first_event_time
+	const lastEventTime = Math.max(state.last_event_time, event.t)
+
 	const base: LiveSessionState = {
 		...state,
 		event_count: state.event_count + 1,
+		first_event_time: firstEventTime,
+		last_event_time: lastEventTime,
+		start_time: state.start_time === 0 ? firstEventTime : state.start_time,
 		recent_events: appendRecent(state.recent_events, event),
 		status: state.status === "complete" ? "complete" as const : "active" as const,
 	}
@@ -255,25 +275,31 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 		// Hydrate from existing events via REST (raw fetch — events endpoint uses query params not typed in Hono).
 		// The endpoint caps limit at 1000, so page until has_next is false; a single
 		// oversized request used to 400 and silently skip hydration (bug B7).
+		const PAGE_LIMIT = 1000
+		const MAX_EVENTS = 100_000
+
+		const fetchEventPages = async (
+			headers: Readonly<Record<string, string>>,
+			offset: number,
+			acc: readonly StoredEvent[],
+		): Promise<readonly StoredEvent[]> => {
+			if (offset >= MAX_EVENTS) return acc
+			const res = await fetch(`/api/sessions/${id}/events?offset=${offset}&limit=${PAGE_LIMIT}`, { headers })
+			if (!res.ok) return acc
+			const body = (await res.json()) as Record<string, unknown>
+			const page = Array.isArray(body.data) ? (body.data as readonly StoredEvent[]) : []
+			const next = [...acc, ...page]
+			const pagination = body.pagination as { readonly has_next?: boolean } | undefined
+			return page.length === 0 || !pagination?.has_next
+				? next
+				: fetchEventPages(headers, offset + page.length, next)
+		}
+
 		;(async () => {
 			try {
 				const token = getToken()
-				const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-				const PAGE_LIMIT = 1000
-				const MAX_EVENTS = 100_000
-				const events: StoredEvent[] = []
-				let offset = 0
-				while (offset < MAX_EVENTS) {
-					const res = await fetch(`/api/sessions/${id}/events?offset=${offset}&limit=${PAGE_LIMIT}`, { headers })
-					if (!res.ok) break
-					const body = (await res.json()) as Record<string, unknown>
-					const page = Array.isArray(body.data) ? (body.data as readonly StoredEvent[]) : []
-					events.push(...page)
-					const pagination = body.pagination as { readonly has_next?: boolean } | undefined
-					if (page.length === 0 || !pagination?.has_next) break
-					offset += page.length
-				}
-
+				const headers: Readonly<Record<string, string>> = token ? { Authorization: `Bearer ${token}` } : {}
+				const events = await fetchEventPages(headers, 0, [])
 				const hydrated = events.reduce(
 					(acc, event) => processEvent(acc, event),
 					createInitialState(id),
@@ -330,17 +356,40 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 		clearLiveLinks()
 	})
 
-	// Duration timer (ticks every second while active)
+	// Duration timer (bug B20): duration is last_event_time - first_event_time
+	// (server timestamps), ticking forward from the last event time only while
+	// active. The effect re-runs whenever last_event_time changes, recording the
+	// local wall-clock instant that event arrived so the per-second tick can
+	// extrapolate from it.
 	createEffect(() => {
 		const s = state()
-		if (!s || s.status === "complete") return
+		if (!s) {
+			setElapsed(0)
+			return
+		}
+
+		// Snapshot the bounds for this run; the effect re-runs when they change.
+		const firstEventTime = s.first_event_time
+		const lastEventTime = s.last_event_time
+		const status = s.status
+		const lastEventReceivedAt = Date.now()
+
+		const tick = () =>
+			setElapsed(
+				computeLiveElapsed({
+					firstEventTime,
+					lastEventTime,
+					status,
+					lastEventReceivedAt,
+					localNow: Date.now(),
+				}),
+			)
+
+		tick()
+		if (status === "complete") return
 
 		// Pragmatic exception: mutable timer ref required for setInterval lifecycle
-		const timer = setInterval(() => {
-			const s2 = state()
-			if (s2) setElapsed(Date.now() - s2.start_time)
-		}, 1000)
-
+		const timer = setInterval(tick, 1000)
 		onCleanup(() => clearInterval(timer))
 	})
 
@@ -352,5 +401,7 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 	return { state, elapsed, isActive }
 }
 
-export { createLiveSessionStore, processEvent, processLink, createInitialState, extractFilePath }
+export { createLiveSessionStore, processEvent, processLink, createInitialState, extractFilePath, computeLiveElapsed }
+// computeLiveElapsed is imported from ./live-duration and re-exported above for
+// backwards compatibility; new code should import it from ./live-duration.
 export type { LiveSessionState, LiveAgentState, PendingTool }

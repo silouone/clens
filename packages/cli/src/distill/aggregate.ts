@@ -57,39 +57,36 @@ export const mergeFileMaps = (maps: readonly FileMapResult[]): FileMapResult => 
 
 // --- mergeStats ---
 
-/** Sum tool_call_count, failure_count, union unique_files, merge tools_by_name. */
+/**
+ * Merge agent-only dimensions onto the parent stats.
+ *
+ * The parent JSONL stream records EVERY tool call in the session — subagent tool
+ * calls land in the same parent stream as PreToolUse/PostToolUseFailure events, so
+ * `parentStats` already counts them. Per-agent stats are re-derived from each
+ * subagent transcript, i.e. the SAME calls a second time. Re-adding agent
+ * tool/failure/per-tool counts therefore double-counts (bug B4: 664 vs raw 336,
+ * failures 25 vs 11). Parent counts computed over the full stream are authoritative
+ * for the session, so tool_call_count, failure_count, failure_rate and
+ * tools_by_name are taken from the parent unchanged.
+ *
+ * Agent-only dimensions are still aggregated:
+ *  - unique_files: unioned (a harmless superset of the parent set; parent tool
+ *    events already carry file paths, so this rarely adds anything but never
+ *    double-counts since it is a set union, not a sum).
+ *  - token_usage: summed. Parent hook events carry no token usage; per-turn token
+ *    counts only exist in the per-agent transcripts, so this is the one dimension
+ *    that genuinely requires agent contributions.
+ */
 export const mergeStats = (
 	parentStats: StatsResult,
 	agentStats: readonly AgentStats[],
 ): StatsResult => {
-	const totalToolCallCount = agentStats.reduce(
-		(acc, s) => acc + s.tool_call_count,
-		parentStats.tool_call_count,
-	);
-
-	const totalFailureCount = agentStats.reduce(
-		(acc, s) => acc + s.failure_count,
-		parentStats.failure_count,
-	);
-
 	const uniqueFilesSet = new Set([
 		...parentStats.unique_files,
 		...agentStats.flatMap((s) => s.unique_files),
 	]);
 
-	const mergedToolsByName = agentStats.reduce<Record<string, number>>(
-		(acc, s) =>
-			Object.entries(s.tools_by_name).reduce<Record<string, number>>(
-				(inner, [name, count]) => ({
-					...inner,
-					[name]: (inner[name] ?? 0) + count,
-				}),
-				acc,
-			),
-		{ ...parentStats.tools_by_name },
-	);
-
-	// Sum token_usage from parent + agents
+	// Sum token_usage from parent + agents (parent hook events usually lack usage)
 	const allTokenUsages = [
 		parentStats.token_usage,
 		...agentStats.map((s) => s.token_usage),
@@ -110,11 +107,9 @@ export const mergeStats = (
 
 	return {
 		...parentStats,
-		tool_call_count: totalToolCallCount,
-		failure_count: totalFailureCount,
-		failure_rate: totalToolCallCount > 0 ? totalFailureCount / totalToolCallCount : 0,
+		// tool_call_count, failure_count, failure_rate, tools_by_name: authoritative
+		// from the parent stream — NOT re-added from per-agent stats (would double-count).
 		unique_files: Array.from(uniqueFilesSet),
-		tools_by_name: mergedToolsByName,
 		...(mergedTokenUsage ? { token_usage: mergedTokenUsage } : {}),
 	};
 };

@@ -18,6 +18,8 @@ import {
 	computePpDelta,
 	rebuildAnalytics,
 	isRebuilding,
+	insightsPopulation,
+	isValidDayKey,
 	type AnalyticsRange,
 	type DeltaResult,
 	type DailyInsightsMetrics,
@@ -63,12 +65,16 @@ type KpiCardProps = {
 	readonly delta?: DeltaResult;
 	readonly deltaLabel?: string;
 	readonly invertColor?: boolean; // true = "down is good" (e.g., backtrack rate)
+	readonly subtitle?: string;
 };
 
 const KpiCard: Component<KpiCardProps> = (props) => (
 	<div class="rounded-lg border border-clens bg-surface p-4">
 		<div class="text-xs text-muted">{props.label}</div>
 		<div class="mt-1 text-2xl font-semibold text-primary">{props.value}</div>
+		<Show when={props.subtitle}>
+			<div class="mt-0.5 text-xs text-muted">{props.subtitle}</div>
+		</Show>
 		<Show when={props.delta && props.delta.direction !== "flat"}>
 			<div class="mt-1 flex items-center gap-1 text-xs">
 				<span classList={{
@@ -222,13 +228,27 @@ export const InsightsPage: Component = () => {
 
 	const totals = insightsTotals;
 	const prevTotals = insightsPreviousTotals;
+	const population = insightsPopulation;
 	const isLoading = () => insightsData.loading;
 	const isEmpty = () => !isLoading() && (totals()?.sessions ?? 0) === 0;
 
+	// Hide "vs prev" deltas when the previous window held no sessions — comparing
+	// against an empty baseline is misleading (B10).
+	const hasPrevBaseline = createMemo(() => (prevTotals()?.sessions ?? 0) > 0);
+
+	// "n of m sessions analyzed" coverage line near the KPIs (B10).
+	const coverageLabel = createMemo(() => {
+		const p = population();
+		if (!p) return undefined;
+		return `${p.analyzed} of ${p.total} sessions analyzed`;
+	});
+
 	// KPI deltas
-	const backtrackDelta = createMemo(() =>
-		totals() && prevTotals() ? computeDelta(totals()!.backtrack_rate, prevTotals()!.backtrack_rate) : undefined,
-	);
+	const backtrackDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		return t && p && hasPrevBaseline() ? computeDelta(t.backtrack_rate, p.backtrack_rate) : undefined;
+	});
 	const editSurvival = createMemo(() => {
 		const t = totals();
 		return t ? ((1 - t.abandoned_edit_rate) * 100).toFixed(0) : "N/A";
@@ -236,13 +256,15 @@ export const InsightsPage: Component = () => {
 	const editSurvivalDelta = createMemo(() => {
 		const t = totals();
 		const p = prevTotals();
-		if (!t || !p) return undefined;
+		if (!t || !p || !hasPrevBaseline()) return undefined;
 		// invert: less abandoned = better
 		return computePpDelta(1 - t.abandoned_edit_rate, 1 - p.abandoned_edit_rate);
 	});
-	const reasoningDelta = createMemo(() =>
-		totals() && prevTotals() ? computeDelta(totals()!.reasoning_action_ratio, prevTotals()!.reasoning_action_ratio) : undefined,
-	);
+	const reasoningDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		return t && p && hasPrevBaseline() ? computeDelta(t.reasoning_action_ratio, p.reasoning_action_ratio) : undefined;
+	});
 
 	// Has edit chain data?
 	const hasEditChains = createMemo(() =>
@@ -325,6 +347,7 @@ export const InsightsPage: Component = () => {
 					<KpiCard
 						label="Quality Score"
 						value={`${(totals()?.agent_quality_score ?? 0).toFixed(0)}/100`}
+						subtitle={coverageLabel()}
 					/>
 					<KpiCard
 						label="Backtrack Rate"
@@ -407,7 +430,8 @@ export const InsightsPage: Component = () => {
 						tooltipLabel={(d) => `${d.date}: ${d.backtrack_count} backtracks`}
 						onClickPoint={(d) => {
 							const datum = d as DailyInsightsMetrics;
-							navigate(`/?date=${datum.date}`);
+							if (!isValidDayKey(datum.date)) return;
+							navigate(`/?date=${encodeURIComponent(datum.date)}&agents=all`);
 						}}
 					/>
 				</div>

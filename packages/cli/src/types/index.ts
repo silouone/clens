@@ -97,16 +97,20 @@ export {
 	type WorktreeCreateLink,
 	type WorktreeRemoveLink,
 } from "./links";
-export type {
-	ClensConfig,
-	DelegatedHooks,
-	ExportManifest,
-	GlobalConfig,
-	GlobalMode,
-	PricingTier,
-	ProjectEntry,
-	ProjectRegistry,
-	SessionSummary,
+export {
+	ACTIVE_THRESHOLD_MS,
+	type ClensConfig,
+	type DelegatedHooks,
+	deriveSessionStatus,
+	type ExportManifest,
+	type GlobalConfig,
+	type GlobalMode,
+	type PricingTier,
+	type ProjectEntry,
+	type ProjectRegistry,
+	SESSION_STATUSES,
+	type SessionStatus,
+	type SessionSummary,
 } from "./session";
 export type {
 	TranscriptContentBlock,

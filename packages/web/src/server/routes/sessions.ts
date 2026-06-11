@@ -2,8 +2,9 @@ import { Hono } from "hono"
 import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
 import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions, readFeatureIndex } from "@clens/cli/src/session"
 import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
-import { diffLinesToUnified } from "@clens/cli/src/utils"
-import type { AgentNode, SessionSummary, StoredEvent, LinkEvent, SpawnLink, ProjectEntry } from "@clens/cli"
+import { diffLinesToUnified, deduplicateSpawns } from "@clens/cli/src/utils"
+import { deriveSessionStatus, SESSION_STATUSES } from "@clens/cli/src/types"
+import type { AgentNode, SessionSummary, SessionStatus, StoredEvent, LinkEvent, SpawnLink, ProjectEntry } from "@clens/cli"
 import { getCachedEvents, setCachedEvents } from "../cache"
 import { createLogger } from "../logger"
 import { pathsMatch } from "../../shared/paths"
@@ -41,7 +42,12 @@ const tryParseJson = (line: string): ParsedEvent | undefined => {
 // results are cached per path and invalidated by (size, mtimeMs).
 const lineCountCache = new Map<string, { size: number; mtimeMs: number; count: number }>()
 
-/** Count non-empty lines exactly, streaming the fd in chunks (no full-file string alloc). */
+/**
+ * Count non-empty lines exactly, streaming the fd in chunks (no full-file string alloc).
+ * Deliberate FP exception (performance hot path): this scans up to hundreds of MB of
+ * session files per listing; byte-level Buffer iteration with local mutable cursors is
+ * the same class of exception fp-patterns grants hashing/byte-scanning loops.
+ */
 const countNonEmptyLines = (fd: number, size: number): number => {
 	const CHUNK = 262144
 	const buf = Buffer.alloc(Math.min(CHUNK, size))
@@ -142,6 +148,38 @@ const countDistilledAgents = (distilledPath: string): number => {
 	}
 }
 
+// Staleness metadata for the detail route (bug B5 — a distill computed over the
+// first N events was being shown as the current truth while the raw session kept
+// growing). We compare the exact raw line count against the events the distill
+// actually covered (distilled.stats.total_events) and surface when they diverge.
+type StalenessInfo = {
+	readonly distilled_at: number
+	readonly raw_event_count: number
+	readonly distill_stale: boolean
+}
+
+const computeStaleness = (
+	projectDir: string,
+	sessionId: string,
+	distilledTotalEvents: number,
+): StalenessInfo | undefined => {
+	const rawPath = `${projectDir}/.clens/sessions/${sessionId}.jsonl`
+	const distilledPath = `${projectDir}/.clens/distilled/${sessionId}.json`
+	try {
+		const rawInfo = readFirstLastLines(rawPath)
+		const rawEventCount = rawInfo?.lineCount ?? 0
+		const distilledAt = statSync(distilledPath).mtimeMs
+		return {
+			distilled_at: distilledAt,
+			raw_event_count: rawEventCount,
+			distill_stale: rawEventCount > distilledTotalEvents,
+		}
+	} catch (err) {
+		log.warn(`Staleness check failed for ${sessionId.slice(0, 8)}:`, err instanceof Error ? err.message : String(err))
+		return undefined
+	}
+}
+
 /**
  * Lightweight session listing — reads only first+last lines per JSONL file.
  * No full file parsing, no enrichment. Returns metadata sufficient for the table.
@@ -171,9 +209,10 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 		}
 	})()
 
-	// Read links once for agent counts
+	// Read links once for agent counts. Deduplicate by agent_id so resumed agents
+	// count once — must match the CLI listSessions rule exactly (bug B15).
 	const links = readLinks(projectDir)
-	const spawns = links.filter(isSpawnLink)
+	const spawns = deduplicateSpawns(links.filter(isSpawnLink))
 	const spawnCountByParent = spawns.reduce(
 		(acc, s) => {
 			const prev = acc.get(s.parent_session) ?? 0
@@ -208,7 +247,10 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 				if (!firstEvent) return []
 
 				const lastEvent = tryParseJson(result.last) ?? firstEvent
-				const isComplete = lastEvent.event === "SessionEnd" || lastEvent.event === "Stop"
+				// SessionEnd ⇒ complete. A trailing Stop no longer means complete (it
+				// fires after every turn — bug B6). Otherwise active iff recent, else idle.
+				const isSessionEnd = lastEvent.event === "SessionEnd"
+				const status = deriveSessionStatus(isSessionEnd, lastEvent.t)
 				const distilledPath = `${distilledDir}/${sessionId}.json`
 				const isDistilled = existsSync(distilledPath)
 
@@ -225,13 +267,13 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 				return [{
 					session_id: sessionId,
 					start_time: firstEvent.t,
-					end_time: isComplete ? lastEvent.t : undefined,
+					end_time: isSessionEnd ? lastEvent.t : undefined,
 					duration_ms: lastEvent.t - firstEvent.t,
 					event_count: result.lineCount,
 					git_branch: (firstEvent.context?.git_branch as string) || undefined,
 					source: typeof firstEvent.data.source === "string" ? firstEvent.data.source : undefined,
 					end_reason: typeof lastEvent.data.reason === "string" ? lastEvent.data.reason : undefined,
-					status: isComplete ? "complete" : "incomplete",
+					status,
 					file_size_bytes: stat.size,
 					agent_count: agentCount,
 					is_distilled: isDistilled,
@@ -249,7 +291,12 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 type SortField = "start_time" | "-start_time" | "duration_ms" | "-duration_ms" | "event_count" | "-event_count"
 const VALID_SORTS: readonly string[] = ["start_time", "-start_time", "duration_ms", "-duration_ms", "event_count", "-event_count"] as const
 
-const VALID_STATUSES: readonly string[] = ["complete", "incomplete"] as const
+// "incomplete" is kept for backward compatibility — it maps to active+idle.
+const VALID_STATUSES: readonly string[] = [...SESSION_STATUSES, "incomplete"] as const
+
+/** Whether a session matches a (possibly legacy) status filter value. */
+const matchesStatusFilter = (status: SessionStatus, filter: string): boolean =>
+	filter === "incomplete" ? status !== "complete" : status === filter
 
 // ── Sort comparator ────────────────────────────────────────────────
 
@@ -303,14 +350,14 @@ const createSessionsRoute = (projectDir: string) =>
 				return c.json({ error: "Invalid sort", code: "INVALID_PARAM", detail: `sort must be one of: ${VALID_SORTS.join(", ")}` }, 400)
 			}
 			if (statusFilter && !VALID_STATUSES.includes(statusFilter)) {
-				return c.json({ error: "Invalid status", code: "INVALID_PARAM", detail: "status must be 'complete' or 'incomplete'" }, 400)
+				return c.json({ error: "Invalid status", code: "INVALID_PARAM", detail: `status must be one of: ${VALID_STATUSES.join(", ")}` }, 400)
 			}
 
 			const enriched = listSessionsLightweight(projectDir)
 
-			// Filter by status
+			// Filter by status (legacy "incomplete" ⇒ active+idle)
 			const filtered = statusFilter
-				? enriched.filter((s) => s.status === statusFilter)
+				? enriched.filter((s) => matchesStatusFilter(s.status, statusFilter))
 				: enriched
 
 			// Sort
@@ -365,8 +412,12 @@ const createSessionsRoute = (projectDir: string) =>
 				}
 				: undefined
 
+			// Staleness: compare distilled coverage against the live raw file (bug B5)
+			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events)
+
 			return c.json({
 				data: distilled,
+				...(staleness ? { staleness } : {}),
 				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
 			})
 		})
@@ -605,12 +656,12 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 			if (page === -1) return c.json({ error: "Invalid page", code: "INVALID_PARAM", detail: "page must be 1-1000" }, 400)
 			if (limit === -1) return c.json({ error: "Invalid limit", code: "INVALID_PARAM", detail: "limit must be 1-5000" }, 400)
 			if (!VALID_SORTS.includes(sort)) return c.json({ error: "Invalid sort", code: "INVALID_PARAM", detail: `sort must be one of: ${VALID_SORTS.join(", ")}` }, 400)
-			if (statusFilter && !VALID_STATUSES.includes(statusFilter)) return c.json({ error: "Invalid status", code: "INVALID_PARAM", detail: "status must be 'complete' or 'incomplete'" }, 400)
+			if (statusFilter && !VALID_STATUSES.includes(statusFilter)) return c.json({ error: "Invalid status", code: "INVALID_PARAM", detail: `status must be one of: ${VALID_STATUSES.join(", ")}` }, 400)
 
 			const enriched = listGlobalSessionsLightweight(projects)
 
-			// Filter by status
-			const afterStatus = statusFilter ? enriched.filter((s) => s.status === statusFilter) : enriched
+			// Filter by status (legacy "incomplete" ⇒ active+idle)
+			const afterStatus = statusFilter ? enriched.filter((s) => matchesStatusFilter(s.status, statusFilter)) : enriched
 
 			// Filter by project
 			const afterProject = projectFilter ? afterStatus.filter((s) => s.project_id === projectFilter) : afterStatus
@@ -657,8 +708,12 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 				}
 				: undefined
 
+			// Staleness: compare distilled coverage against the live raw file (bug B5)
+			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events)
+
 			return c.json({
 				data: distilled,
+				...(staleness ? { staleness } : {}),
 				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
 			})
 		})

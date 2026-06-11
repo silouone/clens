@@ -12,6 +12,7 @@ const API_PRICING = {
 	"claude-opus-4-6": { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 },
 	"claude-opus-4-5": { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 },
 	"claude-opus-4": { input: 15, output: 75, cache_read: 1.5, cache_write: 18.75 },
+	"claude-sonnet-4-6": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
 	"claude-sonnet-4": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
 	"claude-haiku-4-5": { input: 1, output: 5, cache_read: 0.1, cache_write: 1.25 },
 	"claude-haiku-4": { input: 0.8, output: 4, cache_read: 0.08, cache_write: 1.0 },
@@ -25,6 +26,7 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
 	"claude-opus-4": 200_000,
 	"claude-sonnet-4-6": 1_000_000,
 	"claude-sonnet-4": 200_000,
+	"claude-haiku-4-5": 200_000,
 	"claude-haiku-4": 200_000,
 };
 
@@ -118,6 +120,12 @@ export const estimateCostFromTokens = (
 		((cacheReadTokens ?? 0) / 1_000_000) * pricing.cache_read +
 		((cacheCreationTokens ?? 0) / 1_000_000) * pricing.cache_write;
 
+	// is_estimated is false ONLY when grounded in real token usage (B26). If no
+	// real tokens backed this call, the result is not measured usage and must not
+	// claim to be — fall back to is_estimated: true (heuristic-equivalent).
+	const hasRealUsage =
+		inputTokens > 0 || outputTokens > 0 || (cacheReadTokens ?? 0) > 0 || (cacheCreationTokens ?? 0) > 0;
+
 	return {
 		model,
 		estimated_input_tokens: inputTokens,
@@ -125,7 +133,7 @@ export const estimateCostFromTokens = (
 		estimated_cost_usd: Math.round(estimatedCostUsd * 10000) / 10000,
 		...(cacheReadTokens ? { cache_read_tokens: cacheReadTokens } : {}),
 		...(cacheCreationTokens ? { cache_creation_tokens: cacheCreationTokens } : {}),
-		is_estimated: false,
+		is_estimated: !hasRealUsage,
 		pricing_tier: tier,
 	};
 };

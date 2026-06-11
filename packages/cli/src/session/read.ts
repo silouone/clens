@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import type { DistilledSession, LinkEvent, SessionSummary, SpawnLink, StoredEvent } from "../types";
-import { BROADCAST_EVENTS } from "../types";
-import { computeEffectiveDuration, isGhostSession, logError } from "../utils";
+import { BROADCAST_EVENTS, deriveSessionStatus } from "../types";
+import { computeEffectiveDuration, deduplicateSpawns, isGhostSession, logError } from "../utils";
 import { parseDistilledSession, parseLinkEvent } from "./parsers";
 import { readSessionName } from "./transcript";
 
@@ -64,7 +64,11 @@ export const listSessions = (projectDir: string): SessionSummary[] => {
 				const endTime = meaningfulLast.t;
 				const timestamps = parsedLines.filter((e): e is StoredEvent => e !== undefined).map((e) => e.t);
 				const effectiveDuration = computeEffectiveDuration(timestamps);
-				const isComplete = meaningfulLast.event === "SessionEnd" || meaningfulLast.event === "Stop";
+				// A clean SessionEnd marks completion. A trailing Stop no longer does
+				// (it fires after every turn — bug B6). Non-ended sessions are active
+				// only while their last event is recent, else idle.
+				const isSessionEnd = meaningfulLast.event === "SessionEnd";
+				const status = deriveSessionStatus(isSessionEnd, endTime);
 
 				const source =
 					typeof firstEvent.data.source === "string" ? firstEvent.data.source : undefined;
@@ -75,7 +79,7 @@ export const listSessions = (projectDir: string): SessionSummary[] => {
 					{
 						session_id: sessionId,
 						start_time: startTime,
-						end_time: isComplete ? endTime : undefined,
+						end_time: isSessionEnd ? endTime : undefined,
 						// Wall-clock span — must agree with the web list (bug B2: same field
 						// carried wall in the API but idle-trimmed here, so list views disagreed)
 						duration_ms: effectiveDuration.wall_duration_ms,
@@ -84,7 +88,7 @@ export const listSessions = (projectDir: string): SessionSummary[] => {
 						team_name: firstEvent.context?.team_name || undefined,
 						source,
 						end_reason: endReason,
-						status: isComplete ? "complete" : "incomplete",
+						status,
 						file_size_bytes: stat.size,
 					},
 				];
@@ -161,6 +165,26 @@ export const readDistilled = (
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
 
 /**
+ * Count agents in a distilled JSON file recursively (children at every depth).
+ * Returns 0 if the file is missing or cannot be parsed. Used as the authoritative
+ * agent count when a session has been distilled (bug B15 — one source of truth).
+ */
+const countDistilledAgents = (distilledPath: string): number => {
+	try {
+		const parsed: unknown = JSON.parse(readFileSync(distilledPath, "utf-8"));
+		const agents = parsed && typeof parsed === "object" ? (parsed as { agents?: unknown }).agents : undefined;
+		const countRecursive = (nodes: readonly { children?: readonly unknown[] }[]): number =>
+			nodes.reduce(
+				(sum, n) => sum + 1 + countRecursive((n.children ?? []) as readonly { children?: readonly unknown[] }[]),
+				0,
+			);
+		return Array.isArray(agents) ? countRecursive(agents as readonly { children?: readonly unknown[] }[]) : 0;
+	} catch {
+		return 0;
+	}
+};
+
+/**
  * Extract transcript_path from the first event of a session JSONL file that has one.
  * Reads the file content and scans events until it finds one with `data.transcript_path`.
  * Returns null if the file doesn't exist, is empty, or no event has transcript_path.
@@ -193,9 +217,12 @@ export const enrichSessionSummaries = (
 	projectDir: string,
 ): readonly SessionSummary[] => {
 	const links = readLinks(projectDir);
-	const spawns = links.filter(isSpawnLink);
+	// Deduplicate by agent_id so resumed agents (which emit multiple spawn events)
+	// count once. This must match the web list route exactly (bug B15 — CLI counted
+	// raw spawn links while the API counted distinct agents, so they disagreed).
+	const spawns = deduplicateSpawns(links.filter(isSpawnLink));
 
-	// Count spawn links per parent_session
+	// Count deduplicated spawn links per parent_session
 	const spawnCountByParent: ReadonlyMap<string, number> = spawns.reduce<ReadonlyMap<string, number>>(
 		(acc, spawn) => {
 			const current = acc.get(spawn.parent_session) ?? 0;
@@ -219,12 +246,18 @@ export const enrichSessionSummaries = (
 	})();
 
 	return sessions.map((session): SessionSummary => {
-		const spawnCount = spawnCountByParent.get(session.session_id) ?? 0;
-		const agentCount = spawnCount > 0
-			? spawnCount
-			: msgRecipientsBySession.get(session.session_id) ?? 0;
 		const distilledPath = `${projectDir}/.clens/distilled/${session.session_id}.json`;
 		const isDistilled = existsSync(distilledPath);
+
+		// Single source of truth (bug B15): distilled agent count when distilled,
+		// else deduplicated spawn links, else unique msg_send recipients.
+		const distilledCount = isDistilled ? countDistilledAgents(distilledPath) : 0;
+		const spawnCount = spawnCountByParent.get(session.session_id) ?? 0;
+		const agentCount = distilledCount > 0
+			? distilledCount
+			: spawnCount > 0
+				? spawnCount
+				: msgRecipientsBySession.get(session.session_id) ?? 0;
 
 		const hasSpec = isDistilled
 			? (() => {

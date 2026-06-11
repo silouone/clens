@@ -7,6 +7,7 @@ import {
 	mergeFileMaps,
 	mergeStats,
 } from "../src/distill/aggregate";
+import { extractStats } from "../src/distill/stats";
 import { flattenAgents } from "../src/utils";
 import type {
 	AgentNode,
@@ -18,6 +19,7 @@ import type {
 	FileMapEntry,
 	FileMapResult,
 	StatsResult,
+	StoredEvent,
 	TokenUsage,
 	TranscriptReasoning,
 } from "../src/types";
@@ -247,7 +249,12 @@ describe("mergeFileMaps", () => {
 // ---------------------------------------------------------------------------
 
 describe("mergeStats", () => {
-	test("parent + 2 agent stats: tool_call_count sums, unique_files is union, tools_by_name merged", () => {
+	// B4: subagent tool calls already live in the parent JSONL stream and are
+	// counted by parentStats. Per-agent stats are the SAME calls re-derived from
+	// each transcript, so re-adding them double-counts. Parent counts are
+	// authoritative for the session; only unique_files (union) and token_usage
+	// (sum) are still aggregated from agents.
+	test("parent counts are authoritative: tool/failure/per-tool NOT re-added from agents (B4)", () => {
 		const parentStats = makeStatsResult({
 			tool_call_count: 5,
 			failure_count: 1,
@@ -273,24 +280,21 @@ describe("mergeStats", () => {
 
 		const result = mergeStats(parentStats, [agent1, agent2]);
 
-		// tool_call_count: 5 + 8 + 3 = 16
-		expect(result.tool_call_count).toBe(16);
+		// tool_call_count stays at parent value (NOT 5+8+3) — agent calls already counted
+		expect(result.tool_call_count).toBe(5);
 
-		// failure_count: 1 + 2 + 0 = 3
-		expect(result.failure_count).toBe(3);
+		// failure_count stays at parent value (NOT 1+2+0)
+		expect(result.failure_count).toBe(1);
 
-		// failure_rate: 3 / 16 = 0.1875
-		expect(result.failure_rate).toBe(3 / 16);
+		// failure_rate is the parent's, untouched
+		expect(result.failure_rate).toBe(0.2);
 
-		// unique_files: union of all = [a, b, c, d]
+		// tools_by_name stays exactly the parent's map (NOT merged with agents)
+		expect(result.tools_by_name).toEqual({ Read: 3, Edit: 2 });
+
+		// unique_files: still unioned across parent + agents (set union, never double-counts)
 		const uniqueSorted = [...result.unique_files].sort();
 		expect(uniqueSorted).toEqual(["/src/a.ts", "/src/b.ts", "/src/c.ts", "/src/d.ts"]);
-
-		// tools_by_name: Read: 3+1+1=5, Edit: 2+3=5, Bash: 4, Write: 2
-		expect(result.tools_by_name.Read).toBe(5);
-		expect(result.tools_by_name.Edit).toBe(5);
-		expect(result.tools_by_name.Bash).toBe(4);
-		expect(result.tools_by_name.Write).toBe(2);
 
 		// parent duration preserved
 		expect(result.duration_ms).toBe(10000);
@@ -1016,20 +1020,20 @@ describe("aggregateTeamData", () => {
 			agents: [agent1, agent2],
 		});
 
-		// -- stats --
-		// tool_call_count: 6 + 12 + 7 = 25
-		expect(result.stats.tool_call_count).toBe(25);
-		// failure_count: 1 + 3 + 1 = 5
-		expect(result.stats.failure_count).toBe(5);
-		// failure_rate: 5 / 25 = 0.2
-		expect(result.stats.failure_rate).toBe(0.2);
-		// unique_files: union
+		// -- stats (B4) --
+		// Parent counts are authoritative: agent tool calls already live in the
+		// parent stream, so they are NOT re-added.
+		// tool_call_count stays at the parent's 6 (NOT 6+12+7)
+		expect(result.stats.tool_call_count).toBe(6);
+		// failure_count stays at the parent's 1 (NOT 1+3+1)
+		expect(result.stats.failure_count).toBe(1);
+		// failure_rate is the parent's, untouched
+		expect(result.stats.failure_rate).toBe(1 / 6);
+		// unique_files: still unioned across parent + agents
 		const uniqueSorted = [...result.stats.unique_files].sort();
 		expect(uniqueSorted).toEqual(["/src/index.ts", "/src/types.ts", "/test/app.test.ts"]);
-		// tools_by_name merged
-		expect(result.stats.tools_by_name.Read).toBe(11); // 4 + 5 + 2
-		expect(result.stats.tools_by_name.Edit).toBe(6);  // 2 + 4
-		expect(result.stats.tools_by_name.Bash).toBe(8);  // 3 + 5
+		// tools_by_name stays exactly the parent's map (NOT merged with agents)
+		expect(result.stats.tools_by_name).toEqual({ Read: 4, Edit: 2 });
 		// parent duration preserved
 		expect(result.stats.duration_ms).toBe(15000);
 
@@ -1158,8 +1162,10 @@ describe("aggregateTeamData", () => {
 			agents: [child],
 		});
 
-		// tool_call_count: 1 (parent) + 3 (child) + 5 (grandchild) = 9
-		expect(result.stats.tool_call_count).toBe(9);
+		// B4: parent count is authoritative — nested agent calls already live in
+		// the parent stream and are NOT re-added. tool_call_count stays at parent's 1.
+		expect(result.stats.tool_call_count).toBe(1);
+		// unique_files are still unioned across the flattened agent tree.
 		const uniqueSorted = [...result.stats.unique_files].sort();
 		expect(uniqueSorted).toEqual(["/deep/file.ts", "/mid/file.ts"]);
 	});
@@ -1191,5 +1197,157 @@ describe("aggregateTeamData", () => {
 		// The agent_name on the chain should fall back to agent_type (not raw session_id)
 		expect(result.edit_chains.chains).toHaveLength(1);
 		expect(result.edit_chains.chains[0].agent_name).toBe("builder");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// B4 regression: distilled tool/failure counts must equal raw event counts even
+// with subagents. Subagent tool calls already live in the parent JSONL stream,
+// so re-deriving them per-agent and re-adding them double-counts (observed:
+// session c875e176 distilled tool_call_count 664 vs raw PreToolUse 336,
+// failure_count 25 vs raw PostToolUseFailure 11).
+// ---------------------------------------------------------------------------
+
+describe("aggregateTeamData — B4 no double-counting of subagent tool calls", () => {
+	// Build a raw parent event stream: every tool call in the session (parent +
+	// subagents) lands here as PreToolUse / PostToolUseFailure.
+	const makePreTool = (t: number, toolName: string, filePath?: string): StoredEvent => ({
+		t,
+		event: "PreToolUse",
+		sid: "parent-session",
+		data: {
+			tool_name: toolName,
+			...(filePath ? { tool_input: { file_path: filePath } } : {}),
+		},
+	});
+
+	const makeFailure = (t: number, toolName: string): StoredEvent => ({
+		t,
+		event: "PostToolUseFailure",
+		sid: "parent-session",
+		data: { tool_name: toolName },
+	});
+
+	const repeat = (n: number, make: (i: number) => StoredEvent): readonly StoredEvent[] =>
+		Array.from({ length: n }, (_unused, i) => make(i));
+
+	// Mirror the real session shape (scaled down): a realistic per-tool mix.
+	const rawPerTool = { Read: 12, Bash: 9, Edit: 7, Grep: 4 } as const;
+	const rawFailureCount = 3; // all Bash failures, like the real session
+
+	const parentEvents: readonly StoredEvent[] = [
+		...Object.entries(rawPerTool).flatMap(([tool, count], group) =>
+			repeat(count, (i) => makePreTool(1000 + group * 1000 + i, tool, `/src/${tool}-${i}.ts`)),
+		),
+		...repeat(rawFailureCount, (i) => makeFailure(9000 + i, "Bash")),
+	];
+
+	// Raw oracle: counts straight from the event stream.
+	const rawPreToolCount = Object.values(rawPerTool).reduce((a, b) => a + b, 0); // 32
+
+	const parentStats = extractStats(parentEvents);
+
+	// Three subagents whose per-agent stats re-derive subsets of the SAME calls
+	// (this is what agent-distill does from each subagent transcript). These must
+	// NOT be added on top of the parent counts.
+	const agents: readonly AgentNode[] = [
+		makeAgentNode({
+			session_id: "sub-1",
+			agent_type: "builder",
+			tool_call_count: 10,
+			stats: makeAgentStats({
+				tool_call_count: 10,
+				failure_count: 1,
+				tools_by_name: { Read: 4, Edit: 4, Bash: 2 },
+				unique_files: ["/src/Read-0.ts", "/src/Edit-0.ts"],
+			}),
+		}),
+		makeAgentNode({
+			session_id: "sub-2",
+			agent_type: "validator",
+			tool_call_count: 8,
+			stats: makeAgentStats({
+				tool_call_count: 8,
+				failure_count: 1,
+				tools_by_name: { Read: 5, Grep: 3 },
+				unique_files: ["/src/Read-1.ts"],
+			}),
+		}),
+		makeAgentNode({
+			session_id: "sub-3",
+			agent_type: "builder",
+			tool_call_count: 6,
+			stats: makeAgentStats({
+				tool_call_count: 6,
+				failure_count: 1,
+				tools_by_name: { Bash: 5, Edit: 1 },
+				unique_files: ["/src/Bash-0.ts"],
+			}),
+		}),
+	];
+
+	test("sanity: parent extractStats matches the raw event stream", () => {
+		expect(parentStats.tool_call_count).toBe(rawPreToolCount);
+		expect(parentStats.failure_count).toBe(rawFailureCount);
+		expect(parentStats.tools_by_name).toEqual(rawPerTool);
+	});
+
+	test("merged tool_call_count == raw PreToolUse count (not parent + agents)", () => {
+		const result = aggregateTeamData({
+			parentStats,
+			parentFileMap: { files: [] },
+			parentEditChains: { chains: [] },
+			parentBacktracks: [],
+			parentReasoning: [],
+			parentCost: undefined,
+			agents,
+		});
+
+		// Buggy behavior would yield 32 + 10 + 8 + 6 = 56; correct stays at 32.
+		expect(result.stats.tool_call_count).toBe(rawPreToolCount);
+	});
+
+	test("merged failure_count == raw PostToolUseFailure count", () => {
+		const result = aggregateTeamData({
+			parentStats,
+			parentFileMap: { files: [] },
+			parentEditChains: { chains: [] },
+			parentBacktracks: [],
+			parentReasoning: [],
+			parentCost: undefined,
+			agents,
+		});
+
+		// Buggy behavior would yield 3 + 1 + 1 + 1 = 6; correct stays at 3.
+		expect(result.stats.failure_count).toBe(rawFailureCount);
+	});
+
+	test("merged per-tool counts == raw per-tool counts", () => {
+		const result = aggregateTeamData({
+			parentStats,
+			parentFileMap: { files: [] },
+			parentEditChains: { chains: [] },
+			parentBacktracks: [],
+			parentReasoning: [],
+			parentCost: undefined,
+			agents,
+		});
+
+		// Each tool stays at its raw count — no agent contributions added.
+		expect(result.stats.tools_by_name).toEqual(rawPerTool);
+	});
+
+	test("failure_rate is computed from raw counts only", () => {
+		const result = aggregateTeamData({
+			parentStats,
+			parentFileMap: { files: [] },
+			parentEditChains: { chains: [] },
+			parentBacktracks: [],
+			parentReasoning: [],
+			parentCost: undefined,
+			agents,
+		});
+
+		expect(result.stats.failure_rate).toBe(rawFailureCount / rawPreToolCount);
 	});
 });

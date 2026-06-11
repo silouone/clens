@@ -70,7 +70,9 @@ const EmptyState: Component = () => (
 // ── Filter types ────────────────────────────────────────────────────
 
 type ViewMode = "sessions" | "work_units";
-type StatusFilter = "all" | "complete" | "incomplete";
+// "incomplete" is a legacy URL alias matching active+idle (status union changed
+// from complete|incomplete to complete|active|idle — bug B6)
+type StatusFilter = "all" | "complete" | "active" | "idle" | "incomplete";
 type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
 type AgentsFilter = "all" | "top_level" | "multi" | "solo";
 type FeaturesFilter = "all" | "any" | "loop" | "goal" | "workflow";
@@ -81,7 +83,26 @@ const isValidViewMode = (s: string | undefined): s is ViewMode =>
 	s === "sessions" || s === "work_units";
 
 const isValidStatus = (s: string | undefined): s is StatusFilter =>
-	s === "all" || s === "complete" || s === "incomplete";
+	s === "all" || s === "complete" || s === "active" || s === "idle" || s === "incomplete";
+
+/** True when a session row matches the selected status filter. */
+const matchesStatusFilter = (sessionStatus: string, filter: StatusFilter): boolean => {
+	if (filter === "all") return true;
+	if (filter === "incomplete") return sessionStatus !== "complete";
+	return sessionStatus === filter;
+};
+
+const isValidDayKey = (s: string | undefined): s is string =>
+	typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+/** Local-calendar-day key for an epoch-ms timestamp (matches analytics bucketing). */
+const localDayKey = (t: number): string => {
+	const d = new Date(t);
+	const pad = (n: number): string => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const isOnLocalDay = (t: number, dayKey: string): boolean => localDayKey(t) === dayKey;
 
 const isValidAnalyzed = (s: string | undefined): s is AnalyzedFilter =>
 	s === "all" || s === "analyzed" || s === "not_analyzed";
@@ -211,6 +232,20 @@ const hasWorkUnitProjectId = (u: WorkUnit): u is WorkUnit & { readonly project_i
 const getWorkUnitProjectId = (u: WorkUnit): string | undefined =>
 	hasWorkUnitProjectId(u) ? u.project_id : undefined;
 
+// ── Honest count label (B25) ─────────────────────────────────────────
+
+/**
+ * Build the result-count label. When active filters hide sessions the API
+ * returned (e.g. the default Top-level filter excluding subagents, or the
+ * status/feature filters), surface both numbers as "X of Y sessions" so the
+ * count is honest rather than silently showing the post-filter number as if it
+ * were the total. When nothing is hidden, fall back to the plain "Y sessions".
+ */
+export const buildCountLabel = (shown: number, total: number): string => {
+	const noun = `session${total !== 1 ? "s" : ""}`;
+	return shown < total ? `of ${total} ${noun}` : noun;
+};
+
 // ── Main component ──────────────────────────────────────────────────
 
 export const SessionList: Component = () => {
@@ -226,6 +261,7 @@ export const SessionList: Component = () => {
 		view?: string;
 		lifecycle?: string;
 		link_type?: string;
+		date?: string;
 	}>();
 
 	// viewMode is derived from URL params (header nav controls it)
@@ -253,6 +289,10 @@ export const SessionList: Component = () => {
 	const [sortState, setSortState] = createSignal<SortState>(
 		parseSortParam(searchParams.sort),
 	);
+	// Local-day filter set by Usage/Insights chart date clicks (?date=YYYY-MM-DD, bug B22)
+	const [dateFilter, setDateFilter] = createSignal<string | undefined>(
+		isValidDayKey(searchParams.date) ? searchParams.date : undefined,
+	);
 	const [page, setPage] = createSignal(
 		Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1),
 	);
@@ -273,6 +313,7 @@ export const SessionList: Component = () => {
 		const p = page();
 		params.q = q || undefined;
 		params.status = status !== "all" ? status : undefined;
+		params.date = dateFilter();
 		params.analyzed = analyzed !== "all" ? analyzed : undefined;
 		params.agents = agents !== "top_level" ? agents : undefined;
 		params.features = features !== "all" ? features : undefined;
@@ -301,10 +342,14 @@ export const SessionList: Component = () => {
 		const projectId = selectedProjectId();
 
 		return sessions.filter((s) => {
-			if (s.duration_ms <= 0) return false;
+			// B24: do NOT hide zero-duration sessions. Single-event sessions (e.g. a
+			// lone SessionEnd) have duration_ms === 0 but are real sessions the API
+			// returns — every one must be findable via search. They render with
+			// 0 duration and an idle/complete status badge.
 			// Project filter (global mode)
 			if (projectId !== undefined && getProjectId(s) !== projectId) return false;
-			if (status !== "all" && s.status !== status) return false;
+			if (!matchesStatusFilter(s.status, status)) return false;
+			if (dateFilter() && !isOnLocalDay(s.start_time, dateFilter() ?? "")) return false;
 			if (analyzed === "analyzed" && !s.is_distilled) return false;
 			if (analyzed === "not_analyzed" && s.is_distilled) return false;
 			if (agents === "top_level" && s.is_subagent === true) return false;
@@ -319,6 +364,16 @@ export const SessionList: Component = () => {
 			}
 			return true;
 		});
+	});
+
+	// B25: total sessions in the current project scope, BEFORE status/analyzed/
+	// agents/features/search filters. Used as the honest denominator so the count
+	// label can reveal how many sessions the default filters are hiding.
+	const scopedTotal = createMemo(() => {
+		const sessions = sessionList() ?? [];
+		const projectId = selectedProjectId();
+		if (projectId === undefined) return sessions.length;
+		return sessions.filter((s) => getProjectId(s) === projectId).length;
 	});
 
 	// Sorted sessions
@@ -443,15 +498,29 @@ export const SessionList: Component = () => {
 							value: selectedProjectId() ?? "all",
 							onChange: (v: string) => { setSelectedProjectId(v === "all" ? undefined : v); setPage(1); setSelectedRow(-1); },
 						}] : []),
-						{ key: "status", options: [{ label: "All", value: "all" }, { label: "Complete", value: "complete" }, { label: "Incomplete", value: "incomplete" }], value: statusFilter(), onChange: (v: string) => { setStatusFilter(v as StatusFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "status", options: [{ label: "All", value: "all" }, { label: "Complete", value: "complete" }, { label: "Active", value: "active" }, { label: "Idle", value: "idle" }], value: statusFilter(), onChange: (v: string) => { setStatusFilter(v as StatusFilter); setPage(1); setSelectedRow(-1); } },
 						{ key: "analyzed", options: [{ label: "All", value: "all" }, { label: "Analyzed", value: "analyzed" }, { label: "Not analyzed", value: "not_analyzed" }], value: analyzedFilter(), onChange: (v: string) => { setAnalyzedFilter(v as AnalyzedFilter); setPage(1); setSelectedRow(-1); } },
 						{ key: "agents", options: [{ label: "All", value: "all" }, { label: "Top-level", value: "top_level" }, { label: "Multi-agent", value: "multi" }, { label: "Solo", value: "solo" }], value: agentsFilter(), onChange: (v: string) => { setAgentsFilter(v as AgentsFilter); setPage(1); setSelectedRow(-1); } },
 						{ key: "features", options: [{ label: "All", value: "all" }, { label: "Any feature", value: "any" }, { label: "Loop", value: "loop" }, { label: "Goal", value: "goal" }, { label: "Workflow", value: "workflow" }], value: featuresFilter(), onChange: (v: string) => { setFeaturesFilter(v as FeaturesFilter); setPage(1); setSelectedRow(-1); } },
 					]}
 					resultCount={filtered().length}
-					resultLabel={`session${filtered().length !== 1 ? "s" : ""}`}
+					resultLabel={buildCountLabel(filtered().length, scopedTotal())}
 					onRefresh={() => { refetchSessions(); refetchWorkUnits(); }}
 				/>
+				<Show when={dateFilter()}>
+					<div class="flex items-center gap-2 border-b border-clens bg-surface-inset px-4 py-1.5 text-xs text-secondary">
+						<span>
+							Showing sessions from <span class="font-mono font-medium">{dateFilter()}</span>
+						</span>
+						<button
+							type="button"
+							class="rounded border border-clens px-1.5 py-0.5 text-muted hover:text-primary"
+							onClick={() => { setDateFilter(undefined); setPage(1); setSelectedRow(-1); }}
+						>
+							Clear ✕
+						</button>
+					</div>
+				</Show>
 			</Show>
 			<Show when={viewMode() === "work_units"}>
 				<FilterBar

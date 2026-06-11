@@ -650,7 +650,7 @@ export interface FeatureUsage {
 
 export interface AnalyticsSummaryRow {
 	readonly session_id: string;
-	readonly date: string; // "2026-03-15" (UTC)
+	readonly date: string; // "2026-03-15" (LOCAL calendar day; see B18)
 	readonly duration_ms: number;
 	readonly model?: string;
 	readonly cost_usd: number;
@@ -661,6 +661,11 @@ export interface AnalyticsSummaryRow {
 	readonly is_estimated: boolean;
 	readonly tool_call_count: number;
 	readonly failure_count: number;
+	/**
+	 * Per-tool invocation counts (denominator for tool failure rates; see B11).
+	 * Optional because summary rows persisted before B11 lack it; readers default to {}.
+	 */
+	readonly tools_by_name?: Readonly<Record<string, number>>;
 	readonly failures_by_tool: Readonly<Record<string, number>>;
 	readonly agent_count: number;
 	readonly agent_types: readonly {
@@ -676,6 +681,12 @@ export interface AnalyticsSummaryRow {
 	readonly backtrack_files: readonly string[];
 	readonly reasoning_by_intent: Readonly<Record<string, number>>;
 	readonly edit_chain_count: number;
+	/**
+	 * Sum of edits across all chains; divided by edit_chain_count gives the real mean
+	 * chain length (see B19). Optional because rows persisted before B19 lack it;
+	 * readers fall back to edit_chain_count.
+	 */
+	readonly edit_chain_links?: number;
 	readonly abandoned_edits: number;
 	readonly surviving_edits: number;
 	readonly drift_score?: number;
