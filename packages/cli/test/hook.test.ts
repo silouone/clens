@@ -213,4 +213,37 @@ describe("hook handler", () => {
 		expect(existsSync(`${TEST_DIR}/.clens/sessions/git-root-session.jsonl`)).toBe(true);
 		expect(existsSync(`${nestedCwd}/.clens`)).toBe(false);
 	});
+
+	// Regression: a resolved root nested under `.clens/` produced a recursive
+	// `.clens/sessions/.clens/sessions` capture dir that self-perpetuated. The hook
+	// must refuse to write any path nested under a `.clens/` segment.
+	test("refuses to write when the resolved root is nested under .clens", async () => {
+		// A capture dir already nested under `.clens/` (the recursion seed).
+		const nestedRoot = `${TEST_DIR}/.clens/sessions`;
+		mkdirSync(`${nestedRoot}/.clens/sessions`, { recursive: true });
+
+		const payload = JSON.stringify({
+			session_id: "recursive-session",
+			cwd: nestedRoot,
+			hook_event_name: "PreToolUse",
+			tool_name: "Read",
+			tool_input: { file_path: "/baz.ts" },
+			tool_use_id: "t-recursive",
+			transcript_path: "/tmp/t.jsonl",
+			permission_mode: "default",
+		});
+
+		const proc = Bun.spawn(["bun", "run", HOOK_SCRIPT, "PreToolUse"], {
+			stdin: new Response(payload),
+			stdout: "pipe",
+			stderr: "pipe",
+			cwd: PKG_ROOT,
+		});
+
+		await proc.exited;
+
+		// No event written anywhere under the nested `.clens/`.
+		expect(existsSync(`${nestedRoot}/.clens/sessions/recursive-session.jsonl`)).toBe(false);
+		expect(existsSync(`${TEST_DIR}/.clens/sessions/recursive-session.jsonl`)).toBe(false);
+	});
 });

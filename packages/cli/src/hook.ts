@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { sep } from "node:path";
 import type { HookEventType, StoredEvent } from "./types";
 import { logError, resolveProjectRoot } from "./utils";
 
@@ -20,6 +21,13 @@ try {
 	// (or `.git/`) — prevents a subagent running in a subdirectory from
 	// fragmenting session capture into a nested `.clens/`.
 	const projectDir: string = resolveProjectRoot(input.cwd || process.cwd());
+
+	// Guard: refuse to capture into a root that is itself nested under a `.clens/`
+	// directory. Such a root produces a recursive `.clens/sessions/.clens/sessions`
+	// capture dir — and because `resolveProjectRoot` prefers the nearest `.clens/`
+	// marker, that nesting is self-perpetuating once it exists. Exact-segment match
+	// (not substring) so a legit path like `.clens-backup/` is unaffected.
+	if (projectDir.split(sep).includes(".clens")) process.exit(0);
 
 	const sessionsDir = `${projectDir}/.clens/sessions`;
 	mkdirSync(sessionsDir, { recursive: true });

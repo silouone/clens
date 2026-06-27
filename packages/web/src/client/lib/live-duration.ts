@@ -41,7 +41,7 @@ export const computeLiveElapsed = (args: LiveElapsedArgs): number => {
 
 /**
  * A live session whose last event is older than this is "idle", not "active".
- * Mirrors the server's ACTIVE_THRESHOLD_MS (@clens/cli deriveSessionStatus) so
+ * Mirrors the server's ACTIVE_THRESHOLD_MS (clens deriveSessionStatus) so
  * the live detail view and the session list agree on the active/idle boundary —
  * a quiet live session must not show "active" forever while the list says
  * "idle". Kept as a local literal so this leaf module imports nothing.

@@ -1,6 +1,6 @@
 /**
  * Client-side risk score computation.
- * Ported from @clens/cli distill/risk-score.ts — pure functions, no I/O.
+ * Ported from clens distill/risk-score.ts — pure functions, no I/O.
  */
 import type { DistilledSession, RiskLevel } from "../../shared/types";
 

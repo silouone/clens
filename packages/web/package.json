@@ -15,10 +15,11 @@
     "test": "bun test test/ && vitest run",
     "test:api": "bun test test/",
     "test:vitest": "vitest run",
+    "lint": "bunx biome check src/ test/",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clens/cli": "workspace:*",
+    "clens": "workspace:*",
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@kobalte/core": "^0.13.0",

@@ -43,6 +43,9 @@ ai_docs/
 docs/
 cli-review/
 
+# Internal deliberation / self-criticism (not part of the open source project)
+deliberation/
+
 # cLens local capture data
 .clens/
 
@@ -56,3 +59,7 @@ report_kpi_33_sessions.md
 .playwright-cli/
 screenshots/
 ai_review/
+.verify.json
+
+# Generated/placeholder image assets (not real product assets)
+**/Gemini_Generated_Image*

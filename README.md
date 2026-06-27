@@ -1,6 +1,6 @@
 # cLens — Session Observability for Claude Code
 
-[![npm](https://img.shields.io/npm/v/@silou/clens)](https://www.npmjs.com/package/@silou/clens)
+[![npm](https://img.shields.io/npm/v/clens)](https://www.npmjs.com/package/clens)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1151%20passing-brightgreen)]()
 

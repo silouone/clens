@@ -6,7 +6,7 @@
  * `api`/`window` module graph that `stores.ts` transitively imports.
  */
 
-import type { SessionStatus } from "@clens/cli";
+import type { SessionStatus } from "clens";
 
 /**
  * Inputs governing whether the detail view should auto-distill a session.

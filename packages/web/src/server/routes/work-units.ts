@@ -1,7 +1,7 @@
 import { Hono } from "hono"
-import { readWorkUnitIndex } from "@clens/cli/src/session/work-units"
-import { readDistilled } from "@clens/cli/src/session"
-import type { DistilledSession, ProjectEntry, WorkUnit } from "@clens/cli"
+import { readWorkUnitIndex } from "clens/src/session/work-units"
+import { readDistilled } from "clens/src/session"
+import type { DistilledSession, ProjectEntry, WorkUnit } from "clens"
 import { createLogger } from "../logger"
 
 /** A single work unit entry from the index. */

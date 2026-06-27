@@ -297,9 +297,10 @@ export const attributeDiffLines = (
  * Orchestrator: extract diff attribution for all files in edit chains.
  * Combines git diff capture, unified diff parsing, and agent attribution.
  *
- * @deprecated Use `computeToolSourcedDiff` for git-independent attribution.
- * This function queries git at distill-time, so diffs may be stale if the user
- * committed or changed branches after the session.
+ * NOTE: This queries git at distill-time, so diffs may be stale if the user
+ * committed or changed branches after the session. It is used as optional
+ * enrichment for display; `computeToolSourcedDiff` provides the
+ * git-independent source of truth for stats and attribution.
  */
 export const extractGitDiffAttribution = (
 	projectDir: string,

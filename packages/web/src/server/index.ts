@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { resolve, dirname } from "node:path"
-import type { ProjectEntry } from "@clens/cli"
+import type { ProjectEntry } from "clens"
 import { createApp } from "./app"
 import { startLiveWatcher } from "./live"
 import { log, currentLevel } from "./logger"
@@ -116,7 +116,7 @@ if (import.meta.main) {
 
 	const projects = isGlobal
 		? await (async () => {
-			const { discoverAndRegisterProjects } = await import("@clens/cli/src/session/registry")
+			const { discoverAndRegisterProjects } = await import("clens/src/session/registry")
 			return discoverAndRegisterProjects()
 		})()
 		: undefined

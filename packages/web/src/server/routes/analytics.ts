@@ -1,8 +1,8 @@
 import { Hono } from "hono"
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync } from "node:fs"
 import { resolve } from "node:path"
-import { readAnalyticsSummary, rebuildAnalyticsSummary } from "@clens/cli/src/distill/analytics-summary"
-import type { AnalyticsSummaryRow, ProjectEntry } from "@clens/cli"
+import { readAnalyticsSummary, rebuildAnalyticsSummary } from "clens/src/distill/analytics-summary"
+import type { AnalyticsSummaryRow, ProjectEntry } from "clens"
 import {
 	PLAN_MONTHLY_USD,
 	resolvePlan,

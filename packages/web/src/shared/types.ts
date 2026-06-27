@@ -1,9 +1,9 @@
 /**
- * Single import source for all @clens/cli types used in the SPA.
+ * Single import source for all clens types used in the SPA.
  *
  * Usage: import type { SessionSummary, DistilledSession } from "../shared/types";
  */
-import type { ClensConfig } from "@clens/cli";
+import type { ClensConfig } from "clens";
 
 export type {
 	// Session
@@ -99,14 +99,14 @@ export type {
 
 	// Analytics
 	AnalyticsSummaryRow,
-} from "@clens/cli";
+} from "clens";
 
 /**
  * Runtime color-flag palette + guard (session-naming-flags). Re-exported as
  * VALUES (not just types) so the client palette and the server PATCH validator
  * share a single source of truth with the CLI.
  */
-export { COLOR_NAMES, isColorName } from "@clens/cli/src/types";
+export { COLOR_NAMES, isColorName } from "clens/src/types";
 
 // ── Subscription plan (analytics-truth-and-brush) ───────────────────
 //

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { AnalyticsSummaryRow } from "@clens/cli"
+import type { AnalyticsSummaryRow } from "clens"
 import {
 	cacheHitRate,
 	computeDerivedTotals,

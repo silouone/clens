@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createApp } from "../../src/server/app"
-import type { ProjectEntry } from "@clens/cli"
+import type { ProjectEntry } from "clens"
 
 // Regression for repo-mode-nested-clens-projects-dropped (web serving half).
 //
