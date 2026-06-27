@@ -5,12 +5,51 @@ import type { ColorName, SessionSummary } from "../../shared/types";
 // ── Token extraction ────────────────────────────────────────────────
 
 /**
- * Extract auth token from URL query param `?token=...`
- * The server prints the token at startup; the CLI opens the browser with it.
+ * sessionStorage key for the persisted auth token. sessionStorage (NOT
+ * localStorage) so a per-launch token is scoped to this browser session and
+ * never leaks into the next `clens web` launch.
+ */
+const TOKEN_STORAGE_KEY = "clens-token";
+
+/**
+ * Read the persisted token, guarding against environments where storage is
+ * unavailable (private mode, sandboxed iframes).
+ */
+const readStoredToken = (): string | undefined => {
+	try {
+		return sessionStorage.getItem(TOKEN_STORAGE_KEY) ?? undefined;
+	} catch {
+		return undefined;
+	}
+};
+
+/** Persist the token, ignoring failures (private mode / storage disabled). */
+const persistToken = (token: string): void => {
+	try {
+		sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+	} catch {
+		// Storage unavailable — token is still returned for this request.
+	}
+};
+
+/**
+ * Canonical auth-token accessor for the whole client.
+ *
+ * Precedence: a `?token=` URL param always WINS and is persisted to
+ * sessionStorage; otherwise FALL BACK to the previously persisted token. This
+ * keeps auth working across SPA navigations (e.g. session-list row ->
+ * /session/:id) that drop the query string, while a fresh deep-link still
+ * overrides any stale stored value. The server prints the token at startup;
+ * the CLI opens the browser with it.
  */
 const getToken = (): string | undefined => {
 	const params = new URLSearchParams(window.location.search);
-	return params.get("token") ?? undefined;
+	const urlToken = params.get("token") ?? undefined;
+	if (urlToken) {
+		persistToken(urlToken);
+		return urlToken;
+	}
+	return readStoredToken();
 };
 
 // ── Client factory ──────────────────────────────────────────────────

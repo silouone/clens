@@ -1,5 +1,6 @@
 import { createResource, createSignal } from "solid-js";
 import { isSubscriptionPlan, type WebClensConfig } from "../../shared/types";
+import { getToken } from "./api";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -107,8 +108,7 @@ const resetPreferences = (): void => {
 // ── Auth helper ─────────────────────────────────────────────────────
 
 const getTokenHeader = (): Record<string, string> => {
-	const params = new URLSearchParams(window.location.search);
-	const token = params.get("token");
+	const token = getToken();
 	return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
