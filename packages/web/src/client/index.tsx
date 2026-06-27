@@ -19,14 +19,6 @@ import "./index.css";
 
 // ── Legacy route redirects ──────────────────────────────────────────
 
-/** Redirect /session/:id/team -> /session/:id?view=team */
-const TeamRedirect: Component = () => {
-	const params = useParams<{ id: string }>();
-	const navigate = useNavigate();
-	onMount(() => navigate(`/session/${params.id}?view=team`, { replace: true }));
-	return null;
-};
-
 /** Redirect /session/:id/agent/:agentId -> /session/:id?view=agent&agent=:agentId */
 const AgentRedirect: Component = () => {
 	const params = useParams<{ id: string; agentId: string }>();
@@ -91,7 +83,6 @@ render(
 			<Route path="/usage" component={UsagePage} />
 			<Route path="/insights" component={InsightsPage} />
 			<Route path="/settings" component={SettingsPage} />
-			<Route path="/session/:id/team" component={TeamRedirect} />
 			<Route path="/session/:id/agent/:agentId" component={AgentRedirect} />
 		</Router>
 	),

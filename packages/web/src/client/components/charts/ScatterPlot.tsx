@@ -153,15 +153,15 @@ export const ScatterPlot = <T,>(props: ScatterPlotProps<T>): ReturnType<Componen
 			<div class="mt-2 flex gap-3 px-2 text-xs text-muted">
 				<div class="flex items-center gap-1">
 					<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": DRIFT_COLORS.good }} />
-					<span>Low (&lt;0.2)</span>
+					<span class="instrument-microcaps text-[10px] text-muted">Low (&lt;0.2)</span>
 				</div>
 				<div class="flex items-center gap-1">
 					<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": DRIFT_COLORS.warn }} />
-					<span>Medium (0.2-0.5)</span>
+					<span class="instrument-microcaps text-[10px] text-muted">Medium (0.2-0.5)</span>
 				</div>
 				<div class="flex items-center gap-1">
 					<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": DRIFT_COLORS.bad }} />
-					<span>High (&gt;0.5)</span>
+					<span class="instrument-microcaps text-[10px] text-muted">High (&gt;0.5)</span>
 				</div>
 				</div>
 			</div>

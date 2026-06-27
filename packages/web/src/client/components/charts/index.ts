@@ -7,7 +7,7 @@ export { StackedArea } from "./StackedArea";
 export { StackedBar } from "./StackedBar";
 export { ChartTooltip } from "./ChartTooltip";
 export { ChartEmpty } from "./ChartEmpty";
-export { CHART_COLORS, TOKEN_COLORS, BACKTRACK_COLORS, REASONING_COLORS, DRIFT_COLORS, MODEL_PALETTE, MODEL_OTHER, modelColor, formatCompact, formatShortDate } from "./shared";
+export { CHART_COLORS, CHART_CATEGORICAL, categoricalColor, TOKEN_COLORS, BACKTRACK_COLORS, REASONING_COLORS, DRIFT_COLORS, MODEL_OTHER, modelColor, formatCompact, formatShortDate } from "./shared";
 export { parseDay, dayToDate, dateDomain, timeScale, pixelToDate } from "./shared";
 export { brushBand, resolveBrushSelection, createBrush, BRUSH_FILL, BRUSH_MIN_PX } from "./shared";
 export type { BaseChartProps, BrushableChartProps, BrushRange, BrushBand, CreateBrushArgs } from "./shared";

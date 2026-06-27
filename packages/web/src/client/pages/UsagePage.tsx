@@ -1,6 +1,6 @@
 import { createMemo, For, Show, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { RefreshCw, RotateCcw, X } from "lucide-solid";
+import { RefreshCw, RotateCcw } from "lucide-solid";
 import {
 	analyticsRange,
 	setAnalyticsRange,
@@ -31,8 +31,10 @@ import { StackedArea } from "../components/charts/StackedArea";
 import { ChartTooltip, ChartEmpty, TOKEN_COLORS, CHART_COLORS, MODEL_OTHER, modelColor, formatCompact } from "../components/charts";
 import { Tooltip } from "../components/ui/Tooltip";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
+import { Spinner } from "../components/ui/Spinner";
 import { ProjectDropdown } from "../components/ProjectDropdown";
 import type { BrushRange } from "../components/charts/shared";
+import { CustomRangeChip } from "../components/CustomRangeChip";
 
 // ── Range selector ──────────────────────────────────────────────────
 
@@ -64,25 +66,8 @@ const RangeSelector: Component = () => (
 		</For>
 
 		{/* Custom-window chip (AC8): visible only while a brush selection is active.
-		    Shows the resolved inclusive dates with a clear (x) that returns the
-		    dashboard to the active preset. */}
-		<Show when={customRange()}>
-			{(cr) => (
-				<div class="instrument-microcaps flex items-center gap-1.5 rounded-none border border-brand-500 bg-surface-muted px-2.5 py-1 text-[10px] text-primary">
-					<span class="font-mono tabular-nums normal-case tracking-normal">
-						{cr().from}..{cr().to}
-					</span>
-					<button
-						onClick={() => clearCustomRange()}
-						class="text-muted transition hover:text-danger"
-						title="Clear custom range"
-						aria-label="Clear custom range"
-					>
-						<X class="h-3 w-3" />
-					</button>
-				</div>
-			)}
-		</Show>
+		    Shared component so Usage and Insights render the same date format. */}
+		<CustomRangeChip />
 	</div>
 );
 
@@ -102,7 +87,7 @@ type KpiCardProps = {
 
 const KpiCard: Component<KpiCardProps> = (props) => (
 	<div
-		class="group rounded-none border border-clens bg-surface p-4 transition-colors hover:border-brand-500/60 hover:bg-surface-hover"
+		class="group rounded-none border border-clens bg-surface p-4 transition-colors hover:border-strong hover:bg-surface-hover"
 		title={props.tooltip}
 		classList={{ "cursor-help": Boolean(props.tooltip) }}
 	>
@@ -315,14 +300,14 @@ export const UsagePage: Component = () => {
 					<button
 						onClick={() => rebuildAnalytics()}
 						disabled={isRebuilding()}
-						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-brand-500 transition disabled:opacity-50"
+						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-strong transition disabled:opacity-50"
 						title="Rebuild analytics from distilled sessions"
 					>
 						<RotateCcw class="h-4 w-4" classList={{ "animate-spin": isRebuilding() }} />
 					</button>
 					<button
 						onClick={() => refetchUsage()}
-						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-brand-500 transition"
+						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-strong transition"
 						title="Refresh"
 					>
 						<RefreshCw class="h-4 w-4" />
@@ -333,7 +318,7 @@ export const UsagePage: Component = () => {
 			{/* Loading */}
 			<Show when={isLoading()}>
 				<div class="flex items-center justify-center py-20">
-					<div class="h-6 w-6 animate-spin rounded-none border-2 border-brand-500 border-t-transparent" />
+					<Spinner size="md" />
 				</div>
 			</Show>
 

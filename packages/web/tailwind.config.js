@@ -52,6 +52,10 @@ export default {
 			},
 			borderColor: {
 				clens: "var(--clens-border)",
+				// Neutral stronger hairline for generic hover affordances — keeps the
+				// signal-green accent reserved for live/active/ok (FE-24). Driven from
+				// the tick-ruler token so it tracks the active theme.
+				strong: "var(--clens-tick)",
 			},
 			divideColor: {
 				clens: "var(--clens-border)",

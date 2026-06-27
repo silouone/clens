@@ -1,4 +1,4 @@
-import { createResource, createSignal } from "solid-js";
+import { createResource, createRoot, createSignal } from "solid-js";
 import type { ProjectEntry } from "../../shared/types";
 import { authHeaders } from "./api";
 
@@ -27,7 +27,13 @@ const fetchProjects = async (): Promise<readonly ProjectEntry[]> => {
 
 // ── Reactive state ───────────────────────────────────────────────────
 
-const [projectList, { refetch: refetchProjects }] = createResource(fetchProjects);
+// createRoot owns this app-lifetime resource so its computation has a reactive owner —
+// clears the SolidJS "computations created outside createRoot" warning at module load
+// (FE-31). project-store is imported transitively at bootstrap (via analytics-store →
+// KPI header), so it emits at page load too. The root is never disposed.
+const [projectList, { refetch: refetchProjects }] = createRoot(() =>
+	createResource(fetchProjects),
+);
 
 const [selectedProjectId, setSelectedProjectId] = createSignal<string | undefined>(undefined);
 

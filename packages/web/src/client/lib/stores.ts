@@ -1,4 +1,4 @@
-import { createResource, createSignal } from "solid-js";
+import { createResource, createRoot, createSignal } from "solid-js";
 import type { ColorName, ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
 import { api, authHeaders, patchSessionMeta, type SessionMetaPatch } from "./api";
 import { preferences } from "./settings";
@@ -42,8 +42,12 @@ const fetchSessionList = async (): Promise<readonly SessionSummary[]> => {
  * Reactive session list resource.
  * Automatically fetches on first access; call refetch() to refresh.
  */
-const [sessionList, { refetch: refetchSessions, mutate: mutateSessions }] =
-	createResource(fetchSessionList);
+// createRoot owns this app-lifetime resource so the computation it creates has a
+// reactive owner — avoids SolidJS "computations created outside createRoot" warnings
+// at module load (FE-31). The root is never disposed (the store lives for the app's life).
+const [sessionList, { refetch: refetchSessions, mutate: mutateSessions }] = createRoot(
+	() => createResource(fetchSessionList),
+);
 
 // ── Session meta mutation (rename + color flag) ─────────────────────
 

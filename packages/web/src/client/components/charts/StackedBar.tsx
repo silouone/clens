@@ -169,7 +169,7 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 					{(s) => (
 						<div class="flex items-center gap-1">
 							<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": s.color }} />
-							<span>{s.label}</span>
+							<span class="instrument-microcaps text-[10px] text-muted">{s.label}</span>
 						</div>
 					)}
 				</For>

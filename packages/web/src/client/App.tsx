@@ -94,28 +94,33 @@ type AnalyticsDropdownProps = {
 
 const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 	const [open, setOpen] = createSignal(false);
-	let closeTimer: ReturnType<typeof setTimeout> | undefined;
+	let containerRef: HTMLDivElement | undefined;
 
-	const handleEnter = () => {
-		clearTimeout(closeTimer);
-		setOpen(true);
+	// Pure click-toggle menu (FE-30): one unambiguous open interaction. The trigger
+	// no longer navigates on click — it opens/closes the menu; navigation happens
+	// only via the menu items. Click outside closes.
+	const handleOutsideClick = (e: MouseEvent) => {
+		if (open() && containerRef && !containerRef.contains(e.target as Node)) {
+			setOpen(false);
+		}
 	};
 
-	const handleLeave = () => {
-		closeTimer = setTimeout(() => setOpen(false), 150);
-	};
+	onMount(() => document.addEventListener("click", handleOutsideClick));
+	onCleanup(() => document.removeEventListener("click", handleOutsideClick));
 
-	onCleanup(() => clearTimeout(closeTimer));
+	const navigate = (path: string) => {
+		setOpen(false);
+		props.onNavigate(path);
+	};
 
 	return (
-		<div
-			class="relative"
-			onMouseEnter={handleEnter}
-			onMouseLeave={handleLeave}
-		>
+		<div class="relative" ref={containerRef}>
 			{/* Trigger button */}
 			<button
-				onClick={() => props.onNavigate("/usage")}
+				type="button"
+				aria-haspopup="menu"
+				aria-expanded={open()}
+				onClick={() => setOpen((v) => !v)}
 				class="instrument-microcaps flex items-center gap-1 rounded-none border-b-2 px-2.5 py-1 text-[10px] transition"
 				classList={{
 					"text-primary border-brand-500": props.active,
@@ -131,7 +136,7 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 
 			{/* Dropdown panel */}
 			<Show when={open()}>
-				<div class="absolute right-0 top-full z-50 mt-1.5 w-64 origin-top-right animate-dropdown rounded-none border border-clens bg-surface-raised">
+				<div role="menu" class="absolute right-0 top-full z-50 mt-1.5 w-64 origin-top-right animate-dropdown rounded-none border border-clens bg-surface-raised">
 					{/* KPI quick-view */}
 					<Show when={props.loaded}>
 						<div class="border-b border-clens">
@@ -192,7 +197,9 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 					{/* Dashboard links */}
 					<div class="p-1.5">
 						<button
-							onClick={() => { props.onNavigate("/usage"); setOpen(false); }}
+							type="button"
+							role="menuitem"
+							onClick={() => navigate("/usage")}
 							class="flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
 						>
 							<BarChart3 class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />
@@ -202,7 +209,9 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 							</div>
 						</button>
 						<button
-							onClick={() => { props.onNavigate("/insights"); setOpen(false); }}
+							type="button"
+							role="menuitem"
+							onClick={() => navigate("/insights")}
 							class="flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-xs transition hover:bg-surface-hover group"
 						>
 							<Lightbulb class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />

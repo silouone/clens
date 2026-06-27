@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Comp
 import type { LiveSessionState, LiveAgentState, PendingTool } from "../lib/live-store"
 import { extractFilePath } from "../lib/live-store"
 import { formatDuration } from "../lib/format"
+import { Spinner } from "./ui/Spinner"
 import type { StoredEvent } from "../../shared/types"
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -269,10 +270,9 @@ const LiveTimeline: Component<{
 							<span class="w-16 font-mono text-muted tabular-nums shrink-0">
 								{formatTime(tool.started_at)}
 							</span>
-							<span
-								class="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent shrink-0"
-								style={{ "border-color": "var(--clens-warning)", "border-top-color": "transparent" }}
-							/>
+							<span class="shrink-0">
+								<Spinner size="sm" />
+							</span>
 							<span class="font-medium">{tool.name}</span>
 							<Show when={tool.file_path}>
 								<span class="text-muted font-mono truncate">{tool.file_path}</span>

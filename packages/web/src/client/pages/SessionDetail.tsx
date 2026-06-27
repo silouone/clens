@@ -165,7 +165,7 @@ const AgentNotFound: Component<{
 			</p>
 			<button
 				onClick={props.onGoOverview}
-				class="instrument-microcaps mt-3 rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-brand-500"
+				class="instrument-microcaps mt-3 rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-strong"
 			>
 				Go to Overview
 			</button>
@@ -264,6 +264,18 @@ export const SessionDetail: Component = () => {
 	});
 
 	const isNotDistilled = createMemo(() => sessionDetail()?.status === "not_distilled");
+
+	// FE-32: a re-analyze (~3-5s) calls refetchDetail(), which puts the resource
+	// into a "refreshing" state (loading=true) but RETAINS the prior value. Keep
+	// rendering that populated snapshot through the reload instead of swapping the
+	// whole panel — KPI strip included — to a full-page skeleton, which blanked the
+	// readouts and read as the KPI strip "flashing 0". Gate on the retained data
+	// being THIS session so navigating to a different id still shows the skeleton
+	// rather than the previous session's numbers.
+	const hasCurrentDetail = createMemo(() => {
+		const detail = sessionDetail();
+		return detail?.status === "ready" && detail.data.session_id === params.id;
+	});
 
 	// Matching lightweight list row — carries the resolved display_name/label/color
 	// (sidecar-backed naming) that the distilled snapshot lacks, so the header can
@@ -459,7 +471,7 @@ export const SessionDetail: Component = () => {
 
 	return (
 		<PageShell>
-			<Show when={!sessionDetail.loading} fallback={<LoadingSkeleton label="Loading session..." />}>
+			<Show when={!sessionDetail.loading || hasCurrentDetail()} fallback={<LoadingSkeleton label="Loading session..." />}>
 				<Show when={!isNotDistilled()} fallback={
 					<Show
 						when={(() => { const s = liveStore.state(); return s && s.event_count > 0 ? s : undefined })()}

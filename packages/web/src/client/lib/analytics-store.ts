@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal } from "solid-js";
+import { createResource, createRoot, createSignal } from "solid-js";
 import { selectedProjectId } from "./project-store";
 import { localDayKey, matchesLocalDay, isValidDayKey } from "./analytics-day";
 import { authHeaders } from "./api";
@@ -225,8 +225,15 @@ const fetchInsights = async (params: FetchParams): Promise<InsightsResponse | un
 
 // ── Resources ─────────────────────────────────────────────────────
 
-const [usageData, { refetch: refetchUsage }] = createResource(analyticsParams, fetchUsage);
-const [insightsData, { refetch: refetchInsights }] = createResource(analyticsParams, fetchInsights);
+// createRoot owns these app-lifetime resources so their computations have a reactive
+// owner — clears the SolidJS "computations created outside createRoot" warnings at
+// module load (FE-31). The root is never disposed (stores live for the app's life).
+const [usageData, { refetch: refetchUsage }] = createRoot(() =>
+	createResource(analyticsParams, fetchUsage),
+);
+const [insightsData, { refetch: refetchInsights }] = createRoot(() =>
+	createResource(analyticsParams, fetchInsights),
+);
 
 // ── Derived selectors ─────────────────────────────────────────────
 
@@ -322,7 +329,9 @@ const fetchHeaderStats = async (): Promise<HeaderStats> => {
 /** Reactive key: re-fetches when project changes. */
 const headerStatsKey = () => selectedProjectId() ?? "__all__";
 
-const [headerStats, { refetch: refetchHeaderStats }] = createResource(headerStatsKey, fetchHeaderStats);
+const [headerStats, { refetch: refetchHeaderStats }] = createRoot(() =>
+	createResource(headerStatsKey, fetchHeaderStats),
+);
 
 // ── Rebuild ───────────────────────────────────────────────────────
 

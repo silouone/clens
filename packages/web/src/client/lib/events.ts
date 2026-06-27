@@ -162,7 +162,9 @@ const createSSEClient = (handlers: SSEEventHandler = {}): SSEClient => {
 		});
 
 		es.onerror = () => {
-			console.warn(LOG_PREFIX, "Connection error, will reconnect");
+			// Expected on reload / server restart / transient drops — the client
+			// auto-reconnects with backoff, so this is routine, not a warning (FE-33).
+			console.debug(LOG_PREFIX, "Connection error, will reconnect");
 			if (stabilityTimer) clearTimeout(stabilityTimer);
 			es.close();
 			eventSource = undefined;

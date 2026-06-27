@@ -17,7 +17,7 @@ export const Spinner: Component<SpinnerProps> = (props) => {
 
 	return (
 		<div
-			class={`animate-spin rounded-full border-clens border-t-brand-500 ${SIZE_CLASSES[size()]}`}
+			class={`animate-spin rounded-none border-clens border-t-brand-500 ${SIZE_CLASSES[size()]}`}
 			role="status"
 			aria-label="Loading"
 		/>

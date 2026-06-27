@@ -27,56 +27,57 @@ export interface BrushableChartProps {
 	readonly onBrushSelect?: (range: BrushRange) => void;
 }
 
-// ── Color palette ──────────────────────────────────────────────────
+// ── Categorical palette ────────────────────────────────────────────
 //
-// INSTRUMENT direction: traces derive from the token palette so light
-// (paper/graphite) and dark (instrument-black/phosphor) modes both work.
-// Signal green is reserved for primary/live series; amber for secondary
-// warnings; danger red strictly for failures. Remaining series fall back
-// to a muted graphite ramp so multi-series charts stay legible without a
-// rainbow. Inline SVG reads these as fill/stroke, so CSS vars are used
-// directly.
+// INSTRUMENT direction (locked): ONE accent — signal green — for the
+// primary/live series; amber for warnings; danger red strictly for
+// failures. Every other discrete series falls back to a muted graphite
+// ramp so multi-series charts stay legible WITHOUT a rainbow.
+//
+// There is a SINGLE categorical token ramp (`CHART_CATEGORICAL`); every
+// other chart palette here (the named CHART_COLORS aliases and per-model
+// swatches) derives from it, so a given rank always maps to the same
+// instrument tone on both paper (light) and instrument-black (dark) and no
+// two categories collapse onto the same green. Inline SVG reads these as
+// fill/stroke, so CSS vars are used directly.
 
-export const CHART_COLORS = {
-	// Primary signal trace
-	blue: "var(--clens-brand)",
-	// Secondary graphite traces
-	violet: "var(--clens-text-secondary)",
-	emerald: "var(--clens-brand)",
-	slate: "var(--clens-text-muted)",
-	gray: "var(--clens-tick)",
-	// Status traces
-	amber: "var(--clens-warning)",
-	orange: "var(--clens-warning)",
-	red: "var(--clens-danger)",
-	pink: "var(--clens-text-muted)",
-} as const;
-
-// Categorical palette for breakdowns with many discrete series (e.g. cost by
-// model). The restrained CHART_COLORS ramp collapses to ~3 visible tones
-// (brand green / graphite / amber), so a 10-category donut renders as
-// indistinguishable repeats. This palette keeps an instrument-readout feel —
-// cool greens, teals and cyans anchored by amber/gold — while giving every
-// slice a legibly distinct hue on both paper (light) and instrument-black
-// (dark). Index-stable: callers pass sorted-by-magnitude series so a given
-// rank always maps to the same swatch. Tail series collapse to MODEL_OTHER.
-export const MODEL_PALETTE = [
-	"var(--clens-brand)", // phosphor green — dominant series
-	"#2dd4bf", // teal
-	"#38bdf8", // sky
-	"#fbbf24", // amber/gold
-	"#a78bfa", // violet
-	"#22d3ee", // cyan
-	"#fb7185", // rose
-	"#f97316", // orange
-	"#84cc16", // lime
+/**
+ * The one muted categorical token ramp. Index-stable: callers pass
+ * sorted-by-magnitude series so a given rank always maps to the same
+ * swatch. Overflow series collapse to {@link MODEL_OTHER}.
+ */
+export const CHART_CATEGORICAL = [
+	"var(--clens-brand)", // signal green — primary/dominant series
+	"var(--clens-text-secondary)", // graphite
+	"var(--clens-warning)", // amber
+	"var(--clens-text-muted)", // muted graphite
+	"var(--clens-tick)", // faint tick
 ] as const;
+
+/** Stable swatch for the Nth-ranked categorical series, from the one ramp. */
+export const categoricalColor = (index: number): string =>
+	CHART_CATEGORICAL[index % CHART_CATEGORICAL.length];
+
+// Named aliases used by single-series charts and small fixed legends. All
+// resolve onto the one CHART_CATEGORICAL ramp, so no two keys map to the same
+// green (fixed-legend series like the decision-pattern stacked bar stay
+// distinct) and the whole palette stays unified.
+export const CHART_COLORS = {
+	blue: CHART_CATEGORICAL[0], // signal green — primary trace
+	violet: CHART_CATEGORICAL[1], // graphite
+	amber: CHART_CATEGORICAL[2], // amber
+	emerald: CHART_CATEGORICAL[3], // muted graphite (distinct from green)
+	slate: CHART_CATEGORICAL[3], // muted graphite
+	pink: CHART_CATEGORICAL[3], // muted graphite
+} as const;
 
 export const MODEL_OTHER = "var(--clens-text-muted)";
 
-/** Stable swatch for the Nth-ranked categorical series. */
-export const modelColor = (index: number): string =>
-	MODEL_PALETTE[index % MODEL_PALETTE.length];
+/**
+ * Stable swatch for the Nth-ranked per-model series. Alias of
+ * {@link categoricalColor} so model breakdowns share the one ramp.
+ */
+export const modelColor = categoricalColor;
 
 // Distinct graphite/green/amber tones for stacked token series — kept
 // separable without leaving the instrument palette.

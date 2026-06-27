@@ -1,7 +1,7 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { ArrowUp, ArrowDown, ChevronRight, Users, Layers, Pencil, Flag } from "lucide-solid";
+import { ArrowUp, ArrowDown, ChevronRight, Users, Layers, Pencil, EyeOff } from "lucide-solid";
 import { FeatureBadges } from "../components/FeatureBadges";
-import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, type Component, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, setSessionMeta, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
@@ -12,6 +12,8 @@ import { SHOW_WORK_UNITS } from "../lib/feature-flags";
 
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { ColorFlag } from "../components/ui/ColorFlag";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { Toggle } from "../components/ui/Toggle";
 import { WorkUnitCard } from "../components/WorkUnitCard";
 import { FilterBar } from "../components/FilterBar";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
@@ -89,11 +91,12 @@ const EmptyState: Component = () => (
 // ── Filter types ────────────────────────────────────────────────────
 
 type ViewMode = "sessions" | "work_units";
-// "incomplete" is a legacy URL alias matching active+idle (status union changed
-// from complete|incomplete to complete|active|idle — bug B6)
-type StatusFilter = "all" | "complete" | "active" | "idle" | "incomplete";
+type StatusFilter = "all" | "complete" | "active" | "idle";
 type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
-type AgentsFilter = "all" | "top_level" | "multi" | "solo";
+// FE-12: the old `agents` facet conflated two dimensions — subagent visibility
+// (top_level) and team composition (multi/solo). Split into a `hideSubagents`
+// boolean plus a `composition` facet so the two controls are independent.
+type CompositionFilter = "all" | "multi" | "solo";
 type FeaturesFilter = "all" | "any" | "loop" | "goal" | "workflow";
 type LifecycleFilter = "all" | "prime-plan-build" | "prime-build" | "plan-build" | "plan-build-review" | "multi-build" | "ad-hoc";
 type LinkTypeFilter = "all" | "spec" | "branch_time";
@@ -108,7 +111,8 @@ type SessionFilters = {
 	search: string;
 	status: StatusFilter;
 	analyzed: AnalyzedFilter;
-	agents: AgentsFilter;
+	composition: CompositionFilter;
+	hideSubagents: boolean;
 	features: FeaturesFilter;
 	flagged: boolean;
 };
@@ -117,7 +121,8 @@ const FILTER_DEFAULTS: SessionFilters = {
 	search: "",
 	status: "all",
 	analyzed: "all",
-	agents: "top_level",
+	composition: "all",
+	hideSubagents: true,
 	features: "all",
 	flagged: false,
 };
@@ -126,12 +131,11 @@ const isValidViewMode = (s: string | undefined): s is ViewMode =>
 	s === "sessions" || s === "work_units";
 
 const isValidStatus = (s: string | undefined): s is StatusFilter =>
-	s === "all" || s === "complete" || s === "active" || s === "idle" || s === "incomplete";
+	s === "all" || s === "complete" || s === "active" || s === "idle";
 
 /** True when a session row matches the selected status filter. */
 const matchesStatusFilter = (sessionStatus: string, filter: StatusFilter): boolean => {
 	if (filter === "all") return true;
-	if (filter === "incomplete") return sessionStatus !== "complete";
 	return sessionStatus === filter;
 };
 
@@ -150,8 +154,8 @@ const isOnLocalDay = (t: number, dayKey: string): boolean => localDayKey(t) === 
 const isValidAnalyzed = (s: string | undefined): s is AnalyzedFilter =>
 	s === "all" || s === "analyzed" || s === "not_analyzed";
 
-const isValidAgents = (s: string | undefined): s is AgentsFilter =>
-	s === "all" || s === "top_level" || s === "multi" || s === "solo";
+const isValidComposition = (s: string | undefined): s is CompositionFilter =>
+	s === "all" || s === "multi" || s === "solo";
 
 const isValidFeatures = (s: string | undefined): s is FeaturesFilter =>
 	s === "all" || s === "any" || s === "loop" || s === "goal" || s === "workflow";
@@ -395,6 +399,67 @@ const SessionRowName: Component<{ readonly session: SessionSummary }> = (props) 
 	);
 };
 
+// ── Filter facet options + labels (FE-9/FE-25) ──────────────────────
+
+const STATUS_OPTIONS = [
+	{ label: "All", value: "all" },
+	{ label: "Complete", value: "complete" },
+	{ label: "Active", value: "active" },
+	{ label: "Idle", value: "idle" },
+] as const satisfies readonly { label: string; value: StatusFilter }[];
+
+const ANALYZED_OPTIONS = [
+	{ label: "All", value: "all" },
+	{ label: "Analyzed", value: "analyzed" },
+	{ label: "Not analyzed", value: "not_analyzed" },
+] as const satisfies readonly { label: string; value: AnalyzedFilter }[];
+
+const COMPOSITION_OPTIONS = [
+	{ label: "All", value: "all" },
+	{ label: "Multi-agent", value: "multi" },
+	{ label: "Solo", value: "solo" },
+] as const satisfies readonly { label: string; value: CompositionFilter }[];
+
+// FE-25: "Any feature" was a near-synonym of the leading "All". Renamed to
+// "Has feature" so the two are no longer confusable.
+const FEATURES_OPTIONS = [
+	{ label: "All", value: "all" },
+	{ label: "Has feature", value: "any" },
+	{ label: "Loop", value: "loop" },
+	{ label: "Goal", value: "goal" },
+	{ label: "Workflow", value: "workflow" },
+] as const satisfies readonly { label: string; value: FeaturesFilter }[];
+
+const labelOf = (options: readonly { label: string; value: string }[], value: string): string =>
+	options.find((o) => o.value === value)?.label ?? value;
+
+// ── Active-filter chip (FE-9) ───────────────────────────────────────
+
+const FilterChip: Component<{
+	readonly label: string;
+	readonly onRemove: () => void;
+	readonly title?: string;
+}> = (props) => (
+	<button
+		type="button"
+		onClick={props.onRemove}
+		title={props.title ?? "Remove filter"}
+		class="instrument-microcaps inline-flex items-center gap-1.5 rounded-none border border-clens bg-surface-inset px-2 py-0.5 text-[10px] text-secondary transition hover:border-brand-500 hover:text-primary"
+	>
+		{props.label}
+		<span aria-hidden="true" class="text-muted">✕</span>
+	</button>
+);
+
+// One labelled control row inside the Filters popover (FE-9). Stacks the label
+// above the control so wide segmented controls never overflow the popover.
+const FilterRow: Component<{ readonly label: string; readonly children: JSX.Element }> = (props) => (
+	<div class="flex flex-col gap-1.5">
+		<span class="instrument-microcaps text-[10px] text-muted">{props.label}</span>
+		{props.children}
+	</div>
+);
+
 // ── Main component ──────────────────────────────────────────────────
 
 export const SessionList: Component = () => {
@@ -403,7 +468,8 @@ export const SessionList: Component = () => {
 		q?: string;
 		status?: string;
 		analyzed?: string;
-		agents?: string;
+		composition?: string;
+		subagents?: string;
 		features?: string;
 		sort?: string;
 		page?: string;
@@ -427,7 +493,9 @@ export const SessionList: Component = () => {
 		search: searchParams.q ?? FILTER_DEFAULTS.search,
 		status: isValidStatus(searchParams.status) ? searchParams.status : FILTER_DEFAULTS.status,
 		analyzed: isValidAnalyzed(searchParams.analyzed) ? searchParams.analyzed : FILTER_DEFAULTS.analyzed,
-		agents: isValidAgents(searchParams.agents) ? searchParams.agents : FILTER_DEFAULTS.agents,
+		composition: isValidComposition(searchParams.composition) ? searchParams.composition : FILTER_DEFAULTS.composition,
+		// hideSubagents defaults to true; ?subagents=show un-hides them (FE-12).
+		hideSubagents: searchParams.subagents === "show" ? false : FILTER_DEFAULTS.hideSubagents,
 		features: isValidFeatures(searchParams.features) ? searchParams.features : FILTER_DEFAULTS.features,
 		flagged: searchParams.flagged === "1",
 	});
@@ -456,7 +524,8 @@ export const SessionList: Component = () => {
 		const q = filters.search;
 		const status = filters.status;
 		const analyzed = filters.analyzed;
-		const agents = filters.agents;
+		const composition = filters.composition;
+		const hideSubagents = filters.hideSubagents;
 		const features = filters.features;
 		const flagged = filters.flagged;
 		const lifecycle = lifecycleFilter();
@@ -467,7 +536,8 @@ export const SessionList: Component = () => {
 		params.status = status !== "all" ? status : undefined;
 		params.date = dateFilter();
 		params.analyzed = analyzed !== "all" ? analyzed : undefined;
-		params.agents = agents !== "top_level" ? agents : undefined;
+		params.composition = composition !== "all" ? composition : undefined;
+		params.subagents = hideSubagents ? undefined : "show";
 		params.features = features !== "all" ? features : undefined;
 		params.flagged = flagged ? "1" : undefined;
 		params.lifecycle = lifecycle !== "all" ? lifecycle : undefined;
@@ -490,7 +560,8 @@ export const SessionList: Component = () => {
 		const q = filters.search.toLowerCase();
 		const status = filters.status;
 		const analyzed = filters.analyzed;
-		const agents = filters.agents;
+		const composition = filters.composition;
+		const hideSubagents = filters.hideSubagents;
 		const features = filters.features;
 		const flagged = filters.flagged;
 		const projectId = selectedProjectId();
@@ -506,9 +577,9 @@ export const SessionList: Component = () => {
 			if (dateFilter() && !isOnLocalDay(s.start_time, dateFilter() ?? "")) return false;
 			if (analyzed === "analyzed" && !s.is_distilled) return false;
 			if (analyzed === "not_analyzed" && s.is_distilled) return false;
-			if (agents === "top_level" && s.is_subagent === true) return false;
-			if (agents === "multi" && (s.agent_count ?? 0) <= 1) return false;
-			if (agents === "solo" && (s.agent_count ?? 0) > 1) return false;
+			if (hideSubagents && s.is_subagent === true) return false;
+			if (composition === "multi" && (s.agent_count ?? 0) <= 1) return false;
+			if (composition === "solo" && (s.agent_count ?? 0) > 1) return false;
 			if (features === "any" && (s.features?.length ?? 0) === 0) return false;
 			if ((features === "loop" || features === "goal" || features === "workflow") && !s.features?.includes(features)) return false;
 			if (flagged && !isFlagged(s)) return false;
@@ -601,6 +672,41 @@ export const SessionList: Component = () => {
 		setSelectedRow(-1);
 	};
 
+	// ── Consolidated filter helpers (FE-9/FE-10/FE-12) ──────────────────
+
+	// Set one facet and reset paging/selection (every facet change shares this).
+	const setFilter = <K extends keyof SessionFilters>(key: K, value: SessionFilters[K]) => {
+		setFilters(key, value);
+		setPage(1);
+		setSelectedRow(-1);
+	};
+
+	// FE-10: reset EVERY facet to FILTER_DEFAULTS — restores hideSubagents=true and
+	// clears search. dateFilter/project scope have their own affordances by design.
+	const clearAll = () => {
+		setFilters(FILTER_DEFAULTS);
+		setPage(1);
+		setSelectedRow(-1);
+	};
+
+	// Count of advanced facets deviating from their default — drives the Filters
+	// badge. hideSubagents counts only when un-hidden (false ≠ default true).
+	const advancedActiveCount = createMemo(() => {
+		let n = 0;
+		if (filters.status !== FILTER_DEFAULTS.status) n++;
+		if (filters.analyzed !== FILTER_DEFAULTS.analyzed) n++;
+		if (filters.composition !== FILTER_DEFAULTS.composition) n++;
+		if (filters.features !== FILTER_DEFAULTS.features) n++;
+		if (filters.flagged !== FILTER_DEFAULTS.flagged) n++;
+		if (filters.hideSubagents !== FILTER_DEFAULTS.hideSubagents) n++;
+		return n;
+	});
+
+	// Any deviation from defaults (incl. search) — gates the Clear control.
+	const hasActiveFilters = createMemo(() =>
+		advancedActiveCount() > 0 || filters.search !== FILTER_DEFAULTS.search,
+	);
+
 	// ── Keyboard navigation ─────────────────────────────────────
 
 	let searchInputRef: HTMLInputElement | undefined;
@@ -657,11 +763,27 @@ export const SessionList: Component = () => {
 							<dt class="instrument-microcaps text-[9px] text-muted">Sessions</dt>
 							<dd class="font-mono text-sm tabular-nums text-primary">{kpis().total}</dd>
 						</div>
-						<div class="bg-surface px-3 py-1" title="Sessions currently running (last event within the active threshold)">
+						{/* FE-34: KPI readout doubles as a filter shortcut (status = active). */}
+						<div
+							role="button"
+							tabIndex={0}
+							onClick={() => setFilter("status", "active")}
+							onKeyDown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setFilter("status", "active"); } }}
+							title="Sessions currently running — click to filter to active"
+							class="cursor-pointer bg-surface px-3 py-1 transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+						>
 							<dt class="instrument-microcaps text-[9px] text-muted">Live</dt>
 							<dd class="font-mono text-sm tabular-nums text-brand-500">{kpis().live}</dd>
 						</div>
-						<div class="bg-surface px-3 py-1">
+						{/* FE-34: KPI readout doubles as a filter shortcut (analyzed only). */}
+						<div
+							role="button"
+							tabIndex={0}
+							onClick={() => setFilter("analyzed", "analyzed")}
+							onKeyDown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setFilter("analyzed", "analyzed"); } }}
+							title="Distilled sessions — click to filter to analyzed"
+							class="cursor-pointer bg-surface px-3 py-1 transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+						>
 							<dt class="instrument-microcaps text-[9px] text-muted">Analyzed</dt>
 							<dd class="font-mono text-sm tabular-nums text-secondary">{kpis().analyzed}</dd>
 						</div>
@@ -699,51 +821,88 @@ export const SessionList: Component = () => {
 				)}
 			</Show>
 
-			{/* Filters — view-aware */}
+			{/* Filters — view-aware. FE-9: one primary row (search + project +
+			    Filters popover + chips + Clear), not 7 stacked facets. */}
 			<Show when={viewMode() === "sessions"}>
 				<FilterBar
 					searchPlaceholder="Search sessions (press /)"
 					searchValue={filters.search}
-					onSearch={(v) => { setFilters("search", v); setPage(1); setSelectedRow(-1); }}
+					onSearch={(v) => setFilter("search", v)}
 					searchRef={(el) => { searchInputRef = el; }}
-					filters={[
-						...(isGlobalMode() ? [{
-							key: "project",
-							variant: "dropdown" as const,
-							label: "All Projects",
-							options: [
-								{ label: "All Projects", value: "all" },
-								...(projectList() ?? []).map((p) => ({ label: p.name, value: p.id })),
-							],
-							value: selectedProjectId() ?? "all",
-							onChange: (v: string) => { setSelectedProjectId(v === "all" ? undefined : v); setPage(1); setSelectedRow(-1); },
-						}] : []),
-						{ key: "status", options: [{ label: "All", value: "all" }, { label: "Complete", value: "complete" }, { label: "Active", value: "active" }, { label: "Idle", value: "idle" }], value: filters.status, onChange: (v: string) => { setFilters("status", v as StatusFilter); setPage(1); setSelectedRow(-1); } },
-						{ key: "analyzed", options: [{ label: "All", value: "all" }, { label: "Analyzed", value: "analyzed" }, { label: "Not analyzed", value: "not_analyzed" }], value: filters.analyzed, onChange: (v: string) => { setFilters("analyzed", v as AnalyzedFilter); setPage(1); setSelectedRow(-1); } },
-						{ key: "agents", options: [{ label: "All", value: "all" }, { label: "Top-level", value: "top_level" }, { label: "Multi-agent", value: "multi" }, { label: "Solo", value: "solo" }], value: filters.agents, onChange: (v: string) => { setFilters("agents", v as AgentsFilter); setPage(1); setSelectedRow(-1); } },
-						{ key: "features", options: [{ label: "All", value: "all" }, { label: "Any feature", value: "any" }, { label: "Loop", value: "loop" }, { label: "Goal", value: "goal" }, { label: "Workflow", value: "workflow" }], value: filters.features, onChange: (v: string) => { setFilters("features", v as FeaturesFilter); setPage(1); setSelectedRow(-1); } },
-					]}
+					filters={isGlobalMode() ? [{
+						key: "project",
+						variant: "dropdown" as const,
+						label: "All Projects",
+						options: [
+							{ label: "All Projects", value: "all" },
+							...(projectList() ?? []).map((p) => ({ label: p.name, value: p.id })),
+						],
+						value: selectedProjectId() ?? "all",
+						onChange: (v: string) => { setSelectedProjectId(v === "all" ? undefined : v); setPage(1); setSelectedRow(-1); },
+					}] : []}
 					resultCount={filtered().length}
 					resultLabel={buildCountLabel(filtered().length, scopedTotal())}
 					onRefresh={() => { refetchSessions(); refetchWorkUnits(); }}
+					advancedCount={advancedActiveCount()}
+					onClear={hasActiveFilters() ? clearAll : undefined}
+					advancedContent={
+						<div class="flex w-56 flex-col gap-3">
+							<FilterRow label="Status">
+								<SegmentedControl options={STATUS_OPTIONS} value={filters.status} onChange={(v) => setFilter("status", v)} />
+							</FilterRow>
+							<FilterRow label="Analyzed">
+								<SegmentedControl options={ANALYZED_OPTIONS} value={filters.analyzed} onChange={(v) => setFilter("analyzed", v)} />
+							</FilterRow>
+							<FilterRow label="Composition">
+								<SegmentedControl options={COMPOSITION_OPTIONS} value={filters.composition} onChange={(v) => setFilter("composition", v)} />
+							</FilterRow>
+							<FilterRow label="Features">
+								<SegmentedControl options={FEATURES_OPTIONS} value={filters.features} onChange={(v) => setFilter("features", v)} />
+							</FilterRow>
+							<div class="h-px bg-[var(--clens-border)]" />
+							<FilterRow label="Hide subagents">
+								<Toggle checked={filters.hideSubagents} onChange={(v) => setFilter("hideSubagents", v)} />
+							</FilterRow>
+							<FilterRow label="Flagged only">
+								<Toggle checked={filters.flagged} onChange={(v) => setFilter("flagged", v)} />
+							</FilterRow>
+						</div>
+					}
+					chips={
+						<>
+							{/* FE-11: the hidden-subagents default is otherwise invisible — always surface it. */}
+							<Show
+								when={filters.hideSubagents}
+								fallback={<FilterChip label="Subagents shown" onRemove={() => setFilter("hideSubagents", true)} title="Hide subagents again" />}
+							>
+								<button
+									type="button"
+									onClick={() => setFilter("hideSubagents", false)}
+									title="Subagents are hidden by default — show all sessions"
+									class="instrument-microcaps inline-flex items-center gap-1.5 rounded-none border border-brand-500 bg-surface-selected px-2 py-0.5 text-[10px] text-primary transition hover:bg-surface-hover"
+								>
+									<EyeOff class="h-3 w-3" />
+									Subagents hidden — show all
+								</button>
+							</Show>
+							<Show when={filters.status !== "all"}>
+								<FilterChip label={`Status: ${labelOf(STATUS_OPTIONS, filters.status)}`} onRemove={() => setFilter("status", "all")} />
+							</Show>
+							<Show when={filters.analyzed !== "all"}>
+								<FilterChip label={labelOf(ANALYZED_OPTIONS, filters.analyzed)} onRemove={() => setFilter("analyzed", "all")} />
+							</Show>
+							<Show when={filters.composition !== "all"}>
+								<FilterChip label={labelOf(COMPOSITION_OPTIONS, filters.composition)} onRemove={() => setFilter("composition", "all")} />
+							</Show>
+							<Show when={filters.features !== "all"}>
+								<FilterChip label={`Feature: ${labelOf(FEATURES_OPTIONS, filters.features)}`} onRemove={() => setFilter("features", "all")} />
+							</Show>
+							<Show when={filters.flagged}>
+								<FilterChip label="Flagged" onRemove={() => setFilter("flagged", false)} />
+							</Show>
+						</>
+					}
 				/>
-				{/* Flagged-only toggle chip (R12) — narrows to color !== "none" */}
-				<div class="mt-2 flex items-center">
-					<button
-						type="button"
-						aria-pressed={filters.flagged}
-						onClick={() => { setFilters("flagged", (v) => !v); setPage(1); setSelectedRow(-1); }}
-						class={`instrument-microcaps inline-flex items-center gap-1.5 rounded-none border px-2 py-1 text-[10px] transition ${
-							filters.flagged
-								? "border-brand-500 bg-surface-selected text-primary"
-								: "border-clens text-muted hover:border-brand-500 hover:text-secondary"
-						}`}
-						title="Show only flagged sessions"
-					>
-						<Flag class="h-3 w-3" classList={{ "fill-current": filters.flagged }} />
-						Flagged
-					</button>
-				</div>
 				<Show when={dateFilter()}>
 					<div class="flex items-center gap-2 border-b border-clens bg-surface-inset px-4 py-1.5 text-xs text-secondary">
 						<span class="instrument-microcaps text-[10px] text-muted">
@@ -751,7 +910,7 @@ export const SessionList: Component = () => {
 						</span>
 						<button
 							type="button"
-							class="instrument-microcaps rounded-none border border-clens px-1.5 py-0.5 text-[10px] text-muted transition hover:border-brand-500 hover:text-primary"
+							class="instrument-microcaps rounded-none border border-clens px-1.5 py-0.5 text-[10px] text-muted transition hover:border-strong hover:text-primary"
 							onClick={() => { setDateFilter(undefined); setPage(1); setSelectedRow(-1); }}
 						>
 							Clear ✕
@@ -881,7 +1040,7 @@ export const SessionList: Component = () => {
 													<Show when={(session.agent_count ?? 0) > 1}>
 														<A
 															href={`/session/${session.session_id}?view=overview`}
-															class="instrument-microcaps inline-flex items-center gap-0.5 rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-muted transition hover:border-brand-500 hover:text-brand-500"
+															class="instrument-microcaps inline-flex items-center gap-0.5 rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-muted transition hover:border-strong hover:text-brand-500"
 															onClick={(e: MouseEvent) => e.stopPropagation()}
 															title="View multi-agent session"
 														>
@@ -930,7 +1089,7 @@ export const SessionList: Component = () => {
 								setPage((p) => p - 1);
 								setSelectedRow(-1);
 							}}
-							class="instrument-microcaps rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-brand-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-clens"
+							class="instrument-microcaps rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-clens"
 						>
 							Previous
 						</button>
@@ -940,7 +1099,7 @@ export const SessionList: Component = () => {
 								setPage((p) => p + 1);
 								setSelectedRow(-1);
 							}}
-							class="instrument-microcaps rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-brand-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-clens"
+							class="instrument-microcaps rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-clens"
 						>
 							Next
 						</button>

@@ -204,7 +204,7 @@ export const SettingsPage: Component = () => {
 									when={projectConfig()}
 									fallback={
 										<div class="flex items-center gap-2 py-6">
-											<span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--clens-danger)]" />
+											<span class="instrument-led bg-[var(--clens-danger)]" />
 											<span class="text-xs text-muted">Unable to load project configuration.</span>
 										</div>
 									}
@@ -215,7 +215,7 @@ export const SettingsPage: Component = () => {
 												<div class="flex items-center gap-3">
 													<Show when={configSaved()}>
 														<span class="instrument-microcaps flex items-center gap-1.5 text-[10px] text-[var(--clens-success)] animate-fade-in">
-															<span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--clens-success)]" />
+															<span class="instrument-led instrument-led--live bg-[var(--clens-success)]" />
 															Saved
 														</span>
 													</Show>
