@@ -275,7 +275,7 @@ const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	name: new Set(["--color", "--clear", "--json"]),
 	config: new Set(["--pricing", "--json", "--global-mode"]),
 	explore: new Set([]),
-	clean: new Set(["--last", "--all", "--force"]),
+	clean: new Set(["--last", "--all", "--force", "--yes"]),
 	export: new Set(["--last", "--otel"]),
 	what: new Set(["--last", "--json", "--pricing", "--global"]),
 	web: new Set(["--port", "--no-open", "--global"]),
@@ -335,7 +335,8 @@ ${bold("Sessions:")}
   ${cyan("name")}              Set/clear a session's label & color flag
   ${cyan("distill")}           Extract insights from session data
   ${cyan("distill --global")}  Distill every session across all registered projects
-  ${cyan("clean")}             Remove session data
+  ${cyan("clean <id>")}        Remove one session's data (or --last)
+  ${cyan("clean --all")}       Remove every session in this project (prompts; --yes to skip)
   ${cyan("export")}            Export session as archive
   ${cyan("config")}            View or update configuration
   ${cyan("config --global-mode <m>")}  Set global mode: repository or project
@@ -355,6 +356,7 @@ ${bold("Analysis:")}
 ${bold("Options:")}
   ${dim("--last")}         Use most recent session
   ${dim("--force")}        Force operation (skip safety checks)
+  ${dim("--yes, -y")}      Skip confirmation prompt (required for 'clean --all' when non-interactive)
   ${dim("--deep")}         Deep distill: enrich agents with transcript data
   ${dim("--json")}         Output structured JSON
   ${dim("--otel")}         Export in OTLP format
@@ -404,6 +406,7 @@ const pricingValue = pricingIdx >= 0 && pricingIdx + 1 < args.length ? args[pric
 const flags: Flags = {
 	last: args.includes("--last"),
 	force: args.includes("--force"),
+	yes: args.includes("--yes") || args.includes("-y"),
 	otel: args.includes("--otel"),
 	deep: args.includes("--deep"),
 	json: args.includes("--json"),

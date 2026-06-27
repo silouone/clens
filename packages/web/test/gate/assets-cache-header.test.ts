@@ -19,7 +19,10 @@ describe("assets Cache-Control middleware ordering (source gate)", () => {
 
 	test("registers the Cache-Control middleware BEFORE serveStatic for /assets/*", () => {
 		const cacheHeaderIdx = source.indexOf('"public, max-age=31536000, immutable"')
-		const assetsServeStaticIdx = source.indexOf("serveStatic({ root: DIST_DIR })")
+		// CLI-2 renamed the resolved dir from `DIST_DIR` to `distDir` (so the published
+		// CLI can override it via options.distDir); the first serveStatic({ root: distDir })
+		// is still the /assets/* registration. The ordering invariant is unchanged.
+		const assetsServeStaticIdx = source.indexOf("serveStatic({ root: distDir })")
 		expect(cacheHeaderIdx).toBeGreaterThan(-1)
 		expect(assetsServeStaticIdx).toBeGreaterThan(-1)
 		// The header middleware must appear earlier in the file than the /assets

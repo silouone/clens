@@ -82,15 +82,20 @@ export const listGlobalSessions = (): readonly GlobalSessionSummary[] => {
 		})),
 	);
 
-	// Deduplicate by session_id (same session may appear from nested dirs)
-	const seen = new Set<string>();
-	const unique = allSessions.filter((s) => {
-		if (seen.has(s.session_id)) return false;
-		seen.add(s.session_id);
-		return true;
-	});
+	// Deduplicate by session_id — the same session can be captured into multiple
+	// nested .clens dirs (root + package broadcasts), so it appears once per dir.
+	// Keep the most-complete copy (max event_count) as the canonical owner so every
+	// displayed field (capture_dir, status, size, counts) comes from one consistent
+	// source and totals match the web global list (bug NUM-1).
+	const byId = new Map<string, GlobalSessionSummary>();
+	for (const session of allSessions) {
+		const existing = byId.get(session.session_id);
+		if (!existing || session.event_count > existing.event_count) {
+			byId.set(session.session_id, session);
+		}
+	}
 
-	return [...unique].sort((a, b) => b.start_time - a.start_time);
+	return [...byId.values()].sort((a, b) => b.start_time - a.start_time);
 };
 
 /**

@@ -12,6 +12,8 @@ type StartServerOptions = {
 	readonly port?: number
 	readonly token?: string
 	readonly projects?: readonly ProjectEntry[]
+	/** Directory holding the built static client bundle (see AppOptions.distDir). */
+	readonly distDir?: string
 }
 
 type ServerHandle = {
@@ -46,6 +48,7 @@ const startServer = (options: StartServerOptions): ServerHandle => {
 		mode,
 		projectDir: options.projectDir,
 		...(options.projects ? { projects: options.projects } : {}),
+		...(options.distDir ? { distDir: options.distDir } : {}),
 	})
 
 	const server = Bun.serve({

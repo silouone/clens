@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { toSummaryRow } from "../src/distill/analytics-summary";
-import { extractStats } from "../src/distill/stats";
+import { PRICING_VERSION, extractStats, repriceCostEstimate } from "../src/distill/stats";
 import type { CostEstimate, DistilledSession, StoredEvent } from "../src/types";
 
 // Cost-truth tiers (specs/analytics-truth-and-brush): the per-session cost is ALWAYS the
@@ -205,6 +205,84 @@ const makeDistilled = (ce: CostEstimate | undefined): DistilledSession => ({
 	reasoning: [],
 	user_messages: [],
 	complete: true,
+});
+
+describe("repriceCostEstimate — read-time re-pricing against the current table", () => {
+	// Legacy Opus 4.0/4.1 ($15/$75) → current Opus 4.5+ ($5/$25) is exactly 3x on
+	// every component, so any token mix priced at the legacy table re-prices to 1/3.
+	test("a frozen distill-time cost re-prices from its own tokens (57.63 → 19.21)", () => {
+		// 3.842M input tokens × current $5/MTok = $19.21; same tokens × legacy $15 = $57.63.
+		const frozen = makeCostEstimate({
+			model: "claude-opus-4-8-20260101",
+			estimated_input_tokens: 3_842_000,
+			estimated_output_tokens: 0,
+			estimated_cost_usd: 57.63, // frozen at the legacy table
+			cost_basis: "estimated",
+		});
+		const repriced = repriceCostEstimate(frozen);
+		expect(repriced.estimated_cost_usd).toBeCloseTo(19.21, 4);
+		expect(repriced.pricing_version).toBe(PRICING_VERSION);
+	});
+
+	test("re-pricing recomputes from tokens, never transforms the frozen number", () => {
+		// A wrong frozen value must not survive — output is a function of tokens only.
+		const garbage = makeCostEstimate({
+			model: "claude-opus-4-8",
+			estimated_input_tokens: 1_000_000,
+			estimated_output_tokens: 0,
+			estimated_cost_usd: 999.99,
+			cost_basis: "estimated",
+		});
+		expect(repriceCostEstimate(garbage).estimated_cost_usd).toBeCloseTo(5, 4);
+	});
+
+	test("longest-prefix boundary holds: opus-4-5+ at $5, legacy opus-4.x at $15", () => {
+		const tokens = { estimated_input_tokens: 1_000_000, estimated_output_tokens: 0 };
+		const current = repriceCostEstimate(
+			makeCostEstimate({ model: "claude-opus-4-5-20251101", ...tokens }),
+		);
+		const legacy = repriceCostEstimate(
+			makeCostEstimate({ model: "claude-opus-4-1-20250805", ...tokens }),
+		);
+		expect(current.estimated_cost_usd).toBeCloseTo(5, 4);
+		expect(legacy.estimated_cost_usd).toBeCloseTo(15, 4);
+	});
+
+	test("cache tokens are re-priced at current cache rates", () => {
+		const repriced = repriceCostEstimate(
+			makeCostEstimate({
+				model: "claude-opus-4-8",
+				estimated_input_tokens: 0,
+				estimated_output_tokens: 0,
+				cache_read_tokens: 1_000_000, // × $0.5
+				cache_creation_tokens: 1_000_000, // × $6.25
+				estimated_cost_usd: 0,
+			}),
+		);
+		expect(repriced.estimated_cost_usd).toBeCloseTo(6.75, 4);
+	});
+
+	test("a measured cost is NOT re-priced (returned verbatim)", () => {
+		const measured = makeCostEstimate({
+			cost_basis: "measured",
+			is_estimated: false,
+			estimated_cost_usd: 12.5,
+		});
+		const out = repriceCostEstimate(measured);
+		expect(out.estimated_cost_usd).toBe(12.5);
+		expect(out.pricing_version).toBeUndefined();
+	});
+
+	test("an unknown model keeps the frozen value but stamps the version", () => {
+		const unknown = makeCostEstimate({
+			model: "some-future-model",
+			estimated_cost_usd: 42,
+			cost_basis: "estimated",
+		});
+		const out = repriceCostEstimate(unknown);
+		expect(out.estimated_cost_usd).toBe(42);
+		expect(out.pricing_version).toBe(PRICING_VERSION);
+	});
 });
 
 describe("toSummaryRow — cost_basis + measured_cost_usd", () => {

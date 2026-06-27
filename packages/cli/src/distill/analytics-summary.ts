@@ -1,5 +1,32 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import type { CostBasis, CostEstimate, DistilledSession, AnalyticsSummaryRow } from "../types";
+
+/**
+ * Atomically write content to a file: write to a unique temp sibling, then
+ * rename it over the target. `rename(2)` is atomic on the same filesystem, so a
+ * concurrent reader observes either the old file or the new one in full — never
+ * a half-written file. The temp name is keyed by pid + timestamp to avoid
+ * clobbering between concurrent writers.
+ */
+const atomicWriteFile = (filePath: string, content: string): void => {
+	const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+	writeFileSync(tmpPath, content);
+	renameSync(tmpPath, filePath);
+};
+
+/** Parse a JSONL line's `session_id`, or undefined if the line is malformed. */
+const lineSessionId = (line: string): string | undefined => {
+	try {
+		const parsed: unknown = JSON.parse(line);
+		if (parsed && typeof parsed === "object" && "session_id" in parsed) {
+			const id = (parsed as { session_id?: unknown }).session_id;
+			return typeof id === "string" ? id : undefined;
+		}
+	} catch {
+		// malformed line
+	}
+	return undefined;
+};
 
 /**
  * Derive the cost provenance for a summary row from a distilled session's cost estimate.
@@ -159,28 +186,37 @@ export const writeAnalyticsSummary = (
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
 	if (!existsSync(filePath)) {
-		writeFileSync(filePath, `${line}\n`);
+		atomicWriteFile(filePath, `${line}\n`);
 		return;
 	}
 
-	// Read existing lines, replace if session exists, otherwise append
+	// Read existing lines, replace the row whose parsed session_id matches,
+	// otherwise append. Matching is keyed on the parsed JSON id (not a substring
+	// scan) so an id appearing inside another row's free-text field — e.g. an
+	// error message or file path — cannot trigger a false replacement.
 	const existing = readFileSync(filePath, "utf-8");
 	const lines = existing.split("\n").filter(Boolean);
-	const sessionPrefix = `"session_id":"${row.session_id}"`;
-	const replaced = lines.some((l) => l.includes(sessionPrefix));
+	let replaced = false;
+	const updated = lines.map((l) => {
+		if (lineSessionId(l) === row.session_id) {
+			replaced = true;
+			return line;
+		}
+		return l;
+	});
+	if (!replaced) updated.push(line);
 
-	if (replaced) {
-		const updated = lines.map((l) => (l.includes(sessionPrefix) ? line : l));
-		writeFileSync(filePath, `${updated.join("\n")}\n`);
-	} else {
-		appendFileSync(filePath, `${line}\n`);
-	}
+	atomicWriteFile(filePath, `${updated.join("\n")}\n`);
 };
 
 /**
- * Read all analytics summary rows.
+ * Read all analytics summary rows. This is a PURE read: it never mutates disk.
  * Fast path: reads pre-computed analytics-summary.jsonl.
- * Fallback: reads all distilled/*.json files and extracts summary rows (slower, auto-generates JSONL).
+ * Fallback: reads all distilled/*.json files and extracts summary rows (slower).
+ *
+ * The fallback does NOT persist a JSONL file — a read must be side-effect-free so
+ * that concurrent reads can never race on (or corrupt) the summary file. Use
+ * `rebuildAnalyticsSummary` to (re)materialize the file explicitly.
  */
 export const readAnalyticsSummary = (projectDir: string): readonly AnalyticsSummaryRow[] => {
 	const filePath = summaryPath(projectDir);
@@ -205,7 +241,7 @@ export const readAnalyticsSummary = (projectDir: string): readonly AnalyticsSumm
 		if (rows.length > 0) return rows;
 	}
 
-	// Fallback: read all distilled/*.json and build summary rows
+	// Fallback: read all distilled/*.json and build summary rows (no disk write)
 	const distilledDir = `${projectDir}/.clens/distilled`;
 	if (!existsSync(distilledDir)) return [];
 
@@ -223,14 +259,6 @@ export const readAnalyticsSummary = (projectDir: string): readonly AnalyticsSumm
 		} catch {
 			// Skip malformed files
 		}
-	}
-
-	// Auto-generate the JSONL file for next time
-	if (rows.length > 0) {
-		const dir = `${projectDir}/.clens`;
-		if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-		const lines = rows.map((r) => JSON.stringify(r)).join("\n");
-		writeFileSync(filePath, `${lines}\n`);
 	}
 
 	return rows;
@@ -265,7 +293,7 @@ export const rebuildAnalyticsSummary = (projectDir: string): number => {
 		if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 		const filePath = summaryPath(projectDir);
 		const lines = rows.map((r) => JSON.stringify(r)).join("\n");
-		writeFileSync(filePath, `${lines}\n`);
+		atomicWriteFile(filePath, `${lines}\n`);
 	}
 
 	return rows.length;

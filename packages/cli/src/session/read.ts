@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import type { DistilledSession, LinkEvent, SessionSummary, SpawnLink, StoredEvent } from "../types";
+import type { AgentNode, CostEstimate, DistilledSession, LinkEvent, SessionSummary, SpawnLink, StoredEvent } from "../types";
 import { BROADCAST_EVENTS, deriveSessionStatus } from "../types";
+import { repriceCostEstimate } from "../distill/stats";
 import { computeEffectiveDuration, deduplicateSpawns, isGhostSession, logError } from "../utils";
 import { parseDistilledSession, parseLinkEvent } from "./parsers";
 import { computeSessionName, resolveDisplayName } from "./session-name";
@@ -146,8 +147,42 @@ export const readLinks = (projectDir: string): readonly LinkEvent[] => {
 };
 
 /**
+ * Re-price an agent node (and its children) at the current pricing table.
+ * `children` is typed non-optional, but the parse guard (parsers.ts) never
+ * validates it, so a legacy/partial on-disk distill can omit it — guard with
+ * `?? []` so re-pricing never throws and silently drops the whole session.
+ */
+const repriceAgent = (a: AgentNode): AgentNode => ({
+	...a,
+	cost_estimate: a.cost_estimate ? repriceCostEstimate(a.cost_estimate) : a.cost_estimate,
+	children: (a.children ?? []).map(repriceAgent),
+});
+
+/**
+ * Re-price a distilled session's frozen cost estimates against the CURRENT pricing
+ * table, for DISPLAY only. Distilled `cost_estimate` values are frozen at
+ * distill-time rates; when the API price table changes (e.g. Opus 4.5+ dropping
+ * ~3x) those numbers become stale. The on-disk JSON stays the frozen record — this
+ * only transforms the in-memory object returned to callers. Covers the
+ * session-level estimate (top-level + `stats`) and every (nested) agent estimate.
+ * Verbatim measured costs are left unchanged by `repriceCostEstimate`.
+ */
+const repriceDistilled = (d: DistilledSession): DistilledSession => {
+	const reprice = (ce: CostEstimate | undefined): CostEstimate | undefined =>
+		ce ? repriceCostEstimate(ce) : ce;
+	return {
+		...d,
+		cost_estimate: reprice(d.cost_estimate),
+		stats: { ...d.stats, cost_estimate: reprice(d.stats.cost_estimate) },
+		agents: d.agents?.map(repriceAgent),
+	};
+};
+
+/**
  * Read and parse a distilled session JSON file.
  * Returns undefined if the file does not exist or cannot be parsed.
+ * Cost estimates are re-priced against the current table for display; the
+ * on-disk file remains the frozen distill-time record.
  */
 export const readDistilled = (
 	sessionId: string,
@@ -157,7 +192,8 @@ export const readDistilled = (
 	if (!existsSync(distilledPath)) return undefined;
 	try {
 		const content = readFileSync(distilledPath, "utf-8");
-		return parseDistilledSession(content);
+		const parsed = parseDistilledSession(content);
+		return parsed ? repriceDistilled(parsed) : parsed;
 	} catch (err) {
 		logError(projectDir, `readDistilled:${sessionId}`, err);
 		return undefined;

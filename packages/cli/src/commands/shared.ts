@@ -3,6 +3,7 @@ import { readdirSync, statSync } from "node:fs";
 export type Flags = {
 	readonly last: boolean;
 	readonly force: boolean;
+	readonly yes: boolean;
 	readonly otel: boolean;
 	readonly deep: boolean;
 	readonly json: boolean;

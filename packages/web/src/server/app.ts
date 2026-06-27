@@ -24,6 +24,13 @@ type AppOptions = {
 	readonly mode: "development" | "production"
 	readonly projectDir: string
 	readonly projects?: readonly ProjectEntry[]
+	/**
+	 * Directory holding the built static client bundle (index.html + assets/).
+	 * Defaults to the web package's own `dist/`. The published CLI passes the
+	 * location where its build copied the client, since the bundled server's
+	 * `import.meta.dir` no longer points next to the web package.
+	 */
+	readonly distDir?: string
 }
 
 /**
@@ -102,6 +109,7 @@ const createApp = (options: AppOptions) => {
 
 	// ── Static assets (production only) ──
 	if (options.mode === "production") {
+		const distDir = options.distDir ?? DIST_DIR
 		// Fingerprinted assets — immutable cache (1 year). The Cache-Control middleware
 		// MUST be registered BEFORE serveStatic: hono's serveStatic returns the response
 		// on a hit without calling next(), so a header middleware registered after it
@@ -116,16 +124,16 @@ const createApp = (options: AppOptions) => {
 		)
 		app.use(
 			"/assets/*",
-			serveStatic({ root: DIST_DIR }),
+			serveStatic({ root: distDir }),
 		)
 		// All other paths — serve index.html for SPA routing
 		app.get(
 			"*",
-			serveStatic({ root: DIST_DIR }),
+			serveStatic({ root: distDir }),
 		)
 		app.get(
 			"*",
-			serveStatic({ root: DIST_DIR, path: "index.html" }),
+			serveStatic({ root: distDir, path: "index.html" }),
 		)
 	}
 

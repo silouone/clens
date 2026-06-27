@@ -19,6 +19,7 @@ const TEST_DIR = "/tmp/clens-test-init";
 const makeFlags = (overrides: Partial<Flags> = {}): Flags => ({
 	last: false,
 	force: false,
+	yes: false,
 	otel: false,
 	deep: false,
 	json: false,

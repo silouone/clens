@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { bold, cyan, dim } from "./shared";
 
 interface WebCommandOptions {
@@ -17,7 +18,19 @@ const openBrowser = (url: string): void => {
 };
 
 export const webCommand = async (options: WebCommandOptions): Promise<void> => {
+	// Force production mode by default: the dashboard is served from the bundled
+	// static client (set NODE_ENV=development only when driving the vite dev server).
+	if (!process.env.NODE_ENV) {
+		process.env.NODE_ENV = "production";
+	}
+
+	// The web server is bundled into this CLI at build time (see build.ts); it is
+	// NOT a runtime dependency, so npm consumers need nothing from @clens/web.
 	const { startServer, findProjectDir } = await import("@clens/web/server");
+
+	// Built client bundle ships next to the compiled CLI at dist/web/. When this
+	// module is bundled into dist/cli.js, import.meta.dir resolves to dist/.
+	const distDir = resolve(import.meta.dir, "web");
 
 	const projectDir = findProjectDir(options.projectDir);
 
@@ -32,6 +45,7 @@ export const webCommand = async (options: WebCommandOptions): Promise<void> => {
 	const handle = startServer({
 		projectDir,
 		port: options.port,
+		distDir,
 		...(projects && projects.length > 0 ? { projects } : {}),
 	});
 

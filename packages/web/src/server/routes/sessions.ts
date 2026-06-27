@@ -839,18 +839,33 @@ const buildSessionMap = (projects: readonly ProjectEntry[]): ReadonlyMap<string,
 /** Lightweight listing that tags sessions with project info. */
 const listGlobalSessionsLightweight = (
 	projects: readonly ProjectEntry[],
-): readonly (SessionSummary & { readonly project_id: string; readonly project_name: string })[] =>
-	projects
-		.flatMap((project) =>
-			findClensCaptureDirs(project.path).flatMap((captureDir) =>
-				listSessionsLightweight(captureDir).map((session) => ({
-					...session,
-					project_id: project.id,
-					project_name: project.name,
-				})),
-			),
-		)
-		.sort((a, b) => b.start_time - a.start_time)
+): readonly (SessionSummary & { readonly project_id: string; readonly project_name: string })[] => {
+	const all = projects.flatMap((project) =>
+		findClensCaptureDirs(project.path).flatMap((captureDir) =>
+			listSessionsLightweight(captureDir).map((session) => ({
+				...session,
+				project_id: project.id,
+				project_name: project.name,
+			})),
+		),
+	)
+
+	// A single session_id can be captured into multiple .clens dirs (git root +
+	// nested package broadcasts), so the same session surfaces more than once across
+	// capture dirs/projects. De-duplicate keeping the most-complete copy (max
+	// event_count) as the canonical owner — every displayed field is then sourced
+	// from one consistent owner, so SESSIONS/EVENTS/SIZE/ACTIVE/ANALYZED/TOTAL-TIME
+	// totals match the CLI (bug NUM-1: previously no Set → 808 instead of 770).
+	const byId = new Map<string, (typeof all)[number]>()
+	for (const session of all) {
+		const existing = byId.get(session.session_id)
+		if (!existing || session.event_count > existing.event_count) {
+			byId.set(session.session_id, session)
+		}
+	}
+
+	return [...byId.values()].sort((a, b) => b.start_time - a.start_time)
+}
 
 // ── Global sessions route factory ───────────────────────────────
 

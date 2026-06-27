@@ -102,6 +102,56 @@ const extractModel = (events: readonly StoredEvent[]): string | undefined => {
 	return configModel;
 };
 
+/**
+ * Version stamp for the active API pricing table (`API_PRICING`). Bump this
+ * whenever a rate in that table changes so a re-priced cost can be distinguished
+ * from a frozen distill-time value, and stale caches can be detected.
+ */
+export const PRICING_VERSION = "2026-06-11";
+
+/**
+ * Re-price a frozen CostEstimate at the CURRENT pricing table.
+ *
+ * Distilled `cost_estimate` values are frozen at distill-time rates. When the API
+ * price table later changes (e.g. Opus 4.5+ dropping from the legacy $15/$75 to
+ * $5/$25 — exactly 3x on every component) the stored `estimated_cost_usd` becomes
+ * stale (~3x too high). This recomputes the cost from the estimate's OWN token
+ * counts × current-table rates — via the same longest-prefix `getPricing` match,
+ * so version-specific entries still beat family fallbacks — and stamps
+ * `pricing_version`. The frozen number itself is never transformed, only the
+ * tokens are re-multiplied.
+ *
+ * Measured costs (Tier 0) are verbatim captured values, not table-derived, so
+ * they are returned unchanged — repricing them would corrupt a real figure.
+ * Callers keep the on-disk estimate as the frozen record and use the return value
+ * for display only.
+ */
+export const repriceCostEstimate = (
+	estimate: CostEstimate,
+	tier: PricingTier = "api",
+): CostEstimate => {
+	// Tier 0 measured: verbatim captured value — never re-priced (cost-basis.test).
+	if (estimate.cost_basis === "measured") return estimate;
+
+	const pricing = getPricing(estimate.model, tier);
+	// Unknown model (no prefix match) ⇒ cannot re-price; keep the frozen value but
+	// still stamp the version so downstream readers know it was evaluated.
+	if (!pricing) return { ...estimate, pricing_version: PRICING_VERSION };
+
+	const repricedUsd =
+		(estimate.estimated_input_tokens / 1_000_000) * pricing.input +
+		(estimate.estimated_output_tokens / 1_000_000) * pricing.output +
+		((estimate.cache_read_tokens ?? 0) / 1_000_000) * pricing.cache_read +
+		((estimate.cache_creation_tokens ?? 0) / 1_000_000) * pricing.cache_write;
+
+	return {
+		...estimate,
+		estimated_cost_usd: Math.round(repricedUsd * 10000) / 10000,
+		pricing_tier: tier,
+		pricing_version: PRICING_VERSION,
+	};
+};
+
 /** Recompute cost estimate from known token counts and a model identifier. */
 export const estimateCostFromTokens = (
 	model: string,

@@ -219,6 +219,14 @@ export interface CostEstimate {
 	 * (measured-absent ⇒ estimated/heuristic from `is_estimated`).
 	 */
 	readonly cost_basis?: CostBasis;
+	/**
+	 * Version of the pricing table `estimated_cost_usd` was (re-)priced against
+	 * (see `PRICING_VERSION` in distill/stats.ts). Distilled costs are frozen at
+	 * distill-time rates; readers re-price token-grounded estimates against the
+	 * current table for display and stamp this. Absent ⇒ value is at frozen
+	 * distill-time pricing. Never present on verbatim measured costs.
+	 */
+	readonly pricing_version?: string;
 }
 
 export interface TokenUsage {
