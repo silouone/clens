@@ -310,7 +310,7 @@ export const formatCommsTab = (
 		return [
 			ansi.dim("No communication data available."),
 			"",
-			ansi.dim("Re-run: clens distill --deep <session-id>"),
+			ansi.dim("Re-run: clens distill <session-id>"),
 		];
 	}
 
@@ -498,7 +498,7 @@ export const formatReasoningTab = (distilled: DistilledSession): readonly string
 		return [
 			ansi.bold("Reasoning:"),
 			"",
-			ansi.dim("No reasoning data. Run 'clens distill --deep' to extract."),
+			ansi.dim("No reasoning data. Run 'clens distill' to extract."),
 		];
 
 	const byIntent = reasoning.reduce<Readonly<Record<string, number>>>((acc, r) => {

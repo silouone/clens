@@ -174,6 +174,46 @@ describe("Integration: Full server lifecycle", () => {
 		expect(body.staleness.distill_stale).toBe(true)
 	})
 
+	test("GET /api/sessions/:id excludes a torn final line from staleness so it does not flip distill_stale (NUM-22)", async () => {
+		// A live write left a non-empty, unparseable trailing line. It must not be
+		// counted as a real event: the distill covered all 4 complete events, so the
+		// session stays current instead of spuriously flipping to distill_stale.
+		const tornId = "ccbbaadd-9988-7766-5544-332211ccbbaa"
+		const tornEvents = [
+			makeEvent("SessionStart", 1000, { source: "cli" }),
+			makeEvent("PreToolUse", 1200, { tool_name: "Read", tool_use_id: "t1" }),
+			makeEvent("PreToolUse", 1400, { tool_name: "Edit", tool_use_id: "t2" }),
+			makeEvent("PreToolUse", 1600, { tool_name: "Bash", tool_use_id: "t3" }),
+		]
+		// 4 well-formed events + one torn (partial JSON) trailing line, no final newline.
+		writeFileSync(
+			`${TEST_DIR}/.clens/sessions/${tornId}.jsonl`,
+			tornEvents.join("\n") + "\n" + '{"event":"PreToolUse","t":1800,',
+		)
+		writeFileSync(
+			`${TEST_DIR}/.clens/distilled/${tornId}.json`,
+			JSON.stringify({
+				session_id: tornId,
+				stats: { total_events: 4, duration_ms: 600, events_by_type: {}, tools_by_name: {}, tool_call_count: 3, failure_count: 0, failure_rate: 0, unique_files: [] },
+				backtracks: [],
+				decisions: [],
+				file_map: { files: [] },
+				git_diff: { commits: [], hunks: [] },
+				reasoning: [],
+				user_messages: [],
+				complete: false,
+			}),
+		)
+
+		const res = await authFetch(`/api/sessions/${tornId}`)
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		expect(body.staleness).toBeDefined()
+		// Torn trailing line excluded → 4, not 5; matches the distill's coverage.
+		expect(body.staleness.raw_event_count).toBe(4)
+		expect(body.staleness.distill_stale).toBe(false)
+	})
+
 	test("GET /api/sessions/:id reports tier_stale when the distill was priced under a different explicit tier", async () => {
 		const tierId = "aabbccdd-1122-3344-5566-77889900aabb"
 		const tierEvents = [

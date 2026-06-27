@@ -91,7 +91,9 @@ const lastParseableLine = (lines: readonly string[]): string | undefined =>
 	lines.findLast((l) => tryParseJson(l) !== undefined)
 
 /** Read the first and last lines plus an exact (cached) line count. */
-const readFirstLastLines = (filePath: string): { first: string; last: string; lineCount: number } | undefined => {
+const readFirstLastLines = (
+	filePath: string,
+): { first: string; last: string; lineCount: number; lastLineTorn: boolean } | undefined => {
 	const fd = openSync(filePath, "r")
 	try {
 		const stat = fstatSync(fd)
@@ -119,7 +121,8 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 			// Fall back to the last PARSEABLE line so a torn trailing line (live write)
 			// does not collapse the session to its first event.
 			const last = lastParseableLine(lines) ?? lines[lines.length - 1]
-			return { first: lines[0], last, lineCount }
+			const lastLineTorn = tryParseJson(lines[lines.length - 1]) === undefined
+			return { first: lines[0], last, lineCount, lastLineTorn }
 		}
 
 		// Large file: read head + tail chunks for first/last lines only
@@ -127,7 +130,10 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 		readSync(fd, headBuf, 0, CHUNK, 0)
 		const headStr = headBuf.toString("utf-8")
 		const firstNewline = headStr.indexOf("\n")
-		if (firstNewline === -1) return { first: headStr.trim(), last: headStr.trim(), lineCount }
+		if (firstNewline === -1) {
+			const single = headStr.trim()
+			return { first: single, last: single, lineCount, lastLineTorn: tryParseJson(single) === undefined }
+		}
 		const first = headStr.slice(0, firstNewline)
 
 		// Read last line from tail
@@ -137,8 +143,9 @@ const readFirstLastLines = (filePath: string): { first: string; last: string; li
 		const tailLines = tailStr.split("\n").filter(Boolean)
 		// Last PARSEABLE tail line — a torn final line must not become `last`.
 		const last = lastParseableLine(tailLines) ?? (tailLines.length > 0 ? tailLines[tailLines.length - 1] : first)
+		const lastLineTorn = tailLines.length > 0 && tryParseJson(tailLines[tailLines.length - 1]) === undefined
 
-		return { first, last, lineCount }
+		return { first, last, lineCount, lastLineTorn }
 	} finally {
 		closeSync(fd)
 	}
@@ -237,7 +244,11 @@ const computeStaleness = (
 	const distilledPath = `${projectDir}/.clens/distilled/${sessionId}.json`
 	try {
 		const rawInfo = readFirstLastLines(rawPath)
-		const rawEventCount = rawInfo?.lineCount ?? 0
+		// A torn final line (live write left a non-empty, unparseable trailing line) is
+		// not a complete event the distiller would have counted. Counting it inflated
+		// raw_event_count by +1 and spuriously flipped sessions to distill_stale, so it
+		// is excluded from the staleness comparison (NUM-22).
+		const rawEventCount = (rawInfo?.lineCount ?? 0) - (rawInfo?.lastLineTorn ? 1 : 0)
 		const distilledAt = statSync(distilledPath).mtimeMs
 		const configTier = readExplicitConfigTier(projectDir)
 		return {

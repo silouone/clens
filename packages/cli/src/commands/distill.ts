@@ -1,8 +1,15 @@
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import type { BacktrackResult, CostEstimate, DistilledSession, GlobalSessionSummary } from "../types/distill";
 import type { PricingTier } from "../types";
 import { fmtDuration } from "./format-helpers";
 import { bold, cyan, dim, green, red, yellow } from "./shared";
+
+/**
+ * Distilled-output schema version. Stamped onto every written artifact and compared by
+ * `isDistilledFresh`. Bump this whenever the distill output shape changes so existing
+ * cached artifacts are treated as stale and re-distilled (independent of file mtime).
+ */
+export const DISTILL_SCHEMA_VERSION = 1;
 
 const BACKTRACK_LABELS: Readonly<Record<BacktrackResult["type"], string>> = {
 	debugging_loop: "debugging loop",
@@ -124,23 +131,34 @@ export const distillCommand = async (args: {
 	readonly deep: boolean;
 	readonly json: boolean;
 	readonly pricingTier?: import("../types").PricingTier;
-}): Promise<void> => {
+	/**
+	 * Skip the per-session analytics-summary write. Batch drivers set this and
+	 * flush the whole run once at the end (one O(N) pass instead of O(N²)).
+	 */
+	readonly deferAnalyticsSummary?: boolean;
+}): Promise<DistilledSession> => {
 	const { distill } = await import("../distill/index");
-	const result = await distill(args.sessionId, args.projectDir, {
+	const distilled = await distill(args.sessionId, args.projectDir, {
 		deep: args.deep,
 		pricingTier: args.pricingTier,
 	});
+
+	// Stamp the schema version so a freshness check can detect shape drift independent of mtime.
+	const result: DistilledSession = { ...distilled, schema_version: DISTILL_SCHEMA_VERSION };
 
 	// Save distilled result to disk
 	const distilledDir = `${args.projectDir}/.clens/distilled`;
 	mkdirSync(distilledDir, { recursive: true });
 	writeFileSync(`${distilledDir}/${args.sessionId}.json`, JSON.stringify(result, null, 2));
 
-	// Write analytics summary row (best-effort)
-	try {
-		const { writeAnalyticsSummary } = await import("../distill/analytics-summary");
-		writeAnalyticsSummary(result, args.projectDir);
-	} catch { /* best-effort — summary is a derived artifact */ }
+	// Write analytics summary row (best-effort). Skipped in batch mode — the
+	// driver accumulates rows and flushes once via writeAnalyticsSummaryBatch.
+	if (!args.deferAnalyticsSummary) {
+		try {
+			const { writeAnalyticsSummary } = await import("../distill/analytics-summary");
+			writeAnalyticsSummary(result, args.projectDir);
+		} catch { /* best-effort — summary is a derived artifact */ }
+	}
 
 	// Rebuild work unit index (best-effort)
 	try {
@@ -150,7 +168,7 @@ export const distillCommand = async (args: {
 
 	if (args.json) {
 		console.log(JSON.stringify(result, null, 2));
-		return;
+		return result;
 	}
 
 	const sessionPrefix = args.sessionId.slice(0, 8);
@@ -174,6 +192,7 @@ export const distillCommand = async (args: {
 	].join("\n");
 
 	console.log(output);
+	return result;
 };
 
 // ── Batch drivers ────────────────────────────────────────
@@ -191,13 +210,56 @@ export type GlobalDistillCounts = BatchDistillCounts & {
 };
 
 /**
- * True iff `distilledFile` exists and is at least as new as `sessionFile`.
- * Raw `.jsonl` is append-only, so a distilled artifact newer than its source
- * session is up to date and can be skipped on an incremental run.
+ * Current explicit pricing tier for a capture dir: an explicit `--pricing api|max`
+ * override wins, otherwise the explicit tier from `.clens/config.json`. Returns
+ * `undefined` for `auto`/absent config — auto resolves per-session at distill time, so
+ * a cheap up-front comparison is only meaningful for explicit `api`/`max` (mirrors the
+ * web staleness check). A `undefined` expected tier disables the tier-staleness gate.
  */
-export const isDistilledFresh = (sessionFile: string, distilledFile: string): boolean => {
+export const resolveExpectedTier = (
+	captureDir: string,
+	override?: PricingTier,
+): "api" | "max" | undefined => {
+	if (override === "api" || override === "max") return override;
+	try {
+		const raw: unknown = JSON.parse(readFileSync(`${captureDir}/.clens/config.json`, "utf-8"));
+		const pricing = raw && typeof raw === "object" ? (raw as { pricing?: unknown }).pricing : undefined;
+		return pricing === "api" || pricing === "max" ? pricing : undefined;
+	} catch {
+		return undefined;
+	}
+};
+
+/**
+ * True iff the cached distilled artifact is up to date and can be skipped on an
+ * incremental run. A session is stale (NOT fresh) when ANY of:
+ *  - the distilled or session file is missing;
+ *  - the distilled artifact is older than its source `.jsonl` (mtime) — raw is append-only;
+ *  - the stamped `schema_version` differs from the current `DISTILL_SCHEMA_VERSION`
+ *    (artifacts predating the stamp have no version and are treated as stale);
+ *  - an explicit `expectedTier` is given and the distilled `pricing_tier` differs from it.
+ */
+export const isDistilledFresh = (
+	sessionFile: string,
+	distilledFile: string,
+	expectedTier?: "api" | "max",
+): boolean => {
 	if (!existsSync(distilledFile) || !existsSync(sessionFile)) return false;
-	return statSync(distilledFile).mtimeMs >= statSync(sessionFile).mtimeMs;
+	if (statSync(distilledFile).mtimeMs < statSync(sessionFile).mtimeMs) return false;
+	try {
+		const parsed = JSON.parse(readFileSync(distilledFile, "utf-8")) as {
+			readonly schema_version?: number;
+			readonly pricing_tier?: string;
+		};
+		if (parsed.schema_version !== DISTILL_SCHEMA_VERSION) return false;
+		if (expectedTier !== undefined && parsed.pricing_tier !== undefined && parsed.pricing_tier !== expectedTier) {
+			return false;
+		}
+		return true;
+	} catch {
+		// Unparseable cached artifact — re-distill.
+		return false;
+	}
 };
 
 const sessionFilePath = (captureDir: string, sessionId: string): string =>
@@ -225,6 +287,10 @@ export const distillAllInDir = async (args: {
 	}
 
 	console.log(`Distilling ${sessions.length} session(s)...`);
+	// Accumulate freshly-distilled results and flush the analytics summary once at
+	// batch end (O(N) total), instead of rewriting the whole file per session.
+	const distilledResults: DistilledSession[] = [];
+	const expectedTier = resolveExpectedTier(args.projectDir, args.pricingTier);
 	const counts = await sessions.reduce<Promise<BatchDistillCounts>>(
 		async (accP, session, idx) => {
 			const acc = await accP;
@@ -235,6 +301,7 @@ export const distillAllInDir = async (args: {
 				isDistilledFresh(
 					sessionFilePath(args.projectDir, session.session_id),
 					distilledFilePath(args.projectDir, session.session_id),
+					expectedTier,
 				);
 			if (fresh) {
 				console.log(`${progress} ${prefix}… (up to date, skipped)`);
@@ -242,13 +309,15 @@ export const distillAllInDir = async (args: {
 			}
 			console.log(`${progress} ${prefix}...`);
 			try {
-				await distillCommand({
+				const result = await distillCommand({
 					sessionId: session.session_id,
 					projectDir: args.projectDir,
 					deep: args.deep,
 					json: false,
 					pricingTier: args.pricingTier,
+					deferAnalyticsSummary: true,
 				});
+				distilledResults.push(result);
 				return { ...acc, distilled: acc.distilled + 1 };
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
@@ -258,6 +327,11 @@ export const distillAllInDir = async (args: {
 		},
 		Promise.resolve({ distilled: 0, skipped: 0, failed: 0 }),
 	);
+
+	try {
+		const { writeAnalyticsSummaryBatch } = await import("../distill/analytics-summary");
+		writeAnalyticsSummaryBatch(distilledResults, args.projectDir);
+	} catch { /* best-effort — summary is a derived artifact */ }
 
 	console.log(
 		`\nDistilled ${counts.distilled}, skipped ${counts.skipped}, failed ${counts.failed} of ${sessions.length} session(s).`,
@@ -288,6 +362,9 @@ export const distillAllGlobal = async (args: {
 
 	console.log(`Distilling ${sessions.length} session(s) across registered projects...`);
 
+	// Group freshly-distilled results by their capture dir and flush each project's
+	// analytics summary once at the end (O(N) total), not once per session.
+	const resultsByDir = new Map<string, DistilledSession[]>();
 	type Acc = BatchDistillCounts & { readonly lastProject?: string };
 	const final = await sessions.reduce<Promise<Acc>>(
 		async (accP, s, idx) => {
@@ -303,6 +380,7 @@ export const distillAllGlobal = async (args: {
 				isDistilledFresh(
 					sessionFilePath(s.capture_dir, s.session_id),
 					distilledFilePath(s.capture_dir, s.session_id),
+					resolveExpectedTier(s.capture_dir, args.pricingTier),
 				);
 			if (fresh) {
 				console.log(`${progress} ${prefix}… (up to date, skipped)`);
@@ -310,13 +388,17 @@ export const distillAllGlobal = async (args: {
 			}
 			console.log(`${progress} ${prefix}...`);
 			try {
-				await distillCommand({
+				const result = await distillCommand({
 					sessionId: s.session_id,
 					projectDir: s.capture_dir,
 					deep: args.deep,
 					json: false,
 					pricingTier: args.pricingTier,
+					deferAnalyticsSummary: true,
 				});
+				const bucket = resultsByDir.get(s.capture_dir) ?? [];
+				bucket.push(result);
+				resultsByDir.set(s.capture_dir, bucket);
 				return { ...base, distilled: base.distilled + 1 };
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
@@ -326,6 +408,13 @@ export const distillAllGlobal = async (args: {
 		},
 		Promise.resolve({ distilled: 0, skipped: 0, failed: 0 }),
 	);
+
+	try {
+		const { writeAnalyticsSummaryBatch } = await import("../distill/analytics-summary");
+		for (const [captureDir, results] of resultsByDir) {
+			writeAnalyticsSummaryBatch(results, captureDir);
+		}
+	} catch { /* best-effort — summary is a derived artifact */ }
 
 	const projectCount = new Set(sessions.map((s) => s.project_name)).size;
 	console.log(

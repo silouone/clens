@@ -296,7 +296,7 @@ export const reportCommand = async (args: {
 			return;
 		}
 		if (distilled.reasoning.length === 0) {
-			console.log("No reasoning data found. Run 'clens distill --deep' to extract reasoning from transcripts.");
+			console.log("No reasoning data found. Run 'clens distill' to extract reasoning from transcripts.");
 			return;
 		}
 		console.log(args.full ? renderReasoningFull(distilled, args.intent) : renderReasoningSummary(distilled));

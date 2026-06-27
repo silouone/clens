@@ -1,5 +1,14 @@
-import { describe, test, expect } from "bun:test";
-import { toSummaryRow, localDayKey } from "../src/distill/analytics-summary";
+import { afterEach, beforeEach, describe, test, expect } from "bun:test";
+import { mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+	toSummaryRow,
+	localDayKey,
+	readAnalyticsSummary,
+	writeAnalyticsSummary,
+	writeAnalyticsSummaryBatch,
+} from "../src/distill/analytics-summary";
 import type { DistilledSession, EditChain } from "../src/types";
 
 // Regression tests for the analytics summary extractor (specs/revive/bug-register.md):
@@ -110,5 +119,111 @@ describe("toSummaryRow", () => {
 		const row = toSummaryRow(makeDistilled({ edit_chains: { chains: [] } }));
 		expect(row.edit_chain_count).toBe(0);
 		expect(row.edit_chain_links).toBe(0);
+	});
+});
+
+describe("analytics-summary disk reconcile (NUM-7) + batch flush (DIST-2)", () => {
+	let projectDir: string;
+
+	const distilledDir = () => join(projectDir, ".clens", "distilled");
+	const summaryFile = () => join(projectDir, ".clens", "analytics-summary.jsonl");
+
+	const writeDistilledFile = (sessionId: string): DistilledSession => {
+		const d = makeDistilled({ session_id: sessionId });
+		mkdirSync(distilledDir(), { recursive: true });
+		writeFileSync(join(distilledDir(), `${sessionId}.json`), JSON.stringify(d, null, 2));
+		return d;
+	};
+
+	beforeEach(() => {
+		projectDir = join(
+			tmpdir(),
+			`clens-test-analytics-summary-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
+		mkdirSync(projectDir, { recursive: true });
+	});
+
+	afterEach(() => {
+		rmSync(projectDir, { recursive: true, force: true });
+	});
+
+	test("DIST-2: writeAnalyticsSummaryBatch flushes all rows in a single file", () => {
+		const ds = ["s1", "s2", "s3"].map(writeDistilledFile);
+		writeAnalyticsSummaryBatch(ds, projectDir);
+
+		const lines = readFileSync(summaryFile(), "utf-8").split("\n").filter(Boolean);
+		expect(lines.length).toBe(3);
+		expect(readAnalyticsSummary(projectDir).map((r) => r.session_id).sort()).toEqual([
+			"s1",
+			"s2",
+			"s3",
+		]);
+	});
+
+	test("DIST-2: batch merges with existing rows (last write wins, no duplicates)", () => {
+		writeDistilledFile("s1");
+		writeAnalyticsSummary(makeDistilled({ session_id: "s1", start_time: 1 }), projectDir);
+		// Re-flush a batch that updates s1 and adds s2 — must not duplicate s1.
+		writeDistilledFile("s2");
+		writeAnalyticsSummaryBatch(
+			[makeDistilled({ session_id: "s1", start_time: 2 }), makeDistilled({ session_id: "s2" })],
+			projectDir,
+		);
+
+		const lines = readFileSync(summaryFile(), "utf-8").split("\n").filter(Boolean);
+		expect(lines.length).toBe(2);
+	});
+
+	test("NUM-7: read coverage equals distilled-on-disk count when rows are missing", () => {
+		// 3 distilled on disk, but the cached summary only ever captured 2.
+		writeDistilledFile("s1");
+		writeDistilledFile("s2");
+		writeDistilledFile("s3");
+		writeAnalyticsSummaryBatch(
+			[makeDistilled({ session_id: "s1" }), makeDistilled({ session_id: "s2" })],
+			projectDir,
+		);
+		// Cache on disk has 2 rows, distilled/ has 3.
+		expect(readFileSync(summaryFile(), "utf-8").split("\n").filter(Boolean).length).toBe(2);
+
+		// Reconcile-on-read recovers the lost row → coverage matches distilled count.
+		const rows = readAnalyticsSummary(projectDir);
+		expect(rows.length).toBe(3);
+		expect(rows.map((r) => r.session_id).sort()).toEqual(["s1", "s2", "s3"]);
+	});
+
+	test("NUM-7: orphan cached rows (no distilled file) are dropped from coverage", () => {
+		writeDistilledFile("s1");
+		// Cache holds a row whose distilled file no longer exists.
+		writeFileSync(
+			summaryFile(),
+			[
+				JSON.stringify(toSummaryRow(makeDistilled({ session_id: "s1" }))),
+				JSON.stringify(toSummaryRow(makeDistilled({ session_id: "ghost" }))),
+			].join("\n") + "\n",
+		);
+
+		const rows = readAnalyticsSummary(projectDir);
+		expect(rows.map((r) => r.session_id)).toEqual(["s1"]);
+	});
+
+	test("NUM-7: a distilled file newer than the summary is rebuilt from disk", () => {
+		const summaryTime = new Date("2026-01-01T00:00:00Z");
+		const newerTime = new Date("2026-01-02T00:00:00Z");
+
+		writeDistilledFile("s1");
+		// Stale cached row: marks duration as a sentinel we can detect.
+		writeFileSync(
+			summaryFile(),
+			JSON.stringify({ ...toSummaryRow(makeDistilled({ session_id: "s1" })), duration_ms: 999999 }) + "\n",
+		);
+		// Summary is OLDER than the distilled file → cached row is stale and must be rebuilt.
+		utimesSync(summaryFile(), summaryTime, summaryTime);
+		utimesSync(join(distilledDir(), "s1.json"), newerTime, newerTime);
+
+		const rows = readAnalyticsSummary(projectDir);
+		expect(rows.length).toBe(1);
+		// Rebuilt from distilled (duration_ms 5000), not the stale cache (999999).
+		expect(rows[0]?.duration_ms).toBe(5000);
 	});
 });

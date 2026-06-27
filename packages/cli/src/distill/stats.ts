@@ -33,10 +33,28 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
 /** Longest prefix first so version-specific entries beat family fallbacks. */
 const byLengthDesc = (a: string, b: string): number => b.length - a.length;
 
+/**
+ * Bare model aliases Claude Code may emit (e.g. `opus`, `sonnet`, `haiku`)
+ * instead of a fully-qualified id. Each maps to its CURRENT canonical id — the
+ * same tier the alias resolves to today — so the longest-prefix match below
+ * never silently falls through to an unpriced $0. Keyed on the exact lowercased
+ * string, so fully-qualified ids (`claude-opus-4-8`) are untouched.
+ */
+const MODEL_ALIASES: Readonly<Record<string, string>> = {
+	opus: "claude-opus-4-8",
+	sonnet: "claude-sonnet-4-6",
+	haiku: "claude-haiku-4-5",
+	fable: "claude-fable-5",
+};
+
+/** Resolve a bare alias to its canonical model id; pass anything else through. */
+const normalizeModelId = (model: string): string => MODEL_ALIASES[model.toLowerCase()] ?? model;
+
 const CONTEXT_WINDOW_PREFIXES = Object.keys(MODEL_CONTEXT_WINDOWS).sort(byLengthDesc);
 
 export const getModelContextWindow = (model: string): number | undefined => {
-	const matchedPrefix = CONTEXT_WINDOW_PREFIXES.find((prefix) => model.startsWith(prefix));
+	const normalized = normalizeModelId(model);
+	const matchedPrefix = CONTEXT_WINDOW_PREFIXES.find((prefix) => normalized.startsWith(prefix));
 	return matchedPrefix ? MODEL_CONTEXT_WINDOWS[matchedPrefix] : undefined;
 };
 
@@ -56,7 +74,8 @@ interface ModelRates {
 
 /** Get pricing rates for a model+tier combination. "auto" treated same as "api". */
 export const getPricing = (model: string, tier: PricingTier = "api"): ModelRates | undefined => {
-	const matchedPrefix = MODEL_PREFIXES.find((prefix) => model.startsWith(prefix));
+	const normalized = normalizeModelId(model);
+	const matchedPrefix = MODEL_PREFIXES.find((prefix) => normalized.startsWith(prefix));
 	if (!matchedPrefix) return undefined;
 	const base = API_PRICING[matchedPrefix];
 	const multiplier = tier === "max" ? SUBSCRIPTION_MULTIPLIER : 1;

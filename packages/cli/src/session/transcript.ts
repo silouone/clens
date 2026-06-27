@@ -86,3 +86,48 @@ export const readSessionName = (transcriptPath: string): string | null => {
 		return null;
 	}
 };
+
+/** Transcript content plus its custom title, parsed from a single file read. */
+export interface TranscriptWithMeta {
+	readonly entries: readonly TranscriptEntry[];
+	readonly customTitle: string | null;
+}
+
+/**
+ * Read a transcript JSONL ONCE and derive both the chronological entries and the
+ * latest custom title. Equivalent to `readTranscript` + `readSessionName` but with
+ * a single file read and a single JSON.parse per line — used on the hot distill path
+ * where the parent transcript would otherwise be read twice per session.
+ */
+export const readTranscriptWithMeta = (transcriptPath: string): TranscriptWithMeta => {
+	try {
+		if (!existsSync(transcriptPath)) return { entries: [], customTitle: null };
+		const content = readFileSync(transcriptPath, "utf-8").trim();
+		if (!content) return { entries: [], customTitle: null };
+
+		const parsedLines = content
+			.split("\n")
+			.filter(Boolean)
+			.flatMap((line): unknown[] => {
+				try {
+					return [JSON.parse(line)];
+				} catch {
+					return [];
+				}
+			});
+
+		const entries = parsedLines
+			.filter(isTranscriptEntry)
+			.filter((e) => e.type === "user" || e.type === "assistant")
+			.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+		const customTitle = parsedLines.reduce<string | null>(
+			(acc, parsed) => (isCustomTitleEntry(parsed) ? stripEscapedQuotes(parsed.customTitle) : acc),
+			null,
+		);
+
+		return { entries, customTitle };
+	} catch {
+		return { entries: [], customTitle: null };
+	}
+};

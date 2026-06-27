@@ -3,7 +3,7 @@
 // be passed in from the CLI caller so this module stays pure.
 import { existsSync, readFileSync } from "node:fs";
 import { readLinks, readSessionEvents } from "../session/read";
-import { readSessionName, readTranscript, resolveTranscriptPath } from "../session/transcript";
+import { readTranscript, readTranscriptWithMeta, resolveTranscriptPath } from "../session/transcript";
 import type {
 	AgentNode,
 	ClensConfig,
@@ -175,6 +175,11 @@ export const distill = async (
 ): Promise<DistilledSession> => {
 	const events = readSessionEvents(sessionId, projectDir);
 
+	// `--deep` gates git enrichment. The default (shallow) distill is git-free: stats,
+	// attribution and net changes all come from captured tool_input (git-independent).
+	// Only when `deep` is set do we spawn git for commit history and unified-diff context.
+	const deep = options?.deep ?? false;
+
 	// Layer 2: Transcript enrichment (graceful fallback) -- extracted early so reasoning can be passed to stats
 	const transcriptData: {
 		reasoning: TranscriptReasoning[];
@@ -199,8 +204,10 @@ export const distill = async (
 				context_consumption: undefined,
 			};
 
-		const sessionName = readSessionName(tPath) ?? undefined;
-		const entries = readTranscript(tPath);
+		// Single read of the parent transcript yields both entries and the custom title,
+		// avoiding a second full file read + parse per session on the batch distill path.
+		const { entries, customTitle } = readTranscriptWithMeta(tPath);
+		const sessionName = customTitle ?? undefined;
 		if (entries.length === 0)
 			return {
 				reasoning: [],
@@ -258,7 +265,7 @@ export const distill = async (
 	const backtracks = extractBacktracks(events);
 	const decisions = extractDecisions(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
 	const file_map = extractFileMap(events);
-	const git_diff = await extractGitDiff(sessionId, projectDir, events);
+	const git_diff = deep ? await extractGitDiff(sessionId, projectDir, events) : { commits: [], hunks: [] };
 
 	// Plan drift detection
 	const allPrompts: readonly string[] = [
@@ -286,20 +293,23 @@ export const distill = async (
 	// PRIMARY: event-sourced diff attribution (git-independent, always accurate)
 	const tool_sourced_diffs = computeToolSourcedDiff(events, edit_chains_raw, projectDir);
 
-	// OPTIONAL ENRICHMENT: git-based unified diffs (for display, may be stale)
-	// Provides line numbers and context lines that tool-sourced diffs don't have
-	const git_diffs = (() => {
-		try {
-			return extractGitDiffAttribution(projectDir, events, edit_chains_raw);
-		} catch {
-			return [];
-		}
-	})();
+	// OPTIONAL ENRICHMENT (--deep only): git-based unified diffs (for display, may be stale).
+	// Provides line numbers and context lines that tool-sourced diffs don't have. Skipped on
+	// a shallow distill so the default path performs zero git spawns.
+	const git_diffs = deep
+		? (() => {
+				try {
+					return extractGitDiffAttribution(projectDir, events, edit_chains_raw);
+				} catch {
+					return [];
+				}
+			})()
+		: [];
 
-	// Also capture diffs for working tree / staged changes not covered by edit chains
-	const git_net_changes = extractNetChanges(projectDir, events);
+	// Also capture diffs for working tree / staged changes not covered by edit chains (--deep only)
+	const git_net_changes = deep ? extractNetChanges(projectDir, events) : [];
 	const allChangedFiles = [...(git_diff.working_tree_changes ?? []), ...(git_diff.staged_changes ?? []), ...git_net_changes];
-	const extraDiffs = captureMissingDiffs(projectDir, events, git_diffs, allChangedFiles);
+	const extraDiffs = deep ? captureMissingDiffs(projectDir, events, git_diffs, allChangedFiles) : [];
 	const all_git_diffs = [...git_diffs, ...extraDiffs];
 
 	// Tool-sourced is the source of truth for stats and attribution.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { computeLiveElapsed } from "../../src/client/lib/live-duration"
+import { computeLiveElapsed, LIVE_ACTIVE_THRESHOLD_MS } from "../../src/client/lib/live-duration"
 
 // Regression guards for bug B20 (specs/revive/bug-register.md): the live view
 // duration was computed as `Date.now() - start_time` where start_time was the
@@ -76,6 +76,31 @@ describe("computeLiveElapsed (B20)", () => {
 				localNow: 0,
 			}),
 		).toBe(0)
+	})
+
+	test("idle session freezes at the server span and does not keep ticking (NUM-12)", () => {
+		// The reducer only ever emits raw status "active" until a terminal event,
+		// so a quiet live session arrives here as "active". Once its last event is
+		// older than the active threshold it is effectively idle and the counter
+		// must stop advancing: the bare server span, regardless of how far localNow
+		// has run past the last event.
+		const first = 1_000_000
+		const last = first + 60_000 // 60s server span
+		const received = 2_000_000
+		const base = {
+			firstEventTime: first,
+			lastEventTime: last,
+			status: "active" as const,
+			lastEventReceivedAt: received,
+		}
+		// Just past the threshold -> idle -> frozen at the span.
+		expect(
+			computeLiveElapsed({ ...base, localNow: last + LIVE_ACTIVE_THRESHOLD_MS + 1 }),
+		).toBe(60_000)
+		// Much later still -> same frozen value, proving it no longer ticks.
+		expect(computeLiveElapsed({ ...base, localNow: last + LIVE_ACTIVE_THRESHOLD_MS * 100 })).toBe(
+			60_000,
+		)
 	})
 
 	test("does not tick backward if localNow precedes lastEventReceivedAt", () => {

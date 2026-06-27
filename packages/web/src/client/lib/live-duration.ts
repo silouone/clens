@@ -27,14 +27,17 @@ export type LiveElapsedArgs = {
  * active we tick forward *from the last event time*: `localNow -
  * lastEventReceivedAt` is the wall-clock time observed locally since that last
  * event arrived, added on top of the server span so the counter advances
- * smoothly between events. A complete session (or one with no events yet)
- * reports the bare span.
+ * smoothly between events. A complete session, an idle session, or one with no
+ * events yet reports the bare span — once a live session goes idle (its last
+ * event is older than the active threshold) the counter must freeze rather than
+ * keep ticking while nothing is happening.
  */
 export const computeLiveElapsed = (args: LiveElapsedArgs): number => {
 	const { firstEventTime, lastEventTime, status, lastEventReceivedAt, localNow } = args
 	if (firstEventTime === 0 || lastEventTime === 0) return 0
 	const span = lastEventTime - firstEventTime
-	if (status === "complete") return Math.max(0, span)
+	// Only an active session advances; complete and idle both freeze at the span.
+	if (deriveLiveStatus(status, lastEventTime, localNow) !== "active") return Math.max(0, span)
 	const sinceLastEvent = Math.max(0, localNow - lastEventReceivedAt)
 	return Math.max(0, span + sinceLastEvent)
 }

@@ -8,10 +8,16 @@ interface WebCommandOptions {
 	readonly global: boolean;
 }
 
-/** Open a URL in the default browser (macOS). */
+/** Open a URL in the default browser (cross-platform: macOS / Linux / Windows). */
 const openBrowser = (url: string): void => {
+	const command =
+		process.platform === "darwin"
+			? ["open", url]
+			: process.platform === "win32"
+				? ["cmd", "/c", "start", "", url]
+				: ["xdg-open", url];
 	try {
-		Bun.spawn(["open", url], { stdout: "ignore", stderr: "ignore" });
+		Bun.spawn(command, { stdout: "ignore", stderr: "ignore" });
 	} catch {
 		// Silently ignore — user can open manually
 	}

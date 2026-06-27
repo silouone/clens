@@ -622,6 +622,12 @@ export interface DistilledSession {
 	 * resolved to a concrete "api"/"max" at distill time, so only those two appear here.
 	 */
 	readonly pricing_tier?: "api" | "max";
+	/**
+	 * Distill schema version stamped at write time. A freshness check treats a cached
+	 * distilled artifact as stale when this differs from the current `DISTILL_SCHEMA_VERSION`,
+	 * so bumping the version forces a re-distill even when the raw session mtime is unchanged.
+	 */
+	readonly schema_version?: number;
 }
 
 // --- Global Mode Types ---

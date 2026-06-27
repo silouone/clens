@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import type { CostBasis, CostEstimate, DistilledSession, AnalyticsSummaryRow } from "../types";
 
 /**
@@ -170,95 +170,145 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 const summaryPath = (projectDir: string): string =>
 	`${projectDir}/.clens/analytics-summary.jsonl`;
 
+/** Parse JSONL summary content into rows, skipping malformed/non-row lines. */
+const parseSummaryRows = (content: string): AnalyticsSummaryRow[] =>
+	content
+		.split("\n")
+		.filter(Boolean)
+		.flatMap((line): AnalyticsSummaryRow[] => {
+			try {
+				const parsed: unknown = JSON.parse(line);
+				if (parsed && typeof parsed === "object" && "session_id" in parsed) {
+					return [parsed as AnalyticsSummaryRow];
+				}
+				return [];
+			} catch {
+				return [];
+			}
+		});
+
 /**
- * Write or replace an analytics summary row for a session.
- * Appends to analytics-summary.jsonl (or replaces if session already exists).
+ * Load the existing summary file as a map of session_id → raw JSONL line,
+ * preserving file order (a `Map` keeps insertion order; updating an existing key
+ * keeps its original slot). Keyed on the parsed JSON id (not a substring scan) so
+ * an id appearing inside another row's free-text field — e.g. an error message or
+ * file path — cannot trigger a false match.
+ */
+const loadSummaryLineMap = (filePath: string): Map<string, string> => {
+	const map = new Map<string, string>();
+	if (!existsSync(filePath)) return map;
+	for (const line of readFileSync(filePath, "utf-8").split("\n").filter(Boolean)) {
+		const id = lineSessionId(line);
+		if (id !== undefined) map.set(id, line);
+	}
+	return map;
+};
+
+/**
+ * Write or replace analytics summary rows for a batch of sessions in a SINGLE
+ * pass: load the existing file once, merge every row in memory (last write wins
+ * per session_id, existing rows preserved), then flush once via atomic
+ * temp+rename. A batch distill of N sessions thus performs O(N) total summary
+ * work, not the O(N²) of re-reading and re-writing the whole file per session.
+ */
+export const writeAnalyticsSummaryBatch = (
+	distilled: readonly DistilledSession[],
+	projectDir: string,
+): void => {
+	if (distilled.length === 0) return;
+	const filePath = summaryPath(projectDir);
+	const byId = loadSummaryLineMap(filePath);
+	for (const d of distilled) {
+		const row = toSummaryRow(d);
+		byId.set(row.session_id, JSON.stringify(row));
+	}
+
+	const dir = `${projectDir}/.clens`;
+	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+	atomicWriteFile(filePath, `${[...byId.values()].join("\n")}\n`);
+};
+
+/**
+ * Write or replace a single session's analytics summary row. Thin wrapper over
+ * the batch writer (one read + one atomic write).
  */
 export const writeAnalyticsSummary = (
 	distilled: DistilledSession,
 	projectDir: string,
-): void => {
-	const filePath = summaryPath(projectDir);
-	const row = toSummaryRow(distilled);
-	const line = JSON.stringify(row);
+): void => writeAnalyticsSummaryBatch([distilled], projectDir);
 
-	const dir = `${projectDir}/.clens`;
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-
-	if (!existsSync(filePath)) {
-		atomicWriteFile(filePath, `${line}\n`);
-		return;
+/** True iff the distilled file is strictly newer than the summary file. */
+const distilledNewerThanSummary = (distilledFilePath: string, summaryMtimeMs: number): boolean => {
+	try {
+		return statSync(distilledFilePath).mtimeMs > summaryMtimeMs;
+	} catch {
+		return false;
 	}
+};
 
-	// Read existing lines, replace the row whose parsed session_id matches,
-	// otherwise append. Matching is keyed on the parsed JSON id (not a substring
-	// scan) so an id appearing inside another row's free-text field — e.g. an
-	// error message or file path — cannot trigger a false replacement.
-	const existing = readFileSync(filePath, "utf-8");
-	const lines = existing.split("\n").filter(Boolean);
-	let replaced = false;
-	const updated = lines.map((l) => {
-		if (lineSessionId(l) === row.session_id) {
-			replaced = true;
-			return line;
-		}
-		return l;
-	});
-	if (!replaced) updated.push(line);
-
-	atomicWriteFile(filePath, `${updated.join("\n")}\n`);
+/** Build a summary row from a distilled file on disk, or undefined if unreadable. */
+const buildRowFromDistilled = (distilledFilePath: string): AnalyticsSummaryRow | undefined => {
+	try {
+		const distilled = JSON.parse(readFileSync(distilledFilePath, "utf-8")) as DistilledSession;
+		if (distilled.session_id && distilled.stats) return toSummaryRow(distilled);
+	} catch {
+		// malformed distilled file
+	}
+	return undefined;
 };
 
 /**
- * Read all analytics summary rows. This is a PURE read: it never mutates disk.
- * Fast path: reads pre-computed analytics-summary.jsonl.
- * Fallback: reads all distilled/*.json files and extracts summary rows (slower).
+ * Read all analytics summary rows, reconciled against `distilled/` on disk. This
+ * is a PURE read: it never mutates disk.
  *
- * The fallback does NOT persist a JSONL file — a read must be side-effect-free so
- * that concurrent reads can never race on (or corrupt) the summary file. Use
- * `rebuildAnalyticsSummary` to (re)materialize the file explicitly.
+ * The cached `analytics-summary.jsonl` can silently diverge from `distilled/` —
+ * rows lost to a write race or mid-batch crash, or rows left stale by a
+ * re-distill (the cache once reported 317 rows against 320 distilled sessions).
+ * So `distilled/` is the source of truth for BOTH which sessions count as
+ * analyzed AND whether each cached row is current:
+ *   • a cached row is reused only when its distilled file is no newer than the
+ *     summary file (mtime check) — otherwise it is rebuilt from distilled;
+ *   • a distilled file with no cached row is built fresh (recovers lost rows);
+ *   • a cached row with no distilled file is dropped, so the returned count
+ *     equals the distilled-on-disk count (coverage no longer under-reports).
+ *
+ * Reconciliation stays in memory; `rebuildAnalyticsSummary` re-materializes the
+ * file explicitly so a read can never race on (or corrupt) the summary file.
  */
 export const readAnalyticsSummary = (projectDir: string): readonly AnalyticsSummaryRow[] => {
 	const filePath = summaryPath(projectDir);
-
-	// Fast path: pre-computed JSONL exists
-	if (existsSync(filePath)) {
-		const content = readFileSync(filePath, "utf-8");
-		const rows = content
-			.split("\n")
-			.filter(Boolean)
-			.flatMap((line): readonly AnalyticsSummaryRow[] => {
-				try {
-					const parsed: unknown = JSON.parse(line);
-					if (parsed && typeof parsed === "object" && "session_id" in parsed) {
-						return [parsed as AnalyticsSummaryRow];
-					}
-					return [];
-				} catch {
-					return [];
-				}
-			});
-		if (rows.length > 0) return rows;
-	}
-
-	// Fallback: read all distilled/*.json and build summary rows (no disk write)
 	const distilledDir = `${projectDir}/.clens/distilled`;
-	if (!existsSync(distilledDir)) return [];
+
+	// No distilled/ dir → nothing to reconcile against; return cached rows verbatim.
+	if (!existsSync(distilledDir)) {
+		return existsSync(filePath) ? parseSummaryRows(readFileSync(filePath, "utf-8")) : [];
+	}
 
 	const files = readdirSync(distilledDir).filter((f) => f.endsWith(".json"));
 	if (files.length === 0) return [];
 
+	const cachedById = new Map<string, AnalyticsSummaryRow>();
+	let summaryMtimeMs = 0;
+	if (existsSync(filePath)) {
+		summaryMtimeMs = statSync(filePath).mtimeMs;
+		for (const row of parseSummaryRows(readFileSync(filePath, "utf-8"))) {
+			cachedById.set(row.session_id, row);
+		}
+	}
+
 	const rows: AnalyticsSummaryRow[] = [];
 	for (const file of files) {
-		try {
-			const content = readFileSync(`${distilledDir}/${file}`, "utf-8");
-			const distilled = JSON.parse(content) as DistilledSession;
-			if (distilled.session_id && distilled.stats) {
-				rows.push(toSummaryRow(distilled));
-			}
-		} catch {
-			// Skip malformed files
+		const sessionId = file.slice(0, -".json".length);
+		const distilledFilePath = `${distilledDir}/${file}`;
+		const cached = cachedById.get(sessionId);
+		if (cached && !distilledNewerThanSummary(distilledFilePath, summaryMtimeMs)) {
+			rows.push(cached);
+			continue;
 		}
+		// Missing or stale → rebuild from distilled, falling back to the stale
+		// cached row only if the distilled file is unreadable.
+		const next = buildRowFromDistilled(distilledFilePath) ?? cached;
+		if (next) rows.push(next);
 	}
 
 	return rows;

@@ -175,7 +175,7 @@ export const renderAgentReport = (
 const renderToolUsage = (agent: AgentNode): readonly string[] => {
 	const toolsByName = agent.stats?.tools_by_name;
 	if (!toolsByName || Object.keys(toolsByName).length === 0) {
-		return ["Tool Usage: (no stats available - run distill --deep)"];
+		return ["Tool Usage: (no stats available - run distill)"];
 	}
 
 	const totalCalls = agent.stats?.tool_call_count ?? 0;

@@ -14,6 +14,40 @@ type CommandDef = {
 	readonly handler: (ctx: CommandContext) => Promise<void>;
 };
 
+// --- report argument parsing ---
+
+const REPORT_SUBCOMMANDS: ReadonlySet<string> = new Set(["backtracks", "drift", "reasoning"]);
+// Subcommands that consume a trailing positional argument (e.g. `drift <spec-path>`).
+const REPORT_SUBCOMMANDS_WITH_ARG: ReadonlySet<string> = new Set(["drift"]);
+
+type ReportArgs = {
+	readonly subcommand?: string;
+	readonly subcommandArg?: string;
+	readonly sessionInput?: string;
+};
+
+/**
+ * Parse the positionals that follow the `report` command word into a subcommand,
+ * an optional subcommand argument (e.g. the drift spec path), and the session-id
+ * input. Order-independent: the subcommand may appear before OR after the session
+ * id, and `--last` makes the session id implicit (so every remaining operand is an
+ * argument candidate). Pure function — easy to unit-test in isolation.
+ */
+const parseReportArgs = (afterReport: readonly string[], last: boolean): ReportArgs => {
+	const subIdx = afterReport.findIndex((a) => REPORT_SUBCOMMANDS.has(a));
+	const subcommand = subIdx >= 0 ? afterReport[subIdx] : undefined;
+
+	// Non-subcommand positionals, preserving their original order.
+	const operands = afterReport.filter((a) => !REPORT_SUBCOMMANDS.has(a));
+	// Without --last the first operand is the session id; with --last it is implicit.
+	const sessionInput = last ? undefined : operands[0];
+	const argOperands = last ? operands : operands.slice(1);
+	const subcommandArg =
+		subcommand && REPORT_SUBCOMMANDS_WITH_ARG.has(subcommand) ? argOperands[0] : undefined;
+
+	return { subcommand, subcommandArg, sessionInput };
+};
+
 // --- 10 commands ---
 
 const commands: Readonly<Record<string, CommandDef>> = {
@@ -76,19 +110,11 @@ const commands: Readonly<Record<string, CommandDef>> = {
 			const { resolveSessionId } = await import("./commands/shared");
 			const { reportCommand } = await import("./commands/report");
 
-			// Detect subcommand: first positional after "report" that isn't a session ID
-			const subcommands = new Set(["backtracks", "drift", "reasoning"]);
-			const afterReport = ctx.positional.slice(1);
-			const subIdx = afterReport.findIndex((a) => subcommands.has(a));
-			const subcommand = subIdx >= 0 ? afterReport[subIdx] : undefined;
-
-			// Session ID: positional that isn't the subcommand
-			const sessionPositional = afterReport.filter((a) => !subcommands.has(a))[0];
-
-			// Subcommand arg (e.g. spec path for drift): positional after the subcommand
-			const subcommandArg = subcommand && subIdx + 1 < afterReport.length
-				? afterReport.filter((a) => !subcommands.has(a) && a !== sessionPositional)[0]
-				: undefined;
+			// Subcommand + session id + subcommand arg, order-independent (see parseReportArgs).
+			const { subcommand, subcommandArg, sessionInput } = parseReportArgs(
+				ctx.positional.slice(1),
+				ctx.flags.last,
+			);
 
 			// Extract --intent value
 			const intentIdx = ctx.rawArgs.indexOf("--intent");
@@ -97,7 +123,7 @@ const commands: Readonly<Record<string, CommandDef>> = {
 				: undefined;
 
 			await reportCommand({
-				sessionId: resolveSessionId(sessionPositional, ctx.flags.last, ctx.projectDir),
+				sessionId: resolveSessionId(sessionInput, ctx.flags.last, ctx.projectDir),
 				projectDir: ctx.projectDir,
 				json: ctx.flags.json,
 				subcommand,
@@ -113,13 +139,17 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		handler: async (ctx) => {
 			const { resolveSessionId } = await import("./commands/shared");
 			const { agentsCommand } = await import("./commands/agents");
-			const agentId = ctx.flags.last ? ctx.positional[1] : ctx.positional[2];
+
+			// Positionals after the `agents` command word. Without --last the first is
+			// the session id and the second is the agent id; with --last the session is
+			// implicit, so the first positional is the agent id. (--last is order-
+			// independent because it is a flag, not a positional.)
+			const afterAgents = ctx.positional.slice(1);
+			const sessionInput = ctx.flags.last ? undefined : afterAgents[0];
+			const agentId = ctx.flags.last ? afterAgents[0] : afterAgents[1];
+
 			await agentsCommand({
-				sessionId: resolveSessionId(
-					ctx.flags.last ? undefined : ctx.positional[1],
-					ctx.flags.last,
-					ctx.projectDir,
-				),
+				sessionId: resolveSessionId(sessionInput, ctx.flags.last, ctx.projectDir),
 				projectDir: ctx.projectDir,
 				json: ctx.flags.json,
 				agentId,
@@ -127,8 +157,11 @@ const commands: Readonly<Record<string, CommandDef>> = {
 			});
 		},
 	},
+	// D6 (resolved KEEP per DECISIONS.md #6 — NOT frozen): the TUI is kept as a
+	// documented, low-maintenance differentiator. The web dashboard is the canonical
+	// rich surface, so killed-command hints below route to BOTH `explore` and `web`.
 	explore: {
-		description: "Interactive TUI session explorer",
+		description: "Interactive TUI session explorer (or 'clens web' for the dashboard)",
 		handler: async (ctx) => {
 			const { startTui } = await import("./commands/tui");
 			startTui(ctx.projectDir);
@@ -247,19 +280,19 @@ const KILLED_COMMANDS: Readonly<Record<string, string>> = {
 	stats: "Did you mean 'clens report'?",
 	backtracks: "Did you mean 'clens report backtracks'?",
 	backtrack: "Did you mean 'clens report backtracks'?",
-	decisions: "decisions is available in: clens explore",
-	decision: "decisions is available in: clens explore",
+	decisions: "decisions is available in: clens explore | clens web",
+	decision: "decisions is available in: clens explore | clens web",
 	reasoning: "Did you mean 'clens report reasoning'?",
-	edits: "edits is available in: clens explore",
-	edit: "edits is available in: clens explore",
+	edits: "edits is available in: clens explore | clens web",
+	edit: "edits is available in: clens explore | clens web",
 	drift: "Did you mean 'clens report drift'?",
-	timeline: "timeline is available in: clens explore",
+	timeline: "timeline is available in: clens explore | clens web",
 	tree: "Did you mean 'clens agents'?",
 	agent: "Did you mean 'clens agents <id>'?",
 	messages: "Did you mean 'clens agents --comms'?",
 	message: "Did you mean 'clens agents --comms'?",
-	graph: "graph is available in: clens explore",
-	journey: "journey is available in: clens explore",
+	graph: "graph is available in: clens explore | clens web",
+	journey: "journey is available in: clens explore | clens web",
 };
 
 // --- Flag validation ---
@@ -357,7 +390,7 @@ ${bold("Options:")}
   ${dim("--last")}         Use most recent session
   ${dim("--force")}        Force operation (skip safety checks)
   ${dim("--yes, -y")}      Skip confirmation prompt (required for 'clean --all' when non-interactive)
-  ${dim("--deep")}         Deep distill: enrich agents with transcript data
+  ${dim("--deep")}         Deep distill: add git enrichment (commit history, unified diffs); spawns git
   ${dim("--json")}         Output structured JSON
   ${dim("--otel")}         Export in OTLP format
   ${dim("--detail")}       Show detailed backtrack breakdown

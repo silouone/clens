@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { distillAllGlobal, isDistilledFresh } from "../src/commands/distill";
+import { DISTILL_SCHEMA_VERSION, distillAllGlobal, isDistilledFresh } from "../src/commands/distill";
 import type { GlobalSessionSummary } from "../src/types/distill";
 
 // Two-project fixture, injected directly (no registry / HOME dependency):
@@ -78,13 +78,24 @@ describe("distill-global batch driver", () => {
 		rmSync(tempDir, { recursive: true, force: true });
 	});
 
-	test("isDistilledFresh: false when distilled missing, true when newer than session", () => {
+	test("isDistilledFresh: false when distilled missing, true when newer + current schema", () => {
 		const sf = join(projAdir, ".clens", "sessions", `${SESSION_A}.jsonl`);
 		const df = distilledPath(projAdir, SESSION_A);
 		expect(isDistilledFresh(sf, df)).toBe(false);
 		mkdirSync(join(projAdir, ".clens", "distilled"), { recursive: true });
+		// A distilled artifact with no schema_version is treated as stale (DIST-4).
 		writeFileSync(df, "{}");
+		expect(isDistilledFresh(sf, df)).toBe(false);
+		// Newer than the session AND stamped with the current schema version -> fresh.
+		writeFileSync(df, JSON.stringify({ schema_version: DISTILL_SCHEMA_VERSION }));
 		expect(isDistilledFresh(sf, df)).toBe(true);
+		// A mismatched schema version (e.g. after a bump) -> stale even though mtime is fine.
+		writeFileSync(df, JSON.stringify({ schema_version: DISTILL_SCHEMA_VERSION + 1 }));
+		expect(isDistilledFresh(sf, df)).toBe(false);
+		// Pricing-tier drift relative to an explicit expected tier -> stale.
+		writeFileSync(df, JSON.stringify({ schema_version: DISTILL_SCHEMA_VERSION, pricing_tier: "max" }));
+		expect(isDistilledFresh(sf, df, "api")).toBe(false);
+		expect(isDistilledFresh(sf, df, "max")).toBe(true);
 	});
 
 	test("each session distills into its own capture dir (incl. nested repo)", async () => {

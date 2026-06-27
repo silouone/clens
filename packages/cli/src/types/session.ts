@@ -32,10 +32,46 @@ export interface DelegatedHooks {
 
 export type PricingTier = "api" | "max" | "auto";
 
+/**
+ * Capture redaction mode (privacy gate, OSS-9). Controls how much of a raw hook
+ * payload is written to JSONL:
+ *  - `full`     — verbatim payload (DEFAULT; preserves historic behavior).
+ *  - `redacted` — structure preserved, secret-looking values masked (denylist).
+ *  - `metadata` — only known-safe structural fields kept, all free-text dropped (allowlist).
+ */
+export const CAPTURE_MODES = ["full", "redacted", "metadata"] as const;
+export type CaptureMode = (typeof CAPTURE_MODES)[number];
+
+/** Type guard for a valid capture/redaction mode. */
+export const isCaptureMode = (value: unknown): value is CaptureMode =>
+	typeof value === "string" && (CAPTURE_MODES as readonly string[]).includes(value);
+
 export interface ClensConfig {
 	readonly capture: boolean;
 	readonly events?: readonly HookEventType[];
 	readonly pricing?: PricingTier;
+	/** Redaction mode applied at capture time. Absent ⇒ `full`. */
+	readonly mode?: CaptureMode;
+}
+
+// --- Session config extraction (CFG-1) ---
+
+/** A single MCP server observed in a session, with how many times its tools were called. */
+export interface McpServerUsage {
+	readonly name: string;
+	readonly count: number;
+}
+
+/**
+ * Typed, derived view of a session's effective configuration, lifted purely from
+ * its event stream (zero I/O). `permission_mode` and `effort` are the most-recent
+ * non-empty values seen; `mcp_servers` is the deduped set of MCP servers whose
+ * tools were invoked (matched on the `mcp__<server>__<tool>` name pattern).
+ */
+export interface SessionConfig {
+	readonly permission_mode?: string;
+	readonly effort?: string;
+	readonly mcp_servers: readonly McpServerUsage[];
 }
 
 // --- Session naming / color flag types ---

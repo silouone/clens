@@ -240,7 +240,7 @@ export const init = (projectDir: string, target: InitTarget = "local"): InitResu
 		backed_up: true,
 		delegated_hooks_count: delegatedCount,
 		warning: warnings.join("\n  "),
-		tip: "Install analysis tools with: clens plugin install",
+		tip: "Install analysis tools with: clens init plugin",
 	};
 };
 

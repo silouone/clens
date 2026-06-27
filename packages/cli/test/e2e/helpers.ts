@@ -10,6 +10,7 @@
 
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type {
 	AgentNode,
 	CommunicationEdge,
@@ -38,15 +39,24 @@ export type CliResult = {
 	readonly duration_ms: number;
 };
 
-export const runCli = async (
+/**
+ * Path to the standalone COMPILED binary produced by `bun run build:bin`
+ * (`bun build --compile src/cli.ts --outfile bin/clens`). The publish smoke
+ * test exercises this exact artifact rather than the TypeScript source.
+ */
+export const COMPILED_BIN_PATH = resolve(import.meta.dir, "../../bin/clens");
+
+// Shared spawn+capture core. `command` is the executable prefix (e.g.
+// ["bun", "src/cli.ts"] for source or [COMPILED_BIN_PATH] for the binary).
+const spawnAndCapture = async (
+	command: readonly string[],
 	args: readonly string[],
 	projectDir: string,
-	envOverride: Readonly<Record<string, string>> = {},
+	envOverride: Readonly<Record<string, string>>,
 ): Promise<CliResult> => {
-	const cliPath = `${import.meta.dir}/../../src/cli.ts`;
 	const start = performance.now();
 
-	const proc = Bun.spawn(["bun", cliPath, ...args], {
+	const proc = Bun.spawn([...command, ...args], {
 		cwd: projectDir,
 		stdout: "pipe",
 		stderr: "pipe",
@@ -72,6 +82,22 @@ export const runCli = async (
 
 	return { stdout, stderr, exitCode, json, duration_ms };
 };
+
+// Run the CLI from TypeScript source (fast; used by the dev/unit smoke suite).
+export const runCli = (
+	args: readonly string[],
+	projectDir: string,
+	envOverride: Readonly<Record<string, string>> = {},
+): Promise<CliResult> =>
+	spawnAndCapture(["bun", `${import.meta.dir}/../../src/cli.ts`], args, projectDir, envOverride);
+
+// Run the standalone COMPILED binary (bin/clens) — the artifact users install.
+// Build it first with `bun run build:bin`. Used by the publish smoke test.
+export const runCompiledCli = (
+	args: readonly string[],
+	projectDir: string,
+	envOverride: Readonly<Record<string, string>> = {},
+): Promise<CliResult> => spawnAndCapture([COMPILED_BIN_PATH], args, projectDir, envOverride);
 
 // ── ANSI Helpers ────────────────────────────────────────
 

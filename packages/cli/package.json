@@ -49,6 +49,7 @@
   "files": [
     "dist/*.js",
     "dist/web/",
+    "src/types/",
     "agentic/"
   ],
   "bin": {
@@ -64,7 +65,9 @@
     "lint": "bunx biome check src/ test/",
     "lint:fix": "bunx biome check --write src/ test/",
     "format": "bunx biome format --write src/ test/",
-    "prepublishOnly": "bun run typecheck && bun test && bun run build"
+    "pack:check": "npm pack --dry-run 2>&1 | grep -q 'src/types/index.ts' && echo 'OK: type declarations present in tarball' || (echo 'FAIL: type declarations missing from tarball' && exit 1)",
+    "smoke:publish": "bun run build:bin && CLENS_PUBLISH_SMOKE=1 bun test test/e2e/publish-smoke.test.ts",
+    "prepublishOnly": "bun run typecheck && bun test && bun run build && bun run pack:check && bun run smoke:publish"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.3",

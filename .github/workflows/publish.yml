@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # OIDC token for npm publish provenance (--provenance). An explicit
+      # permissions block replaces the default set, so id-token must be listed
+      # alongside contents or provenance is silently disabled.
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -37,7 +41,10 @@ jobs:
         run: bun run lint
       - name: Build
         run: bun run build
+      - name: Verify pack contents (web bundle + types)
+        run: node scripts/verify-pack.mjs packages/cli
       - name: Publish (packages/cli only — root is private)
-        run: npm publish -w packages/cli --access public
+        working-directory: packages/cli
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
