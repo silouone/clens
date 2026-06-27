@@ -39,5 +39,13 @@ export const BottomPanel: Component<BottomPanelProps> = (props) => {
 		}
 	};
 
-	return <div class="h-full overflow-y-auto">{renderTabContent()}</div>;
+	// Single scroll region: this wrapper keeps `h-full` (so TimelineTab's
+	// `h-full` flex layout — fixed header + internal `flex-1 overflow-y-auto`
+	// list — still resolves against a definite-height parent) but no longer
+	// owns an `overflow-y-auto` of its own. The parent tabpanel
+	// (OverviewPanel: `flex-1 overflow-y-auto`) is the sole scroller for the
+	// non-self-managing sibling tabs (Backtracks/Edits/Comms), removing the
+	// redundant nested scroller (#31). TimelineTab keeps its own internal
+	// scroll, so its filter/legend header stays pinned.
+	return <div class="h-full">{renderTabContent()}</div>;
 };
