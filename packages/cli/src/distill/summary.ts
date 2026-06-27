@@ -88,12 +88,15 @@ export interface SummaryOptions {
 const buildNarrative = (opts: SummaryOptions): string => {
 	const { stats, backtracks, phases, file_map, reasoning, team_metrics, activeDuration, agents, editChains } = opts;
 	const modelName = stats.model ?? "unknown model";
-	const duration = formatDurationHuman(stats.duration_ms);
+	// Lead with the WALL span (B2 semantic) so the narrative matches the web
+	// DURATION tile / session list. duration_ms is idle-trimmed and would
+	// contradict the wall span on team sessions (e.g. "2h 5m" vs a 6h span).
+	const duration = formatDurationHuman(stats.wall_duration_ms ?? stats.duration_ms);
 	const top3 = topNTools(stats.tools_by_name, 3);
 	const filesModified = file_map.filter((f) => f.edits > 0 || f.writes > 0).length;
 
 	const activeTag =
-		activeDuration && activeDuration.active_ms < stats.duration_ms
+		activeDuration && activeDuration.active_ms < (stats.wall_duration_ms ?? stats.duration_ms)
 			? ` (${formatDurationHuman(activeDuration.active_ms)} active)`
 			: "";
 	const sentence1 = `A ${duration} session${activeTag} using ${modelName} with ${stats.tool_call_count} tool calls.`;

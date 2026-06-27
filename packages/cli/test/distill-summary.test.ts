@@ -305,6 +305,51 @@ describe("extractSummary", () => {
 		expect(result.narrative).toContain("primarily debugging");
 	});
 
+	test("narrative leads with the wall span and shows active tag when active < wall (#29)", () => {
+		// Team-session shape: wall span > idle-trimmed duration > active.
+		// The narrative DURATION lead must match the web tile (wall span, B2),
+		// not the idle-trimmed duration_ms.
+		const stats = makeStats({
+			wall_duration_ms: 22_020_000, // 6h 7m 0s (wall span)
+			duration_ms: 7_557_000, // 2h 5m 57s (idle-trimmed)
+		});
+		const activeDuration = {
+			active_ms: 5_400_000, // 1h 30m 0s (active < wall)
+			idle_ms: 16_620_000,
+			pause_ms: 0,
+		};
+
+		const result = extractSummary({
+			stats,
+			backtracks: [],
+			phases: [],
+			file_map: [],
+			reasoning: [],
+			activeDuration,
+		});
+
+		// Leads with the WALL span, NOT the idle-trimmed duration.
+		expect(result.narrative).toContain("A 6h 7m 0s session");
+		expect(result.narrative).not.toContain("A 2h 5m 57s session");
+		// Active tag reflects the active duration.
+		expect(result.narrative).toContain("(1h 30m 0s active)");
+		// key_metrics.duration_human stays idle-trimmed (out of scope, locked).
+		expect(result.key_metrics.duration_human).toBe("2h 5m 57s");
+	});
+
+	test("narrative falls back to duration_ms when wall_duration_ms absent (#29)", () => {
+		// Single-agent sessions without a wall span keep the existing behavior.
+		const result = extractSummary({
+			stats: makeStats(), // duration_ms 45m 30s, no wall_duration_ms
+			backtracks: [],
+			phases: [],
+			file_map: [],
+			reasoning: [],
+		});
+
+		expect(result.narrative).toContain("A 45m 30s session");
+	});
+
 	test("narrative unchanged when no team_metrics provided", () => {
 		const result = extractSummary({
 			stats: makeStats(),
