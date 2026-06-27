@@ -249,6 +249,45 @@ describe("Integration: Full server lifecycle", () => {
 		rmSync(`${TEST_DIR}/.clens/config.json`, { force: true })
 	})
 
+	test("GET /api/sessions/:id does NOT report tier_stale when the distill's tier matches the explicit config tier", async () => {
+		// Boundary companion to the mismatch case: when the tier a distill is read
+		// under equals the user's current explicit setting, costs are current and
+		// tier_stale must stay false (no spurious re-analyze prompt). readDistilled
+		// re-prices estimated (non-measured) costs to the "api" tier for display, so
+		// the comparison tier here is "api" — pin that equality stays non-stale.
+		const matchId = "bbccddee-2233-4455-6677-8899aabbccdd"
+		const matchEvents = [
+			makeEvent("SessionStart", 1000, { source: "cli" }),
+			makeEvent("SessionEnd", 2000, {}),
+		]
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${matchId}.jsonl`, matchEvents.join("\n") + "\n")
+		writeFileSync(
+			`${TEST_DIR}/.clens/distilled/${matchId}.json`,
+			JSON.stringify({
+				session_id: matchId,
+				stats: {
+					total_events: 2, duration_ms: 1000, events_by_type: {}, tools_by_name: {},
+					tool_call_count: 0, failure_count: 0, failure_rate: 0, unique_files: [],
+					cost_estimate: { model: "claude-fable-5", estimated_input_tokens: 1, estimated_output_tokens: 1, estimated_cost_usd: 0.01, is_estimated: false, pricing_tier: "api" },
+				},
+				backtracks: [], decisions: [], file_map: { files: [] },
+				git_diff: { commits: [], hunks: [] }, reasoning: [], user_messages: [],
+				complete: true,
+			}),
+		)
+		// Explicit config tier equals the (re-priced) tier the distill is read under
+		writeFileSync(`${TEST_DIR}/.clens/config.json`, JSON.stringify({ capture: true, pricing: "api" }))
+
+		const res = await authFetch(`/api/sessions/${matchId}`)
+		expect(res.status).toBe(200)
+		const body = await res.json()
+		expect(body.staleness).toBeDefined()
+		expect(body.staleness.tier_stale).toBe(false)
+		expect(body.staleness.distill_stale).toBe(false)
+
+		rmSync(`${TEST_DIR}/.clens/config.json`, { force: true })
+	})
+
 	// ── Live status thresholds (bug B6) ────────────────────────────
 
 	test("a session whose last event is recent lists as active (bug B6)", async () => {

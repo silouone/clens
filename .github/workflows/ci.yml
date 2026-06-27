@@ -8,6 +8,10 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # TEST-10: pin the timezone so time-relative analytics window tests are deterministic
+    # across runners. ubuntu-latest already defaults to UTC; this makes it explicit.
+    env:
+      TZ: UTC
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
