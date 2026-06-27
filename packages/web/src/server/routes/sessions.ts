@@ -196,14 +196,25 @@ const countAgentsRecursive = (agents: readonly { children?: readonly unknown[] }
 	agents.reduce((sum, a) => sum + 1 + countAgentsRecursive((a.children ?? []) as readonly { children?: readonly unknown[] }[]), 0)
 
 /** Count all agents in a distilled JSON file (recursive through children). */
-const countDistilledAgents = (distilledPath: string): number => {
+/**
+ * Single read of a distilled file, surfacing both the recursive agent count and the
+ * idle-trimmed active span (`stats.duration_ms`, locked semantics). The trimmed span
+ * powers the SessionList "ACTIVE" header chip — distinct from the per-row wall span —
+ * and is reused from this one read so no extra per-session I/O is added (bug NUM-3).
+ */
+const readDistilledRollup = (
+	distilledPath: string,
+): { readonly agentCount: number; readonly activeDurationMs?: number } => {
 	try {
 		const content = readFileSync(distilledPath, "utf-8")
 		const parsed = JSON.parse(content)
 		const agents = parsed?.agents
-		return Array.isArray(agents) ? countAgentsRecursive(agents) : 0
+		const agentCount = Array.isArray(agents) ? countAgentsRecursive(agents) : 0
+		const trimmed = parsed?.stats?.duration_ms
+		const activeDurationMs = typeof trimmed === "number" && trimmed >= 0 ? trimmed : undefined
+		return { agentCount, activeDurationMs }
 	} catch {
-		return 0
+		return { agentCount: 0 }
 	}
 }
 
@@ -340,11 +351,18 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 				// fires after every turn — bug B6). Otherwise active iff recent, else idle.
 				const isSessionEnd = lastEvent.event === "SessionEnd"
 				const status = deriveSessionStatus(isSessionEnd, lastEvent.t)
+				// Lone-SessionEnd ghost (NUM-4): the only captured line is a SessionEnd, so
+				// the session start was never recorded — a torn/partial capture with 0 real
+				// content. It must never render as "DONE 0s". Tag it EMPTY so the row shows
+				// as torn; it is KEPT (not dropped) to preserve list-count parity with the
+				// CLI (NUM-1), which does not drop these either.
+				const isEmpty = result.lineCount === 1 && isSessionEnd
 				const distilledPath = `${distilledDir}/${sessionId}.json`
 				const isDistilled = existsSync(distilledPath)
 
 				// Agent count: distilled (recursive, authoritative) > spawn links > msg_send > 0
-				const distilledCount = isDistilled ? countDistilledAgents(distilledPath) : 0
+				const distilledRollup = isDistilled ? readDistilledRollup(distilledPath) : { agentCount: 0 }
+				const distilledCount = distilledRollup.agentCount
 				const spawnCount = spawnCountByParent.get(sessionId) ?? 0
 				const msgCount = msgRecipientsBySession.get(sessionId)?.size ?? 0
 				const agentCount = distilledCount > 0
@@ -367,6 +385,8 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 					agent_count: agentCount,
 					is_distilled: isDistilled,
 					is_subagent: subagentIds.has(sessionId),
+					...(isEmpty ? { is_empty: true } : {}),
+					...(distilledRollup.activeDurationMs !== undefined ? { active_duration_ms: distilledRollup.activeDurationMs } : {}),
 					...((featureIndex.get(sessionId)?.length ?? 0) > 0 ? { features: featureIndex.get(sessionId) } : {}),
 				}]
 			} catch (err) {
@@ -388,6 +408,45 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 /** Resolve a single session's enriched summary (display_name/label/color) by id. */
 const resolveSessionRow = (projectDir: string, sessionId: string): SessionSummary | undefined =>
 	listSessionsLightweight(projectDir).find((s) => s.session_id === sessionId)
+
+// ── Short-id prefix resolution (FE-2) ──────────────────────────────
+
+type PrefixResolution =
+	| { readonly kind: "ok"; readonly id: string }
+	| { readonly kind: "ambiguous"; readonly matches: readonly string[] }
+	| { readonly kind: "none" }
+
+/**
+ * Resolve a possibly-truncated session id (e.g. an 8-char prefix from a list link)
+ * to a full session id by matching `.jsonl` file names (FE-2). An exact file wins
+ * with no scan; otherwise a UNIQUE prefix match resolves, an ambiguous prefix is
+ * reported (caller → 400), and no match yields "none" (caller → 404). Full ids pass
+ * straight through via the exact-file check.
+ */
+const resolveSessionIdPrefix = (projectDir: string, id: string): PrefixResolution => {
+	const sessionsDir = `${projectDir}/.clens/sessions`
+	if (existsSync(`${sessionsDir}/${id}.jsonl`)) return { kind: "ok", id }
+	const matches = (() => {
+		try {
+			return readdirSync(sessionsDir)
+				.filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl" && f.startsWith(id))
+				.map((f) => f.slice(0, -".jsonl".length))
+		} catch {
+			return []
+		}
+	})()
+	if (matches.length === 1) return { kind: "ok", id: matches[0] }
+	if (matches.length > 1) return { kind: "ambiguous", matches }
+	return { kind: "none" }
+}
+
+/** Deterministic 400 body fields for an ambiguous short-id prefix (FE-2). Spread into
+ *  an inline `c.json(...)` so Hono's RPC type inference for the route is preserved. */
+const ambiguousPrefixError = (rawId: string, count: number) => ({
+	error: "Ambiguous session id prefix",
+	code: "AMBIGUOUS_SESSION_ID" as const,
+	detail: `${rawId} matches ${count} sessions — use a longer prefix or the full id`,
+})
 
 // ── Meta-patch body parsing / validation ──────────────────────────
 
@@ -558,7 +617,11 @@ const createSessionsRoute = (projectDir: string) =>
 
 		// GET /api/sessions/:sessionId — session detail (distilled)
 		.get("/:sessionId", (c) => {
-			const sessionId = c.req.param("sessionId")
+			const rawId = c.req.param("sessionId")
+			// Resolve a short id prefix (e.g. list-provided 8-char id) to the full id (FE-2).
+			const resolved = resolveSessionIdPrefix(projectDir, rawId)
+			if (resolved.kind === "ambiguous") return c.json(ambiguousPrefixError(rawId, resolved.matches.length), 400)
+			const sessionId = resolved.kind === "ok" ? resolved.id : rawId
 			log.info(`Session detail: ${sessionId.slice(0, 8)}`)
 
 			const distilled = readDistilled(sessionId, projectDir)
@@ -890,6 +953,25 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 		return project?.path ?? fallbackProjectDir
 	}
 
+	// Resolve a short id prefix to its full id + owning capture dir across all
+	// projects (FE-2). Exact id wins; a unique prefix resolves; multiple → ambiguous.
+	type GlobalResolution =
+		| { readonly kind: "ok"; readonly id: string; readonly projectDir: string }
+		| { readonly kind: "ambiguous"; readonly count: number }
+		| { readonly kind: "none" }
+	const resolveGlobalSession = (id: string): GlobalResolution => {
+		const map = buildSessionMap(projects)
+		const exact = map.get(id)
+		if (exact) return { kind: "ok", id, projectDir: exact.path }
+		const matches = [...map.keys()].filter((k) => k.startsWith(id))
+		if (matches.length === 1) {
+			const owner = map.get(matches[0])
+			return owner ? { kind: "ok", id: matches[0], projectDir: owner.path } : { kind: "none" }
+		}
+		if (matches.length > 1) return { kind: "ambiguous", count: matches.length }
+		return { kind: "none" }
+	}
+
 	return new Hono()
 		// GET /api/sessions — list sessions from all projects with pagination
 		.get("/", (c) => {
@@ -928,10 +1010,14 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 			})
 		})
 
-		// GET /api/sessions/:sessionId — session detail (resolves project)
+		// GET /api/sessions/:sessionId — session detail (resolves project + short id)
 		.get("/:sessionId", (c) => {
-			const sessionId = c.req.param("sessionId")
-			const projectDir = resolveProjectDir(sessionId)
+			const rawId = c.req.param("sessionId")
+			// Resolve a short id prefix (e.g. list-provided 8-char id) to the full id (FE-2).
+			const resolved = resolveGlobalSession(rawId)
+			if (resolved.kind === "ambiguous") return c.json(ambiguousPrefixError(rawId, resolved.count), 400)
+			const sessionId = resolved.kind === "ok" ? resolved.id : rawId
+			const projectDir = resolved.kind === "ok" ? resolved.projectDir : resolveProjectDir(rawId)
 			log.info(`Session detail (global): ${sessionId.slice(0, 8)} → ${projectDir}`)
 
 			const distilled = readDistilled(sessionId, projectDir)

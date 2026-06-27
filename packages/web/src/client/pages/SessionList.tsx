@@ -559,11 +559,17 @@ export const SessionList: Component = () => {
 		const scoped = projectId === undefined
 			? sessions
 			: sessions.filter((s) => getProjectId(s) === projectId);
-		const active = scoped.filter((s) => s.status === "active").length;
+		const live = scoped.filter((s) => s.status === "active").length;
 		const analyzed = scoped.filter((s) => s.is_distilled).length;
 		const events = scoped.reduce((sum, s) => sum + s.event_count, 0);
-		const duration = scoped.reduce((sum, s) => sum + s.duration_ms, 0);
-		return { total: scoped.length, active, analyzed, events, duration };
+		// SPAN = Σ wall-clock duration_ms (locked semantics; includes idle gaps).
+		const span = scoped.reduce((sum, s) => sum + s.duration_ms, 0);
+		// ACTIVE = Σ idle-trimmed active spans — distinct from SPAN. Only analyzed
+		// sessions carry active_duration_ms, so this is a partial-coverage estimate
+		// (rendered with "~"); activeCoverage tracks how many sessions contribute.
+		const withActive = scoped.filter((s) => typeof s.active_duration_ms === "number");
+		const activeDuration = withActive.reduce((sum, s) => sum + (s.active_duration_ms ?? 0), 0);
+		return { total: scoped.length, live, analyzed, events, span, activeDuration, activeCoverage: withActive.length };
 	});
 
 	const handleRowClick = (session: SessionSummary) => {
@@ -632,9 +638,9 @@ export const SessionList: Component = () => {
 							<dt class="instrument-microcaps text-[9px] text-muted">Sessions</dt>
 							<dd class="font-mono text-sm tabular-nums text-primary">{kpis().total}</dd>
 						</div>
-						<div class="bg-surface px-3 py-1">
-							<dt class="instrument-microcaps text-[9px] text-muted">Active</dt>
-							<dd class="font-mono text-sm tabular-nums text-brand-500">{kpis().active}</dd>
+						<div class="bg-surface px-3 py-1" title="Sessions currently running (last event within the active threshold)">
+							<dt class="instrument-microcaps text-[9px] text-muted">Live</dt>
+							<dd class="font-mono text-sm tabular-nums text-brand-500">{kpis().live}</dd>
 						</div>
 						<div class="bg-surface px-3 py-1">
 							<dt class="instrument-microcaps text-[9px] text-muted">Analyzed</dt>
@@ -644,9 +650,18 @@ export const SessionList: Component = () => {
 							<dt class="instrument-microcaps text-[9px] text-muted">Events</dt>
 							<dd class="font-mono text-sm tabular-nums text-secondary">{kpis().events.toLocaleString()}</dd>
 						</div>
-						<div class="bg-surface px-3 py-1">
-							<dt class="instrument-microcaps text-[9px] text-muted">Total time</dt>
-							<dd class="font-mono text-sm tabular-nums text-secondary">{formatDuration(kpis().duration)}</dd>
+						<div class="bg-surface px-3 py-1" title="Total wall-clock span summed across sessions (includes idle gaps between turns)">
+							<dt class="instrument-microcaps text-[9px] text-muted">Span</dt>
+							<dd class="font-mono text-sm tabular-nums text-secondary">{formatDuration(kpis().span)}</dd>
+						</div>
+						<div
+							class="bg-surface px-3 py-1"
+							title={`Idle-trimmed active time across ${kpis().activeCoverage} analyzed session${kpis().activeCoverage !== 1 ? "s" : ""} — estimate, analyzed sessions only`}
+						>
+							<dt class="instrument-microcaps text-[9px] text-muted">Active</dt>
+							<dd class="font-mono text-sm tabular-nums text-secondary">
+								{kpis().activeCoverage > 0 ? `~${formatDuration(kpis().activeDuration)}` : "—"}
+							</dd>
 						</div>
 					</dl>
 				</div>
@@ -823,11 +838,20 @@ export const SessionList: Component = () => {
 												})()}
 											</td>
 										</Show>
-										<td class="px-4 py-2">
-												<StatusBadge status={session.status} compact />
+											<td class="px-4 py-2">
+												{/* Lone-SessionEnd torn capture renders EMPTY, never "DONE 0s" (NUM-4). */}
+												<Show when={session.is_empty} fallback={<StatusBadge status={session.status} compact />}>
+													<span
+														class="instrument-microcaps inline-flex items-center gap-1.5 text-[9px] text-muted"
+														title="Only a SessionEnd event was captured — the session start was not recorded (torn/empty capture)."
+													>
+														<span class="instrument-led bg-[var(--clens-tick)]" />
+														empty
+													</span>
+												</Show>
 											</td>
 											<td class="px-4 py-2 text-right font-mono tabular-nums text-secondary">
-												{formatDuration(session.duration_ms)}
+												{session.is_empty ? "—" : formatDuration(session.duration_ms)}
 											</td>
 											<td class="px-4 py-2 text-right font-mono tabular-nums text-secondary">{session.event_count}</td>
 											<td class="px-4 py-2 text-right font-mono tabular-nums text-secondary">

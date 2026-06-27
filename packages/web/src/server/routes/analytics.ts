@@ -25,6 +25,12 @@ type Range = "7d" | "30d" | "90d" | "all"
 interface Population {
 	readonly analyzed: number
 	readonly total: number
+	/**
+	 * Sessions in the window that exist raw but are NOT yet reflected in analytics
+	 * (not distilled). Surfaced as an "N pending" indicator so a freshly ended
+	 * session is visibly accounted for before a full distill runs (NUM-8).
+	 */
+	readonly pending: number
 }
 
 interface DailyUsageMetrics {
@@ -124,7 +130,6 @@ interface InsightsTotals {
 	readonly reasoning_action_ratio: number
 	readonly reasoning_distribution: Record<string, number>
 	readonly decision_type_distribution: Record<string, number>
-	readonly agent_quality_score: number
 }
 
 interface ToolErrorEntry {
@@ -337,10 +342,13 @@ const computePopulation = (
 	analyzedRows: readonly AnalyticsSummaryRow[],
 	range: Range,
 	window: CustomWindow | undefined,
-): Population => ({
-	analyzed: analyzedRows.length,
-	total: countRawSessionsInWindow(rawStartTimes, range, window),
-})
+): Population => {
+	const analyzed = analyzedRows.length
+	const total = countRawSessionsInWindow(rawStartTimes, range, window)
+	// Clamp: windowing (analyzed counted by row, total by raw start day) can make
+	// the difference negative at the edges; pending is never below zero (NUM-8).
+	return { analyzed, total, pending: Math.max(0, total - analyzed) }
+}
 
 // ── Usage metrics computation ──────────────────────────────────────
 
@@ -583,13 +591,11 @@ const computeDailyInsights = (byDate: ReadonlyMap<string, readonly AnalyticsSumm
 			}
 		})
 
-const computeQualityScore = (totals: InsightsTotals): number => {
-	const score = 100
-		- (totals.abandoned_edit_rate * 50)
-		- (totals.backtrack_rate * 10)
-		- (Number.isNaN(totals.avg_drift_score) ? 0 : totals.avg_drift_score * 25)
-	return Math.max(0, Math.min(100, score))
-}
+// Quality Score was CUT for launch (DECISIONS.md D3): it was dimensionally
+// incoherent and window-unstable (22 vs 52 multiplier), and shipping a misleading
+// headline on an observability tool is worse than omitting it. The headline, the
+// `agent_quality_score` field, and the dead second implementation are removed; a
+// normalized re-introduction is a follow-up.
 
 const computeInsightsTotals = (rows: readonly AnalyticsSummaryRow[]): InsightsTotals => {
 	if (rows.length === 0) {
@@ -598,7 +604,6 @@ const computeInsightsTotals = (rows: readonly AnalyticsSummaryRow[]): InsightsTo
 			avg_drift_score: Number.NaN, sessions_with_drift: 0,
 			reasoning_action_ratio: 0,
 			reasoning_distribution: {}, decision_type_distribution: {},
-			agent_quality_score: 100,
 		}
 	}
 
@@ -614,7 +619,6 @@ const computeInsightsTotals = (rows: readonly AnalyticsSummaryRow[]): InsightsTo
 
 	const totalReasoning = rows.reduce((s, r) => s + Object.values(r.reasoning_by_intent).reduce((a, b) => a + b, 0), 0)
 	const totalToolCalls = rows.reduce((s, r) => s + r.tool_call_count, 0)
-	const totalFailures = rows.reduce((s, r) => s + r.failure_count, 0)
 
 	// Merge distributions
 	const reasoningDist = rows.reduce<Record<string, number>>(
@@ -632,11 +636,10 @@ const computeInsightsTotals = (rows: readonly AnalyticsSummaryRow[]): InsightsTo
 		{},
 	)
 
-	const failureRate = totalToolCalls > 0 ? totalFailures / totalToolCalls : 0
 	const backtrackRate = rows.length > 0 ? totalBacktracks / rows.length : 0
 	const abandonedEditRate = editTotal > 0 ? totalAbandoned / editTotal : 0
 
-	const partialTotals: InsightsTotals = {
+	return {
 		sessions: rows.length,
 		backtrack_rate: backtrackRate,
 		abandoned_edit_rate: abandonedEditRate,
@@ -645,19 +648,6 @@ const computeInsightsTotals = (rows: readonly AnalyticsSummaryRow[]): InsightsTo
 		reasoning_action_ratio: totalToolCalls > 0 ? totalReasoning / totalToolCalls : 0,
 		reasoning_distribution: reasoningDist,
 		decision_type_distribution: decisionDist,
-		agent_quality_score: 0, // computed below
-	}
-
-	// Quality score uses failure_rate from usage computation
-	const score = 100
-		- (failureRate * 100)
-		- (backtrackRate * 10)
-		- (abandonedEditRate * 50)
-		- (Number.isNaN(avgDrift) ? 0 : avgDrift * 25)
-
-	return {
-		...partialTotals,
-		agent_quality_score: Math.max(0, Math.min(100, score)),
 	}
 }
 

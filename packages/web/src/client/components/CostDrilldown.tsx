@@ -1,5 +1,5 @@
 import { createEffect, onCleanup, Show, type Component } from "solid-js";
-import type { DistilledSession } from "../../shared/types";
+import type { CostEstimate, DistilledSession, TokenUsage } from "../../shared/types";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -19,6 +19,26 @@ const cacheEfficiency = (input: number, cacheRead: number): string => {
 	return `${Math.round((cacheRead / total) * 100)}%`;
 };
 
+/**
+ * Derive a token breakdown from a CostEstimate (NUM-15).
+ *
+ * `stats.token_usage` is absent on ~92% of sessions (the cost is token-estimated
+ * rather than from a verbatim usage object), which left the drilldown blank. The
+ * CostEstimate that backs every priced session still carries its own token
+ * counts, so fall back to those. The estimated banner already flags provenance.
+ * Returns undefined when there is no cost_estimate, so the "not available"
+ * branch still covers the truly-empty case.
+ */
+const tokensFromCost = (cost: CostEstimate | undefined): TokenUsage | undefined =>
+	cost
+		? {
+				input_tokens: cost.estimated_input_tokens,
+				output_tokens: cost.estimated_output_tokens,
+				cache_read_tokens: cost.cache_read_tokens ?? 0,
+				cache_creation_tokens: cost.cache_creation_tokens ?? 0,
+			}
+		: undefined;
+
 // ── Token row ────────────────────────────────────────────────────────
 
 const TokenRow: Component<{
@@ -37,7 +57,9 @@ const TokenRow: Component<{
 
 export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 	const cost = () => props.session.cost_estimate;
-	const tokens = () => props.session.stats.token_usage;
+	// Prefer a verbatim token_usage object; fall back to the CostEstimate's own
+	// token counts when it's absent (NUM-15) so the breakdown isn't blank.
+	const tokens = () => props.session.stats.token_usage ?? tokensFromCost(cost());
 
 	// Close on outside click via backdrop
 	// Close on Escape key

@@ -8,10 +8,48 @@ export const formatDuration = (ms: number): string => {
 	return `${h}h ${m % 60}m`;
 };
 
-/** Format a USD cost value (e.g. "$1.23" or "~$1.23" for estimated). */
+/**
+ * Format a USD cost value (e.g. "$1.23", or "~$1.23" / "~<$0.01" for estimated).
+ *
+ * `isEstimated` should be `true` whenever the source `cost_basis !== "measured"`
+ * (per-session costs are ~0% measured on disk — cache_read dominates). The `~`
+ * is applied to BOTH the normal and sub-cent branches so an estimated session
+ * never renders a bare exact figure (NUM-5 / locked honesty caveat).
+ */
 export const formatCost = (usd: number, isEstimated?: boolean): string => {
 	const prefix = isEstimated ? "~" : "";
-	return usd < 0.01 ? "<$0.01" : `${prefix}$${usd.toFixed(2)}`;
+	return usd < 0.01 ? `${prefix}<$0.01` : `${prefix}$${usd.toFixed(2)}`;
+};
+
+/**
+ * Humanize a raw model id into its public display name (NUM-6).
+ *
+ * Captured model ids arrive in their raw API form — lowercase, hyphenated, and
+ * sometimes carrying a context-window variant suffix (e.g. `claude-fable-5`,
+ * `CLAUDE-FABLE-5`, `claude-opus-4-8[1m]`). Rendered verbatim in a public UI
+ * they read as internal/unpolished. This maps them to the canonical Anthropic
+ * display names ("Claude Fable 5", "Claude Opus 4.8") and strips the bracketed
+ * `[1m]`/`[200k]` variant suffix entirely.
+ *
+ * Algorithmic (no lookup table): the dash-number id pattern title-cases the
+ * leading name tokens and dot-joins the trailing numeric version segments —
+ * `claude-opus-4-8` → "Claude Opus 4.8", `claude-fable-5` → "Claude Fable 5".
+ * Unrecognized shapes fall through unchanged.
+ */
+export const modelDisplayName = (modelId: string): string => {
+	if (!modelId) return modelId;
+	// Drop a context-window variant suffix like "[1m]" / "[200k]".
+	const base = modelId.replace(/\s*\[[^\]]*\]\s*$/i, "").trim();
+	const parts = base.split("-").filter(Boolean);
+	if (parts.length === 0) return modelId;
+	const words: string[] = [];
+	const version: string[] = [];
+	for (const p of parts) {
+		if (/^\d+$/.test(p)) version.push(p);
+		else words.push(p.charAt(0).toUpperCase() + p.slice(1));
+	}
+	const name = words.join(" ");
+	return version.length > 0 ? `${name} ${version.join(".")}` : name;
 };
 
 /** Format a percentage from value/total (e.g. "59%" or "< 1%"). */

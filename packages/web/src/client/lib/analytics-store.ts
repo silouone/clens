@@ -11,6 +11,8 @@ export type AnalyticsRange = "7d" | "30d" | "90d" | "all";
 export interface Population {
 	readonly analyzed: number;
 	readonly total: number;
+	/** Window sessions present raw but not yet analyzed (distilled) — "N pending" (NUM-8). */
+	readonly pending: number;
 }
 
 export interface DailyUsageMetrics {
@@ -106,7 +108,6 @@ export interface InsightsTotals {
 	readonly reasoning_action_ratio: number;
 	readonly reasoning_distribution: Record<string, number>;
 	readonly decision_type_distribution: Record<string, number>;
-	readonly agent_quality_score: number;
 }
 
 export interface ToolErrorEntry {
@@ -297,9 +298,10 @@ const fetchHeaderStats = async (): Promise<HeaderStats> => {
 		const body = await res.json();
 		const t = body.data?.totals as UsageTotals | undefined;
 		if (!t) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0 };
-		// "today" count from daily array
+		// "today" count from daily array — daily rows are keyed by LOCAL calendar day
+		// (analytics-summary.localDayKey), so match on the local current day, not UTC.
 		const daily = (body.data?.daily ?? []) as readonly DailyUsageMetrics[];
-		const today = new Date().toISOString().slice(0, 10);
+		const today = localDayKey(Date.now());
 		const todayRow = daily.find((d) => d.date === today);
 		return {
 			totalSessions: t.sessions,

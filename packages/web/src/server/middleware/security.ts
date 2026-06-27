@@ -15,9 +15,16 @@ type ErrorResponse = {
 const errorJson = (c: Context, status: 401 | 403 | 400, body: ErrorResponse) =>
 	c.json(body, status)
 
-// ── UUID regex for session ID path validation ──────────────────────
+// ── Session ID path validation ─────────────────────────────────────
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// A bare hex prefix (e.g. an 8-char id from a list link) is also accepted so the
+// route layer can resolve it to a full session id (FE-2) instead of the gate
+// returning 400. Hex-only (no path separators / dots) — no traversal risk.
+const SHORT_ID_RE = /^[0-9a-f]{8,32}$/i
+
+const isValidSessionId = (id: string): boolean => UUID_RE.test(id) || SHORT_ID_RE.test(id)
 
 // ── Auth token middleware ──────────────────────────────────────────
 
@@ -50,17 +57,18 @@ const authToken = (serverToken: string) =>
 // ── Session ID path validation ─────────────────────────────────────
 
 /**
- * Validates that :sessionId path params match UUID format.
+ * Validates that :sessionId path params are either a full UUID or a hex id prefix
+ * (which the route resolves to a full id, FE-2). Anything else → 400.
  */
 const validateSessionId = () =>
 	createMiddleware(async (c, next) => {
 		const sessionId = c.req.param("sessionId")
-		if (sessionId && !UUID_RE.test(sessionId)) {
+		if (sessionId && !isValidSessionId(sessionId)) {
 			log.warn(`Invalid session ID: ${sessionId}`)
 			return errorJson(c, 400, {
 				error: "Invalid session ID",
 				code: "INVALID_SESSION_ID",
-				detail: `Session ID must be a valid UUID, got: ${sessionId}`,
+				detail: `Session ID must be a valid UUID or hex id prefix, got: ${sessionId}`,
 			})
 		}
 		await next()

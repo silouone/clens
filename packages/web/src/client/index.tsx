@@ -1,10 +1,11 @@
 /* @refresh reload */
-import { Route, Router, useParams, useNavigate } from "@solidjs/router";
-import { onMount, type Component } from "solid-js";
+import { Route, Router, useParams, useNavigate, useLocation } from "@solidjs/router";
+import { createEffect, onMount, type Component } from "solid-js";
 import { render } from "solid-js/web";
 import { App } from "./App";
 import { SessionList } from "./pages/SessionList";
 import { SessionDetail } from "./pages/SessionDetail";
+import { sessionList } from "./lib/stores";
 import { WorkUnitDetail } from "./pages/WorkUnitDetail";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SHOW_WORK_UNITS } from "./lib/feature-flags";
@@ -34,6 +35,35 @@ const AgentRedirect: Component = () => {
 	return null;
 };
 
+// ── Short-id session route (FE-2) ───────────────────────────────────
+
+const SESSION_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Wraps /session/:id. When the id is a short prefix (e.g. an 8-char id from a list
+ * link) rather than a full UUID, resolve it to the canonical full id from the
+ * already-loaded session list and redirect (FE-2). Canonicalizing the URL means
+ * every downstream fetch + `params.id === session_id` lookup in SessionDetail uses
+ * the full id. The server resolves the prefix too, so SessionDetail still loads
+ * while the redirect settles; a never-resolved id falls through to its own 404.
+ */
+const SessionDetailRoute: Component = () => {
+	const params = useParams<{ id: string }>();
+	const navigate = useNavigate();
+	const location = useLocation();
+	createEffect(() => {
+		const id = params.id;
+		if (SESSION_UUID_RE.test(id)) return;
+		const sessions = sessionList();
+		if (!sessions) return; // list still loading — server-side resolution covers the fetch
+		const match = sessions.find((s) => s.session_id.startsWith(id));
+		if (match && match.session_id !== id) {
+			navigate(`/session/${match.session_id}${location.search}`, { replace: true });
+		}
+	});
+	return <SessionDetail />;
+};
+
 // Work Units is feature-flagged off (SHOW_WORK_UNITS). When hidden, the
 // /work-unit/:id route falls back to a redirect home so the feature is
 // unreachable by direct URL. The WorkUnitDetail page stays imported and intact —
@@ -56,7 +86,7 @@ render(
 	() => (
 		<Router root={App}>
 			<Route path="/" component={SessionList} />
-			<Route path="/session/:id" component={SessionDetail} />
+			<Route path="/session/:id" component={SessionDetailRoute} />
 			<Route path="/work-unit/:id" component={WorkUnitRoute} />
 			<Route path="/usage" component={UsagePage} />
 			<Route path="/insights" component={InsightsPage} />

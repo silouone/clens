@@ -192,11 +192,8 @@ const Highlights: Component = () => {
 			result.push(`${basename} remains a hotspot with ${topFile.count} backtracks.`);
 		}
 
-		// Quality score — only surface when we actually have a positive reading;
-		// a "0/100" headline reads as a catastrophic failure rather than "no data".
-		if (t.agent_quality_score > 0) {
-			result.push(`Quality score: ${t.agent_quality_score.toFixed(0)}/100.`);
-		}
+		// Quality Score was CUT for launch (DECISIONS.md D3) — it was dimensionally
+		// incoherent and window-unstable; no headline is shown.
 
 		return result;
 	});
@@ -295,11 +292,14 @@ export const InsightsPage: Component = () => {
 	// against an empty baseline is misleading (B10).
 	const hasPrevBaseline = createMemo(() => (prevTotals()?.sessions ?? 0) > 0);
 
-	// "n of m sessions analyzed" coverage line near the KPIs (B10).
+	// "n of m sessions analyzed" coverage line near the KPIs (B10). When raw sessions
+	// exist that haven't been distilled yet, surface them as "· N pending" so a freshly
+	// ended session is visibly accounted for before a full distill runs (NUM-8).
 	const coverageLabel = createMemo(() => {
 		const p = population();
 		if (!p) return undefined;
-		return `${p.analyzed} of ${p.total} sessions analyzed`;
+		const base = `${p.analyzed} of ${p.total} sessions analyzed`;
+		return p.pending > 0 ? `${base} · ${p.pending} pending` : base;
 	});
 
 	// KPI deltas
@@ -347,12 +347,6 @@ export const InsightsPage: Component = () => {
 	const decisionBuckets = createMemo(() =>
 		bucketDecisions(dailyInsights(), analyticsRange()),
 	);
-
-	// Quality score — a raw "0/100" reads as a catastrophic grade rather than
-	// "not yet measured". Treat a zero/absent score as no-reading and render a
-	// neutral em-dash with an explanatory tooltip (no change to the data itself).
-	const qualityScore = createMemo(() => totals()?.agent_quality_score ?? 0);
-	const hasQualityScore = createMemo(() => qualityScore() > 0);
 
 	// Top reasoning category insight
 	const topReasoningInsight = createMemo(() => {
@@ -411,20 +405,14 @@ export const InsightsPage: Component = () => {
 
 			{/* Content */}
 			<Show when={!isLoading() && !isEmpty()}>
-				{/* KPI Cards */}
-				<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-					<KpiCard
-						label="Quality Score"
-						value={hasQualityScore() ? `${qualityScore().toFixed(0)}/100` : "—"}
-						muted={!hasQualityScore()}
-						valueTitle={hasQualityScore() ? undefined : "Quality score not yet available for this range — distill more sessions to populate it."}
-						subtitle={coverageLabel()}
-					/>
+				{/* KPI Cards — Quality Score CUT for launch (DECISIONS.md D3). */}
+				<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
 					<KpiCard
 						label="Backtrack Rate"
 						value={`${(totals()?.backtrack_rate ?? 0).toFixed(1)}/sess`}
 						delta={backtrackDelta()}
 						invertColor
+						subtitle={coverageLabel()}
 					/>
 					<KpiCard
 						label="Edit Survival"

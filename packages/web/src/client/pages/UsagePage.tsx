@@ -24,11 +24,11 @@ import {
 	type DeltaResult,
 	type DailyUsageMetrics,
 } from "../lib/analytics-store";
-import { formatDuration } from "../lib/format";
+import { formatDuration, modelDisplayName } from "../lib/format";
 import { BarChart } from "../components/charts/BarChart";
 import { LineChart } from "../components/charts/LineChart";
 import { StackedArea } from "../components/charts/StackedArea";
-import { ChartTooltip, TOKEN_COLORS, CHART_COLORS, MODEL_OTHER, modelColor, formatCompact } from "../components/charts";
+import { ChartTooltip, ChartEmpty, TOKEN_COLORS, CHART_COLORS, MODEL_OTHER, modelColor, formatCompact } from "../components/charts";
 import { Tooltip } from "../components/ui/Tooltip";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
 import { ProjectDropdown } from "../components/ProjectDropdown";
@@ -275,7 +275,10 @@ export const UsagePage: Component = () => {
 	const modelSegments = createMemo(() => {
 		const models = modelBreakdown().filter((m) => m.cost_usd > 0);
 		const head = models.slice(0, MODEL_TOP_N).map((m, i) => ({
-			label: m.model,
+			// Humanize the raw model id (NUM-6): "claude-fable-5" / "claude-opus-4-8[1m]"
+			// → "Claude Fable 5" / "Claude Opus 4.8". Color stays index-keyed, so the
+			// display label never affects the palette.
+			label: modelDisplayName(m.model),
 			value: m.cost_usd,
 			color: modelColor(i),
 		}));
@@ -399,6 +402,9 @@ export const UsagePage: Component = () => {
 				{/* Token Composition */}
 				<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 					<SectionHeader title="Token Composition" hint="drag to zoom a range" />
+					{/* No priced sessions ⇒ no token signal (every model-bearing session
+					    gets a cost_estimate). Empty state, not a flat-zero stack (NUM-16). */}
+					<Show when={hasCost()} fallback={<ChartEmpty height={220} ariaLabel="No token data" label="No priced sessions in range" />}>
 					<StackedArea
 						data={dailyUsage()}
 						x={(d) => d.date}
@@ -425,11 +431,15 @@ export const UsagePage: Component = () => {
 						onBrushSelect={onBrushSelect}
 						onClickPoint={(d) => navigateToDate(d)}
 					/>
+					</Show>
 				</div>
 
 				{/* Cost Trend */}
 				<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 					<SectionHeader title="Cost Trend" hint="drag to zoom a range" />
+					{/* Gate on hasCost(): no priced sessions ⇒ empty state, not a
+					    flat-zero cost series (NUM-16). */}
+					<Show when={hasCost()} fallback={<ChartEmpty height={180} ariaLabel="No cost data" label="No priced sessions in range" />}>
 					<LineChart
 						data={dailyUsage()}
 						x={(d) => d.date}
@@ -443,6 +453,7 @@ export const UsagePage: Component = () => {
 						onBrushSelect={onBrushSelect}
 						onClickPoint={(d) => navigateToDate(d)}
 					/>
+					</Show>
 				</div>
 
 				{/* Session Volume + Cache Efficiency (side by side) */}

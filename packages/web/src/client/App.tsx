@@ -138,7 +138,10 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Database class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										<div class="instrument-microcaps text-[9px] text-muted leading-none">Total</div>
+										{/* Source is usage totals.sessions = the distilled (analyzed) subset,
+										    not the raw population shown in the session list. Label it "Analyzed"
+										    so the header never contradicts the list total (NUM-10). */}
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">Analyzed</div>
 										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.sessionCount}</div>
 									</div>
 								</div>

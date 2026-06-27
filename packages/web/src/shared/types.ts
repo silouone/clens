@@ -33,6 +33,7 @@ export type {
 	FileDiffAttribution,
 	PhaseInfo,
 	CostEstimate,
+	TokenUsage,
 	TimelineEntry,
 	PlanDriftReport,
 
