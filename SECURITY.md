@@ -38,5 +38,3 @@ sensitive:
 
 This is a deliberate, documented trade-off — cLens captures everything so the
 analysis is faithful. There is no inline redaction at capture time.
-</content>
-</invoke>

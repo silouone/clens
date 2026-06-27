@@ -63,3 +63,5 @@ ai_review/
 
 # Generated/placeholder image assets (not real product assets)
 **/Gemini_Generated_Image*
+# Stray root-level asset dump (real product assets live in packages/web/src/client/assets)
+/assets/
