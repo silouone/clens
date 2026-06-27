@@ -308,7 +308,8 @@
           <code class="mono"><span class="prompt">$ </span><span id="install-cmd">npm i -g clens &amp;&amp; clens init</span></code>
           <button class="icon-btn btn-sm" data-copy="npm i -g clens &amp;&amp; clens init" aria-label="Copy install command">Copy</button>
         </div>
-        <p class="copy-note">Install command pending the public npm-rename — confirm the package name before relying on it.</p>
+        <!-- BUILD NOTE (LAND-2 / D1): canonical npm name resolved to `clens` (the public name). Publish under `clens` is still pending — no creds in the autonomous run — so confirm `npm i -g clens` installs end-to-end BEFORE DNS cutover. -->
+        <p class="copy-note"><span class="mono">clens</span> is the public package name — npm publish is pending; verify it installs before relying on it.</p>
 
         <div class="bezel">
           <div class="bezel-bar">
@@ -478,7 +479,8 @@
 <span class="comment"># use Claude Code normally, then…</span>
 <span class="prompt">$ </span>clens distill --last &amp;&amp; clens what --last</pre>
         </div>
-        <p class="copy-note">Install command pending the public npm-rename — confirm the package name before relying on it.</p>
+        <!-- BUILD NOTE (LAND-2 / D1): canonical npm name resolved to `clens` (the public name). Publish under `clens` is still pending — no creds in the autonomous run — so confirm `npm i -g clens` installs end-to-end BEFORE DNS cutover. -->
+        <p class="copy-note"><span class="mono">clens</span> is the public package name — npm publish is pending; verify it installs before relying on it.</p>
       </div>
     </section>
 
