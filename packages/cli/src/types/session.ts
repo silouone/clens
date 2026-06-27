@@ -1,5 +1,5 @@
 import type { FeatureFlag } from "./distill";
-import type { HookEventType } from "./events";
+import type { EffortLevel, HookEventType, PermissionMode } from "./events";
 
 // Export types
 export interface ExportManifest {
@@ -63,15 +63,30 @@ export interface McpServerUsage {
 }
 
 /**
+ * A CLAUDE.md memory file in effect for a session. `memory_type` is reported by
+ * the `InstructionsLoaded` hook event when the live binary emits it ("realized");
+ * `"inferred"` marks the distill-time fallback that records fact-of-existence of
+ * the project/user CLAUDE.md paths when no such event was captured (CFG-5).
+ */
+export interface ClaudeMdInEffect {
+	readonly file_path: string;
+	readonly memory_type: "User" | "Project" | "Local" | "Managed" | "inferred";
+	readonly load_reason?: string;
+}
+
+/**
  * Typed, derived view of a session's effective configuration, lifted purely from
  * its event stream (zero I/O). `permission_mode` and `effort` are the most-recent
- * non-empty values seen; `mcp_servers` is the deduped set of MCP servers whose
- * tools were invoked (matched on the `mcp__<server>__<tool>` name pattern).
+ * recognized values seen (unknown raw values dropped); `mcp_servers` is the
+ * deduped set of MCP servers whose tools were invoked (matched on the
+ * `mcp__<server>__<tool>` name pattern). `claude_md_in_effect` is realized from
+ * `InstructionsLoaded` events when present, else an inferred fallback (CFG-5).
  */
 export interface SessionConfig {
-	readonly permission_mode?: string;
-	readonly effort?: string;
+	readonly permission_mode?: PermissionMode;
+	readonly effort?: EffortLevel;
 	readonly mcp_servers: readonly McpServerUsage[];
+	readonly claude_md_in_effect?: readonly ClaudeMdInEffect[];
 }
 
 // --- Session naming / color flag types ---

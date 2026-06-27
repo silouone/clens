@@ -36,6 +36,7 @@ import { extractGitDiff, extractNetChanges } from "./git-diff";
 import { computePlanDrift, detectSpecRef } from "./plan-drift";
 import { extractContextConsumption } from "./context-consumption";
 import { extractReasoning } from "./reasoning";
+import { extractSessionConfig } from "./session-config";
 import { estimateCostFromTokens, extractStats } from "./stats";
 import { extractSummary } from "./summary";
 import { extractTeamMetrics } from "./team";
@@ -262,6 +263,7 @@ export const distill = async (
 	// Layer 1: Hook-based extractors (stats receives reasoning + transcript token usage for cost)
 	const stats = extractStats(events, reasoning, token_usage, costTier);
 	const feature_usage = extractFeatureUsage(events);
+	const session_config = extractSessionConfig(events);
 	const backtracks = extractBacktracks(events);
 	const decisions = extractDecisions(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
 	const file_map = extractFileMap(events);
@@ -515,6 +517,7 @@ export const distill = async (
 		...(task_list && task_list.tasks.length > 0 ? { task_list } : {}),
 		...(context_consumption ? { context_consumption } : {}),
 		...(feature_usage ? { feature_usage } : {}),
+		session_config,
 		// Record the tier this distill was priced at so a staleness check can detect when
 		// the configured tier changed since (tier-change-never-recomputes-stale-tier-mixing).
 		pricing_tier: resolvedTier,

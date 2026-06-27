@@ -1,4 +1,13 @@
-import type { McpServerUsage, SessionConfig, StoredEvent } from "../types";
+import {
+	type ClaudeMdInEffect,
+	type EffortLevel,
+	isEffortLevel,
+	isPermissionMode,
+	type McpServerUsage,
+	type PermissionMode,
+	type SessionConfig,
+	type StoredEvent,
+} from "../types";
 
 /**
  * MCP tool naming convention: `mcp__<server>__<tool>`. Server names may contain
@@ -13,35 +22,82 @@ const mcpServerOf = (toolName: string): string | undefined => {
 	return match ? match[1] : undefined;
 };
 
-/** Most-recent non-empty string value of a data field across the event stream. */
-const latestStringField = (
+/** Most-recent value of a data field across the stream that satisfies `accept`. */
+const latestField = <T>(
 	events: readonly StoredEvent[],
 	field: string,
-): string | undefined =>
-	events.reduceRight<string | undefined>((found, e) => {
+	accept: (value: unknown) => value is T,
+): T | undefined =>
+	events.reduceRight<T | undefined>((found, e) => {
 		if (found !== undefined) return found;
 		const value = e.data[field];
-		return typeof value === "string" && value.length > 0 ? value : undefined;
+		return accept(value) ? value : undefined;
 	}, undefined);
+
+const VALID_MEMORY_TYPES = new Set(["User", "Project", "Local", "Managed"]);
+
+/**
+ * Realize CLAUDE.md-in-effect entries from captured `InstructionsLoaded` events.
+ * Returns undefined when none were captured (the installed binary may predate the
+ * event — see CFG-5 BLOCKED-VERIFY), letting the caller fall back to an inferred
+ * list. Deduped by `file_path`, preserving first-seen order. Pure (zero I/O).
+ */
+const realizeClaudeMd = (events: readonly StoredEvent[]): readonly ClaudeMdInEffect[] | undefined => {
+	const seen = new Set<string>();
+	const realized: ClaudeMdInEffect[] = [];
+	for (const e of events) {
+		if (e.event !== "InstructionsLoaded") continue;
+		const filePath = e.data.file_path;
+		if (typeof filePath !== "string" || filePath.length === 0 || seen.has(filePath)) continue;
+		const rawType = e.data.memory_type;
+		const memory_type = typeof rawType === "string" && VALID_MEMORY_TYPES.has(rawType)
+			? (rawType as ClaudeMdInEffect["memory_type"])
+			: "inferred";
+		const loadReason = e.data.load_reason;
+		seen.add(filePath);
+		realized.push({
+			file_path: filePath,
+			memory_type,
+			...(typeof loadReason === "string" && loadReason.length > 0 ? { load_reason: loadReason } : {}),
+		});
+	}
+	return realized.length > 0 ? realized : undefined;
+};
+
+export interface SessionConfigOptions {
+	/**
+	 * Inferred CLAUDE.md fallback (CFG-5), used only when no `InstructionsLoaded`
+	 * events were captured. Produced by `capture/settings.ts:inferClaudeMd` at the
+	 * (impure) call site so this extractor stays I/O-free.
+	 */
+	readonly claudeMdFallback?: readonly ClaudeMdInEffect[];
+}
 
 /**
  * Pure extraction of a session's effective configuration from its event stream.
  *
- * - `permission_mode` and `effort` are lifted as the most-recent non-empty values
- *   observed on event payloads (later events override earlier ones).
+ * - `permission_mode` and `effort` are lifted as the most-recent *recognized*
+ *   values observed on event payloads (unknown raw values are dropped, never
+ *   thrown on); later events override earlier ones.
  * - `mcp_servers` aggregates the distinct MCP servers whose tools were invoked,
  *   counted from `PreToolUse` events (matching `tool_call_count` in stats; Post/
  *   Failure events are NOT counted to avoid double-counting a single call).
  *   The result is deduped by server name and sorted by count desc, then name asc.
+ * - `claude_md_in_effect` is realized from `InstructionsLoaded` events when the
+ *   live binary emits them, otherwise the inferred fallback (if provided).
  *
  * Performs zero I/O.
  */
-export const extractSessionConfig = (events: readonly StoredEvent[]): SessionConfig => {
-	const permission_mode = latestStringField(events, "permission_mode");
-	// OPEN-DECISION: `effort` source field is unverified (no event type or fixture
-	// defines it). Extracting defensively from `data.effort`; confirm against real
-	// capture and widen the fallback chain if the field lives elsewhere.
-	const effort = latestStringField(events, "effort");
+export const extractSessionConfig = (
+	events: readonly StoredEvent[],
+	options: SessionConfigOptions = {},
+): SessionConfig => {
+	const permission_mode: PermissionMode | undefined = latestField(
+		events,
+		"permission_mode",
+		isPermissionMode,
+	);
+	const effort: EffortLevel | undefined = latestField(events, "effort", isEffortLevel);
 
 	const counts = events.reduce<Map<string, number>>((acc, e) => {
 		if (e.event !== "PreToolUse") return acc;
@@ -56,9 +112,12 @@ export const extractSessionConfig = (events: readonly StoredEvent[]): SessionCon
 		.map(([name, count]) => ({ name, count }))
 		.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
+	const claude_md_in_effect = realizeClaudeMd(events) ?? options.claudeMdFallback;
+
 	return {
 		...(permission_mode !== undefined ? { permission_mode } : {}),
 		...(effort !== undefined ? { effort } : {}),
 		mcp_servers,
+		...(claude_md_in_effect && claude_md_in_effect.length > 0 ? { claude_md_in_effect } : {}),
 	};
 };

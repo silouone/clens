@@ -1,4 +1,4 @@
-import type { SessionSummary } from "./session";
+import type { SessionConfig, SessionSummary } from "./session";
 import type { TranscriptReasoning, TranscriptUserMessage } from "./transcript";
 
 // Distill types
@@ -615,6 +615,13 @@ export interface DistilledSession {
 	readonly task_list?: TaskListResult;
 	readonly context_consumption?: ContextConsumption;
 	readonly feature_usage?: FeatureUsage;
+	/**
+	 * Effective session configuration (permission mode, effort, MCP servers) lifted
+	 * purely from the event stream. Optional only for back-compat with distills
+	 * written before this field shipped; `extractSessionConfig` always returns an
+	 * object for freshly distilled sessions.
+	 */
+	readonly session_config?: SessionConfig;
 	/**
 	 * Resolved pricing tier this session was distilled (and priced) with. Surfaced so a
 	 * cache/staleness layer can detect when the configured tier has changed since distill

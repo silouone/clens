@@ -1,4 +1,5 @@
-import type { SessionStartContext } from "../types";
+import type { SessionStartContext, SettingsSnapshot } from "../types";
+import { resolveSettingsSnapshot } from "./settings";
 
 export const enrichSessionStart = (input: Record<string, unknown>): SessionStartContext => {
 	const cwd = (input.cwd as string) || process.cwd();
@@ -8,6 +9,8 @@ export const enrichSessionStart = (input: Record<string, unknown>): SessionStart
 	const trigger = input.trigger as string | undefined;
 	const validSources = new Set(["startup", "resume", "clear", "compact"]);
 	const validTriggers = new Set(["manual", "auto"]);
+
+	const settings_snapshot = getSettingsSnapshot(projectDir);
 
 	return {
 		project_dir: projectDir,
@@ -27,7 +30,21 @@ export const enrichSessionStart = (input: Record<string, unknown>): SessionStart
 		trigger: trigger && validTriggers.has(trigger)
 			? (trigger as "manual" | "auto")
 			: undefined,
+		...(settings_snapshot ? { settings_snapshot } : {}),
 	};
+};
+
+/**
+ * Tier-B settings snapshot (CFG-3), captured once at SessionStart only. Wrapped so
+ * a resolver bug can never break capture (defense-in-depth — the resolver already
+ * returns undefined on read failure). NEVER call this on a hot-path event.
+ */
+const getSettingsSnapshot = (projectDir: string): SettingsSnapshot | undefined => {
+	try {
+		return resolveSettingsSnapshot(projectDir, "session_start");
+	} catch {
+		return undefined;
+	}
 };
 
 const getGitBranch = (cwd: string): string | null => {

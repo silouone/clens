@@ -1,6 +1,25 @@
-import type { DistilledSession } from "../types";
+import type { DistilledSession, SessionConfig } from "../types";
 import { classifySeverity, truncate } from "./format-helpers";
 import { bold, cyan, dim, green } from "./shared";
+
+// --- Config line (pure) ---
+
+/**
+ * Dense single-line summary of a session's effective config. Omits segments with
+ * no data; returns undefined when nothing is known (so callers can skip the line).
+ * Pure — no I/O, no ANSI — so it is unit-testable in isolation.
+ */
+export const formatConfigLine = (config: SessionConfig | undefined): string | undefined => {
+	if (!config) return undefined;
+	const segments = [
+		config.permission_mode ? `perm:${config.permission_mode}` : undefined,
+		config.effort ? `effort:${config.effort}` : undefined,
+		config.mcp_servers.length > 0
+			? `mcp:${config.mcp_servers.map((s) => s.name).join(",")}`
+			: undefined,
+	].filter((s): s is string => s !== undefined);
+	return segments.length > 0 ? segments.join(" · ") : undefined;
+};
 
 // --- Section builders ---
 
@@ -101,6 +120,7 @@ interface WhatJson {
 		readonly turn_count: number;
 	} | null;
 	readonly files_changed: readonly string[];
+	readonly config: SessionConfig | null;
 }
 
 const buildWhatJson = (distilled: DistilledSession): WhatJson => {
@@ -142,6 +162,7 @@ const buildWhatJson = (distilled: DistilledSession): WhatJson => {
 			.filter((f) => f.edits > 0 || f.writes > 0)
 			.map((f) => f.file_path)
 			.slice(0, 15),
+		config: distilled.session_config ?? null,
 	};
 };
 
@@ -150,12 +171,14 @@ const buildWhatJson = (distilled: DistilledSession): WhatJson => {
 const renderWhatDefault = (distilled: DistilledSession): string => {
 	const issues = getIssuesSection(distilled);
 	const files = getFilesChangedSection(distilled);
+	const configLine = formatConfigLine(distilled.session_config);
 
 	return [
 		`${bold("Request:")} ${getRequestSection(distilled)}`,
 		`${bold("Outcome:")} ${getOutcomeSection(distilled)}`,
 		`${bold("Cost:")}    ${getCostSection(distilled)}`,
 		`${bold("Context:")} ${getContextSection(distilled)}`,
+		...(configLine ? [`${bold("Config:")}  ${configLine}`] : []),
 		"",
 		bold("Issues:"),
 		...issues,

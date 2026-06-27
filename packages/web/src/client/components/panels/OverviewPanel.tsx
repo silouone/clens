@@ -8,6 +8,7 @@ import {
 import { Files } from "lucide-solid";
 import type { DistilledSession } from "../../../shared/types";
 import { SessionOverview, type RelatedSessionsData } from "../SessionOverview";
+import { ConfigEnvironment } from "../ConfigEnvironment";
 import { NarrativeSection } from "../NarrativeSection";
 import { IssuesPanel } from "../IssuesPanel";
 import { ThinkingBreakdown } from "../ThinkingBreakdown";
@@ -81,6 +82,9 @@ const OverviewContent: Component<OverviewPanelProps> = (props) => (
 	<div class="space-y-3">
 		{/* 1. Session Overview */}
 		<SessionOverview session={props.session} relatedSessions={props.relatedSessions} onRedistill={props.onRedistill} />
+
+		{/* 1b. Config / Environment (renders nothing for legacy distills w/o config) */}
+		<ConfigEnvironment session={props.session} />
 
 		{/* 2. Task Plan */}
 		<Show when={props.session.task_list && props.session.task_list.tasks.length > 0 && props.session.task_list}>

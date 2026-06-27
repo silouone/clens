@@ -1,7 +1,41 @@
-import type { BacktrackResult, DistilledSession, FileMapEntry } from "../types";
+import type { BacktrackResult, DistilledSession, FileMapEntry, SessionConfig } from "../types";
 import { flattenAgents, formatSessionDateFull } from "../utils";
 import { classifySeverity, fmtDuration, truncate } from "./format-helpers";
-import { bold, cyan, dim, green } from "./shared";
+import { bold, cyan, dim, green, yellow } from "./shared";
+
+// --- Config / Environment section (pure) ---
+
+/** Permission modes that relax guardrails -- rendered with an amber LED. */
+const RELAXED_PERMISSION_MODES = new Set(["bypassPermissions", "dontAsk"]);
+
+/**
+ * Render the CONFIG / ENVIRONMENT block for a session. Returns [] when no config
+ * data is known (old distills) so the caller can omit the section entirely.
+ * The permission-mode bullet maps to the locked LED palette: amber when guardrails
+ * are relaxed (bypassPermissions/dontAsk), signal-green otherwise.
+ */
+export const renderConfigSection = (config: SessionConfig | undefined): readonly string[] => {
+	if (!config) return [];
+
+	const rows: string[] = [];
+
+	if (config.permission_mode) {
+		const relaxed = RELAXED_PERMISSION_MODES.has(config.permission_mode);
+		const led = relaxed ? yellow("■") : green("■");
+		rows.push(`    ${led} Permission: ${config.permission_mode}`);
+	}
+	if (config.effort) {
+		rows.push(`    Effort: ${config.effort}`);
+	}
+	if (config.mcp_servers.length > 0) {
+		const servers = config.mcp_servers.map((s) => `${s.name} (${s.count})`).join(", ");
+		rows.push(`    MCP servers: ${servers}`);
+	}
+
+	if (rows.length === 0) return [];
+
+	return ["", bold("  Config / Environment:"), ...rows];
+};
 
 const typeLabel = (type: BacktrackResult["type"]): string =>
 	type === "failure_retry"
@@ -175,6 +209,7 @@ export const renderReportDefault = (distilled: DistilledSession): string => {
 		...btSection,
 		...highRiskSection,
 		...topToolsSection,
+		...renderConfigSection(distilled.session_config),
 		...agentSection,
 		"",
 		tip,
