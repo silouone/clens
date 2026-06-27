@@ -20,8 +20,13 @@ jobs:
       - run: bun install
       - name: Typecheck
         run: bun run typecheck
-      - name: Test
-        run: bun test --coverage
+      # TEST-5: run BOTH package suites explicitly so the web suite can never be
+      # silently dropped (root `bun test` recursion is incidental). Per D5-RESOLVED
+      # there is no vitest harness — the web tests are bun:test and run here.
+      - name: Test CLI
+        run: bun run test:cli
+      - name: Test web
+        run: bun run test:web
       - name: Lint
         run: bun run lint
       - name: Build
