@@ -73,7 +73,7 @@ export const HeroBand: Component<HeroBandProps> = (props) => {
 		<div
 			class={`animate-fade-in rounded-none border border-clens bg-surface-raised ${verdictRule()}`}
 		>
-			<div class="flex flex-col gap-4 p-4">
+			<div class="flex flex-col gap-3 p-3">
 				{/* Verdict — the dominant above-the-fold answer (R-A1/R-B2, AC2):
 				    a large category LED square + a big microcaps label in the
 				    verdict hue + one honest one-line detail. */}

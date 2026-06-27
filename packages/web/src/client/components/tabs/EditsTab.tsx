@@ -173,7 +173,7 @@ const ChurnSummary: Component<{ readonly chains: readonly EditChain[] }> = (prop
 
 			{/* Top-churned files — one bar per FILE (chains aggregated by path). */}
 			<div class="pt-3">
-				<p class="instrument-microcaps mb-1.5 text-[9px] text-muted">Most-churned files</p>
+				<p class="instrument-microcaps mb-1.5 text-[10px] text-muted">Most-churned files</p>
 				<HorizontalBar
 					data={topFiles()}
 					label={(d) => basename(d.file_path)}
@@ -188,7 +188,7 @@ const ChurnSummary: Component<{ readonly chains: readonly EditChain[] }> = (prop
 			<Show when={gaugeDenom() > 0}>
 				<div class="mt-3 border-t border-clens pt-3">
 					<div class="mb-1 flex items-baseline justify-between text-xs">
-						<span class="instrument-microcaps text-[9px] text-muted">Abandoned waste</span>
+						<span class="instrument-microcaps text-[10px] text-muted">Abandoned waste</span>
 						<span class="font-mono tabular-nums text-secondary">
 							{Math.round(abandonedPct())}%
 						</span>

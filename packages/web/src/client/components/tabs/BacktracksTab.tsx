@@ -198,7 +198,7 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 					</div>
 
 					{/* By type (donut) + by tool (bar). */}
-					<div class="grid gap-4 md:grid-cols-2">
+					<div class="grid gap-3 md:grid-cols-2">
 						<Show when={byType().length > 0}>
 							<div>
 								<span class="instrument-microcaps text-[10px] text-muted">By type</span>

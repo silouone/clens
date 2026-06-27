@@ -228,6 +228,9 @@ export const generateTicks = (max: number, count: number = 5): readonly number[]
 export const formatCompact = (n: number): string => {
 	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
 	if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+	// Integers render exactly — a count of 6 is "6", never "6.0" (the stray-decimal
+	// bug). Only genuinely fractional sub-1000 values keep one decimal of precision.
+	if (Number.isInteger(n)) return String(n);
 	return n < 10 ? n.toFixed(1) : String(Math.round(n));
 };
 

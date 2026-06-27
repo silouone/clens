@@ -23,9 +23,16 @@ const basename = (path: string): string => path.split("/").pop() || path;
 
 type FileChurn = { readonly file_path: string; readonly edits: number };
 
-const HeadlineStat: Component<{ readonly label: string; readonly value: number }> = (props) => (
+const HeadlineStat: Component<{
+	readonly label: string;
+	readonly value: number;
+	readonly color?: string;
+}> = (props) => (
 	<div class="flex flex-col gap-0.5">
-		<span class="font-mono text-lg leading-none tabular-nums text-primary">
+		<span
+			class="font-mono text-lg leading-none tabular-nums text-primary"
+			style={props.color ? { color: props.color } : undefined}
+		>
 			{props.value.toLocaleString()}
 		</span>
 		<span class="instrument-microcaps text-[9px] text-muted">{props.label}</span>
@@ -71,12 +78,16 @@ export const EditsWidget: Component<WidgetProps> = (props) => {
 				<div class="grid grid-cols-3 gap-2 border-b border-clens pb-3">
 					<HeadlineStat label="Chains" value={chains().length} />
 					<HeadlineStat label="Edits" value={totalEdits()} />
-					<HeadlineStat label="Abandoned" value={abandoned()} />
+					<HeadlineStat
+						label="Abandoned"
+						value={abandoned()}
+						color={abandoned() > 0 ? "var(--clens-warning)" : undefined}
+					/>
 				</div>
 
 				{/* Most-churned files. */}
 				<div class="pt-3">
-					<p class="instrument-microcaps mb-1.5 text-[9px] text-muted">Most-churned files</p>
+					<p class="instrument-microcaps mb-1.5 text-[10px] text-muted">Most-churned files</p>
 					<HorizontalBar
 						data={topFiles()}
 						label={(d) => basename(d.file_path)}
@@ -91,7 +102,7 @@ export const EditsWidget: Component<WidgetProps> = (props) => {
 				<Show when={totalEdits() > 0}>
 					<div class="mt-3 border-t border-clens pt-3">
 						<div class="mb-1 flex items-baseline justify-between text-xs">
-							<span class="instrument-microcaps text-[9px] text-muted">Abandoned waste</span>
+							<span class="instrument-microcaps text-[10px] text-muted">Abandoned waste</span>
 							<span class="font-mono tabular-nums text-secondary">
 								{Math.round(abandonedPct())}%
 							</span>
@@ -105,7 +116,7 @@ export const EditsWidget: Component<WidgetProps> = (props) => {
 								class="h-full rounded-none"
 								style={{
 									width: `${abandonedPct()}%`,
-									"background-color": CATEGORY.edits.cssVar,
+									"background-color": "var(--clens-warning)",
 								}}
 							/>
 						</div>
