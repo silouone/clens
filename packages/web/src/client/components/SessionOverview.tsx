@@ -190,11 +190,11 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 
 			{/* KPI Grid - Row 1 */}
 			<div class="grid grid-cols-1 md:grid-cols-3">
-				{/* Duration */}
+				{/* Timing: Span = wall-clock, Active = working time (idle excluded) */}
 				<div class="px-3 py-2 md:border-r border-clens">
-					<h4 class={SECTION_HEADING}>Duration</h4>
+					<h4 class={SECTION_HEADING}>Timing</h4>
 					<div class="space-y-1">
-						<MetaRow label="Duration" value={formatDuration(totalMs())} />
+						<MetaRow label="Span" value={formatDuration(totalMs())} />
 						<Show when={activeMs() !== undefined}>
 							<MetaRow
 								label="Active"

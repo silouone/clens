@@ -2,6 +2,7 @@ import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { ArrowUp, ArrowDown, ChevronRight, Users, Layers, Pencil, Flag } from "lucide-solid";
 import { FeatureBadges } from "../components/FeatureBadges";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
+import { createStore } from "solid-js/store";
 import { useKeyboard } from "../lib/keyboard";
 import { sessionList, refetchSessions, setSessionMeta, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
 import type { ColorName, SessionSummary, WorkUnit } from "../../shared/types";
@@ -96,6 +97,30 @@ type AgentsFilter = "all" | "top_level" | "multi" | "solo";
 type FeaturesFilter = "all" | "any" | "loop" | "goal" | "workflow";
 type LifecycleFilter = "all" | "prime-plan-build" | "prime-build" | "plan-build" | "plan-build-review" | "multi-build" | "ad-hoc";
 type LinkTypeFilter = "all" | "spec" | "branch_time";
+
+/**
+ * The six session-list filter signals consolidated into one object (FE-28).
+ * Single source of truth + a DEFAULTS constant — the foundation every W5 filter
+ * task (reset, presets, persistence) builds on. Work-unit (lifecycle/link_type),
+ * chart-driven (date), sort and pagination state stay separate by design.
+ */
+type SessionFilters = {
+	search: string;
+	status: StatusFilter;
+	analyzed: AnalyzedFilter;
+	agents: AgentsFilter;
+	features: FeaturesFilter;
+	flagged: boolean;
+};
+
+const FILTER_DEFAULTS: SessionFilters = {
+	search: "",
+	status: "all",
+	analyzed: "all",
+	agents: "top_level",
+	features: "all",
+	flagged: false,
+};
 
 const isValidViewMode = (s: string | undefined): s is ViewMode =>
 	s === "sessions" || s === "work_units";
@@ -395,23 +420,17 @@ export const SessionList: Component = () => {
 	// direct ?view=work_units URL. The work-unit render blocks below stay intact.
 	const viewMode = (): ViewMode =>
 		SHOW_WORK_UNITS && isValidViewMode(searchParams.view) ? searchParams.view : "sessions";
-	const [search, setSearch] = createSignal(searchParams.q ?? "");
-	const [statusFilter, setStatusFilter] = createSignal<StatusFilter>(
-		isValidStatus(searchParams.status) ? searchParams.status : "all",
-	);
-	const [analyzedFilter, setAnalyzedFilter] = createSignal<AnalyzedFilter>(
-		isValidAnalyzed(searchParams.analyzed) ? searchParams.analyzed : "all",
-	);
-	const [agentsFilter, setAgentsFilter] = createSignal<AgentsFilter>(
-		isValidAgents(searchParams.agents) ? searchParams.agents : "top_level",
-	);
-	const [featuresFilter, setFeaturesFilter] = createSignal<FeaturesFilter>(
-		isValidFeatures(searchParams.features) ? searchParams.features : "all",
-	);
-	// Flagged-only filter (R12): narrows the list to sessions with a non-"none" color.
-	const [flaggedFilter, setFlaggedFilter] = createSignal<boolean>(
-		searchParams.flagged === "1",
-	);
+	// FE-28: the six session filters live in one store, seeded from the URL and
+	// falling back to FILTER_DEFAULTS. `flagged` (R12) narrows the list to sessions
+	// with a non-"none" color.
+	const [filters, setFilters] = createStore<SessionFilters>({
+		search: searchParams.q ?? FILTER_DEFAULTS.search,
+		status: isValidStatus(searchParams.status) ? searchParams.status : FILTER_DEFAULTS.status,
+		analyzed: isValidAnalyzed(searchParams.analyzed) ? searchParams.analyzed : FILTER_DEFAULTS.analyzed,
+		agents: isValidAgents(searchParams.agents) ? searchParams.agents : FILTER_DEFAULTS.agents,
+		features: isValidFeatures(searchParams.features) ? searchParams.features : FILTER_DEFAULTS.features,
+		flagged: searchParams.flagged === "1",
+	});
 	const [lifecycleFilter, setLifecycleFilter] = createSignal<LifecycleFilter>(
 		isValidLifecycle(searchParams.lifecycle) ? searchParams.lifecycle : "all",
 	);
@@ -434,12 +453,12 @@ export const SessionList: Component = () => {
 	// Sync state -> URL params (viewMode is driven by URL, not synced back)
 	createEffect(() => {
 		const params: Record<string, string | undefined> = {};
-		const q = search();
-		const status = statusFilter();
-		const analyzed = analyzedFilter();
-		const agents = agentsFilter();
-		const features = featuresFilter();
-		const flagged = flaggedFilter();
+		const q = filters.search;
+		const status = filters.status;
+		const analyzed = filters.analyzed;
+		const agents = filters.agents;
+		const features = filters.features;
+		const flagged = filters.flagged;
 		const lifecycle = lifecycleFilter();
 		const linkType = linkTypeFilter();
 		const sort = sortState();
@@ -468,12 +487,12 @@ export const SessionList: Component = () => {
 	// Filtered + searched sessions
 	const filtered = createMemo(() => {
 		const sessions = sessionList() ?? [];
-		const q = search().toLowerCase();
-		const status = statusFilter();
-		const analyzed = analyzedFilter();
-		const agents = agentsFilter();
-		const features = featuresFilter();
-		const flagged = flaggedFilter();
+		const q = filters.search.toLowerCase();
+		const status = filters.status;
+		const analyzed = filters.analyzed;
+		const agents = filters.agents;
+		const features = filters.features;
+		const flagged = filters.flagged;
 		const projectId = selectedProjectId();
 
 		return sessions.filter((s) => {
@@ -533,7 +552,7 @@ export const SessionList: Component = () => {
 	// ── Work units filtered by search + project + lifecycle + link_type ──
 	const filteredWorkUnits = createMemo(() => {
 		const units = workUnitList() ?? [];
-		const q = search().toLowerCase();
+		const q = filters.search.toLowerCase();
 		const projectId = selectedProjectId();
 		const lifecycle = lifecycleFilter();
 		const linkType = linkTypeFilter();
@@ -633,7 +652,7 @@ export const SessionList: Component = () => {
 						</h1>
 						<span class="instrument-microcaps text-[10px] text-muted">cLens console</span>
 					</div>
-					<dl class="flex items-stretch gap-px overflow-hidden border border-clens bg-surface-muted text-right">
+					<dl class="flex flex-wrap items-stretch gap-px border border-clens bg-surface-muted text-right">
 						<div class="bg-surface px-3 py-1">
 							<dt class="instrument-microcaps text-[9px] text-muted">Sessions</dt>
 							<dd class="font-mono text-sm tabular-nums text-primary">{kpis().total}</dd>
@@ -684,8 +703,8 @@ export const SessionList: Component = () => {
 			<Show when={viewMode() === "sessions"}>
 				<FilterBar
 					searchPlaceholder="Search sessions (press /)"
-					searchValue={search()}
-					onSearch={(v) => { setSearch(v); setPage(1); setSelectedRow(-1); }}
+					searchValue={filters.search}
+					onSearch={(v) => { setFilters("search", v); setPage(1); setSelectedRow(-1); }}
 					searchRef={(el) => { searchInputRef = el; }}
 					filters={[
 						...(isGlobalMode() ? [{
@@ -699,10 +718,10 @@ export const SessionList: Component = () => {
 							value: selectedProjectId() ?? "all",
 							onChange: (v: string) => { setSelectedProjectId(v === "all" ? undefined : v); setPage(1); setSelectedRow(-1); },
 						}] : []),
-						{ key: "status", options: [{ label: "All", value: "all" }, { label: "Complete", value: "complete" }, { label: "Active", value: "active" }, { label: "Idle", value: "idle" }], value: statusFilter(), onChange: (v: string) => { setStatusFilter(v as StatusFilter); setPage(1); setSelectedRow(-1); } },
-						{ key: "analyzed", options: [{ label: "All", value: "all" }, { label: "Analyzed", value: "analyzed" }, { label: "Not analyzed", value: "not_analyzed" }], value: analyzedFilter(), onChange: (v: string) => { setAnalyzedFilter(v as AnalyzedFilter); setPage(1); setSelectedRow(-1); } },
-						{ key: "agents", options: [{ label: "All", value: "all" }, { label: "Top-level", value: "top_level" }, { label: "Multi-agent", value: "multi" }, { label: "Solo", value: "solo" }], value: agentsFilter(), onChange: (v: string) => { setAgentsFilter(v as AgentsFilter); setPage(1); setSelectedRow(-1); } },
-						{ key: "features", options: [{ label: "All", value: "all" }, { label: "Any feature", value: "any" }, { label: "Loop", value: "loop" }, { label: "Goal", value: "goal" }, { label: "Workflow", value: "workflow" }], value: featuresFilter(), onChange: (v: string) => { setFeaturesFilter(v as FeaturesFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "status", options: [{ label: "All", value: "all" }, { label: "Complete", value: "complete" }, { label: "Active", value: "active" }, { label: "Idle", value: "idle" }], value: filters.status, onChange: (v: string) => { setFilters("status", v as StatusFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "analyzed", options: [{ label: "All", value: "all" }, { label: "Analyzed", value: "analyzed" }, { label: "Not analyzed", value: "not_analyzed" }], value: filters.analyzed, onChange: (v: string) => { setFilters("analyzed", v as AnalyzedFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "agents", options: [{ label: "All", value: "all" }, { label: "Top-level", value: "top_level" }, { label: "Multi-agent", value: "multi" }, { label: "Solo", value: "solo" }], value: filters.agents, onChange: (v: string) => { setFilters("agents", v as AgentsFilter); setPage(1); setSelectedRow(-1); } },
+						{ key: "features", options: [{ label: "All", value: "all" }, { label: "Any feature", value: "any" }, { label: "Loop", value: "loop" }, { label: "Goal", value: "goal" }, { label: "Workflow", value: "workflow" }], value: filters.features, onChange: (v: string) => { setFilters("features", v as FeaturesFilter); setPage(1); setSelectedRow(-1); } },
 					]}
 					resultCount={filtered().length}
 					resultLabel={buildCountLabel(filtered().length, scopedTotal())}
@@ -712,16 +731,16 @@ export const SessionList: Component = () => {
 				<div class="mt-2 flex items-center">
 					<button
 						type="button"
-						aria-pressed={flaggedFilter()}
-						onClick={() => { setFlaggedFilter((v) => !v); setPage(1); setSelectedRow(-1); }}
+						aria-pressed={filters.flagged}
+						onClick={() => { setFilters("flagged", (v) => !v); setPage(1); setSelectedRow(-1); }}
 						class={`instrument-microcaps inline-flex items-center gap-1.5 rounded-none border px-2 py-1 text-[10px] transition ${
-							flaggedFilter()
+							filters.flagged
 								? "border-brand-500 bg-surface-selected text-primary"
 								: "border-clens text-muted hover:border-brand-500 hover:text-secondary"
 						}`}
 						title="Show only flagged sessions"
 					>
-						<Flag class="h-3 w-3" classList={{ "fill-current": flaggedFilter() }} />
+						<Flag class="h-3 w-3" classList={{ "fill-current": filters.flagged }} />
 						Flagged
 					</button>
 				</div>
@@ -743,8 +762,8 @@ export const SessionList: Component = () => {
 			<Show when={viewMode() === "work_units"}>
 				<FilterBar
 					searchPlaceholder="Search work units (press /)"
-					searchValue={search()}
-					onSearch={(v) => { setSearch(v); }}
+					searchValue={filters.search}
+					onSearch={(v) => { setFilters("search", v); }}
 					searchRef={(el) => { searchInputRef = el; }}
 					filters={[
 						{ key: "lifecycle", variant: "dropdown", label: "Lifecycle", options: [{ label: "All Lifecycles", value: "all" }, { label: "Prime > Build", value: "prime-build" }, { label: "Prime > Plan > Build", value: "prime-plan-build" }, { label: "Plan > Build", value: "plan-build" }, { label: "Plan > Build > Review", value: "plan-build-review" }, { label: "Multi-Build", value: "multi-build" }, { label: "Ad-hoc", value: "ad-hoc" }], value: lifecycleFilter(), onChange: (v: string) => { setLifecycleFilter(v as LifecycleFilter); } },
@@ -781,7 +800,9 @@ export const SessionList: Component = () => {
 			{/* Sessions Table */}
 			<Show when={viewMode() === "sessions"}>
 			<div class="mt-3 overflow-x-auto rounded-none border border-clens">
-				<table class="w-full text-left text-sm">
+				{/* FE-7: min-width floor so the NAME column is never starved; the
+				    overflow-x-auto wrapper scrolls horizontally on narrow viewports. */}
+				<table class="w-full min-w-[1040px] text-left text-sm">
 					<thead class="border-b border-clens bg-surface-inset text-[10px] text-muted">
 						<tr>
 							<SortableHeader label="Name" field="session_name" sort={sortState()} onSort={handleSort} />
@@ -789,7 +810,7 @@ export const SessionList: Component = () => {
 								<th class="instrument-microcaps px-4 py-2.5">Project</th>
 							</Show>
 							<th class="instrument-microcaps px-4 py-2.5">Status</th>
-							<SortableHeader label="Duration" field="duration_ms" sort={sortState()} onSort={handleSort} align="right" />
+							<SortableHeader label="Span" field="duration_ms" sort={sortState()} onSort={handleSort} align="right" />
 							<SortableHeader label="Events" field="event_count" sort={sortState()} onSort={handleSort} align="right" />
 							<SortableHeader label="Agents" field="agent_count" sort={sortState()} onSort={handleSort} align="right" />
 							<SortableHeader label="Size" field="file_size_bytes" sort={sortState()} onSort={handleSort} align="right" />

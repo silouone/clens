@@ -65,9 +65,9 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 
 				{/* Left sidebar nav — width driven by sidebarWidth preference (percentage) */}
 				<aside
-					class="absolute inset-y-0 left-0 z-30 shrink-0 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0"
+					class="absolute inset-y-0 left-0 z-30 w-[80%] max-w-xs shrink-0 transform transition-transform duration-200 ease-in-out md:relative md:max-w-none md:w-[var(--sidebar-width)] md:translate-x-0"
 					classList={{ "-translate-x-full": !sidebarOpen(), "translate-x-0": sidebarOpen() }}
-					style={{ width: `${preferences().sidebarWidth}%` }}
+					style={{ "--sidebar-width": `${preferences().sidebarWidth}%` }}
 					aria-label="Detail sidebar"
 				>
 					{props.nav}

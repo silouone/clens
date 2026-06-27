@@ -52,7 +52,7 @@ const RangeSelector: Component = () => {
 		setAnalyticsRange(r);
 	};
 	return (
-		<div class="flex items-center gap-1">
+		<div class="flex flex-wrap items-center gap-1">
 			<For each={RANGES}>
 				{(r) => (
 					<button
@@ -366,10 +366,10 @@ export const InsightsPage: Component = () => {
 			{/* Header */}
 			<div class="flex items-end justify-between mb-6">
 				<div>
-					<h1 class="text-xl font-semibold text-primary leading-none">Insights</h1>
+					<h1 class="instrument-microcaps text-[13px] tracking-[0.14em] text-primary">Insights</h1>
 					<div class="instrument-ruler mt-2 w-40" />
 				</div>
-				<div class="flex items-center gap-3">
+				<div class="flex flex-wrap items-center justify-end gap-3">
 					<ProjectDropdown />
 					<CustomRangeChip />
 					<RangeSelector />
@@ -552,7 +552,7 @@ export const InsightsPage: Component = () => {
 							<div class="rounded-none border border-clens bg-surface p-4">
 								<SectionHeader title="Tool Errors" />
 								<div class="overflow-x-auto">
-									<table class="w-full text-xs">
+									<table class="w-full min-w-[20rem] text-xs">
 										<thead>
 											<tr class="text-left text-muted border-b border-clens">
 												<th class="instrument-microcaps py-2 pr-4 text-[10px]">Tool</th>
@@ -581,7 +581,7 @@ export const InsightsPage: Component = () => {
 							<div class="rounded-none border border-clens bg-surface p-4">
 								<SectionHeader title="Error Patterns" />
 								<div class="overflow-x-auto">
-									<table class="w-full text-xs">
+									<table class="w-full min-w-[20rem] text-xs">
 										<thead>
 											<tr class="text-left text-muted border-b border-clens">
 												<th class="instrument-microcaps py-2 pr-4 text-[10px]">Pattern</th>
@@ -615,13 +615,14 @@ export const InsightsPage: Component = () => {
 						<div class="rounded-none border border-clens bg-surface p-4">
 							<SectionHeader title="Worst Sessions" />
 							<div class="overflow-x-auto">
-								<table class="w-full text-xs">
+								<table class="w-full min-w-[20rem] text-xs">
 									<thead>
 										<tr class="text-left text-muted border-b border-clens">
 											<th class="instrument-microcaps py-2 pr-4 text-[10px]">Session</th>
 											<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Backtracks</th>
 											<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Cost</th>
-											<th class="instrument-microcaps py-2 text-[10px] text-right">Duration</th>
+											{/* Active = working time, idle excluded (aggregate stats.duration_ms) */}
+											<th class="instrument-microcaps py-2 text-[10px] text-right">Active</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -655,7 +656,7 @@ export const InsightsPage: Component = () => {
 						<div class="rounded-none border border-clens bg-surface p-4">
 							<SectionHeader title="Hotspot Files" />
 							<div class="overflow-x-auto">
-								<table class="w-full text-xs">
+								<table class="w-full min-w-[20rem] text-xs">
 									<thead>
 										<tr class="text-left text-muted border-b border-clens">
 											<th class="instrument-microcaps py-2 pr-4 text-[10px]">File Path</th>

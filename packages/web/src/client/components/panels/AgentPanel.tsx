@@ -71,7 +71,8 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 					</Show>
 				</div>
 				<div class="grid grid-cols-2 gap-x-6 gap-y-0.5 max-w-md overflow-hidden">
-					<StatItem label="Duration" value={formatDuration(props.agent.duration_ms)} />
+					{/* Agent duration_ms is idle-trimmed effective working time → "Active" */}
+					<StatItem label="Active" value={formatDuration(props.agent.duration_ms)} />
 					<StatItem label="Tool calls" value={String(props.agent.tool_call_count)} />
 					<Show when={props.agent.model}>
 						{(m) => <StatItem label="Model" value={m()} />}

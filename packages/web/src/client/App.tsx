@@ -6,7 +6,7 @@ import { ErrorFallback } from "./components/ErrorFallback";
 import { KeyboardHelp } from "./components/KeyboardHelp";
 import { headerStats } from "./lib/analytics-store";
 import { initSSE } from "./lib/events";
-import { formatDuration } from "./lib/format";
+import { formatCost, formatDuration } from "./lib/format";
 import { toggleHelp, setKeyboardNavigate } from "./lib/keyboard";
 import { preferences } from "./lib/settings";
 import { SHOW_WORK_UNITS } from "./lib/feature-flags";
@@ -87,6 +87,7 @@ type AnalyticsDropdownProps = {
 	readonly totalEvents: number;
 	readonly avgDuration: number;
 	readonly totalCost: number;
+	readonly sessionsWithCost: number;
 	readonly loaded: boolean;
 	readonly onNavigate: (path: string) => void;
 };
@@ -138,10 +139,13 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Database class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										{/* Source is usage totals.sessions = the distilled (analyzed) subset,
-										    not the raw population shown in the session list. Label it "Analyzed"
-										    so the header never contradicts the list total (NUM-10). */}
-										<div class="instrument-microcaps text-[9px] text-muted leading-none">Analyzed</div>
+										{/* Source is usage totals.sessions = the analytics-summary (distilled)
+										    subset, which can lag the live session list. The list KPI labeled
+										    "Analyzed" counts live is_distilled instead, so the two can disagree;
+										    name this one "Reported" to make the distinct source explicit and
+										    never contradict the list total (NUM-10 / NUM-20).
+										    OPEN-DECISION: exact wording ("Reported" vs "In Analytics"). */}
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">Reported</div>
 										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.sessionCount}</div>
 									</div>
 								</div>
@@ -162,7 +166,9 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Clock class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										<div class="instrument-microcaps text-[9px] text-muted leading-none">Avg Duration</div>
+										{/* Active = working time (idle excluded); aggregate uses stats.duration_ms,
+										    per-session views use active_duration_ms — same concept, distinct computation. */}
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">Avg Active</div>
 										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{formatDuration(props.avgDuration)}</div>
 									</div>
 								</div>
@@ -172,8 +178,11 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 								<DollarSign class="h-3.5 w-3.5 text-muted shrink-0" />
 								<div class="min-w-0">
 									<div class="instrument-microcaps text-[9px] text-muted leading-none">Total Cost</div>
+									{/* LOCKED: never render $0.00. When no session carried a cost
+									    (sessions_with_cost === 0) show "-"; otherwise formatCost guards
+									    the sub-cent case with "<$0.01" (NUM-21). */}
 									<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">
-										${props.totalCost < 1 ? props.totalCost.toFixed(2) : props.totalCost.toFixed(2)}
+										{props.sessionsWithCost === 0 ? "-" : formatCost(props.totalCost)}
 									</div>
 								</div>
 							</div>
@@ -217,7 +226,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 	setKeyboardNavigate(navigate);
 
 	// ── KPI derivations (from analytics API — server-aggregated, no limit) ──
-	const stats = () => headerStats() ?? { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0 };
+	const stats = () => headerStats() ?? { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
 
 	let disconnectSSE: (() => void) | undefined;
 	let removeThemeListener: (() => void) | undefined;
@@ -277,6 +286,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 							totalEvents={stats().totalEvents}
 							avgDuration={stats().avgDurationMs}
 							totalCost={stats().totalCostUsd}
+							sessionsWithCost={stats().sessionsWithCost}
 							loaded={headerStats.state !== "pending"}
 							onNavigate={navigate}
 						/>

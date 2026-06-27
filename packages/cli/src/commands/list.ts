@@ -41,7 +41,7 @@ export const listCommand = async (args: { projectDir: string; json: boolean; glo
 				"Team".padEnd(15) +
 				"Type".padEnd(10) +
 				"D".padEnd(3) +
-				"Duration".padEnd(12) +
+				"Span".padEnd(12) +
 				"Events".padEnd(10) +
 				"Status",
 		),

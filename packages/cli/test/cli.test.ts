@@ -128,7 +128,7 @@ describe("cli list", () => {
 		expect(stdout).toContain("ID");
 		expect(stdout).toContain("Branch");
 		expect(stdout).toContain("Team");
-		expect(stdout).toContain("Duration");
+		expect(stdout).toContain("Span");
 		expect(stdout).toContain("Events");
 		expect(stdout).toContain("Status");
 		expect(stdout).toContain("aaaabbbb");

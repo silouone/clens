@@ -120,7 +120,7 @@ export const SettingsPage: Component = () => {
 		<PageShell>
 			<div class="flex-1 overflow-y-auto scrollbar-hidden">
 				<div class="mx-auto w-full max-w-4xl px-6 py-8 lg:px-8">
-					<h1 class="text-lg font-semibold text-primary">Settings</h1>
+					<h1 class="instrument-microcaps text-[13px] tracking-[0.14em] text-primary">Settings</h1>
 					<div class="instrument-ruler mt-1.5 mb-8 w-40" />
 
 					<div class="space-y-8">

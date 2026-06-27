@@ -63,7 +63,7 @@ const FilterDropdown = (props: {
 
 export const FilterBar = (props: FilterBarProps) => (
 	<div class="mt-3 flex flex-wrap items-center gap-3">
-		<div class="relative">
+		<div class="relative w-full sm:w-auto">
 			<Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
 			<input
 				ref={props.searchRef}
@@ -71,7 +71,7 @@ export const FilterBar = (props: FilterBarProps) => (
 				placeholder={props.searchPlaceholder}
 				value={props.searchValue}
 				onInput={(e) => props.onSearch(e.currentTarget.value)}
-				class="w-64 rounded-none border border-clens bg-surface-raised py-1.5 pl-8 pr-3 text-sm font-mono text-primary placeholder:font-sans placeholder:text-muted focus:border-brand-500 focus:outline-none"
+				class="w-full sm:w-64 rounded-none border border-clens bg-surface-raised py-1.5 pl-8 pr-3 text-sm font-mono text-primary placeholder:font-sans placeholder:text-muted focus:border-brand-500 focus:outline-none"
 			/>
 		</div>
 		<For each={props.filters}>

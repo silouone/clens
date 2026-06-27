@@ -12,18 +12,18 @@ export const Toggle: Component<ToggleProps> = (props) => (
 		role="switch"
 		aria-checked={props.checked}
 		disabled={props.disabled}
-		class="relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50"
+		class="relative inline-flex h-[20px] w-[40px] shrink-0 cursor-pointer rounded-[2px] border border-clens transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
 		classList={{
-			"bg-brand-500": props.checked,
-			"bg-surface-muted": !props.checked,
+			"bg-surface-muted": props.checked,
+			"bg-surface": !props.checked,
 		}}
 		onClick={() => props.onChange(!props.checked)}
 	>
 		<span
-			class="pointer-events-none inline-block h-[18px] w-[18px] translate-y-[2px] rounded-full bg-white shadow-sm transition-transform duration-200"
+			class="pointer-events-none inline-block h-[14px] w-[14px] translate-y-[2px] rounded-[1px] transition-transform duration-200"
 			classList={{
-				"translate-x-[20px]": props.checked,
-				"translate-x-[2px]": !props.checked,
+				"translate-x-[23px] bg-brand-500": props.checked,
+				"translate-x-[2px] bg-muted": !props.checked,
 			}}
 		/>
 	</button>

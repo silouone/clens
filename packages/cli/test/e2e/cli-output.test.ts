@@ -67,7 +67,9 @@ describe("CLI Text Output Format", () => {
 		const plain = stripAnsi(r.stdout);
 		expect(plain).toContain("ID");
 		expect(plain).toContain("Branch");
-		expect(plain).toContain("Duration");
+		// "Span" = wall-clock span (NUM-11: standardized Span/Active vocabulary;
+		// list per-row duration_ms remains wall-clock span, label renamed from "Duration")
+		expect(plain).toContain("Span");
 		expect(plain).toContain("Events");
 		expect(plain).toContain("Status");
 	});

@@ -76,7 +76,7 @@ const LiveHeader: Component<{ readonly state: LiveSessionState; readonly elapsed
 		</div>
 
 		{/* KPI chips */}
-		<KpiChip label="Duration" value={formatDuration(props.elapsed)} />
+		<KpiChip label="Span" value={formatDuration(props.elapsed)} />
 		<KpiChip label="Events" value={String(props.state.event_count)} />
 		<KpiChip label="Tools" value={String(props.state.tool_call_count)} />
 		<KpiChip label="Agents" value={String(props.state.agents.size)} />

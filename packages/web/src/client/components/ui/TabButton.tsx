@@ -30,7 +30,7 @@ export const TabButton: Component<TabButtonProps> = (props) => (
 		role="tab"
 		aria-selected={props.active}
 		onClick={props.onClick}
-		class="flex items-center gap-1.5 rounded-none px-3 py-1.5 text-xs font-medium transition-colors focus-ring"
+		class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-none px-3 py-1.5 text-xs font-medium transition-colors focus-ring"
 		classList={{
 			"bg-surface-muted text-primary": props.active,
 			"text-muted hover:text-secondary hover:bg-surface-hover": !props.active,

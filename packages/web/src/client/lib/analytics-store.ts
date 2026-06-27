@@ -286,6 +286,9 @@ export interface HeaderStats {
 	readonly totalEvents: number;
 	readonly avgDurationMs: number;
 	readonly totalCostUsd: number;
+	/** Sessions that carried a non-zero cost — drives the header "-" guard so a
+	 *  $0.00 total is never rendered (NUM-21). */
+	readonly sessionsWithCost: number;
 }
 
 const fetchHeaderStats = async (): Promise<HeaderStats> => {
@@ -294,10 +297,10 @@ const fetchHeaderStats = async (): Promise<HeaderStats> => {
 	if (project) qs.set("project", project);
 	try {
 		const res = await fetch(`/api/analytics/usage?${qs.toString()}`, { headers: authHeaders() });
-		if (!res.ok) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0 };
+		if (!res.ok) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
 		const body = await res.json();
 		const t = body.data?.totals as UsageTotals | undefined;
-		if (!t) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0 };
+		if (!t) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
 		// "today" count from daily array — daily rows are keyed by LOCAL calendar day
 		// (analytics-summary.localDayKey), so match on the local current day, not UTC.
 		const daily = (body.data?.daily ?? []) as readonly DailyUsageMetrics[];
@@ -309,9 +312,10 @@ const fetchHeaderStats = async (): Promise<HeaderStats> => {
 			totalEvents: t.total_tool_calls,
 			avgDurationMs: t.avg_duration_ms,
 			totalCostUsd: t.cost_usd,
+			sessionsWithCost: t.sessions_with_cost,
 		};
 	} catch {
-		return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0 };
+		return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
 	}
 };
 

@@ -1,5 +1,16 @@
 import defaultTheme from "tailwindcss/defaultTheme";
 
+/**
+ * Live signal-green tone resolved from the single `--clens-brand` token so it
+ * tracks the active theme (light: signal #0A8754, dark: phosphor #33FF99) — one
+ * accent, never a static second green. `color-mix` keeps Tailwind opacity
+ * modifiers (e.g. `brand-500/60`) working; a bare `var()` drops them silently.
+ */
+const brandTone = ({ opacityValue }) =>
+	opacityValue === undefined
+		? "var(--clens-brand)"
+		: `color-mix(in srgb, var(--clens-brand) calc(${opacityValue} * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
 	content: ["./src/client/**/*.{tsx,ts,html}"],
@@ -46,16 +57,22 @@ export default {
 				clens: "var(--clens-border)",
 			},
 			colors: {
-				// Signal-green ramp (light) → phosphor-green (dark) — the one accent.
-				// 400/500 are the live trace tones; 50/900 the faint wash tints.
+				// Signal-green accent — the ONE accent (live / active / ok).
+				// The live trace tones (400/500/600) are driven from the single
+				// `--clens-brand` token so dark mode shows exactly one green
+				// (phosphor #33FF99) and light mode one green (signal #0A8754) —
+				// no static second green bleeding across themes (FE-3). The
+				// color-mix function form preserves Tailwind opacity modifiers
+				// (e.g. `brand-500/60`) which a bare `var()` would silently drop.
+				// 50–300 / 700–950 stay static faint wash tints (currently unused).
 				brand: {
 					50: "#E6F2EC",
 					100: "#CFE8DB",
 					200: "#A7D6BF",
 					300: "#6CBF98",
-					400: "#33FF99",
-					500: "#0A8754",
-					600: "#097A4C",
+					400: brandTone,
+					500: brandTone,
+					600: brandTone,
 					700: "#086B43",
 					800: "#0E2A1E",
 					900: "#0E2A1E",

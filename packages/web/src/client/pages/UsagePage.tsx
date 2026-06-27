@@ -46,7 +46,7 @@ const selectPreset = (r: AnalyticsRange): void => {
 };
 
 const RangeSelector: Component = () => (
-	<div class="flex items-center gap-1">
+	<div class="flex flex-wrap items-center gap-1">
 		<For each={RANGES}>
 			{(r) => (
 				<button
@@ -306,10 +306,10 @@ export const UsagePage: Component = () => {
 			{/* Header */}
 			<div class="flex items-center justify-between mb-6">
 				<div>
-					<h1 class="text-xl font-semibold text-primary">Usage</h1>
+					<h1 class="instrument-microcaps text-[13px] tracking-[0.14em] text-primary">Usage</h1>
 					<div class="instrument-ruler mt-1.5 w-40" />
 				</div>
-				<div class="flex items-center gap-3">
+				<div class="flex flex-wrap items-center justify-end gap-3">
 					<ProjectDropdown />
 					<RangeSelector />
 					<button
@@ -374,7 +374,7 @@ export const UsagePage: Component = () => {
 				</div>
 
 				{/* Secondary KPIs */}
-				<div class="grid grid-cols-3 gap-4 mb-6">
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
 					<KpiCard
 						label="Total Sessions"
 						value={String(totals()?.sessions ?? 0)}
@@ -392,7 +392,7 @@ export const UsagePage: Component = () => {
 							: "Cache-read share: cache-read tokens ÷ (fresh input + cache-read). Higher means more context was served from cache."}
 					/>
 					<KpiCard
-						label="Avg Duration"
+						label="Avg Active"
 						value={formatDuration(totals()?.avg_duration_ms ?? 0)}
 						delta={durationDelta()}
 						invertColor
@@ -500,14 +500,15 @@ export const UsagePage: Component = () => {
 					<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Agent Types" />
 						<div class="overflow-x-auto">
-							<table class="w-full text-xs">
+							<table class="w-full min-w-[40rem] text-xs">
 								<thead>
 									<tr class="text-left text-muted border-b border-clens">
 										<th class="instrument-microcaps py-2 pr-4 text-[10px]">Type</th>
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Spawns</th>
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Sessions</th>
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Avg Cost</th>
-										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Avg Duration</th>
+										{/* Agent duration_ms is idle-trimmed effective working time → "Active" */}
+										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Avg Active</th>
 										<th class="instrument-microcaps py-2 text-[10px] text-right">
 											{/* Renamed from "Fail Rate" (AC10): this is tool-call error rate
 											    (failures ÷ tool calls), NOT how often the agent failed to

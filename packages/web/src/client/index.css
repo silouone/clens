@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Responsive: 3-tier breakpoint contract (FE-17 / REQ-FE-06) ─────
+   The whole responsive sweep (FE-13 … FE-19) is implemented against ONE
+   explicit contract — see specs/clens-oss-refactor/breakpoint-contract.md.
+   Tailwind defaults are used (no `screens` override), mapped to 3 tiers:
+     Mobile   base / no prefix   < 640px   (design target 375px)
+     Tablet   sm: (md: refine)   >= 640px  (md: >= 768px nav/tab wrap point)
+     Desktop  lg:                >= 1024px
+   Boundaries are sm (640) and lg (1024); md (768) is an intra-tablet
+   refinement. xl/2xl are reserved — do not use in app code. Nothing may
+   clip or sit off-screen at 375px. */
+
 /* ── Design tokens ─────────────────────────────────────────────── */
 
 html {

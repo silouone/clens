@@ -465,10 +465,41 @@ const computeUsageTotals = (
 	}
 }
 
+/**
+ * Humanize a raw captured model id into a public breakdown label (NUM-13), mirroring
+ * the client `modelDisplayName` (NUM-6) at the data source so junk ids never reach any
+ * consumer. Returns `null` for sentinels that must NOT appear as a model row:
+ *   - "<synthetic>" / "synthetic": Claude Code's internal synthetic turns, not a model.
+ *   - missing/empty/"unknown": the captor never recorded a model — unattributable.
+ * Real ids are title-cased with dot-joined version segments and the bracketed
+ * context-window suffix stripped (`claude-opus-4-8[1m]` → "Claude Opus 4.8",
+ * bare `opus` → "Opus"). Mirrors client/lib/format.modelDisplayName; a shared
+ * extraction is a follow-up (kept local to honor the single-file change scope).
+ */
+const modelDisplayLabel = (model: string | null | undefined): string | null => {
+	if (!model) return null
+	const base = model.replace(/\s*\[[^\]]*\]\s*$/i, "").trim()
+	const lower = base.toLowerCase()
+	if (base === "" || lower === "<synthetic>" || lower === "synthetic" || lower === "unknown") return null
+	const parts = base.split("-").filter(Boolean)
+	if (parts.length === 0) return null
+	const words: string[] = []
+	const version: string[] = []
+	for (const p of parts) {
+		if (/^\d+$/.test(p)) version.push(p)
+		else words.push(p.charAt(0).toUpperCase() + p.slice(1))
+	}
+	const name = words.join(" ")
+	return version.length > 0 ? `${name} ${version.join(".")}` : name
+}
+
 const computeModelBreakdown = (rows: readonly AnalyticsSummaryRow[]): readonly ModelBreakdown[] => {
 	const byModel = new Map<string, { count: number; cost: number; tokens: number; duration: number }>()
 	rows.forEach((r) => {
-		const model = r.model ?? "unknown"
+		// Drop synthetic/unknown sentinel rows rather than surfacing them as raw junk
+		// labels (NUM-13); real ids are humanized at the source.
+		const model = modelDisplayLabel(r.model)
+		if (model === null) return
 		const existing = byModel.get(model) ?? { count: 0, cost: 0, tokens: 0, duration: 0 }
 		byModel.set(model, {
 			count: existing.count + 1,
