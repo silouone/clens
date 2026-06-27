@@ -2,7 +2,6 @@ import { Hono } from "hono"
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { distill } from "clens/src/distill"
-import { rebuildWorkUnitIndex } from "clens/src/session/work-units"
 import { writeAnalyticsSummary } from "clens/src/distill/analytics-summary"
 import type { ProjectEntry } from "clens"
 import { broadcastSSE } from "./events"
@@ -104,7 +103,6 @@ const createCommandsRoute = (projectDir: string, projects: readonly ProjectEntry
 					} catch (err) {
 						log.warn(`Analytics summary update failed: ${sessionId.slice(0, 8)}`, err instanceof Error ? err.message : String(err))
 					}
-					try { rebuildWorkUnitIndex(ownerDir) } catch { /* best-effort */ }
 					broadcastSSE({
 						type: "distill_complete",
 						data: { session_id: sessionId },

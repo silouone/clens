@@ -240,12 +240,6 @@ export const SessionDetail: Component = () => {
 		return undefined;
 	});
 
-	const relatedSessions = createMemo(() => {
-		const detail = sessionDetail();
-		if (detail?.status === "ready") return detail.relatedSessions;
-		return undefined;
-	});
-
 	// Staleness metadata from the detail route (bug B5). Present only when the
 	// session is distilled and the route could compare against the raw file.
 	const staleness = createMemo(() => {
@@ -555,7 +549,6 @@ export const SessionDetail: Component = () => {
 												session={s()}
 												sessionId={params.id}
 												isMultiAgent={isMultiAgent()}
-												relatedSessions={relatedSessions()}
 												onRedistill={handleRedistill}
 											/>
 										}>
@@ -564,7 +557,6 @@ export const SessionDetail: Component = () => {
 													session={s()}
 													sessionId={params.id}
 													isMultiAgent={isMultiAgent()}
-													relatedSessions={relatedSessions()}
 													onRedistill={handleRedistill}
 												/>
 											</Match>

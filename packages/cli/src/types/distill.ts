@@ -513,39 +513,6 @@ export interface ActiveDurationResult {
 	readonly pause_ms: number;
 }
 
-// --- Work Unit Types ---
-
-export type WorkUnitSessionRole = "creator" | "consumer" | "modifier";
-
-export interface WorkUnitSession {
-	readonly session_id: string;
-	readonly session_name?: string;
-	readonly phase: PhaseType | "other";
-	readonly role: WorkUnitSessionRole;
-	readonly start_time: number;
-	readonly duration_ms: number;
-	readonly git_branch?: string;
-}
-
-export type WorkUnitLinkType = "spec" | "branch_time";
-
-export interface WorkUnit {
-	readonly id: string;
-	readonly link_type: WorkUnitLinkType;
-	readonly spec_path?: string;
-	readonly git_branch?: string;
-	readonly sessions: readonly WorkUnitSession[];
-	readonly lifecycle: "prime-plan-build" | "prime-build" | "plan-build" | "plan-build-review" | "multi-build" | "ad-hoc";
-	readonly total_duration_ms: number;
-	readonly date_range: { readonly start: number; readonly end: number };
-}
-
-export interface WorkUnitIndex {
-	readonly version: 1;
-	readonly updated_at: number;
-	readonly units: readonly WorkUnit[];
-}
-
 export interface TaskRecord {
 	readonly task_id: string;
 	readonly subject: string;
@@ -649,11 +616,6 @@ export interface GlobalSessionSummary extends SessionSummary {
 	 * Used to route per-session distill to the correct (possibly nested) capture dir.
 	 */
 	readonly capture_dir: string;
-}
-
-export interface GlobalWorkUnit extends WorkUnit {
-	readonly project_id: string;
-	readonly project_name: string;
 }
 
 // --- Feature Usage Types (loop / goal / workflow) ---

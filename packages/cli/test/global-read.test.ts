@@ -10,7 +10,6 @@ import {
 } from "../src/session/registry";
 import {
 	listGlobalSessions,
-	listGlobalWorkUnits,
 	resolveProjectForSession,
 } from "../src/session/global-read";
 
@@ -131,53 +130,6 @@ describe("global-read", () => {
 
 			const betaSession = sessions.find((s) => s.session_id === SESSION_B1);
 			expect(betaSession?.capture_dir).toBe(projectB);
-		});
-	});
-
-	describe("listGlobalWorkUnits", () => {
-		test("returns empty when no work unit indices exist", () => {
-			const units = listGlobalWorkUnits();
-			// Filter to our test projects only
-			const testUnits = units.filter(
-				(u) => u.project_name === "project-alpha" || u.project_name === "project-beta",
-			);
-			expect(testUnits.length).toBe(0);
-		});
-
-		test("returns units tagged with project info when index exists", () => {
-			const index = {
-				version: 1,
-				updated_at: Date.now(),
-				units: [
-					{
-						id: "unit-alpha-1",
-						link_type: "spec",
-						spec_path: "specs/plan.md",
-						sessions: [
-							{
-								session_id: SESSION_A1,
-								phase: "plan",
-								role: "creator",
-								start_time: 1000,
-								duration_ms: 1000,
-							},
-						],
-						lifecycle: "plan",
-						total_duration_ms: 1000,
-						date_range: { start: 1000, end: 2000 },
-					},
-				],
-			};
-			writeFileSync(
-				join(projectA, ".clens", "_work_units.json"),
-				JSON.stringify(index),
-			);
-
-			const units = listGlobalWorkUnits();
-			const alphaUnits = units.filter((u) => u.project_id === "project-alpha");
-			expect(alphaUnits.length).toBe(1);
-			expect(alphaUnits[0].project_name).toBe("project-alpha");
-			expect(alphaUnits[0].id).toBe("unit-alpha-1");
 		});
 	});
 

@@ -1,20 +1,18 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { ArrowUp, ArrowDown, ChevronRight, Users, Layers, Pencil, EyeOff } from "lucide-solid";
+import { ArrowUp, ArrowDown, ChevronRight, Users, Pencil, EyeOff } from "lucide-solid";
 import { FeatureBadges } from "../components/FeatureBadges";
 import { createEffect, createMemo, createSignal, For, Show, type Component, type JSX } from "solid-js";
 import { createStore } from "solid-js/store";
 import { useKeyboard } from "../lib/keyboard";
-import { sessionList, refetchSessions, setSessionMeta, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
-import type { ColorName, SessionSummary, WorkUnit } from "../../shared/types";
+import { sessionList, refetchSessions, setSessionMeta, globalError, clearError } from "../lib/stores";
+import type { ColorName, SessionSummary } from "../../shared/types";
 import { formatDuration, formatDate } from "../lib/format";
 import { preferences } from "../lib/settings";
-import { SHOW_WORK_UNITS } from "../lib/feature-flags";
 
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { ColorFlag } from "../components/ui/ColorFlag";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Toggle } from "../components/ui/Toggle";
-import { WorkUnitCard } from "../components/WorkUnitCard";
 import { FilterBar } from "../components/FilterBar";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
 import { ProjectBadge } from "../components/ProjectFilter";
@@ -90,7 +88,6 @@ const EmptyState: Component = () => (
 
 // ── Filter types ────────────────────────────────────────────────────
 
-type ViewMode = "sessions" | "work_units";
 type StatusFilter = "all" | "complete" | "active" | "idle";
 type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
 // FE-12: the old `agents` facet conflated two dimensions — subagent visibility
@@ -98,14 +95,12 @@ type AnalyzedFilter = "all" | "analyzed" | "not_analyzed";
 // boolean plus a `composition` facet so the two controls are independent.
 type CompositionFilter = "all" | "multi" | "solo";
 type FeaturesFilter = "all" | "any" | "loop" | "goal" | "workflow";
-type LifecycleFilter = "all" | "prime-plan-build" | "prime-build" | "plan-build" | "plan-build-review" | "multi-build" | "ad-hoc";
-type LinkTypeFilter = "all" | "spec" | "branch_time";
 
 /**
  * The six session-list filter signals consolidated into one object (FE-28).
  * Single source of truth + a DEFAULTS constant — the foundation every W5 filter
- * task (reset, presets, persistence) builds on. Work-unit (lifecycle/link_type),
- * chart-driven (date), sort and pagination state stay separate by design.
+ * task (reset, presets, persistence) builds on. Chart-driven (date), sort and
+ * pagination state stay separate by design.
  */
 type SessionFilters = {
 	search: string;
@@ -126,9 +121,6 @@ const FILTER_DEFAULTS: SessionFilters = {
 	features: "all",
 	flagged: false,
 };
-
-const isValidViewMode = (s: string | undefined): s is ViewMode =>
-	s === "sessions" || s === "work_units";
 
 const isValidStatus = (s: string | undefined): s is StatusFilter =>
 	s === "all" || s === "complete" || s === "active" || s === "idle";
@@ -159,12 +151,6 @@ const isValidComposition = (s: string | undefined): s is CompositionFilter =>
 
 const isValidFeatures = (s: string | undefined): s is FeaturesFilter =>
 	s === "all" || s === "any" || s === "loop" || s === "goal" || s === "workflow";
-
-const isValidLifecycle = (s: string | undefined): s is LifecycleFilter =>
-	s === "all" || s === "prime-plan-build" || s === "prime-build" || s === "plan-build" || s === "plan-build-review" || s === "multi-build" || s === "ad-hoc";
-
-const isValidLinkType = (s: string | undefined): s is LinkTypeFilter =>
-	s === "all" || s === "spec" || s === "branch_time";
 
 // ── Sort types ──────────────────────────────────────────────────────
 
@@ -272,12 +258,6 @@ const getProjectId = (s: SessionSummary): string | undefined =>
 
 const getProjectName = (s: SessionSummary): string | undefined =>
 	hasProjectName(s) ? s.project_name : undefined;
-
-const hasWorkUnitProjectId = (u: WorkUnit): u is WorkUnit & { readonly project_id: string } =>
-	"project_id" in u;
-
-const getWorkUnitProjectId = (u: WorkUnit): string | undefined =>
-	hasWorkUnitProjectId(u) ? u.project_id : undefined;
 
 // ── Honest count label (B25) ─────────────────────────────────────────
 
@@ -473,19 +453,10 @@ export const SessionList: Component = () => {
 		features?: string;
 		sort?: string;
 		page?: string;
-		view?: string;
-		lifecycle?: string;
-		link_type?: string;
 		date?: string;
 		flagged?: string;
 	}>();
 
-	// viewMode is derived from URL params (header nav controls it).
-	// Work Units is feature-flagged off: when hidden, force "sessions" so the
-	// work-units view, its toggle, and its refetch are all unreachable even via a
-	// direct ?view=work_units URL. The work-unit render blocks below stay intact.
-	const viewMode = (): ViewMode =>
-		SHOW_WORK_UNITS && isValidViewMode(searchParams.view) ? searchParams.view : "sessions";
 	// FE-28: the six session filters live in one store, seeded from the URL and
 	// falling back to FILTER_DEFAULTS. `flagged` (R12) narrows the list to sessions
 	// with a non-"none" color.
@@ -499,12 +470,6 @@ export const SessionList: Component = () => {
 		features: isValidFeatures(searchParams.features) ? searchParams.features : FILTER_DEFAULTS.features,
 		flagged: searchParams.flagged === "1",
 	});
-	const [lifecycleFilter, setLifecycleFilter] = createSignal<LifecycleFilter>(
-		isValidLifecycle(searchParams.lifecycle) ? searchParams.lifecycle : "all",
-	);
-	const [linkTypeFilter, setLinkTypeFilter] = createSignal<LinkTypeFilter>(
-		isValidLinkType(searchParams.link_type) ? searchParams.link_type : "all",
-	);
 	const [sortState, setSortState] = createSignal<SortState>(
 		parseSortParam(searchParams.sort),
 	);
@@ -518,7 +483,7 @@ export const SessionList: Component = () => {
 	const [selectedRow, setSelectedRow] = createSignal(-1);
 	const pageSize = () => preferences().sessionListLimit;
 
-	// Sync state -> URL params (viewMode is driven by URL, not synced back)
+	// Sync state -> URL params
 	createEffect(() => {
 		const params: Record<string, string | undefined> = {};
 		const q = filters.search;
@@ -528,8 +493,6 @@ export const SessionList: Component = () => {
 		const hideSubagents = filters.hideSubagents;
 		const features = filters.features;
 		const flagged = filters.flagged;
-		const lifecycle = lifecycleFilter();
-		const linkType = linkTypeFilter();
 		const sort = sortState();
 		const p = page();
 		params.q = q || undefined;
@@ -540,18 +503,9 @@ export const SessionList: Component = () => {
 		params.subagents = hideSubagents ? undefined : "show";
 		params.features = features !== "all" ? features : undefined;
 		params.flagged = flagged ? "1" : undefined;
-		params.lifecycle = lifecycle !== "all" ? lifecycle : undefined;
-		params.link_type = linkType !== "all" ? linkType : undefined;
 		params.sort = serializeSortParam(sort);
 		params.page = p > 1 ? String(p) : undefined;
 		setSearchParams(params);
-	});
-
-	// Refetch work units when switching to work_units view
-	createEffect(() => {
-		if (viewMode() === "work_units") {
-			refetchWorkUnits();
-		}
 	});
 
 	// Filtered + searched sessions
@@ -619,28 +573,6 @@ export const SessionList: Component = () => {
 	});
 
 	const totalPages = createMemo(() => Math.max(1, Math.ceil(sorted().length / pageSize())));
-
-	// ── Work units filtered by search + project + lifecycle + link_type ──
-	const filteredWorkUnits = createMemo(() => {
-		const units = workUnitList() ?? [];
-		const q = filters.search.toLowerCase();
-		const projectId = selectedProjectId();
-		const lifecycle = lifecycleFilter();
-		const linkType = linkTypeFilter();
-
-		return units.filter((u) => {
-			if (u.total_duration_ms <= 0) return false;
-			// Project filter (global mode)
-			if (projectId !== undefined && getWorkUnitProjectId(u) !== projectId) return false;
-			if (lifecycle !== "all" && u.lifecycle !== lifecycle) return false;
-			if (linkType !== "all" && u.link_type !== linkType) return false;
-			if (!q) return true;
-			const spec = (u.spec_path ?? "").toLowerCase();
-			const branch = (u.git_branch ?? "").toLowerCase();
-			const sessionNames = u.sessions.map((s) => (s.session_name ?? s.session_id).toLowerCase());
-			return spec.includes(q) || branch.includes(q) || sessionNames.some((n) => n.includes(q));
-		});
-	});
 
 	// ── Header KPI readouts (derived from already-loaded session store; no fetch) ──
 	const kpis = createMemo(() => {
@@ -754,7 +686,7 @@ export const SessionList: Component = () => {
 					<div class="flex items-baseline gap-2.5">
 						<span class="instrument-led instrument-led--live bg-[var(--clens-live)]" />
 						<h1 class="instrument-microcaps text-[13px] tracking-[0.14em] text-primary">
-							{viewMode() === "work_units" ? "Work Units" : "Sessions"}
+							Sessions
 						</h1>
 						<span class="instrument-microcaps text-[10px] text-muted">cLens console</span>
 					</div>
@@ -821,9 +753,9 @@ export const SessionList: Component = () => {
 				)}
 			</Show>
 
-			{/* Filters — view-aware. FE-9: one primary row (search + project +
+			{/* Filters. FE-9: one primary row (search + project +
 			    Filters popover + chips + Clear), not 7 stacked facets. */}
-			<Show when={viewMode() === "sessions"}>
+			<div>
 				<FilterBar
 					searchPlaceholder="Search sessions (press /)"
 					searchValue={filters.search}
@@ -842,7 +774,7 @@ export const SessionList: Component = () => {
 					}] : []}
 					resultCount={filtered().length}
 					resultLabel={buildCountLabel(filtered().length, scopedTotal())}
-					onRefresh={() => { refetchSessions(); refetchWorkUnits(); }}
+					onRefresh={() => { refetchSessions(); }}
 					advancedCount={advancedActiveCount()}
 					onClear={hasActiveFilters() ? clearAll : undefined}
 					advancedContent={
@@ -917,47 +849,8 @@ export const SessionList: Component = () => {
 						</button>
 					</div>
 				</Show>
-			</Show>
-			<Show when={viewMode() === "work_units"}>
-				<FilterBar
-					searchPlaceholder="Search work units (press /)"
-					searchValue={filters.search}
-					onSearch={(v) => { setFilters("search", v); }}
-					searchRef={(el) => { searchInputRef = el; }}
-					filters={[
-						{ key: "lifecycle", variant: "dropdown", label: "Lifecycle", options: [{ label: "All Lifecycles", value: "all" }, { label: "Prime > Build", value: "prime-build" }, { label: "Prime > Plan > Build", value: "prime-plan-build" }, { label: "Plan > Build", value: "plan-build" }, { label: "Plan > Build > Review", value: "plan-build-review" }, { label: "Multi-Build", value: "multi-build" }, { label: "Ad-hoc", value: "ad-hoc" }], value: lifecycleFilter(), onChange: (v: string) => { setLifecycleFilter(v as LifecycleFilter); } },
-						{ key: "link_type", variant: "dropdown", label: "Link Type", options: [{ label: "All Types", value: "all" }, { label: "Spec-linked", value: "spec" }, { label: "Branch-linked", value: "branch_time" }], value: linkTypeFilter(), onChange: (v: string) => { setLinkTypeFilter(v as LinkTypeFilter); } },
-					]}
-					resultCount={filteredWorkUnits().length}
-					resultLabel={`work unit${filteredWorkUnits().length !== 1 ? "s" : ""}`}
-					onRefresh={() => { refetchWorkUnits(); }}
-				/>
-			</Show>
-
-			{/* Work Units View */}
-			<Show when={viewMode() === "work_units"}>
-				<div class="mt-3">
-					<Show
-						when={filteredWorkUnits().length > 0}
-						fallback={
-							<div class="flex flex-col items-center gap-3 border border-clens bg-surface-inset py-14 text-muted">
-								<Layers class="h-8 w-8 text-muted" />
-								<p class="instrument-microcaps text-sm tracking-[0.14em] text-secondary">No work units found</p>
-								<p class="max-w-xs text-center text-xs leading-relaxed">Distill sessions with spec files to generate work units.</p>
-							</div>
-						}
-					>
-						<div class="overflow-hidden rounded-none border border-clens">
-							<For each={filteredWorkUnits()}>
-								{(unit) => <WorkUnitCard unit={unit} />}
-							</For>
-						</div>
-					</Show>
-				</div>
-			</Show>
-
+			</div>
 			{/* Sessions Table */}
-			<Show when={viewMode() === "sessions"}>
 			<div class="mt-3 overflow-x-auto rounded-none border border-clens">
 				{/* FE-7: min-width floor so the NAME column is never starved; the
 				    overflow-x-auto wrapper scrolls horizontally on narrow viewports. */}
@@ -1074,10 +967,9 @@ export const SessionList: Component = () => {
 					</tbody>
 				</table>
 			</div>
-			</Show>
 
 			{/* Pagination */}
-			<Show when={viewMode() === "sessions" && totalPages() > 1}>
+			<Show when={totalPages() > 1}>
 				<div class="mt-4 flex items-center justify-between text-sm">
 					<span class="instrument-microcaps flex items-baseline gap-1 text-[10px] text-muted">
 						Page <span class="font-mono text-xs tabular-nums text-secondary">{page()}</span> of <span class="font-mono text-xs tabular-nums text-secondary">{totalPages()}</span>

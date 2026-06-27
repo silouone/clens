@@ -7,7 +7,7 @@ import {
 } from "solid-js";
 import { Files } from "lucide-solid";
 import type { DistilledSession } from "../../../shared/types";
-import { SessionOverview, type RelatedSessionsData } from "../SessionOverview";
+import { SessionOverview } from "../SessionOverview";
 import { ConfigEnvironment } from "../ConfigEnvironment";
 import { NarrativeSection } from "../NarrativeSection";
 import { IssuesPanel } from "../IssuesPanel";
@@ -30,7 +30,6 @@ type OverviewPanelProps = {
 	readonly session: DistilledSession;
 	readonly sessionId: string;
 	readonly isMultiAgent: boolean;
-	readonly relatedSessions?: RelatedSessionsData;
 	readonly onRedistill?: () => Promise<void>;
 };
 
@@ -81,7 +80,7 @@ const FileListCard: Component<{
 const OverviewContent: Component<OverviewPanelProps> = (props) => (
 	<div class="space-y-3">
 		{/* 1. Session Overview */}
-		<SessionOverview session={props.session} relatedSessions={props.relatedSessions} onRedistill={props.onRedistill} />
+		<SessionOverview session={props.session} onRedistill={props.onRedistill} />
 
 		{/* 1b. Config / Environment (renders nothing for legacy distills w/o config) */}
 		<ConfigEnvironment session={props.session} />
@@ -195,7 +194,6 @@ export const OverviewPanel: Component<OverviewPanelProps> = (props) => {
 							session={props.session}
 							sessionId={props.sessionId}
 							isMultiAgent={props.isMultiAgent}
-							relatedSessions={props.relatedSessions}
 							onRedistill={props.onRedistill}
 						/>
 					</div>

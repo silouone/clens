@@ -1,9 +1,8 @@
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import type { GlobalSessionSummary, GlobalWorkUnit, ProjectEntry, SessionSummary } from "../types";
+import type { GlobalSessionSummary, ProjectEntry, SessionSummary } from "../types";
 import { readGlobalConfig, resolveProjectEntries } from "./registry";
 import { listSessions, enrichSessionSummaries } from "./read";
-import { readWorkUnitIndex } from "./work-units";
 
 /**
  * In repository mode, a single project (git root) may contain multiple
@@ -96,39 +95,6 @@ export const listGlobalSessions = (): readonly GlobalSessionSummary[] => {
 	}
 
 	return [...byId.values()].sort((a, b) => b.start_time - a.start_time);
-};
-
-/**
- * List work units across all registered projects.
- */
-export const listGlobalWorkUnits = (): readonly GlobalWorkUnit[] => {
-	const projects = resolveProjectEntries();
-	const config = readGlobalConfig();
-	const isRepoMode = config.global_mode === "repository";
-
-	const allUnits = projects.flatMap((project): readonly GlobalWorkUnit[] => {
-		if (isRepoMode) {
-			const clensDirs = findAllClensDirs(project.path);
-			return clensDirs.flatMap((dir) => {
-				const index = readWorkUnitIndex(dir);
-				if (!index) return [];
-				return index.units.map((unit): GlobalWorkUnit => ({
-					...unit,
-					project_id: project.id,
-					project_name: project.name,
-				}));
-			});
-		}
-		const index = readWorkUnitIndex(project.path);
-		if (!index) return [];
-		return index.units.map((unit): GlobalWorkUnit => ({
-			...unit,
-			project_id: project.id,
-			project_name: project.name,
-		}));
-	});
-
-	return [...allUnits].sort((a, b) => b.date_range.start - a.date_range.start);
 };
 
 /**

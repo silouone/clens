@@ -50,7 +50,6 @@ describe("CLI Text Output Format", () => {
 			"--force",
 			"--deep",
 			"--json",
-			"--otel",
 			"--comms",
 			"--version",
 			"--help",

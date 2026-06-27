@@ -61,12 +61,6 @@ export type {
 	WorkflowUsage,
 	WorkingTreeChange,
 	GlobalSessionSummary,
-	GlobalWorkUnit,
-	WorkUnit,
-	WorkUnitIndex,
-	WorkUnitLinkType,
-	WorkUnitSession,
-	WorkUnitSessionRole,
 } from "./distill";
 export { COST_BASES } from "./distill";
 export {

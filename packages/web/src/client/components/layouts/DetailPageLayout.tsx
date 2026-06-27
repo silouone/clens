@@ -4,7 +4,7 @@ import { ArrowLeft, Menu, X } from "lucide-solid";
 import { preferences } from "../../lib/settings";
 
 type DetailPageLayoutProps = {
-	/** Label for the back button (e.g. "Sessions", "Work Units") */
+	/** Label for the back button (e.g. "Sessions") */
 	readonly backLabel: string;
 	/** URL to navigate back to */
 	readonly backHref: string;

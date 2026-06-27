@@ -1,6 +1,6 @@
 import { createResource, createRoot, createSignal } from "solid-js";
-import type { ColorName, ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
-import { api, authHeaders, patchSessionMeta, type SessionMetaPatch } from "./api";
+import type { ColorName, ConversationEntry, DistilledSession, SessionSummary } from "../../shared/types";
+import { api, patchSessionMeta, type SessionMetaPatch } from "./api";
 import { preferences } from "./settings";
 import { isStaleConversationFetch } from "./fetch-guard";
 
@@ -117,19 +117,6 @@ const setSessionMeta = async (id: string, patch: SessionMetaPatch): Promise<void
 
 // ── Session detail (lazy) ───────────────────────────────────────────
 
-/** Related sessions data from work unit index. */
-type RelatedSessionsData = {
-	readonly work_unit_id: string;
-	readonly spec_path?: string;
-	readonly sessions: readonly {
-		readonly session_id: string;
-		readonly session_name?: string;
-		readonly phase: string;
-		readonly role: string;
-		readonly start_time: number;
-	}[];
-};
-
 /**
  * Staleness metadata from the detail route (bug B5): how the distilled snapshot
  * compares to the live raw session file. `distill_stale` is true when the raw
@@ -148,7 +135,6 @@ type SessionDetailResult =
 	| {
 			readonly status: "ready";
 			readonly data: DistilledSession;
-			readonly relatedSessions?: RelatedSessionsData;
 			readonly staleness?: StalenessData;
 	  }
 	| { readonly status: "not_distilled" };
@@ -184,11 +170,6 @@ const createSessionDetail = (sessionId: () => string | undefined) => {
 			return undefined;
 		}
 		console.debug(LOG_PREFIX, `Session ${id.slice(0, 8)}: loaded`);
-		const raw = "related_sessions" in body ? body.related_sessions : undefined;
-		const relatedSessions: RelatedSessionsData | undefined =
-			raw && typeof raw === "object" && "sessions" in raw && Array.isArray(raw.sessions)
-				? raw as RelatedSessionsData
-				: undefined;
 		const rawStaleness = "staleness" in body ? body.staleness : undefined;
 		// Validate every field the banner renders, not just the flag (untrusted body)
 		const staleness: StalenessData | undefined =
@@ -205,7 +186,6 @@ const createSessionDetail = (sessionId: () => string | undefined) => {
 		return {
 			status: "ready",
 			data: data as DistilledSession,
-			relatedSessions,
 			...(staleness ? { staleness } : {}),
 		};
 	};
@@ -349,90 +329,6 @@ const createAgentConversationResource = (
 	return createResource(key, fetcher);
 };
 
-// ── Work Units ──────────────────────────────────────────────────────
-
-const fetchWorkUnits = async (): Promise<readonly WorkUnit[]> => {
-	console.debug(LOG_PREFIX, "Fetching work units");
-	try {
-		const res = await fetch("/api/work-units", { headers: authHeaders() });
-		if (!res.ok) {
-			console.error(LOG_PREFIX, `Work units error: HTTP ${res.status}`);
-			return [];
-		}
-		const body = await res.json();
-		const data = body.data;
-		if (!Array.isArray(data)) return [];
-		console.debug(LOG_PREFIX, `Work units: ${data.length} units`);
-		return data as readonly WorkUnit[];
-	} catch (err) {
-		console.error(LOG_PREFIX, "Work units fetch failed:", err);
-		return [];
-	}
-};
-
-const [workUnitList, { refetch: refetchWorkUnits }] =
-	createResource(fetchWorkUnits);
-
-// ── Work Unit Detail (lazy) ─────────────────────────────────────────
-
-/** Session data within a work unit detail response. */
-type WorkUnitDetailSession = {
-	readonly session_id: string;
-	readonly session_name?: string;
-	readonly phase: string;
-	readonly role: string;
-	readonly start_time: number;
-	readonly distilled: DistilledSession | null;
-	readonly summary: {
-		readonly session_id: string;
-		readonly session_name?: string;
-		readonly is_distilled: boolean;
-		readonly duration_ms: number;
-	};
-};
-
-/** Response from the work unit detail endpoint. */
-type WorkUnitDetailResult = {
-	readonly unit: WorkUnit;
-	readonly sessions: readonly WorkUnitDetailSession[];
-};
-
-/**
- * Create a reactive resource for a work unit's enriched detail data.
- * Lazily loaded — only fetches when id signal changes.
- */
-const createWorkUnitDetail = (id: () => string | undefined) => {
-	const fetcher = async (
-		unitId: string,
-	): Promise<WorkUnitDetailResult | undefined> => {
-		console.debug(LOG_PREFIX, `Fetching work unit detail: ${unitId.slice(0, 12)}`);
-		try {
-			const res = await fetch(`/api/work-units/${unitId}/detail`, { headers: authHeaders() });
-			if (!res.ok) {
-				const body = await res.json().catch(() => ({ error: "Unknown error" }));
-				const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
-				console.error(LOG_PREFIX, `Work unit detail error (${unitId.slice(0, 12)}):`, msg);
-				setGlobalError({ message: msg, code: String(res.status) });
-				return undefined;
-			}
-			const body = await res.json();
-			const data = body.data;
-			if (!data || typeof data !== "object" || !("unit" in data) || !("sessions" in data) || !Array.isArray(data.sessions)) {
-				console.error(LOG_PREFIX, `Work unit ${unitId.slice(0, 12)}: invalid data format`);
-				setGlobalError({ message: "Invalid work unit data format", code: "PARSE_ERROR" });
-				return undefined;
-			}
-			console.debug(LOG_PREFIX, `Work unit ${unitId.slice(0, 12)}: loaded`);
-			return data as WorkUnitDetailResult;
-		} catch (err) {
-			console.error(LOG_PREFIX, "Work unit detail fetch failed:", err);
-			return undefined;
-		}
-	};
-
-	return createResource(id, fetcher);
-};
-
 export {
 	globalError,
 	setGlobalError,
@@ -443,9 +339,5 @@ export {
 	createSessionDetail,
 	createConversationStore,
 	createAgentConversationResource,
-	workUnitList,
-	refetchWorkUnits,
-	fetchWorkUnits,
-	createWorkUnitDetail,
 };
-export type { ApiError, ConversationStore, RelatedSessionsData, SessionDetailResult, WorkUnitDetailResult, WorkUnitDetailSession };
+export type { ApiError, ConversationStore, SessionDetailResult };

@@ -186,7 +186,6 @@ const commands: Readonly<Record<string, CommandDef>> = {
 			await exportCommand({
 				sessionId: resolveSessionId(ctx.positional[1], ctx.flags.last, ctx.projectDir),
 				projectDir: ctx.projectDir,
-				otel: ctx.flags.otel,
 			});
 		},
 	},
@@ -309,7 +308,7 @@ const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	config: new Set(["--pricing", "--json", "--global-mode"]),
 	explore: new Set([]),
 	clean: new Set(["--last", "--all", "--force", "--yes"]),
-	export: new Set(["--last", "--otel"]),
+	export: new Set(["--last"]),
 	what: new Set(["--last", "--json", "--pricing", "--global"]),
 	web: new Set(["--port", "--no-open", "--global"]),
 };
@@ -392,7 +391,6 @@ ${bold("Options:")}
   ${dim("--yes, -y")}      Skip confirmation prompt (required for 'clean --all' when non-interactive)
   ${dim("--deep")}         Deep distill: add git enrichment (commit history, unified diffs); spawns git
   ${dim("--json")}         Output structured JSON
-  ${dim("--otel")}         Export in OTLP format
   ${dim("--detail")}       Show detailed backtrack breakdown
   ${dim("--full")}         Show full reasoning text
   ${dim("--intent")}       Filter by reasoning intent type
@@ -440,7 +438,6 @@ const flags: Flags = {
 	last: args.includes("--last"),
 	force: args.includes("--force"),
 	yes: args.includes("--yes") || args.includes("-y"),
-	otel: args.includes("--otel"),
 	deep: args.includes("--deep"),
 	json: args.includes("--json"),
 	help: args.includes("--help") || args.includes("-h"),

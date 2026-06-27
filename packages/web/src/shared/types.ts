@@ -79,13 +79,6 @@ export type {
 	TaskRecord,
 	TaskListResult,
 
-	// Work Units
-	WorkUnit,
-	WorkUnitIndex,
-	WorkUnitSession,
-	WorkUnitSessionRole,
-	WorkUnitLinkType,
-
 	// Config
 	ClensConfig,
 	PricingTier,
@@ -96,7 +89,6 @@ export type {
 
 	// Global mode
 	GlobalSessionSummary,
-	GlobalWorkUnit,
 
 	// Analytics
 	AnalyticsSummaryRow,

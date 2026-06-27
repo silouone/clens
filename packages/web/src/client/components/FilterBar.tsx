@@ -25,8 +25,8 @@ type FilterBarProps = {
 	readonly resultLabel: string;
 	readonly onRefresh: () => void;
 	// FE-9: advanced facets collapse into a single "Filters" popover instead of a
-	// stack of segmented-control rows. These props are optional so existing callers
-	// (e.g. the work-units view) render the plain primary row unchanged.
+	// stack of segmented-control rows. These props are optional so callers that
+	// don't need advanced facets render the plain primary row unchanged.
 	readonly advancedContent?: JSX.Element; // popover body (labelled facet controls)
 	readonly advancedCount?: number; // count badge of active advanced facets
 	readonly chips?: JSX.Element; // active-filter chips rendered below the primary row

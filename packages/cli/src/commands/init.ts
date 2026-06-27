@@ -503,8 +503,3 @@ export const initCommand = (args: {
 	const result = init(args.projectDir, target);
 	renderInitResult(result);
 };
-
-/** @deprecated Use initCommand with flags instead. Kept for backward compat during migration. */
-export const uninitCommand = (projectDir: string): void => {
-	renderUninit(projectDir, false);
-};

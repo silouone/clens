@@ -9,7 +9,6 @@ import { initSSE } from "./lib/events";
 import { formatCost, formatDuration } from "./lib/format";
 import { toggleHelp, setKeyboardNavigate } from "./lib/keyboard";
 import { preferences } from "./lib/settings";
-import { SHOW_WORK_UNITS } from "./lib/feature-flags";
 import { theme, toggleTheme, initThemeListener } from "./lib/theme";
 
 // ── Icons ───────────────────────────────────────────────────────────
@@ -46,23 +45,13 @@ type NavItem = {
 	readonly matchPrefix: string;
 };
 
-const ALL_NAV_ITEMS: readonly NavItem[] = [
-	{ label: "Sessions", path: "/?view=sessions", matchPrefix: "/session" },
-	{ label: "Work Units", path: "/?view=work_units", matchPrefix: "/work-unit" },
+const NAV_ITEMS: readonly NavItem[] = [
+	{ label: "Sessions", path: "/", matchPrefix: "/session" },
 ] as const;
 
-// Work Units is feature-flagged off; filter its nav entry out when hidden so the
-// feature is unreachable from the header. Entry definition above stays intact.
-const NAV_ITEMS: readonly NavItem[] = ALL_NAV_ITEMS.filter(
-	(item) => SHOW_WORK_UNITS || item.label !== "Work Units",
-);
-
-const isNavActive = (item: NavItem, pathname: string, search: string): boolean => {
+const isNavActive = (item: NavItem, pathname: string): boolean => {
 	if (item.label === "Sessions") {
-		return (pathname === "/" && !search.includes("view=work_units")) || pathname.startsWith("/session");
-	}
-	if (item.label === "Work Units") {
-		return (pathname === "/" && search.includes("view=work_units")) || pathname.startsWith("/work-unit");
+		return pathname === "/" || pathname.startsWith("/session");
 	}
 	return pathname.startsWith(item.matchPrefix);
 };
@@ -279,8 +268,8 @@ export const App: Component<RouteSectionProps> = (props) => {
 									onClick={() => navigate(item.path)}
 									class="instrument-microcaps rounded-none px-2.5 py-1 text-[10px] transition border-b-2"
 									classList={{
-										"text-primary border-brand-500": isNavActive(item, location.pathname, location.search),
-										"text-muted border-transparent hover:text-secondary": !isNavActive(item, location.pathname, location.search),
+										"text-primary border-brand-500": isNavActive(item, location.pathname),
+										"text-muted border-transparent hover:text-secondary": !isNavActive(item, location.pathname),
 									}}
 								>
 									{item.label}

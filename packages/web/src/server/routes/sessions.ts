@@ -2,7 +2,7 @@ import { Hono } from "hono"
 import type { Context } from "hono"
 import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions, readFeatureIndex, enrichSessionSummaries, setSessionMeta } from "clens/src/session"
+import { readDistilled, readSessionEvents, readLinks, readTranscript, readFeatureIndex, enrichSessionSummaries, setSessionMeta } from "clens/src/session"
 import { buildConversation, buildConversationFromTranscript } from "clens/src/session/conversation"
 import { diffLinesToUnified, deduplicateSpawns } from "clens/src/utils"
 import { deriveSessionStatus, SESSION_STATUSES, BROADCAST_EVENTS, isColorName } from "clens/src/types"
@@ -636,29 +636,12 @@ const createSessionsRoute = (projectDir: string) =>
 				return c.json({ status: "not_distilled" as const }, 202)
 			}
 
-			// Enrich with related sessions from work unit index
-			const related = getRelatedSessions(sessionId, projectDir)
-			const relatedSessions = related.work_unit
-				? {
-					work_unit_id: related.work_unit.id,
-					spec_path: related.work_unit.spec_path,
-					sessions: related.work_unit.sessions.map((s) => ({
-						session_id: s.session_id,
-						session_name: s.session_name,
-						phase: s.phase,
-						role: s.role,
-						start_time: s.start_time,
-					})),
-				}
-				: undefined
-
 			// Staleness: compare distilled coverage against the live raw file (bug B5)
 			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events, (distilled.cost_estimate ?? distilled.stats.cost_estimate)?.pricing_tier)
 
 			return c.json({
 				data: distilled,
 				...(staleness ? { staleness } : {}),
-				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
 			})
 		})
 
@@ -1027,28 +1010,12 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 				return c.json({ status: "not_distilled" as const }, 202)
 			}
 
-			const related = getRelatedSessions(sessionId, projectDir)
-			const relatedSessions = related.work_unit
-				? {
-					work_unit_id: related.work_unit.id,
-					spec_path: related.work_unit.spec_path,
-					sessions: related.work_unit.sessions.map((s) => ({
-						session_id: s.session_id,
-						session_name: s.session_name,
-						phase: s.phase,
-						role: s.role,
-						start_time: s.start_time,
-					})),
-				}
-				: undefined
-
 			// Staleness: compare distilled coverage against the live raw file (bug B5)
 			const staleness = computeStaleness(projectDir, sessionId, distilled.stats.total_events, (distilled.cost_estimate ?? distilled.stats.cost_estimate)?.pricing_tier)
 
 			return c.json({
 				data: distilled,
 				...(staleness ? { staleness } : {}),
-				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
 			})
 		})
 

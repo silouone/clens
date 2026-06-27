@@ -1,6 +1,4 @@
 import { createMemo, createSignal, Show, type Component } from "solid-js";
-import { A } from "@solidjs/router";
-import { ExternalLink } from "lucide-solid";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatPercentage, formatCost, truncateMultiline } from "../lib/format";
 import { renderPlainText } from "../lib/markdown";
@@ -8,26 +6,11 @@ import { Card } from "./ui/Card";
 import { MetaRow } from "./ui/MetaRow";
 import { CostDrilldown } from "./CostDrilldown";
 import { TimelineBar } from "./TimelineBar";
-import { RelatedSessionBadges } from "./RelatedSessionBadges";
-import { SHOW_WORK_UNITS } from "../lib/feature-flags";
 
 // -- Types ----------------------------------------------------------------
 
-export type RelatedSessionsData = {
-	readonly work_unit_id: string;
-	readonly spec_path?: string;
-	readonly sessions: readonly {
-		readonly session_id: string;
-		readonly session_name?: string;
-		readonly phase: string;
-		readonly role: string;
-		readonly start_time: number;
-	}[];
-};
-
 type SessionOverviewProps = {
 	readonly session: DistilledSession;
-	readonly relatedSessions?: RelatedSessionsData;
 	readonly onRedistill?: () => Promise<void>;
 };
 
@@ -119,42 +102,18 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 
 	return (
 		<Card class="p-4">
-			{/* Spec/WorkUnit bar */}
-			<Show when={specPath() || props.relatedSessions}>
-				<div class="mb-3 flex flex-wrap items-center justify-end gap-2">
-					<Show when={specPath()}>
-						{(path) => (
-							<div class="inline-flex items-center gap-2 rounded-none border border-clens bg-surface-inset px-3 py-1.5">
-								<span class="instrument-microcaps text-[10px] text-muted">Spec</span>
-								<span class="truncate font-mono text-xs text-secondary" title={path()}>
-									{path()}
-								</span>
-							</div>
-						)}
-					</Show>
-					{/* Work Units is feature-flagged off (SHOW_WORK_UNITS); the link stays
-					    in source but never renders while hidden. */}
-					<Show when={SHOW_WORK_UNITS && props.relatedSessions?.work_unit_id}>
-						{(wuId) => (
-							<A
-								href={`/work-unit/${wuId()}`}
-								class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens bg-surface-inset px-2.5 py-1 text-[10px] text-secondary transition hover:bg-surface-hover"
-							>
-								View Work Unit
-								<ExternalLink class="h-2.5 w-2.5" />
-							</A>
-						)}
-					</Show>
-					<Show when={props.relatedSessions}>
-						{(related) => (
-							<RelatedSessionBadges
-								currentSessionId={session().session_id}
-								relatedSessions={related().sessions}
-								specPath={related().spec_path}
-							/>
-						)}
-					</Show>
-				</div>
+			{/* Spec bar */}
+			<Show when={specPath()}>
+				{(path) => (
+					<div class="mb-3 flex flex-wrap items-center justify-end gap-2">
+						<div class="inline-flex items-center gap-2 rounded-none border border-clens bg-surface-inset px-3 py-1.5">
+							<span class="instrument-microcaps text-[10px] text-muted">Spec</span>
+							<span class="truncate font-mono text-xs text-secondary" title={path()}>
+								{path()}
+							</span>
+						</div>
+					</div>
+				)}
 			</Show>
 
 			{/* Request section */}

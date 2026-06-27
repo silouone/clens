@@ -7,7 +7,6 @@ import { authToken, validateSessionId, cors } from "./middleware/security"
 import { eventsRoute } from "./routes/events"
 import { createSessionsRoute, createGlobalSessionsRoute } from "./routes/sessions"
 import { createCommandsRoute } from "./routes/commands"
-import { createWorkUnitsRoute, createGlobalWorkUnitsRoute } from "./routes/work-units"
 import { createConfigRoute } from "./routes/config"
 import { createAnalyticsRoute, createGlobalAnalyticsRoute } from "./routes/analytics"
 import { createLogger } from "./logger"
@@ -98,9 +97,6 @@ const createApp = (options: AppOptions) => {
 		.route("/api/sessions", isGlobal
 			? createGlobalSessionsRoute(projects, options.projectDir)
 			: createSessionsRoute(options.projectDir))
-		.route("/api/work-units", isGlobal
-			? createGlobalWorkUnitsRoute(projects, options.projectDir)
-			: createWorkUnitsRoute(options.projectDir))
 		.route("/api/commands/sessions", createCommandsRoute(options.projectDir, projects))
 		.route("/api/config", createConfigRoute(options.projectDir))
 		.route("/api/analytics", isGlobal

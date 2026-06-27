@@ -11,5 +11,4 @@ export type { SessionMetaMap, SessionMetaPatch } from "./session-meta";
 export { readSessionName, readTranscript, readTranscriptWithMeta, resolveTranscriptPath } from "./transcript";
 export type { TranscriptWithMeta } from "./transcript";
 export { registerProject, unregisterProject, readRegistry, writeRegistry, registryPath, resolveProjectEntries, discoverAndRegisterProjects, readGlobalConfig, writeGlobalConfig, isValidGlobalMode, globalConfigPath } from "./registry";
-export { getRelatedSessions, readWorkUnitIndex, rebuildWorkUnitIndex, writeWorkUnitIndex } from "./work-units";
-export { listGlobalSessions, listGlobalWorkUnits, resolveProjectForSession } from "./global-read";
+export { listGlobalSessions, resolveProjectForSession } from "./global-read";

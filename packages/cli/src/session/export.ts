@@ -11,7 +11,6 @@ const extractTimestamp = (obj: Record<string, unknown>): number | undefined =>
 export const exportSession = async (
 	sessionId: string,
 	projectDir: string,
-	_options?: { otel?: boolean },
 ): Promise<string> => {
 	const sessionsDir = `${projectDir}/.clens/sessions`;
 	const sessionPath = `${sessionsDir}/${sessionId}.jsonl`;
