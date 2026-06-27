@@ -93,6 +93,22 @@ export default {
 				},
 				muted: "var(--clens-muted)",
 				accent: "var(--clens-accent)",
+				// Semantic category channels (overview-moat-refactor). Bare var()
+				// refs so `text-cat-risk`, `border-cat-cost`, `bg-cat-context`, etc.
+				// resolve to the additive --clens-cat-* tokens and track the theme.
+				// NOTE: bare var() (unlike the brand color-mix form) drops Tailwind
+				// opacity modifiers — `text-cat-risk/60` will NOT work. Fine for the
+				// solid instrument channels; Wave 1 should use full-opacity classes.
+				cat: {
+					timing: "var(--clens-cat-timing)",
+					cost: "var(--clens-cat-cost)",
+					risk: "var(--clens-cat-risk)",
+					context: "var(--clens-cat-context)",
+					outcome: "var(--clens-cat-outcome)",
+					edits: "var(--clens-cat-edits)",
+					comms: "var(--clens-cat-comms)",
+					agents: "var(--clens-cat-agents)",
+				},
 			},
 			boxShadow: {
 				card: "var(--clens-shadow-card)",

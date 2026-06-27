@@ -66,6 +66,21 @@ html {
 	--clens-flag-blue: #2C5E8A;
 	--clens-flag-violet: #6B4A9A;
 	--clens-flag-gray: #7A7E7B;
+	/* Semantic category channels (overview-moat-refactor) — one restrained hue
+	   per signal category, used for colored left-rules / microcaps labels / LED
+	   dots / chart strokes. ADDITIVE: the 5 locked base tokens are untouched.
+	   By design several channels REUSE existing base/status/flag hues (outcome=
+	   brand/success, cost=warning, risk=danger, context=flag-violet, edits=
+	   flag-blue) — the category palette is a coordinated instrument set, not a
+	   second rainbow. Light = deepened for paper legibility. */
+	--clens-cat-timing: #0E7C7B;
+	--clens-cat-cost: #9A6700;
+	--clens-cat-risk: #B42318;
+	--clens-cat-context: #6B4A9A;
+	--clens-cat-outcome: #0A8754;
+	--clens-cat-edits: #2C5E8A;
+	--clens-cat-comms: #1E7A8C;
+	--clens-cat-agents: #4A5B9A;
 }
 
 .dark {
@@ -106,6 +121,19 @@ html {
 	--clens-flag-blue: #5EA8E0;
 	--clens-flag-violet: #B08AE0;
 	--clens-flag-gray: #8A948F;
+	/* Semantic category channels (overview-moat-refactor) — phosphor-adjacent on
+	   instrument black. ADDITIVE; the 5 locked base tokens are untouched. By
+	   design outcome=brand(#33FF99, locked), cost=warning, risk=danger,
+	   context=flag-violet, edits=flag-blue REUSE existing hues as deliberate
+	   channel reuse, not drift. */
+	--clens-cat-timing: #4FD6C9;
+	--clens-cat-cost: #FFB000;
+	--clens-cat-risk: #FF6B5E;
+	--clens-cat-context: #B08AE0;
+	--clens-cat-outcome: #33FF99;
+	--clens-cat-edits: #5EA8E0;
+	--clens-cat-comms: #5FD0E0;
+	--clens-cat-agents: #8A9AE0;
 }
 
 body {

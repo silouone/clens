@@ -207,3 +207,117 @@ describe("banned INSTRUMENT idioms (client source)", () => {
 		expect(BANNED_ROUNDED_FULL.test('class="rounded-md border"')).toBe(false);
 	});
 });
+
+// ── LOCKED semantic category palette (overview-moat-refactor) ────────
+// The Overview moat refactor adds an ADDITIVE semantic accent palette: one
+// restrained hue per signal category (timing / cost / risk / context /
+// outcome / edits / comms / agents), defined in BOTH themes. Per constraint
+// C1 the 5 base assertions above are untouched; these are NEW locked
+// assertions so a future palette drift fails the build just like the base.
+//
+// IMPORTANT — the category palette DELIBERATELY REUSES existing base / status
+// / flag hues as coordinated instrument channels (it is not a second
+// rainbow). These collisions are INTENTIONAL and must NOT be asserted as
+// "distinct from base":
+//   outcome  == --clens-brand / --clens-success / --clens-flag-green
+//               (dark outcome #33FF99 == the LOCKED dark brand value)
+//   cost     == --clens-warning / --clens-flag-amber
+//   risk     == --clens-danger  (dark also == --clens-flag-red)
+//   context  == --clens-flag-violet
+//   edits    == --clens-flag-blue
+// The meaningful guards therefore are: (1) each category token is pinned to
+// its exact hex per theme, (2) the 8 category tokens are mutually distinct
+// within a theme (no two channels collapse to the same color), and (3) no
+// category token collides with a LOCKED readability anchor (surface /
+// text-primary) — the one collision that would actually break legibility.
+
+describe("locked category palette (index.css)", () => {
+	const root = blockTokens(":root");
+	const dark = blockTokens(".dark");
+
+	const CAT_KEYS = [
+		"timing",
+		"cost",
+		"risk",
+		"context",
+		"outcome",
+		"edits",
+		"comms",
+		"agents",
+	] as const;
+
+	// Exact per-theme hex pins. A one-digit drift must fail (mirrors the base
+	// guard's intent). Case-insensitive via the uppercasing in blockTokens.
+	const lightHex: Readonly<Record<string, string>> = {
+		"--clens-cat-timing": "#0E7C7B",
+		"--clens-cat-cost": "#9A6700",
+		"--clens-cat-risk": "#B42318",
+		"--clens-cat-context": "#6B4A9A",
+		"--clens-cat-outcome": "#0A8754",
+		"--clens-cat-edits": "#2C5E8A",
+		"--clens-cat-comms": "#1E7A8C",
+		"--clens-cat-agents": "#4A5B9A",
+	};
+	const darkHex: Readonly<Record<string, string>> = {
+		"--clens-cat-timing": "#4FD6C9",
+		"--clens-cat-cost": "#FFB000",
+		"--clens-cat-risk": "#FF6B5E",
+		"--clens-cat-context": "#B08AE0",
+		"--clens-cat-outcome": "#33FF99",
+		"--clens-cat-edits": "#5EA8E0",
+		"--clens-cat-comms": "#5FD0E0",
+		"--clens-cat-agents": "#8A9AE0",
+	};
+
+	CAT_KEYS.forEach((key) => {
+		const name = `--clens-cat-${key}`;
+		test(`:root ${name} === ${lightHex[name]}`, () => {
+			expect(root.get(name)).toBe(lightHex[name]);
+		});
+		test(`.dark ${name} === ${darkHex[name]}`, () => {
+			expect(dark.get(name)).toBe(darkHex[name]);
+		});
+	});
+
+	const catValues = (tokens: Map<string, string>): string[] =>
+		CAT_KEYS.map((k) => tokens.get(`--clens-cat-${k}`)).filter(
+			(v): v is string => v !== undefined,
+		);
+
+	test("all 8 category tokens are present in both themes", () => {
+		expect(catValues(root).length).toBe(8);
+		expect(catValues(dark).length).toBe(8);
+	});
+
+	test("category channels are mutually distinct within :root (no two collapse)", () => {
+		const values = catValues(root);
+		expect(new Set(values).size).toBe(values.length);
+	});
+
+	test("category channels are mutually distinct within .dark (no two collapse)", () => {
+		const values = catValues(dark);
+		expect(new Set(values).size).toBe(values.length);
+	});
+
+	test("no category token collides with a LOCKED readability anchor", () => {
+		// The readability anchors are the surfaces and primary text — a category
+		// hue equal to one of these would be invisible on/against it. (Collisions
+		// with brand/status/flag tokens are intentional channel reuse, NOT checked.)
+		const lightAnchors = new Set([
+			root.get("--clens-surface"),
+			root.get("--clens-text-primary"),
+		]);
+		const darkAnchors = new Set([
+			dark.get("--clens-surface"),
+			dark.get("--clens-text-primary"),
+		]);
+		expect(catValues(root).filter((v) => lightAnchors.has(v))).toEqual([]);
+		expect(catValues(dark).filter((v) => darkAnchors.has(v))).toEqual([]);
+	});
+
+	test("the category hex pin rejects a drift (guard bites)", () => {
+		// Proof the pin would FAIL on a one-digit drift, not just pass today.
+		expect(dark.get("--clens-cat-risk")).not.toBe("#FF6B5F");
+		expect(root.get("--clens-cat-timing")).not.toBe("#0E7C7C");
+	});
+});
