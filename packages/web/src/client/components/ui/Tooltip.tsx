@@ -12,7 +12,7 @@ export const Tooltip: Component<TooltipProps> = (props) => (
 			{props.children}
 		</KTooltip.Trigger>
 		<KTooltip.Portal>
-			<KTooltip.Content class="z-50 rounded-md border border-clens bg-surface-raised px-3 py-1.5 text-xs text-secondary shadow-lg">
+			<KTooltip.Content class="z-50 rounded-none border border-clens bg-surface-overlay px-2.5 py-1.5 text-xs text-secondary">
 				<KTooltip.Arrow />
 				{props.content}
 			</KTooltip.Content>

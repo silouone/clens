@@ -15,7 +15,12 @@ import {
 } from "../lib/settings";
 import type { FontSize, TimestampFormat } from "../lib/settings";
 import { theme, setTheme } from "../lib/theme";
-import type { PricingTier } from "../../shared/types";
+import {
+	PLAN_MONTHLY_USD,
+	planFromLegacyPricing,
+	DEFAULT_SUBSCRIPTION_PLAN,
+	type SubscriptionPlan,
+} from "../../shared/types";
 
 // ── Theme mode (3-way: light / dark / system) ───────────────────────
 
@@ -50,11 +55,18 @@ const PAGE_SIZE_OPTIONS = [
 	{ label: "100", value: "100" },
 ] as const;
 
-const PRICING_OPTIONS = [
-	{ label: "API", value: "api" as PricingTier },
-	{ label: "Max", value: "max" as PricingTier },
-	{ label: "Auto", value: "auto" as PricingTier },
+const PLAN_OPTIONS = [
+	{ label: "Pro", value: "pro" as SubscriptionPlan },
+	{ label: "Max 5×", value: "max5x" as SubscriptionPlan },
+	{ label: "Max 20×", value: "max20x" as SubscriptionPlan },
+	{ label: "API", value: "api" as SubscriptionPlan },
 ] as const;
+
+/** Human-readable monthly rate for the plan-selector row description. */
+const planRateLabel = (plan: SubscriptionPlan): string =>
+	plan === "api"
+		? "Pay-as-you-go — paid equals API-equivalent value"
+		: `Flat $${PLAN_MONTHLY_USD[plan]}/mo subscription`;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -162,9 +174,9 @@ export const SettingsPage: Component = () => {
 										step="1"
 										value={preferences().sidebarWidth}
 										onInput={(e) => setPreference("sidebarWidth", Number(e.currentTarget.value))}
-										class="w-36 accent-brand-500"
+										class="w-36 cursor-pointer accent-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
 									/>
-									<span class="text-xs text-muted tabular-nums w-8 text-right">
+									<span class="instrument-microcaps tabular-nums w-10 text-right text-[11px] text-secondary">
 										{preferences().sidebarWidth}%
 									</span>
 								</div>
@@ -184,15 +196,16 @@ export const SettingsPage: Component = () => {
 								fallback={
 									<div class="flex items-center gap-2 py-6">
 										<Spinner size="sm" />
-										<span class="text-xs text-muted">Loading project config...</span>
+										<span class="instrument-microcaps text-[10px] text-muted">Loading project config…</span>
 									</div>
 								}
 							>
 								<Show
 									when={projectConfig()}
 									fallback={
-										<div class="py-6 text-xs text-muted">
-											Unable to load project configuration.
+										<div class="flex items-center gap-2 py-6">
+											<span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--clens-danger)]" />
+											<span class="text-xs text-muted">Unable to load project configuration.</span>
 										</div>
 									}
 								>
@@ -201,7 +214,10 @@ export const SettingsPage: Component = () => {
 											<SettingRow label="Capture enabled" description="Enable or disable hook event capture">
 												<div class="flex items-center gap-3">
 													<Show when={configSaved()}>
-														<span class="instrument-microcaps text-[10px] text-success animate-fade-in">Saved</span>
+														<span class="instrument-microcaps flex items-center gap-1.5 text-[10px] text-[var(--clens-success)] animate-fade-in">
+															<span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--clens-success)]" />
+															Saved
+														</span>
 													</Show>
 													<Toggle
 														checked={config().capture}
@@ -209,13 +225,22 @@ export const SettingsPage: Component = () => {
 													/>
 												</div>
 											</SettingRow>
-											<SettingRow label="Pricing tier" description="Model pricing tier for cost estimates">
-												<SegmentedControl
-													options={PRICING_OPTIONS}
-													value={config().pricing ?? "auto"}
-													onChange={(v) => handleConfigSave({ pricing: v })}
-												/>
-											</SettingRow>
+											{(() => {
+												const currentPlan = (): SubscriptionPlan =>
+													config().plan ?? (config().pricing ? planFromLegacyPricing(config().pricing) : DEFAULT_SUBSCRIPTION_PLAN);
+												return (
+													<SettingRow
+														label="Subscription plan"
+														description={`Drives PAID vs VALUE vs ROI — ${planRateLabel(currentPlan())}`}
+													>
+														<SegmentedControl
+															options={PLAN_OPTIONS}
+															value={currentPlan()}
+															onChange={(v) => handleConfigSave({ plan: v })}
+														/>
+													</SettingRow>
+												);
+											})()}
 										</>
 									)}
 								</Show>
@@ -225,12 +250,12 @@ export const SettingsPage: Component = () => {
 						{/* ── Section 4: Server Info ─────────────────────────── */}
 						<SettingsSection title="Server Info">
 							<SettingRow label="Server port">
-								<span class="font-mono text-sm text-secondary tabular-nums">
+								<span class="inline-flex items-center rounded-none border border-clens bg-surface-inset px-2 py-0.5 font-mono text-sm text-secondary tabular-nums">
 									{window.location.port || "80"}
 								</span>
 							</SettingRow>
 							<SettingRow label="Origin">
-								<span class="font-mono text-sm text-secondary truncate max-w-[300px]" title={window.location.origin}>
+								<span class="inline-flex max-w-[300px] items-center truncate rounded-none border border-clens bg-surface-inset px-2 py-0.5 font-mono text-sm text-secondary" title={window.location.origin}>
 									{window.location.origin}
 								</span>
 							</SettingRow>
@@ -239,7 +264,7 @@ export const SettingsPage: Component = () => {
 						{/* ── Section 5: Data Management ────────────────────── */}
 						<SettingsSection title="Data Management">
 							<SettingRow label="Local storage usage" description="Approximate size of stored preferences">
-								<span class="font-mono text-sm text-secondary tabular-nums">
+								<span class="inline-flex items-center rounded-none border border-clens bg-surface-inset px-2 py-0.5 font-mono text-sm text-secondary tabular-nums">
 									{getStorageSize()}
 								</span>
 							</SettingRow>
@@ -247,7 +272,7 @@ export const SettingsPage: Component = () => {
 								<Button
 									variant="secondary"
 									size="sm"
-									class="text-danger hover:bg-surface-hover"
+									class="text-[var(--clens-danger)] transition-colors hover:border-[var(--clens-danger)]/40 hover:bg-surface-hover"
 									onClick={() => {
 										resetPreferences();
 										setThemeMode("system");

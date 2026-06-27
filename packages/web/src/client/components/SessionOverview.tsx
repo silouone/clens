@@ -9,6 +9,7 @@ import { MetaRow } from "./ui/MetaRow";
 import { CostDrilldown } from "./CostDrilldown";
 import { TimelineBar } from "./TimelineBar";
 import { RelatedSessionBadges } from "./RelatedSessionBadges";
+import { SHOW_WORK_UNITS } from "../lib/feature-flags";
 
 // -- Types ----------------------------------------------------------------
 
@@ -131,7 +132,9 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 							</div>
 						)}
 					</Show>
-					<Show when={props.relatedSessions?.work_unit_id}>
+					{/* Work Units is feature-flagged off (SHOW_WORK_UNITS); the link stays
+					    in source but never renders while hidden. */}
+					<Show when={SHOW_WORK_UNITS && props.relatedSessions?.work_unit_id}>
 						{(wuId) => (
 							<A
 								href={`/work-unit/${wuId()}`}

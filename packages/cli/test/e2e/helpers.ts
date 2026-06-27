@@ -38,7 +38,11 @@ export type CliResult = {
 	readonly duration_ms: number;
 };
 
-export const runCli = async (args: readonly string[], projectDir: string): Promise<CliResult> => {
+export const runCli = async (
+	args: readonly string[],
+	projectDir: string,
+	envOverride: Readonly<Record<string, string>> = {},
+): Promise<CliResult> => {
 	const cliPath = `${import.meta.dir}/../../src/cli.ts`;
 	const start = performance.now();
 
@@ -46,7 +50,7 @@ export const runCli = async (args: readonly string[], projectDir: string): Promi
 		cwd: projectDir,
 		stdout: "pipe",
 		stderr: "pipe",
-		env: { ...process.env, NO_COLOR: "1" },
+		env: { ...process.env, NO_COLOR: "1", ...envOverride },
 	});
 
 	const stdout = await new Response(proc.stdout).text();

@@ -55,7 +55,7 @@ export const listCommand = async (args: { projectDir: string; json: boolean; glo
 				const projectCol = args.global
 					? (isGlobalSession(s) ? (s.project_name ?? "").slice(0, 15) : "").padEnd(17)
 					: "";
-				const name = truncate(s.session_name ?? "-", 25);
+				const name = truncate(s.display_name ?? s.session_name ?? "-", 25);
 				const started = formatSessionDate(s.start_time);
 				const branch = (s.git_branch || "-").slice(0, 14);
 				const team = (s.team_name || "-").slice(0, 13);

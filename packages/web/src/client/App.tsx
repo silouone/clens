@@ -9,6 +9,7 @@ import { initSSE } from "./lib/events";
 import { formatDuration } from "./lib/format";
 import { toggleHelp, setKeyboardNavigate } from "./lib/keyboard";
 import { preferences } from "./lib/settings";
+import { SHOW_WORK_UNITS } from "./lib/feature-flags";
 import { theme, toggleTheme, initThemeListener } from "./lib/theme";
 
 // ── Icons ───────────────────────────────────────────────────────────
@@ -45,10 +46,16 @@ type NavItem = {
 	readonly matchPrefix: string;
 };
 
-const NAV_ITEMS: readonly NavItem[] = [
+const ALL_NAV_ITEMS: readonly NavItem[] = [
 	{ label: "Sessions", path: "/?view=sessions", matchPrefix: "/session" },
 	{ label: "Work Units", path: "/?view=work_units", matchPrefix: "/work-unit" },
 ] as const;
+
+// Work Units is feature-flagged off; filter its nav entry out when hidden so the
+// feature is unreachable from the header. Entry definition above stays intact.
+const NAV_ITEMS: readonly NavItem[] = ALL_NAV_ITEMS.filter(
+	(item) => SHOW_WORK_UNITS || item.label !== "Work Units",
+);
 
 const isNavActive = (item: NavItem, pathname: string, search: string): boolean => {
 	if (item.label === "Sessions") {

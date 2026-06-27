@@ -1,4 +1,4 @@
-import type { CostEstimate, PricingTier, StatsResult, StoredEvent, TokenUsage, TranscriptReasoning } from "../types";
+import type { CostBasis, CostEstimate, PricingTier, StatsResult, StoredEvent, TokenUsage, TranscriptReasoning } from "../types";
 import { computeEffectiveDuration, findLastMeaningfulEvent } from "../utils";
 
 // Per-MTok API rates (platform.claude.com pricing, verified 2026-06-11).
@@ -134,9 +134,52 @@ export const estimateCostFromTokens = (
 		...(cacheReadTokens ? { cache_read_tokens: cacheReadTokens } : {}),
 		...(cacheCreationTokens ? { cache_creation_tokens: cacheCreationTokens } : {}),
 		is_estimated: !hasRealUsage,
+		// Real tokens ⇒ "estimated"; no real tokens ⇒ this is a heuristic-equivalent
+		// (e.g. an all-zero usage object) so it must not claim token-grounded provenance.
+		cost_basis: hasRealUsage ? "estimated" : "heuristic",
 		pricing_tier: tier,
 	};
 };
+
+/**
+ * Extract a measured per-session cost (Tier-0) from captured event data.
+ *
+ * Claude Code's local transcripts do NOT carry an SDK result `total_cost_usd`
+ * today (coverage measured at ~0% on disk, 2026-06-21 — only token `usage` is
+ * present), so this is forward-looking: it activates only when a capture path
+ * supplies `total_cost_usd`/`costUSD` (> 0) on a hook event's data. Picks the
+ * largest such value (a cumulative session total rather than a per-turn delta).
+ */
+const extractMeasuredCostUsd = (events: readonly StoredEvent[]): number | undefined => {
+	const readCost = (raw: unknown): number | undefined =>
+		typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : undefined;
+
+	const costs = events.flatMap((e) => {
+		const direct = readCost(e.data.total_cost_usd) ?? readCost(e.data.costUSD);
+		return direct !== undefined ? [direct] : [];
+	});
+
+	return costs.length > 0 ? Math.max(...costs) : undefined;
+};
+
+/** Build a Tier-0 "measured" cost estimate from a verbatim measured cost. */
+const measuredCostEstimate = (
+	model: string,
+	measuredCostUsd: number,
+	tokenUsage: TokenUsage | undefined,
+	tier: PricingTier,
+): CostEstimate => ({
+	model,
+	estimated_input_tokens: tokenUsage?.input_tokens ?? 0,
+	estimated_output_tokens: tokenUsage?.output_tokens ?? 0,
+	// Verbatim measured value — never rounded away, never multiplied by a subscription factor.
+	estimated_cost_usd: measuredCostUsd,
+	...(tokenUsage?.cache_read_tokens ? { cache_read_tokens: tokenUsage.cache_read_tokens } : {}),
+	...(tokenUsage?.cache_creation_tokens ? { cache_creation_tokens: tokenUsage.cache_creation_tokens } : {}),
+	is_estimated: false,
+	cost_basis: "measured",
+	pricing_tier: tier,
+});
 
 /** Extract accumulated token usage from events containing usage/token_usage data. */
 const extractTokenUsage = (events: readonly StoredEvent[]): TokenUsage | undefined => {
@@ -197,6 +240,7 @@ const estimateCost = (
 		estimated_output_tokens: estimatedOutputTokens,
 		estimated_cost_usd: Math.round(estimatedCostUsd * 10000) / 10000,
 		is_estimated: true,
+		cost_basis: "heuristic",
 		pricing_tier: tier,
 	};
 };
@@ -277,35 +321,49 @@ export const extractStats = (
 	const lastMeaningful = findLastMeaningfulEvent(events);
 	const endTime = lastMeaningful?.t ?? events[events.length - 1].t;
 
-	// 3-tier cost resolution: transcript tokens > hook event tokens > heuristic
+	// 4-tier cost resolution: measured > transcript tokens > hook event tokens > heuristic.
+	// The stored cost is ALWAYS API-equivalent value at FULL LIST PRICE — token/heuristic
+	// tiers price at "api" (never the subscription-multiplied "max" rate). The resolved
+	// `tier` is still recorded on `pricing_tier` so a staleness layer can detect tier drift.
 	const hookTokenUsage = extractTokenUsage(events);
 	const resolvedTokenUsage = transcriptTokenUsage ?? hookTokenUsage;
+	const measuredCostUsd = extractMeasuredCostUsd(events);
+
+	// Stamp the resolved tier onto a full-list-priced estimate for staleness detection.
+	const withResolvedTier = (estimate: CostEstimate | undefined): CostEstimate | undefined =>
+		estimate ? { ...estimate, pricing_tier: tier } : undefined;
 
 	const cost_estimate = (() => {
-		// Tier 1: Transcript token usage (most accurate)
+		// Tier 0: Measured cost — taken verbatim, marked cost_basis: "measured".
+		if (measuredCostUsd !== undefined && model) {
+			return measuredCostEstimate(model, measuredCostUsd, resolvedTokenUsage, tier);
+		}
+		// Tier 1: Transcript token usage (most accurate token-based estimate)
 		if (transcriptTokenUsage && model) {
-			return estimateCostFromTokens(
-				model,
-				transcriptTokenUsage.input_tokens,
-				transcriptTokenUsage.output_tokens,
-				transcriptTokenUsage.cache_read_tokens,
-				transcriptTokenUsage.cache_creation_tokens,
-				tier,
+			return withResolvedTier(
+				estimateCostFromTokens(
+					model,
+					transcriptTokenUsage.input_tokens,
+					transcriptTokenUsage.output_tokens,
+					transcriptTokenUsage.cache_read_tokens,
+					transcriptTokenUsage.cache_creation_tokens,
+				),
 			);
 		}
 		// Tier 2: Hook event token usage
 		if (hookTokenUsage && model) {
-			return estimateCostFromTokens(
-				model,
-				hookTokenUsage.input_tokens,
-				hookTokenUsage.output_tokens,
-				hookTokenUsage.cache_read_tokens,
-				hookTokenUsage.cache_creation_tokens,
-				tier,
+			return withResolvedTier(
+				estimateCostFromTokens(
+					model,
+					hookTokenUsage.input_tokens,
+					hookTokenUsage.output_tokens,
+					hookTokenUsage.cache_read_tokens,
+					hookTokenUsage.cache_creation_tokens,
+				),
 			);
 		}
 		// Tier 3: Heuristic (magic numbers)
-		return estimateCost(model, events.length, toolCallCount, reasoning, tier);
+		return withResolvedTier(estimateCost(model, events.length, toolCallCount, reasoning));
 	})();
 
 	const timestamps = events.map((e) => e.t);

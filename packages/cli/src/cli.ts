@@ -34,44 +34,32 @@ const commands: Readonly<Record<string, CommandDef>> = {
 	distill: {
 		description: "Extract insights from session data",
 		handler: async (ctx) => {
-			const { distillCommand } = await import("./commands/distill");
-
 			const pricingTier = ctx.flags.pricing as import("./types").PricingTier | undefined;
 
-			if (ctx.flags.all) {
-				const { listSessions } = await import("./session/read");
-				const sessions = listSessions(ctx.projectDir);
-				if (sessions.length === 0) {
-					console.log("No sessions found.");
-					return;
-				}
-				console.log(`Distilling ${sessions.length} session(s)...`);
-				const results = await sessions.reduce<Promise<readonly string[]>>(
-					async (accP, session, idx) => {
-						const acc = await accP;
-						const progress = `[${idx + 1}/${sessions.length}]`;
-						console.log(`${progress} ${session.session_id.slice(0, 8)}...`);
-						try {
-							await distillCommand({
-								sessionId: session.session_id,
-								projectDir: ctx.projectDir,
-								deep: ctx.flags.deep,
-								json: false,
-								pricingTier,
-							});
-							return [...acc, session.session_id];
-						} catch (err) {
-							const msg = err instanceof Error ? err.message : String(err);
-							console.error(`  Error: ${msg}`);
-							return acc;
-						}
-					},
-					Promise.resolve([]),
-				);
-				console.log(`\nDistilled ${results.length}/${sessions.length} session(s).`);
+			// --global: distill every session across all registered projects.
+			if (ctx.flags.global) {
+				const { distillAllGlobal } = await import("./commands/distill");
+				await distillAllGlobal({
+					deep: ctx.flags.deep,
+					pricingTier,
+					force: ctx.flags.force,
+				});
 				return;
 			}
 
+			// --all: distill every session in the current project dir.
+			if (ctx.flags.all) {
+				const { distillAllInDir } = await import("./commands/distill");
+				await distillAllInDir({
+					projectDir: ctx.projectDir,
+					deep: ctx.flags.deep,
+					pricingTier,
+					force: ctx.flags.force,
+				});
+				return;
+			}
+
+			const { distillCommand } = await import("./commands/distill");
 			const { resolveSessionId } = await import("./commands/shared");
 			await distillCommand({
 				sessionId: resolveSessionId(ctx.positional[1], ctx.flags.last, ctx.projectDir),
@@ -199,6 +187,24 @@ const commands: Readonly<Record<string, CommandDef>> = {
 			});
 		},
 	},
+	name: {
+		description: "Set/clear a session's label and color (no args prints current)",
+		handler: async (ctx) => {
+			const { nameCommand } = await import("./commands/name");
+			const colorIdx = ctx.rawArgs.indexOf("--color");
+			const color = colorIdx >= 0 && colorIdx + 1 < ctx.rawArgs.length
+				? ctx.rawArgs[colorIdx + 1]
+				: undefined;
+			nameCommand({
+				sessionArg: ctx.positional[1],
+				projectDir: ctx.projectDir,
+				label: ctx.positional[2],
+				color,
+				clear: ctx.rawArgs.includes("--clear"),
+				json: ctx.flags.json,
+			});
+		},
+	},
 	config: {
 		description: "View or update clens configuration",
 		handler: async (ctx) => {
@@ -263,9 +269,10 @@ const GLOBAL_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
 const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	init: new Set(["--remove", "--status", "--dev", "--global", "--legacy"]),
 	list: new Set(["--json", "--global"]),
-	distill: new Set(["--last", "--all", "--deep", "--json", "--pricing"]),
+	distill: new Set(["--last", "--all", "--global", "--force", "--deep", "--json", "--pricing"]),
 	report: new Set(["--last", "--json", "--detail", "--full", "--intent"]),
 	agents: new Set(["--last", "--json", "--comms"]),
+	name: new Set(["--color", "--clear", "--json"]),
 	config: new Set(["--pricing", "--json", "--global-mode"]),
 	explore: new Set([]),
 	clean: new Set(["--last", "--all", "--force"]),
@@ -287,7 +294,7 @@ const validateFlags = (cmd: string, rawArgs: readonly string[]): string | undefi
 
 	const flagArgs = rawArgs.filter((a) => a.startsWith("--") || (a.startsWith("-") && a.length === 2));
 	// Skip values after --intent and --port (they're not flags)
-	const VALUE_FLAGS = new Set(["--intent", "--port", "--pricing", "--global-mode"]);
+	const VALUE_FLAGS = new Set(["--intent", "--port", "--pricing", "--global-mode", "--color"]);
 	const actualFlags = flagArgs.reduce<readonly string[]>((acc, arg, i) => {
 		if (i > 0 && VALUE_FLAGS.has(rawArgs[rawArgs.indexOf(arg) - 1])) return acc;
 		return [...acc, arg];
@@ -325,7 +332,9 @@ ${bold("Setup:")}
 ${bold("Sessions:")}
   ${cyan("list")}              List captured sessions
   ${cyan("list --global")}     List sessions across all registered projects
+  ${cyan("name")}              Set/clear a session's label & color flag
   ${cyan("distill")}           Extract insights from session data
+  ${cyan("distill --global")}  Distill every session across all registered projects
   ${cyan("clean")}             Remove session data
   ${cyan("export")}            Export session as archive
   ${cyan("config")}            View or update configuration
@@ -360,6 +369,8 @@ ${bold("Options:")}
   ${dim("--port <n>")}     Web dashboard port (default 3700)
   ${dim("--no-open")}      Don't open browser automatically
   ${dim("--pricing <t>")} Pricing tier: api, max, or auto
+  ${dim("--color <c>")}   Session color flag: none, red, amber, green, blue, violet, gray
+  ${dim("--clear")}       Clear a session's label and color
   ${dim("--version")}      Show version
   ${dim("--help")}         Show help
 
@@ -367,7 +378,10 @@ ${bold("Examples:")}
   clens init                          # Set up hooks (local)
   clens init --global                 # Set up hooks (global)
   clens list                          # See all sessions
+  clens name a288 "Auth refactor" --color amber  # Label + flag a session
+  clens name a288 --clear             # Revert to computed name, unflag
   clens distill --last                # Distill latest session
+  clens distill --global              # distill all sessions in every repo
   clens report --last                 # Summary of latest session
   clens report --last backtracks      # Backtrack analysis
   clens report --last drift specs/p.md  # Drift against spec
@@ -408,7 +422,7 @@ const flags: Flags = {
 };
 
 // Exclude values that follow value-bearing flags (--intent, --port, --pricing)
-const VALUE_FLAG_SET = new Set(["--intent", "--port", "--pricing"]);
+const VALUE_FLAG_SET = new Set(["--intent", "--port", "--pricing", "--color"]);
 const positional = args.filter((a, i) => {
 	if (a.startsWith("--") || a.startsWith("-")) return false;
 	if (i > 0 && VALUE_FLAG_SET.has(args[i - 1])) return false;

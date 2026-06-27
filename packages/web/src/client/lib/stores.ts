@@ -1,6 +1,6 @@
 import { createResource, createSignal } from "solid-js";
-import type { ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
-import { api, authHeaders } from "./api";
+import type { ColorName, ConversationEntry, DistilledSession, SessionSummary, WorkUnit } from "../../shared/types";
+import { api, authHeaders, patchSessionMeta, type SessionMetaPatch } from "./api";
 import { preferences } from "./settings";
 import { isStaleConversationFetch } from "./fetch-guard";
 
@@ -42,8 +42,74 @@ const fetchSessionList = async (): Promise<readonly SessionSummary[]> => {
  * Reactive session list resource.
  * Automatically fetches on first access; call refetch() to refresh.
  */
-const [sessionList, { refetch: refetchSessions }] =
+const [sessionList, { refetch: refetchSessions, mutate: mutateSessions }] =
 	createResource(fetchSessionList);
+
+// ── Session meta mutation (rename + color flag) ─────────────────────
+
+/**
+ * Apply a label/color patch to a single session with an optimistic update.
+ *
+ * Flow (D6): immediately patch the in-memory row so the UI reflects the edit
+ * with zero latency, fire the PATCH, then reconcile the row with the server's
+ * authoritative resolution (display_name/name_source by precedence). On failure
+ * the optimistic change is rolled back so the list never diverges from disk.
+ *
+ * The optimistic row is a best-effort guess; only the server knows the resolved
+ * display_name when a label is cleared (it reverts to custom-title/computed),
+ * so the reconcile step is what makes the displayed name correct, not the guess.
+ */
+const replaceRow = (
+	rows: readonly SessionSummary[] | undefined,
+	id: string,
+	next: SessionSummary,
+): readonly SessionSummary[] | undefined =>
+	rows?.map((s) => (s.session_id === id ? next : s));
+
+const optimisticRow = (row: SessionSummary, patch: SessionMetaPatch): SessionSummary => {
+	// Label: string sets; null or whitespace-only clears (mirrors server R7/R8).
+	const nextLabel =
+		"label" in patch
+			? typeof patch.label === "string" && patch.label.trim().length > 0
+				? patch.label.trim()
+				: undefined
+			: row.label;
+	// Color: a non-"none" name sets; null/"none" clears (R13).
+	const nextColor: ColorName | undefined =
+		"color" in patch
+			? patch.color && patch.color !== "none"
+				? patch.color
+				: undefined
+			: row.color;
+	// Best-effort display name: a label wins immediately; clearing it falls back to
+	// the existing display_name until the server reconciles the true precedence.
+	const display = nextLabel ?? row.display_name ?? row.session_id.slice(0, 8);
+	return {
+		...row,
+		label: nextLabel,
+		color: nextColor,
+		display_name: display,
+		name_source: nextLabel ? "label" : row.name_source,
+	};
+};
+
+const setSessionMeta = async (id: string, patch: SessionMetaPatch): Promise<void> => {
+	const current = sessionList();
+	const prev = current?.find((s) => s.session_id === id);
+	if (prev) {
+		mutateSessions((rows) => replaceRow(rows, id, optimisticRow(prev, patch)));
+	}
+	try {
+		const resolved = await patchSessionMeta(id, patch);
+		mutateSessions((rows) => replaceRow(rows, id, resolved));
+	} catch (err) {
+		// Roll back the optimistic write so the list matches disk again.
+		if (prev) mutateSessions((rows) => replaceRow(rows, id, prev));
+		const msg = err instanceof Error ? err.message : String(err);
+		console.error(LOG_PREFIX, `setSessionMeta failed (${id.slice(0, 8)}):`, msg);
+		setGlobalError({ message: msg, code: "META_PATCH" });
+	}
+};
 
 // ── Session detail (lazy) ───────────────────────────────────────────
 
@@ -369,6 +435,7 @@ export {
 	clearError,
 	sessionList,
 	refetchSessions,
+	setSessionMeta,
 	createSessionDetail,
 	createConversationStore,
 	createAgentConversationResource,

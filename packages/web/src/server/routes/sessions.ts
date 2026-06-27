@@ -1,10 +1,12 @@
 import { Hono } from "hono"
+import type { Context } from "hono"
 import { existsSync, readdirSync, statSync, openSync, readSync, fstatSync, closeSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions, readFeatureIndex } from "@clens/cli/src/session"
+import { readDistilled, readSessionEvents, readLinks, readTranscript, getRelatedSessions, readFeatureIndex, enrichSessionSummaries, setSessionMeta } from "@clens/cli/src/session"
 import { buildConversation, buildConversationFromTranscript } from "@clens/cli/src/session/conversation"
 import { diffLinesToUnified, deduplicateSpawns } from "@clens/cli/src/utils"
-import { deriveSessionStatus, SESSION_STATUSES, BROADCAST_EVENTS } from "@clens/cli/src/types"
+import { deriveSessionStatus, SESSION_STATUSES, BROADCAST_EVENTS, isColorName } from "@clens/cli/src/types"
+import type { ColorName } from "@clens/cli"
 import type { AgentNode, SessionSummary, SessionStatus, StoredEvent, LinkEvent, SpawnLink, ProjectEntry } from "@clens/cli"
 import { getCachedEvents, setCachedEvents } from "../cache"
 import { createLogger } from "../logger"
@@ -305,7 +307,7 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 		new Map<string, Set<string>>(),
 	)
 
-	return files
+	const rows = files
 		.flatMap((file): readonly SessionSummary[] => {
 			const filePath = `${sessionsDir}/${file}`
 			const sessionId = file.replace(".jsonl", "")
@@ -362,6 +364,94 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 			}
 		})
 		.sort((a, b) => b.start_time - a.start_time)
+
+	// Merge the cLens session-meta sidecar + custom-title + computed first-prompt
+	// into each row, resolving display_name/name_source/label/color by precedence
+	// (R1/R5). enrichSessionSummaries reads the sidecar ONCE per call (R16) and
+	// reuses the same agent-count dedup rules as the lightweight pass (bug B15), so
+	// counts are unchanged; it overlays naming + color and preserves features /
+	// is_subagent via spread. A malformed sidecar degrades to {} inside the CLI (R15).
+	return enrichSessionSummaries(rows, projectDir)
+}
+
+/** Resolve a single session's enriched summary (display_name/label/color) by id. */
+const resolveSessionRow = (projectDir: string, sessionId: string): SessionSummary | undefined =>
+	listSessionsLightweight(projectDir).find((s) => s.session_id === sessionId)
+
+// ── Meta-patch body parsing / validation ──────────────────────────
+
+type MetaPatchBody = { readonly label?: string | null; readonly color?: ColorName | null }
+type MetaPatchResult =
+	| { readonly ok: true; readonly patch: MetaPatchBody }
+	| { readonly ok: false; readonly error: string; readonly detail: string }
+
+/**
+ * Validate the PATCH /meta body. Accepts `{ label?: string|null, color?: ColorName|null }`.
+ *  - `label`: string sets, null/empty/whitespace clears (R7/R8) — clearing is delegated to setSessionMeta.
+ *  - `color`: a palette ColorName sets, null/"none" clears (R13); any other value → 400 (R14).
+ * Only keys actually present in the body are forwarded, so a label-only patch never
+ * touches color and vice-versa.
+ */
+const parseMetaPatch = (raw: unknown): MetaPatchResult => {
+	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+		return { ok: false, error: "Invalid body", detail: "Expected a JSON object with optional label/color." }
+	}
+	const obj = raw as Record<string, unknown>
+	const hasLabel = "label" in obj
+	const hasColor = "color" in obj
+
+	if (hasLabel && obj.label !== null && typeof obj.label !== "string") {
+		return { ok: false, error: "Invalid label", detail: "label must be a string or null." }
+	}
+	if (hasColor && obj.color !== null && !isColorName(obj.color)) {
+		return { ok: false, error: "Invalid color", detail: "color must be one of: none, red, amber, green, blue, violet, gray, or null." }
+	}
+
+	return {
+		ok: true,
+		patch: {
+			...(hasLabel ? { label: obj.label as string | null } : {}),
+			...(hasColor ? { color: obj.color as ColorName | null } : {}),
+		},
+	}
+}
+
+/**
+ * Shared handler for PATCH /api/sessions/:sessionId/meta. Validates the body,
+ * persists via the CLI's atomic setSessionMeta, and returns the freshly resolved
+ * session row (display_name/name_source/label/color). Session-id format is already
+ * enforced by validateSessionId middleware; a non-existent session yields 404.
+ */
+const handleMetaPatch = async (c: Context, projectDir: string, sessionId: string): Promise<Response> => {
+	const sessionPath = `${projectDir}/.clens/sessions/${sessionId}.jsonl`
+	if (!existsSync(sessionPath)) {
+		return c.json({ error: "Session not found", code: "NOT_FOUND" }, 404)
+	}
+
+	const body: unknown = await c.req.json().catch(() => undefined)
+	if (body === undefined) {
+		return c.json({ error: "Invalid JSON body", code: "INVALID_BODY", detail: "Request body must be valid JSON." }, 400)
+	}
+
+	const parsed = parseMetaPatch(body)
+	if (!parsed.ok) {
+		// Invalid color/label rejected before any write — state unchanged (R14).
+		return c.json({ error: parsed.error, code: "INVALID_PARAM", detail: parsed.detail }, 400)
+	}
+
+	try {
+		setSessionMeta(projectDir, sessionId, parsed.patch)
+	} catch (err) {
+		// Defensive: setSessionMeta also validates color; surface as 400, state unchanged.
+		log.warn(`setSessionMeta failed for ${sessionId.slice(0, 8)}:`, err instanceof Error ? err.message : String(err))
+		return c.json({ error: "Invalid color", code: "INVALID_PARAM", detail: err instanceof Error ? err.message : String(err) }, 400)
+	}
+
+	const row = resolveSessionRow(projectDir, sessionId)
+	if (!row) {
+		return c.json({ error: "Session not found", code: "NOT_FOUND" }, 404)
+	}
+	return c.json({ data: row })
 }
 
 type SortField = "start_time" | "-start_time" | "duration_ms" | "-duration_ms" | "event_count" | "-event_count"
@@ -496,6 +586,12 @@ const createSessionsRoute = (projectDir: string) =>
 				...(staleness ? { staleness } : {}),
 				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
 			})
+		})
+
+		// PATCH /api/sessions/:sessionId/meta — set/clear user label + color (R6/R7/R10/R13/R14)
+		.patch("/:sessionId/meta", async (c) => {
+			const sessionId = c.req.param("sessionId")
+			return handleMetaPatch(c, projectDir, sessionId)
 		})
 
 		// GET /api/sessions/:sessionId/events — paginated events
@@ -842,6 +938,13 @@ const createGlobalSessionsRoute = (projects: readonly ProjectEntry[], fallbackPr
 				...(staleness ? { staleness } : {}),
 				...(relatedSessions ? { related_sessions: relatedSessions } : {}),
 			})
+		})
+
+		// PATCH /api/sessions/:sessionId/meta — set/clear user label + color (R6/R7/R10/R13/R14)
+		.patch("/:sessionId/meta", async (c) => {
+			const sessionId = c.req.param("sessionId")
+			const projectDir = resolveProjectDir(sessionId)
+			return handleMetaPatch(c, projectDir, sessionId)
 		})
 
 		// GET /api/sessions/:sessionId/events — paginated events

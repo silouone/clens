@@ -21,7 +21,8 @@ export interface DailyUsageMetrics {
 	readonly total_output_tokens: number;
 	readonly cache_read_tokens: number;
 	readonly cache_creation_tokens: number;
-	readonly cache_hit_rate: number;
+	/** Cache-read share, or `null` when no fresh input was captured (n/a, AC9). */
+	readonly cache_hit_rate: number | null;
 	readonly avg_duration_ms: number;
 	readonly median_duration_ms: number;
 	readonly avg_agent_count: number;
@@ -31,12 +32,24 @@ export interface DailyUsageMetrics {
 
 export interface UsageTotals {
 	readonly sessions: number;
+	/** API-equivalent value at full list price (retained for back-compat; == value_usd). */
 	readonly cost_usd: number;
+	/** API-equivalent value at full list price (Σ cost_usd). */
+	readonly value_usd: number;
+	/** Subscription cash paid over the window: rate × (D / 30), or value for `api`. */
+	readonly paid_usd: number;
+	/** value_usd / paid_usd (1 for `api`; 0 when paid is 0 and plan isn't `api`). */
+	readonly roi: number;
+	/** Σ cost_usd for sessions whose cost_basis === "measured". */
+	readonly measured_cost_usd: number;
+	/** measured_cost_usd / value_usd (0 when value 0) — drives the "X% estimated" badge. */
+	readonly measured_fraction: number;
 	readonly input_tokens: number;
 	readonly output_tokens: number;
 	readonly cache_read_tokens: number;
 	readonly cache_creation_tokens: number;
-	readonly cache_hit_rate: number;
+	/** Cache-read share, or `null` when no fresh input was captured (n/a, AC9). */
+	readonly cache_hit_rate: number | null;
 	readonly avg_duration_ms: number;
 	readonly median_duration_ms: number;
 	readonly avg_agents_per_session: number;
@@ -136,21 +149,54 @@ export interface InsightsResponse {
 const [analyticsRange, setAnalyticsRange] = createSignal<AnalyticsRange>("30d");
 const [focusedDate, setFocusedDate] = createSignal<string | undefined>();
 
+/**
+ * Inline time-range brush selection (analytics-truth-and-brush). When set, every
+ * usage + insights widget re-scopes to exactly [from..to] (inclusive local days)
+ * and the preset chips render as "Custom". Cleared returns to the active preset.
+ */
+export interface CustomRange {
+	readonly from: string;
+	readonly to: string;
+}
+
+const [customRange, setCustomRangeSignal] = createSignal<CustomRange | undefined>();
+
+/** Set the custom brush window. Bounds are normalized so a right-to-left drag still works. */
+const setCustomRange = (range: CustomRange): void => {
+	setCustomRangeSignal(range.from <= range.to ? range : { from: range.to, to: range.from });
+};
+
+/** Clear the brush window, returning the dashboard to the active preset. */
+const clearCustomRange = (): void => {
+	setCustomRangeSignal(undefined);
+};
+
 // Local-day filter helpers (B22) live in ./analytics-day so they can be unit-tested
 // without loading this store's module-level Solid resources. Re-exported below.
 
 // ── Fetchers ──────────────────────────────────────────────────────
 
-type FetchParams = { readonly range: AnalyticsRange; readonly project: string | undefined };
+type FetchParams = {
+	readonly range: AnalyticsRange;
+	readonly project: string | undefined;
+	readonly custom: CustomRange | undefined;
+};
 
 const analyticsParams = (): FetchParams => ({
 	range: analyticsRange(),
 	project: selectedProjectId(),
+	custom: customRange(),
 });
 
 const buildQuery = (endpoint: string, params: FetchParams): string => {
 	const qs = new URLSearchParams({ range: params.range });
 	if (params.project) qs.set("project", params.project);
+	// A custom brush window overrides the preset: thread from/to so the server scopes
+	// the current window to [from,to] inclusive and the previous to the preceding span.
+	if (params.custom) {
+		qs.set("from", params.custom.from);
+		qs.set("to", params.custom.to);
+	}
 	return `/api/analytics/${endpoint}?${qs.toString()}`;
 };
 
@@ -297,6 +343,9 @@ const rebuildAnalytics = async (): Promise<number> => {
 export {
 	analyticsRange,
 	setAnalyticsRange,
+	customRange,
+	setCustomRange,
+	clearCustomRange,
 	focusedDate,
 	setFocusedDate,
 	usageData,

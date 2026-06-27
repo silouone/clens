@@ -38,6 +38,7 @@ clens init                          # install hooks
 # use Claude Code normally
 clens list                          # see captured sessions
 clens distill --last                # analyze latest session
+clens distill --global              # analyze every session across all your repos
 clens what --last                   # quick summary: request, outcome, cost
 clens report --last                 # detailed report
 clens report --last backtracks      # drill into backtracks
@@ -64,6 +65,7 @@ clens explore                       # interactive TUI explorer
 |---|---|
 | `list` | List captured sessions with duration, events, team, type, status |
 | `distill [id]` | Extract insights: backtracks, decisions, file map, reasoning, edit chains |
+| `distill --global` | Distill every session across all registered projects (incremental; `--force` to re-distill) |
 | `what [id]` | Quick summary: request, outcome, cost, issues, files changed |
 | `report [id]` | Session summary -- backtrack severity, high-risk files, top tools |
 | `report [id] backtracks` | Backtrack analysis (add `--detail` for per-backtrack breakdown) |
@@ -87,8 +89,9 @@ clens explore                       # interactive TUI explorer
 | `--last` | Most commands | Use most recent session |
 | `--json` | Analysis commands | Output structured JSON |
 | `--all` | `distill`, `clean` | Apply to all sessions |
+| `--global` | `distill`, `list` | Operate across all registered projects |
 | `--deep` | `distill` | Enrich agents with transcript data |
-| `--force` | `clean` | Skip safety checks |
+| `--force` | `clean`, `distill` | Skip safety checks; for `distill`, re-distill fresh sessions |
 | `--detail` | `report backtracks` | Per-backtrack breakdown |
 | `--full` | `report reasoning` | Show full thinking text |
 | `--intent <type>` | `report reasoning` | Filter by intent type |

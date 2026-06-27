@@ -1,9 +1,12 @@
 import { createMemo, For, Show, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { RefreshCw, RotateCcw } from "lucide-solid";
+import { RefreshCw, RotateCcw, X } from "lucide-solid";
 import {
 	analyticsRange,
 	setAnalyticsRange,
+	customRange,
+	setCustomRange,
+	clearCustomRange,
 	insightsData,
 	refetchInsights,
 	dailyInsights,
@@ -24,6 +27,7 @@ import {
 	type DeltaResult,
 	type DailyInsightsMetrics,
 } from "../lib/analytics-store";
+import { formatShortDate } from "../components/charts/shared";
 import { formatDuration } from "../lib/format";
 import { BarChart } from "../components/charts/BarChart";
 import { StackedArea } from "../components/charts/StackedArea";
@@ -38,23 +42,60 @@ import { ProjectDropdown } from "../components/ProjectDropdown";
 
 const RANGES: readonly AnalyticsRange[] = ["7d", "30d", "90d", "all"] as const;
 
-const RangeSelector: Component = () => (
-	<div class="flex items-center gap-1">
-		<For each={RANGES}>
-			{(r) => (
+// A custom brush window (set by dragging a time chart) takes precedence over the
+// preset chips and re-scopes every Insights number/chart via the shared store.
+// While it is active no preset is "selected"; clicking one clears the brush.
+const RangeSelector: Component = () => {
+	const isCustom = createMemo(() => customRange() !== undefined);
+	const selectPreset = (r: AnalyticsRange) => {
+		clearCustomRange();
+		setAnalyticsRange(r);
+	};
+	return (
+		<div class="flex items-center gap-1">
+			<For each={RANGES}>
+				{(r) => (
+					<button
+						onClick={() => selectPreset(r)}
+						class="instrument-microcaps rounded-none border px-2.5 py-1 text-[10px] transition"
+						classList={{
+							"text-primary bg-surface-muted border-brand-500": !isCustom() && analyticsRange() === r,
+							"text-muted border-clens hover:text-secondary hover:bg-surface-hover": isCustom() || analyticsRange() !== r,
+						}}
+					>
+						{r === "all" ? "All" : r}
+					</button>
+				)}
+			</For>
+		</div>
+	);
+};
+
+// ── Custom range chip (AC8) ─────────────────────────────────────────
+//
+// When a brush window is active, surface the resolved dates and a control to
+// clear back to the active preset. Mirrors the Usage page so brushing on either
+// tab reads identically.
+const CustomRangeChip: Component = () => (
+	<Show when={customRange()}>
+		{(range) => (
+			<div class="instrument-microcaps flex items-center gap-1.5 rounded-none border border-brand-500 bg-surface-muted px-2.5 py-1 text-[10px] text-primary">
+				<span class="h-1.5 w-1.5 shrink-0 bg-brand-500" />
+				<span>Custom</span>
+				<span class="font-mono tabular-nums text-secondary normal-case tracking-normal">
+					{formatShortDate(range().from)}–{formatShortDate(range().to)}
+				</span>
 				<button
-					onClick={() => setAnalyticsRange(r)}
-					class="instrument-microcaps rounded-none border px-2.5 py-1 text-[10px] transition"
-					classList={{
-						"text-primary bg-surface-muted border-brand-500": analyticsRange() === r,
-						"text-muted border-clens hover:text-secondary hover:bg-surface-hover": analyticsRange() !== r,
-					}}
+					onClick={() => clearCustomRange()}
+					class="ml-0.5 -mr-0.5 text-muted transition-colors hover:text-danger"
+					title="Clear custom range"
+					aria-label="Clear custom range"
 				>
-					{r === "all" ? "All" : r}
+					<X class="h-3 w-3" />
 				</button>
-			)}
-		</For>
-	</div>
+			</div>
+		)}
+	</Show>
 );
 
 // ── KPI Card ────────────────────────────────────────────────────────
@@ -66,12 +107,24 @@ type KpiCardProps = {
 	readonly deltaLabel?: string;
 	readonly invertColor?: boolean; // true = "down is good" (e.g., backtrack rate)
 	readonly subtitle?: string;
+	readonly muted?: boolean; // dim the value when it represents "no reading" rather than a real datum
+	readonly valueTitle?: string; // native tooltip for the value (e.g. explaining a "—")
 };
 
 const KpiCard: Component<KpiCardProps> = (props) => (
-	<div class="rounded-none border border-clens bg-surface p-4">
+	<div class="group rounded-none border border-clens bg-surface p-4 transition-colors hover:border-brand-500/60 hover:bg-surface-hover">
 		<div class="instrument-microcaps text-[10px] text-muted">{props.label}</div>
-		<div class="mt-1 font-mono tabular-nums text-2xl font-semibold text-primary">{props.value}</div>
+		<div
+			title={props.valueTitle}
+			class="mt-1 font-mono tabular-nums text-2xl font-semibold"
+			classList={{
+				"text-primary": !props.muted,
+				"text-muted": props.muted,
+				"cursor-help": Boolean(props.valueTitle),
+			}}
+		>
+			{props.value}
+		</div>
 		<Show when={props.subtitle}>
 			<div class="mt-0.5 text-xs text-muted">{props.subtitle}</div>
 		</Show>
@@ -98,7 +151,10 @@ const KpiCard: Component<KpiCardProps> = (props) => (
 // ── Section header ──────────────────────────────────────────────────
 
 const SectionHeader: Component<{ readonly title: string }> = (props) => (
-	<h3 class="instrument-microcaps text-[11px] text-muted mb-2">{props.title}</h3>
+	<div class="mb-3 flex items-center gap-2">
+		<span class="h-1.5 w-1.5 shrink-0 bg-brand-500/70" />
+		<h3 class="instrument-microcaps text-[11px] text-secondary">{props.title}</h3>
+	</div>
 );
 
 // ── Highlights ──────────────────────────────────────────────────────
@@ -136,8 +192,11 @@ const Highlights: Component = () => {
 			result.push(`${basename} remains a hotspot with ${topFile.count} backtracks.`);
 		}
 
-		// Quality score
-		result.push(`Quality score: ${t.agent_quality_score.toFixed(0)}/100.`);
+		// Quality score — only surface when we actually have a positive reading;
+		// a "0/100" headline reads as a catastrophic failure rather than "no data".
+		if (t.agent_quality_score > 0) {
+			result.push(`Quality score: ${t.agent_quality_score.toFixed(0)}/100.`);
+		}
 
 		return result;
 	});
@@ -289,6 +348,12 @@ export const InsightsPage: Component = () => {
 		bucketDecisions(dailyInsights(), analyticsRange()),
 	);
 
+	// Quality score — a raw "0/100" reads as a catastrophic grade rather than
+	// "not yet measured". Treat a zero/absent score as no-reading and render a
+	// neutral em-dash with an explanatory tooltip (no change to the data itself).
+	const qualityScore = createMemo(() => totals()?.agent_quality_score ?? 0);
+	const hasQualityScore = createMemo(() => qualityScore() > 0);
+
 	// Top reasoning category insight
 	const topReasoningInsight = createMemo(() => {
 		const segs = reasoningSegments();
@@ -305,11 +370,14 @@ export const InsightsPage: Component = () => {
 			<ChartTooltip />
 
 			{/* Header */}
-			<div class="flex items-center justify-between mb-6">
-				<h1 class="text-xl font-semibold text-primary">Insights</h1>
-					<div class="instrument-ruler mt-1.5 w-40" />
+			<div class="flex items-end justify-between mb-6">
+				<div>
+					<h1 class="text-xl font-semibold text-primary leading-none">Insights</h1>
+					<div class="instrument-ruler mt-2 w-40" />
+				</div>
 				<div class="flex items-center gap-3">
 					<ProjectDropdown />
+					<CustomRangeChip />
 					<RangeSelector />
 					<button
 						onClick={() => rebuildAnalytics()}
@@ -347,7 +415,9 @@ export const InsightsPage: Component = () => {
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 					<KpiCard
 						label="Quality Score"
-						value={`${(totals()?.agent_quality_score ?? 0).toFixed(0)}/100`}
+						value={hasQualityScore() ? `${qualityScore().toFixed(0)}/100` : "—"}
+						muted={!hasQualityScore()}
+						valueTitle={hasQualityScore() ? undefined : "Quality score not yet available for this range — distill more sessions to populate it."}
 						subtitle={coverageLabel()}
 					/>
 					<KpiCard
@@ -375,8 +445,8 @@ export const InsightsPage: Component = () => {
 				<Show when={hasEditChains()}>
 					<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Edit Efficiency" />
-						<div class="mb-2 text-xs text-muted">
-							{editSurvival()}% of edits survive to final state
+						<div class="mb-3 text-xs text-muted">
+							<span class="font-mono tabular-nums text-secondary">{editSurvival()}%</span> of edits survive to final state
 						</div>
 						<BarChart
 							data={dailyInsights()}
@@ -388,6 +458,7 @@ export const InsightsPage: Component = () => {
 							tooltipLabel={(d) =>
 								`${d.date}: ${d.avg_edit_chain_length.toFixed(1)} avg chain length, ${((1 - d.abandoned_edit_rate) * 100).toFixed(0)}% survival`
 							}
+							onBrushSelect={(r) => setCustomRange({ from: r.start, to: r.end })}
 						/>
 					</div>
 				</Show>
@@ -434,6 +505,7 @@ export const InsightsPage: Component = () => {
 							if (!isValidDayKey(datum.date)) return;
 							navigate(`/?date=${encodeURIComponent(datum.date)}&agents=all`);
 						}}
+						onBrushSelect={(r) => setCustomRange({ from: r.start, to: r.end })}
 					/>
 				</div>
 
@@ -442,7 +514,7 @@ export const InsightsPage: Component = () => {
 					<div class="rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Reasoning Distribution" />
 						<Show when={reasoningSegments().length > 0} fallback={
-							<div class="text-xs text-muted py-4 text-center">No reasoning data available</div>
+							<div class="instrument-microcaps py-10 text-center text-[10px] text-muted">No reasoning data</div>
 						}>
 							<DonutChart
 								segments={reasoningSegments()}
@@ -451,14 +523,14 @@ export const InsightsPage: Component = () => {
 								centerValue={formatCompact(reasoningSegments().reduce((s, seg) => s + seg.value, 0))}
 							/>
 							<Show when={topReasoningInsight()}>
-								<div class="mt-3 text-xs text-muted italic">{topReasoningInsight()}</div>
+								<div class="mt-3 border-t border-clens/60 pt-3 text-xs italic text-muted">{topReasoningInsight()}</div>
 							</Show>
 						</Show>
 					</div>
 					<div class="rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Decision Patterns" />
 						<Show when={decisionBuckets().length > 0} fallback={
-							<div class="text-xs text-muted py-4 text-center">No decision data available</div>
+							<div class="instrument-microcaps py-10 text-center text-[10px] text-muted">No decision data</div>
 						}>
 							<StackedBar
 								data={decisionBuckets()}
@@ -503,7 +575,7 @@ export const InsightsPage: Component = () => {
 										<tbody>
 											<For each={toolErrors()}>
 												{(te) => (
-													<tr class="border-b border-clens/50">
+													<tr class="border-b border-clens/50 transition-colors hover:bg-surface-hover">
 														<td class="py-2 pr-4 font-medium text-primary">{te.tool_name}</td>
 														<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{te.total_failures}</td>
 														<td class="py-2 text-right text-secondary">
@@ -532,7 +604,7 @@ export const InsightsPage: Component = () => {
 										<tbody>
 											<For each={topErrorPatterns()}>
 												{(ep) => (
-													<tr class="border-b border-clens/50">
+													<tr class="border-b border-clens/50 transition-colors hover:bg-surface-hover">
 														<td class="py-2 pr-4 text-primary truncate max-w-48" title={ep.pattern}>
 															{ep.pattern.slice(0, 50)}{ep.pattern.length > 50 ? "..." : ""}
 														</td>
@@ -605,7 +677,7 @@ export const InsightsPage: Component = () => {
 									<tbody>
 										<For each={topBacktrackFiles()}>
 											{(f) => (
-												<tr class="border-b border-clens/50">
+												<tr class="border-b border-clens/50 transition-colors hover:bg-surface-hover">
 													<td class="py-2 pr-4 text-primary truncate max-w-64" title={f.file}>
 														{f.file.split("/").slice(-2).join("/")}
 													</td>

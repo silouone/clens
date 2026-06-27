@@ -43,15 +43,24 @@ const findAllClensDirs = (projectDir: string, maxDepth = 3): readonly string[] =
  * List sessions for a project. In repository mode, scans all nested `.clens/`
  * dirs within the project. In project mode, just reads the single dir.
  */
-const listSessionsForProject = (project: ProjectEntry, isRepoMode: boolean): readonly SessionSummary[] => {
+const listSessionsForProject = (
+	project: ProjectEntry,
+	isRepoMode: boolean,
+): readonly (SessionSummary & { readonly capture_dir: string })[] => {
 	if (!isRepoMode) {
-		return enrichSessionSummaries(listSessions(project.path), project.path);
+		return enrichSessionSummaries(listSessions(project.path), project.path).map(
+			(session) => ({ ...session, capture_dir: project.path }),
+		);
 	}
 
-	// Repository mode: merge sessions from all .clens/ dirs in the repo
+	// Repository mode: merge sessions from all .clens/ dirs in the repo. Each
+	// owning `dir` is the capture dir for the sessions it yields.
 	const clensDirs = findAllClensDirs(project.path);
 	return clensDirs.flatMap((dir) =>
-		enrichSessionSummaries(listSessions(dir), dir),
+		enrichSessionSummaries(listSessions(dir), dir).map((session) => ({
+			...session,
+			capture_dir: dir,
+		})),
 	);
 };
 

@@ -205,7 +205,7 @@ const WorkUnitOverview: Component<{
 			<div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
 				{/* Session phase timeline visualization */}
 				<div class="rounded-none border border-clens bg-surface-raised p-3">
-					<h3 class="instrument-microcaps mb-2 text-[11px] text-muted">
+					<h3 class="instrument-microcaps mb-2.5 border-b border-clens pb-1.5 text-[11px] text-muted">
 						Session Timeline
 					</h3>
 					<div class="space-y-1.5">
@@ -223,18 +223,18 @@ const WorkUnitOverview: Component<{
 								};
 
 								return (
-									<div class="flex items-center gap-2">
-										<span class="w-20 shrink-0 truncate text-[10px] text-muted">
+									<div class="group flex items-center gap-2">
+										<span class="w-20 shrink-0 truncate text-[10px] tabular-nums text-muted transition-colors group-hover:text-secondary">
 											{session.session_name ?? session.session_id.slice(0, 8)}
 										</span>
 										<div class="relative flex-1 h-4 rounded-none border border-clens bg-surface-inset">
 											<div
-												class={`absolute top-0.5 bottom-0.5 rounded-none ${PHASE_COLORS[session.phase] ?? PHASE_COLORS.other}`}
+												class={`absolute top-0.5 bottom-0.5 rounded-none transition-opacity opacity-90 group-hover:opacity-100 ${PHASE_COLORS[session.phase] ?? PHASE_COLORS.other}`}
 												style={{ left: `${startOffset()}%`, width: `${widthPct()}%` }}
 												title={`${session.phase} - ${formatDuration(session.distilled?.stats.duration_ms ?? 0)}`}
 											/>
 										</div>
-										<span class="instrument-microcaps w-10 shrink-0 text-right text-[10px] text-muted">
+										<span class="instrument-microcaps w-10 shrink-0 text-right text-[10px] text-muted transition-colors group-hover:text-secondary">
 											{session.phase}
 										</span>
 									</div>
@@ -247,13 +247,14 @@ const WorkUnitOverview: Component<{
 				{/* Agent breakdown */}
 				<Show when={allAgents().length > 0}>
 					<div class="rounded-none border border-clens bg-surface-raised p-3">
-						<h3 class="instrument-microcaps mb-2 text-[11px] text-muted">
-							Agents ({allAgents().length})
+						<h3 class="instrument-microcaps mb-2.5 flex items-baseline justify-between border-b border-clens pb-1.5 text-[11px] text-muted">
+							<span>Agents</span>
+							<span class="tabular-nums text-secondary">{allAgents().length}</span>
 						</h3>
-						<div class="space-y-1">
+						<div class="space-y-0.5">
 							<For each={allAgents()}>
 								{(agent) => (
-									<div class="flex items-center gap-2 rounded-none px-2 py-1.5 hover:bg-surface-hover transition-colors">
+									<div class="flex items-center gap-2 rounded-none px-2 py-1.5 transition-colors hover:bg-surface-hover">
 										<span class={`shrink-0 rounded-none px-1.5 py-0.5 text-[10px] font-medium leading-none ${getTypeBadgeClass(agent.agent_type)}`}>
 											{agent.agent_type}
 										</span>
@@ -262,12 +263,12 @@ const WorkUnitOverview: Component<{
 										</span>
 										<Show when={agent.cost_estimate}>
 											{(cost) => (
-												<span class="text-[10px] tabular-nums text-muted" title={cost().is_estimated ? "Estimated" : undefined}>
+												<span class="w-14 shrink-0 text-right text-[10px] tabular-nums text-muted" title={cost().is_estimated ? "Estimated" : undefined}>
 													{formatCost(cost().estimated_cost_usd, cost().is_estimated)}
 												</span>
 											)}
 										</Show>
-										<span class="text-[10px] tabular-nums text-muted">
+										<span class="w-12 shrink-0 text-right text-[10px] tabular-nums text-muted">
 											{formatDuration(agent.duration_ms)}
 										</span>
 									</div>
@@ -281,13 +282,14 @@ const WorkUnitOverview: Component<{
 			{/* File list */}
 			<Show when={fileList().length > 0}>
 				<div class="rounded-none border border-clens bg-surface-raised p-3">
-					<h3 class="instrument-microcaps mb-2 text-[11px] text-muted">
-						Files Modified ({fileList().length})
+					<h3 class="instrument-microcaps mb-2.5 flex items-baseline justify-between border-b border-clens pb-1.5 text-[11px] text-muted">
+						<span>Files Modified</span>
+						<span class="tabular-nums text-secondary">{fileList().length}</span>
 					</h3>
 					<div class="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
 						<For each={fileList()}>
 							{(file) => (
-								<div class="flex items-center gap-2 rounded-none px-2 py-1 hover:bg-surface-hover transition-colors">
+								<div class="flex items-center gap-2 rounded-none px-2 py-1 transition-colors hover:bg-surface-hover">
 									{/* Full repo-relative path, truncated from the LEFT so the filename
 									    stays visible — basenames alone made distinct files with the same
 									    name (root vs packages/web package.json) look like duplicates */}
@@ -422,8 +424,10 @@ export const WorkUnitDetail: Component = () => {
 		<PageShell>
 			<Show when={!detail.loading} fallback={<LoadingSkeleton label="Loading work unit..." />}>
 				<Show when={unit()} fallback={
-					<div class="flex h-full items-center justify-center">
-						<p class="text-xs text-muted">Work unit not found.</p>
+					<div class="flex h-full flex-col items-center justify-center gap-3">
+						<div class="instrument-ruler h-px w-24 opacity-60" />
+						<p class="instrument-microcaps text-[11px] text-muted">Work unit not found</p>
+						<div class="instrument-ruler h-px w-24 opacity-60" />
 					</div>
 				}>
 					{(u) => (
@@ -487,9 +491,11 @@ export const WorkUnitDetail: Component = () => {
 											<Match when={currentView() === "session" && selectedSession()}>
 												{/* Session-level view: reuse OverviewPanel or show "not analyzed" */}
 												<Show when={selectedSession()?.distilled} fallback={
-													<div class="flex h-full items-center justify-center">
+													<div class="flex h-full flex-col items-center justify-center gap-3">
+														<div class="instrument-ruler h-px w-24 opacity-60" />
+														<p class="instrument-microcaps text-[11px] text-muted">Session not yet analyzed</p>
 														<p class="text-xs text-muted">
-															Session not yet analyzed. Run <code class="font-mono">clens distill</code> first.
+															Run <code class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-[11px] text-secondary">clens distill</code> first.
 														</p>
 													</div>
 												}>

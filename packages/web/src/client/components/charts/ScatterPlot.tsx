@@ -78,6 +78,7 @@ export const ScatterPlot = <T,>(props: ScatterPlotProps<T>): ReturnType<Componen
 									x1={0} y1={yScale()(tick)}
 									x2={cw()} y2={yScale()(tick)}
 									stroke={CHART_HAIRLINE}
+									stroke-opacity={tick === 0 ? 1 : 0.55}
 								/>
 								<text
 									x={-8} y={yScale()(tick)}

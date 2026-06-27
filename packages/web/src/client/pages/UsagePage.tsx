@@ -1,9 +1,12 @@
 import { createMemo, For, Show, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { RefreshCw, RotateCcw } from "lucide-solid";
+import { RefreshCw, RotateCcw, X } from "lucide-solid";
 import {
 	analyticsRange,
 	setAnalyticsRange,
+	customRange,
+	setCustomRange,
+	clearCustomRange,
 	usageData,
 	refetchUsage,
 	dailyUsage,
@@ -25,32 +28,61 @@ import { formatDuration } from "../lib/format";
 import { BarChart } from "../components/charts/BarChart";
 import { LineChart } from "../components/charts/LineChart";
 import { StackedArea } from "../components/charts/StackedArea";
-import { DonutChart } from "../components/charts/DonutChart";
-import { HorizontalBar } from "../components/charts/HorizontalBar";
-import { ChartTooltip, TOKEN_COLORS, CHART_COLORS, formatCompact } from "../components/charts";
+import { ChartTooltip, TOKEN_COLORS, CHART_COLORS, MODEL_OTHER, modelColor, formatCompact } from "../components/charts";
+import { Tooltip } from "../components/ui/Tooltip";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
 import { ProjectDropdown } from "../components/ProjectDropdown";
+import type { BrushRange } from "../components/charts/shared";
 
 // ── Range selector ──────────────────────────────────────────────────
 
 const RANGES: readonly AnalyticsRange[] = ["7d", "30d", "90d", "all"] as const;
+
+// Selecting a preset always clears any active brush window (AC8): the preset and
+// the custom window are mutually exclusive views of the same dashboard.
+const selectPreset = (r: AnalyticsRange): void => {
+	clearCustomRange();
+	setAnalyticsRange(r);
+};
 
 const RangeSelector: Component = () => (
 	<div class="flex items-center gap-1">
 		<For each={RANGES}>
 			{(r) => (
 				<button
-					onClick={() => setAnalyticsRange(r)}
+					onClick={() => selectPreset(r)}
 					class="instrument-microcaps rounded-none border px-2.5 py-1 text-[10px] transition"
 					classList={{
-						"text-primary bg-surface-muted border-brand-500": analyticsRange() === r,
-						"text-muted border-clens hover:text-secondary hover:bg-surface-hover": analyticsRange() !== r,
+						// A preset reads as active only when no custom window overrides it.
+						"text-primary bg-surface-muted border-brand-500": !customRange() && analyticsRange() === r,
+						"text-muted border-clens hover:text-secondary hover:bg-surface-hover": Boolean(customRange()) || analyticsRange() !== r,
 					}}
 				>
 					{r === "all" ? "All" : r}
 				</button>
 			)}
 		</For>
+
+		{/* Custom-window chip (AC8): visible only while a brush selection is active.
+		    Shows the resolved inclusive dates with a clear (x) that returns the
+		    dashboard to the active preset. */}
+		<Show when={customRange()}>
+			{(cr) => (
+				<div class="instrument-microcaps flex items-center gap-1.5 rounded-none border border-brand-500 bg-surface-muted px-2.5 py-1 text-[10px] text-primary">
+					<span class="font-mono tabular-nums normal-case tracking-normal">
+						{cr().from}..{cr().to}
+					</span>
+					<button
+						onClick={() => clearCustomRange()}
+						class="text-muted transition hover:text-danger"
+						title="Clear custom range"
+						aria-label="Clear custom range"
+					>
+						<X class="h-3 w-3" />
+					</button>
+				</div>
+			)}
+		</Show>
 	</div>
 );
 
@@ -61,23 +93,43 @@ type KpiCardProps = {
 	readonly value: string;
 	readonly delta?: DeltaResult;
 	readonly deltaLabel?: string;
+	readonly invertColor?: boolean; // true = "down is good" (e.g., paid cost)
 	readonly tooltip?: string;
 	readonly subtitle?: string;
+	readonly badge?: string; // small INSTRUMENT pill (e.g. "49% estimated")
+	readonly muted?: boolean; // dim the value when it represents "no reading"
 };
 
 const KpiCard: Component<KpiCardProps> = (props) => (
-	<div class="rounded-none border border-clens bg-surface p-4" title={props.tooltip}>
+	<div
+		class="group rounded-none border border-clens bg-surface p-4 transition-colors hover:border-brand-500/60 hover:bg-surface-hover"
+		title={props.tooltip}
+		classList={{ "cursor-help": Boolean(props.tooltip) }}
+	>
 		<div class="instrument-microcaps text-[10px] text-muted">{props.label}</div>
-		<div class="mt-1 font-mono tabular-nums text-2xl font-semibold text-primary">{props.value}</div>
+		<div
+			class="mt-1 font-mono tabular-nums text-2xl font-semibold"
+			classList={{ "text-primary": !props.muted, "text-muted": props.muted }}
+		>
+			{props.value}
+		</div>
+		<Show when={props.badge}>
+			<div class="instrument-microcaps mt-1.5 inline-flex items-center rounded-none border border-warning/50 px-1.5 py-0.5 text-[9px] text-warning">
+				{props.badge}
+			</div>
+		</Show>
 		<Show when={props.subtitle}>
 			<div class="mt-0.5 text-xs text-muted">{props.subtitle}</div>
 		</Show>
 		<Show when={props.delta && props.delta.direction !== "flat"}>
 			<div class="mt-1 flex items-center gap-1 text-xs">
 				<span classList={{
-					"text-success": props.delta?.direction === "up" && props.label !== "Total Cost",
-					"text-danger": props.delta?.direction === "down" && props.label !== "Total Cost" || props.delta?.direction === "up" && props.label === "Total Cost",
-					"text-success hidden2": props.delta?.direction === "down" && props.label === "Total Cost",
+					"text-success": (props.invertColor
+						? props.delta?.direction === "down"
+						: props.delta?.direction === "up"),
+					"text-danger": (props.invertColor
+						? props.delta?.direction === "up"
+						: props.delta?.direction === "down"),
 				}}>
 					{props.delta?.direction === "up" ? "+" : "-"}
 					{props.delta?.value.toFixed(1)}
@@ -91,8 +143,14 @@ const KpiCard: Component<KpiCardProps> = (props) => (
 
 // ── Section header ──────────────────────────────────────────────────
 
-const SectionHeader: Component<{ readonly title: string }> = (props) => (
-	<h3 class="instrument-microcaps text-[11px] text-muted mb-2">{props.title}</h3>
+const SectionHeader: Component<{ readonly title: string; readonly hint?: string }> = (props) => (
+	<div class="mb-3 flex items-center gap-2">
+		<span class="h-1.5 w-1.5 shrink-0 bg-brand-500/70" />
+		<h3 class="instrument-microcaps text-[11px] text-secondary">{props.title}</h3>
+		<Show when={props.hint}>
+			<span class="text-[10px] text-muted">{props.hint}</span>
+		</Show>
+	</div>
 );
 
 // ── Empty state ─────────────────────────────────────────────────────
@@ -117,6 +175,20 @@ const EmptyState: Component = () => (
 	</div>
 );
 
+// ── Formatting helpers ──────────────────────────────────────────────
+
+const fmtUsd = (n: number): string => `$${n.toFixed(2)}`;
+
+// ROI reads as a multiplier ("5.1x"). Below 10x keep one decimal; above, round —
+// "47x" not "47.0x". Zero (no paid baseline / no value) renders as a dash upstream.
+const fmtRoi = (roi: number): string => `${roi < 10 ? roi.toFixed(1) : Math.round(roi)}x`;
+
+// "X% estimated" badge text from measured_fraction (AC12). measured_fraction is
+// the share backed by Claude's own measured cost; the inverse is estimated. Only
+// surfaced when some of the window is NOT measured.
+const estimatedPct = (measuredFraction: number): number =>
+	Math.round((1 - measuredFraction) * 100);
+
 // ── Main page ───────────────────────────────────────────────────────
 
 export const UsagePage: Component = () => {
@@ -124,14 +196,17 @@ export const UsagePage: Component = () => {
 
 	// Navigate to the session list filtered to the clicked day. The list consumes
 	// the `date` query param and keeps only sessions whose start_time falls on that
-	// LOCAL calendar day (B22 — previously this param went nowhere). `agents=all`
-	// is set so single-day drill-downs aren't silently narrowed by the default
-	// top-level-only filter.
+	// LOCAL calendar day (B22). `agents=all` is set so single-day drill-downs aren't
+	// silently narrowed by the default top-level-only filter.
 	const navigateToDate = (d: unknown) => {
 		const datum = d as DailyUsageMetrics;
 		if (!isValidDayKey(datum.date)) return;
 		navigate(`/?date=${encodeURIComponent(datum.date)}&agents=all`);
 	};
+
+	// Brush → custom window (AC7): a completed drag on any time chart sets the
+	// inclusive [from,to] window; the store re-fetches and every widget re-scopes.
+	const onBrushSelect = (r: BrushRange) => setCustomRange({ from: r.start, to: r.end });
 
 	const totals = usageTotals;
 	const prevTotals = usagePreviousTotals;
@@ -144,23 +219,46 @@ export const UsagePage: Component = () => {
 	// non-empty previous window.
 	const hasPrevBaseline = createMemo(() => (prevTotals()?.sessions ?? 0) > 0);
 
-	// Cost has no signal when nothing in the window is priced — show an em dash, not
-	// a fake "$0.00" (B10).
+	// Value/paid/roi have no signal when nothing in the window is priced — show an
+	// em dash, not a fake "$0.00" / "0.0x" (B10).
 	const hasCost = createMemo(() => (totals()?.sessions_with_cost ?? 0) > 0);
 
-	// KPI deltas
-	const costDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.cost_usd, prevTotals()!.cost_usd) : undefined,
+	// Cache hit rate is `null` (n/a) when no fresh input was captured (AC9) — never
+	// render a misleading 100%.
+	const cacheNa = createMemo(() => totals()?.cache_hit_rate == null);
+
+	// KPI deltas. value/paid track API-equivalent value (cost_usd === value_usd).
+	const valueDelta = createMemo(() =>
+		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.value_usd, prevTotals()!.value_usd) : undefined,
+	);
+	const paidDelta = createMemo(() =>
+		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.paid_usd, prevTotals()!.paid_usd) : undefined,
+	);
+	const roiDelta = createMemo(() =>
+		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.roi, prevTotals()!.roi) : undefined,
 	);
 	const sessionDelta = createMemo(() =>
 		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.sessions, prevTotals()!.sessions) : undefined,
 	);
-	const cacheDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline() ? computePpDelta(totals()!.cache_hit_rate, prevTotals()!.cache_hit_rate) : undefined,
-	);
+	// Cache delta only when both windows have a real (non-null) reading.
+	const cacheDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		if (!t || !p || !hasPrevBaseline()) return undefined;
+		if (t.cache_hit_rate == null || p.cache_hit_rate == null) return undefined;
+		return computePpDelta(t.cache_hit_rate, p.cache_hit_rate);
+	});
 	const durationDelta = createMemo(() =>
 		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.avg_duration_ms, prevTotals()!.avg_duration_ms) : undefined,
 	);
+
+	// Estimated-fraction badge (AC12): only when the window is not fully measured.
+	const estimatedBadge = createMemo(() => {
+		const t = totals();
+		if (!t || !hasCost()) return undefined;
+		const pct = estimatedPct(t.measured_fraction);
+		return pct > 0 ? `${pct}% estimated` : undefined;
+	});
 
 	// "n of m sessions analyzed" — analyzed = distilled (drives every metric),
 	// total = all raw sessions in the window (B10).
@@ -170,14 +268,33 @@ export const UsagePage: Component = () => {
 		return `${p.analyzed} of ${p.total} sessions analyzed`;
 	});
 
-	// Model breakdown donut segments
-	const modelSegments = createMemo(() =>
-		modelBreakdown().map((m, i) => ({
+	// Model breakdown donut segments. Drop zero-cost models, give each remaining
+	// model a distinct hue, and collapse the long tail past the top 8 into a single
+	// "Other" slice so the legend stays readable.
+	const MODEL_TOP_N = 8;
+	const modelSegments = createMemo(() => {
+		const models = modelBreakdown().filter((m) => m.cost_usd > 0);
+		const head = models.slice(0, MODEL_TOP_N).map((m, i) => ({
 			label: m.model,
 			value: m.cost_usd,
-			color: [CHART_COLORS.blue, CHART_COLORS.violet, CHART_COLORS.emerald, CHART_COLORS.amber, CHART_COLORS.pink][i % 5],
-		})),
-	);
+			color: modelColor(i),
+		}));
+		const tail = models.slice(MODEL_TOP_N);
+		if (tail.length > 0) {
+			head.push({
+				label: `Other (${tail.length})`,
+				value: tail.reduce((sum, m) => sum + m.cost_usd, 0),
+				color: MODEL_OTHER,
+			});
+		}
+		return head;
+	});
+	// Sum + max across the (already cost-sorted) segments — drive the ranked
+	// readout's share % and proportional bar widths. A pie hides a heavy-tailed
+	// cost split (1–2 models dominating, the rest slivers); ranked bars read it
+	// at a glance.
+	const modelTotalValue = createMemo(() => modelSegments().reduce((s, m) => s + m.value, 0));
+	const modelMaxValue = createMemo(() => modelSegments().reduce((m, s) => Math.max(m, s.value), 0));
 
 	return (
 		<div class="mx-auto max-w-7xl px-4 py-6">
@@ -185,8 +302,10 @@ export const UsagePage: Component = () => {
 
 			{/* Header */}
 			<div class="flex items-center justify-between mb-6">
-				<h1 class="text-xl font-semibold text-primary">Usage</h1>
+				<div>
+					<h1 class="text-xl font-semibold text-primary">Usage</h1>
 					<div class="instrument-ruler mt-1.5 w-40" />
+				</div>
 				<div class="flex items-center gap-3">
 					<ProjectDropdown />
 					<RangeSelector />
@@ -222,16 +341,37 @@ export const UsagePage: Component = () => {
 
 			{/* Content */}
 			<Show when={!isLoading() && !isEmpty()}>
-				{/* KPI Cards */}
-				<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+				{/* Cost truth: PAID (subscription) vs API VALUE vs ROI. The old single
+				    "Total Cost" headline conflated value extracted with cash paid — this
+				    splits them honestly and flags the estimated share (AC4, AC12). */}
+				<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
 					<KpiCard
-						label="Total Cost"
-						value={hasCost() ? `$${(totals()?.cost_usd ?? 0).toFixed(2)}` : "—"}
-						delta={hasCost() ? costDelta() : undefined}
-						tooltip={hasCost()
-							? `Cost data available for ${totals()?.sessions_with_cost ?? 0}/${totals()?.sessions ?? 0} sessions`
-							: "no priced sessions"}
+						label="Paid"
+						value={hasCost() ? fmtUsd(totals()?.paid_usd ?? 0) : "—"}
+						delta={hasCost() ? paidDelta() : undefined}
+						invertColor
+						muted={!hasCost()}
+						tooltip="What you actually paid over this window — your flat subscription rate prorated to the window length (set your plan in Settings). For pay-as-you-go (API), this equals API value."
 					/>
+					<KpiCard
+						label="API Value"
+						value={hasCost() ? fmtUsd(totals()?.value_usd ?? 0) : "—"}
+						delta={hasCost() ? valueDelta() : undefined}
+						muted={!hasCost()}
+						badge={estimatedBadge()}
+						tooltip="API-equivalent value: what these sessions would cost at Anthropic's full list price. This is value extracted, not a bill. Some sessions are token-estimated rather than measured — see the estimated badge."
+					/>
+					<KpiCard
+						label="ROI"
+						value={hasCost() && (totals()?.roi ?? 0) > 0 ? fmtRoi(totals()?.roi ?? 0) : "—"}
+						delta={hasCost() ? roiDelta() : undefined}
+						muted={!hasCost() || (totals()?.roi ?? 0) === 0}
+						tooltip="Return on subscription: API value ÷ amount paid. 5.1x means you extracted ~5× the list-price value of what you paid. Always 1x on pay-as-you-go (API) plans."
+					/>
+				</div>
+
+				{/* Secondary KPIs */}
+				<div class="grid grid-cols-3 gap-4 mb-6">
 					<KpiCard
 						label="Total Sessions"
 						value={String(totals()?.sessions ?? 0)}
@@ -240,20 +380,25 @@ export const UsagePage: Component = () => {
 					/>
 					<KpiCard
 						label="Cache Hit Rate"
-						value={`${((totals()?.cache_hit_rate ?? 0) * 100).toFixed(0)}%`}
-						delta={cacheDelta()}
+						value={cacheNa() ? "—" : `${((totals()?.cache_hit_rate ?? 0) * 100).toFixed(0)}%`}
+						delta={cacheNa() ? undefined : cacheDelta()}
 						deltaLabel="pp"
+						muted={cacheNa()}
+						tooltip={cacheNa()
+							? "n/a — no fresh input tokens were captured this window, so cache-read share is undefined (not 100%)."
+							: "Cache-read share: cache-read tokens ÷ (fresh input + cache-read). Higher means more context was served from cache."}
 					/>
 					<KpiCard
 						label="Avg Duration"
 						value={formatDuration(totals()?.avg_duration_ms ?? 0)}
 						delta={durationDelta()}
+						invertColor
 					/>
 				</div>
 
 				{/* Token Composition */}
 				<div class="mb-6 rounded-none border border-clens bg-surface p-4">
-					<SectionHeader title="Token Composition" />
+					<SectionHeader title="Token Composition" hint="drag to zoom a range" />
 					<StackedArea
 						data={dailyUsage()}
 						x={(d) => d.date}
@@ -277,13 +422,14 @@ export const UsagePage: Component = () => {
 						tooltipLabel={(d) =>
 							`${d.date}: ${formatCompact(d.total_input_tokens + d.total_output_tokens + d.cache_read_tokens + d.cache_creation_tokens)} tokens`
 						}
+						onBrushSelect={onBrushSelect}
 						onClickPoint={(d) => navigateToDate(d)}
 					/>
 				</div>
 
 				{/* Cost Trend */}
 				<div class="mb-6 rounded-none border border-clens bg-surface p-4">
-					<SectionHeader title="Cost Trend" />
+					<SectionHeader title="Cost Trend" hint="drag to zoom a range" />
 					<LineChart
 						data={dailyUsage()}
 						x={(d) => d.date}
@@ -294,6 +440,7 @@ export const UsagePage: Component = () => {
 						ariaLabel="Daily cost trend line chart"
 						formatY={(v) => `$${v.toFixed(2)}`}
 						tooltipLabel={(d) => `${d.date}: $${d.total_cost_usd.toFixed(2)}`}
+						onBrushSelect={onBrushSelect}
 						onClickPoint={(d) => navigateToDate(d)}
 					/>
 				</div>
@@ -312,6 +459,7 @@ export const UsagePage: Component = () => {
 							tooltipLabel={(d) =>
 								`${d.date}: ${d.session_count} sessions, median ${formatDuration(d.median_duration_ms)}`
 							}
+							onBrushSelect={onBrushSelect}
 							onClickPoint={(d) => navigateToDate(d)}
 						/>
 					</div>
@@ -320,13 +468,18 @@ export const UsagePage: Component = () => {
 						<LineChart
 							data={dailyUsage()}
 							x={(d) => d.date}
-							y={(d) => d.cache_hit_rate * 100}
+							y={(d) => (d.cache_hit_rate ?? 0) * 100}
 							height={180}
 							color={CHART_COLORS.emerald}
 							fillArea
 							ariaLabel="Cache hit rate area chart"
 							formatY={(v) => `${v.toFixed(0)}%`}
-							tooltipLabel={(d) => `${d.date}: ${(d.cache_hit_rate * 100).toFixed(1)}% cache hit rate`}
+							tooltipLabel={(d) =>
+								d.cache_hit_rate == null
+									? `${d.date}: n/a (no fresh input)`
+									: `${d.date}: ${(d.cache_hit_rate * 100).toFixed(1)}% cache hit rate`
+							}
+							onBrushSelect={onBrushSelect}
 						/>
 					</div>
 				</div>
@@ -344,13 +497,20 @@ export const UsagePage: Component = () => {
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Sessions</th>
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Avg Cost</th>
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Avg Duration</th>
-										<th class="instrument-microcaps py-2 text-[10px] text-right">Fail Rate</th>
+										<th class="instrument-microcaps py-2 text-[10px] text-right">
+											{/* Renamed from "Fail Rate" (AC10): this is tool-call error rate
+											    (failures ÷ tool calls), NOT how often the agent failed to
+											    spawn. A 1-spawn agent can't have a 3.1% spawn rate. */}
+											<Tooltip content="Tool-call error rate: failed tool calls ÷ total tool calls for this agent type. Not a spawn-failure rate.">
+												<span class="cursor-help border-b border-dotted border-muted">Tool Error Rate</span>
+											</Tooltip>
+										</th>
 									</tr>
 								</thead>
 								<tbody>
 									<For each={agentTypeBreakdown()}>
 										{(a) => (
-											<tr class="border-b border-clens/50 hover:bg-surface-hover cursor-pointer transition">
+											<tr class="border-b border-clens/50 hover:bg-surface-hover transition">
 												<td class="py-2 pr-4 font-medium text-primary">{a.agent_type}</td>
 												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{a.spawn_count}</td>
 												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{a.sessions_appeared_in}</td>
@@ -366,17 +526,62 @@ export const UsagePage: Component = () => {
 					</div>
 				</Show>
 
-				{/* Model Breakdown */}
+				{/* Model Breakdown — ranked cost readout. Replaces a donut: cost-by-model
+				    is heavy-tailed (1–2 models ≈ all spend), so pie slivers were
+				    illegible. Bars sorted by cost with share % read instantly. */}
 				<Show when={modelSegments().length > 0}>
 					<div class="mb-6 rounded-none border border-clens bg-surface p-4">
-						<SectionHeader title="Model Breakdown" />
-						<DonutChart
-							segments={modelSegments()}
-							ariaLabel="Model cost breakdown donut chart"
-							centerLabel="Total"
-							centerValue={`$${(totals()?.cost_usd ?? 0).toFixed(2)}`}
-							formatValue={(v) => `$${v.toFixed(2)}`}
-						/>
+						<div class="mb-3 flex items-baseline justify-between gap-2">
+							<SectionHeader title="Model Breakdown" />
+							{/* Total = sum of the bars (cost by model), so rows and header
+							    reconcile and the shares add to 100%. */}
+							<div class="flex items-baseline gap-1.5">
+								<span class="instrument-microcaps text-[10px] text-muted">Total</span>
+								<span class="font-mono text-sm font-semibold tabular-nums text-primary">
+									{fmtUsd(modelTotalValue())}
+								</span>
+							</div>
+						</div>
+						<div class="flex flex-col gap-1.5" role="img" aria-label="Model cost breakdown">
+							<For each={modelSegments()}>
+								{(seg) => {
+									const sharePct = () => {
+										const t = modelTotalValue();
+										return t > 0 ? (seg.value / t) * 100 : 0;
+									};
+									const barPct = () => {
+										const m = modelMaxValue();
+										return m > 0 ? (seg.value / m) * 100 : 0;
+									};
+									return (
+										<div class="group flex items-center gap-2.5">
+											<span
+												class="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+												style={{ "background-color": seg.color }}
+											/>
+											<span
+												class="w-44 shrink-0 truncate instrument-microcaps text-[10px] text-secondary"
+												title={seg.label}
+											>
+												{seg.label}
+											</span>
+											<div class="h-4 flex-1 overflow-hidden rounded-none border border-clens bg-surface-inset">
+												<div
+													class="h-full rounded-none transition-all group-hover:opacity-80"
+													style={{ width: `${barPct()}%`, "background-color": seg.color }}
+												/>
+											</div>
+											<span class="w-20 shrink-0 text-right font-mono text-xs tabular-nums text-secondary">
+												{fmtUsd(seg.value)}
+											</span>
+											<span class="w-9 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">
+												{sharePct().toFixed(0)}%
+											</span>
+										</div>
+									);
+								}}
+							</For>
+						</div>
 					</div>
 				</Show>
 			</Show>

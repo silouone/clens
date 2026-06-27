@@ -38,6 +38,33 @@ export interface ClensConfig {
 	readonly pricing?: PricingTier;
 }
 
+// --- Session naming / color flag types ---
+
+/**
+ * Closed palette of session color flags. `none` means unflagged; any other value
+ * marks the session as flagged (bookmarked) so it pops out in lists.
+ */
+export const COLOR_NAMES = ["none", "red", "amber", "green", "blue", "violet", "gray"] as const;
+export type ColorName = (typeof COLOR_NAMES)[number];
+
+/** Type guard for a valid color palette value. */
+export const isColorName = (value: unknown): value is ColorName =>
+	typeof value === "string" && (COLOR_NAMES as readonly string[]).includes(value);
+
+/** Provenance of a session's resolved display name (highest precedence first). */
+export type NameSource = "label" | "custom_title" | "computed" | "id";
+
+/**
+ * cLens-owned per-session metadata, stored in the `.clens/session-meta.json`
+ * sidecar keyed by session id. Independent of raw/distilled artifacts so it
+ * survives `clens clean` and re-distill.
+ */
+export interface SessionMeta {
+	readonly label?: string;
+	readonly color?: ColorName;
+	readonly updated_at: number;
+}
+
 // A session is "complete" only when it ended cleanly (last meaningful event is
 // SessionEnd). If it didn't end but its last event is recent it's "active";
 // otherwise it's gone quiet and is "idle". See bug B6 (Stop ⇒ complete was wrong).
@@ -86,6 +113,11 @@ export interface SessionSummary {
 	readonly has_spec?: boolean;      // true if distilled data has plan_drift
 	readonly is_subagent?: boolean;   // true if spawned by another session
 	readonly features?: readonly FeatureFlag[]; // harness features used (loop/goal/workflow)
+	// --- Naming / color flag (resolved at list time, never recomputed by surfaces) ---
+	readonly display_name?: string;   // resolved name by precedence (label>custom_title>computed>id)
+	readonly name_source?: NameSource; // provenance of display_name
+	readonly label?: string;          // user-entered custom label (sidecar), if any
+	readonly color?: ColorName;       // user color flag (sidecar); non-"none" = flagged
 }
 
 // --- Global Config Types ---

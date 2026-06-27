@@ -82,7 +82,7 @@ const cors = (mode: "development" | "production") =>
 
 		if (origin && allowed) {
 			c.header("Access-Control-Allow-Origin", origin)
-			c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			c.header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 			c.header("Access-Control-Allow-Headers", "Authorization, Content-Type")
 			c.header("Access-Control-Max-Age", "3600")
 		}

@@ -925,7 +925,7 @@ describe("enrichNodeFromSessionEvents", () => {
 
 	// Regression: agent-fallback-costs-ignore-pricing-tier.
 	// The fallback cost path must honor the resolved tier, not silently default to "api".
-	test("threads pricing tier into fallback cost estimate (max ≈ 1/3 of api)", () => {
+	test("fallback cost is full-list (multiplier retired) but still records the resolved tier", () => {
 		const baseNode: AgentNode = {
 			session_id: "agent-1",
 			agent_type: "builder",
@@ -959,8 +959,10 @@ describe("enrichNodeFromSessionEvents", () => {
 		const maxCost = maxNode.cost_estimate?.estimated_cost_usd ?? 0;
 		expect(apiCost).toBeGreaterThan(0);
 		expect(maxCost).toBeGreaterThan(0);
-		// max tier applies the ~1/3 subscription multiplier.
-		expect(maxCost).toBeCloseTo(apiCost / 3, 4);
+		// Cost-truth contract: the stored cost is ALWAYS the API-equivalent value at full
+		// list price — the SUBSCRIPTION_MULTIPLIER is retired from the stored value, so the
+		// "max" tier no longer scales it. The resolved tier is still recorded for staleness.
+		expect(maxCost).toBe(apiCost);
 		expect(maxNode.cost_estimate?.pricing_tier).toBe("max");
 		expect(apiNode.cost_estimate?.pricing_tier).toBe("api");
 	});

@@ -18,6 +18,7 @@ export type {
 	CommunicationEdgeType,
 	CommunicationSequenceEntry,
 	ConversationGroup,
+	CostBasis,
 	CostEstimate,
 	CumulativeStats,
 	DecisionPoint,
@@ -67,6 +68,7 @@ export type {
 	WorkUnitSession,
 	WorkUnitSessionRole,
 } from "./distill";
+export { COST_BASES } from "./distill";
 export {
 	type AgentEvent,
 	type BaseHookInput,
@@ -100,15 +102,20 @@ export {
 export {
 	ACTIVE_THRESHOLD_MS,
 	type ClensConfig,
+	COLOR_NAMES,
+	type ColorName,
 	type DelegatedHooks,
 	deriveSessionStatus,
 	type ExportManifest,
 	type GlobalConfig,
 	type GlobalMode,
+	isColorName,
+	type NameSource,
 	type PricingTier,
 	type ProjectEntry,
 	type ProjectRegistry,
 	SESSION_STATUSES,
+	type SessionMeta,
 	type SessionStatus,
 	type SessionSummary,
 } from "./session";

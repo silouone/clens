@@ -1,31 +1,35 @@
 import { Hono } from "hono"
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs"
-import type { ClensConfig, PricingTier } from "@clens/cli"
+import { isSubscriptionPlan, type WebClensConfig } from "../../shared/types"
 
 // ── Validation helpers ────────────────────────────────────────────
+//
+// `config.plan` (SubscriptionPlan) replaces the old `config.pricing` (PricingTier).
+// We keep reading legacy `pricing` for back-compat but always write the new `plan`.
 
-const VALID_PRICING_TIERS: readonly PricingTier[] = ["api", "max", "auto"] as const
+const DEFAULT_CONFIG: WebClensConfig = { capture: true }
 
-const isValidPricingTier = (value: string): value is PricingTier =>
-	VALID_PRICING_TIERS.includes(value as PricingTier)
-
-const DEFAULT_CONFIG: ClensConfig = { capture: true }
+/** Read a legacy `pricing` tier value if present (kept only for back-compat surfacing). */
+const readLegacyPricing = (value: unknown): WebClensConfig["pricing"] =>
+	value === "api" || value === "max" || value === "auto" ? value : undefined
 
 // ── Read / Write helpers ──────────────────────────────────────────
 
-const readConfig = (projectDir: string): ClensConfig => {
+const readConfig = (projectDir: string): WebClensConfig => {
 	const configPath = `${projectDir}/.clens/config.json`
 	if (!existsSync(configPath)) return DEFAULT_CONFIG
 	try {
 		const raw: unknown = JSON.parse(readFileSync(configPath, "utf-8"))
 		if (typeof raw !== "object" || raw === null) return DEFAULT_CONFIG
-		const obj = raw as Record<string, unknown>
+		const obj: Readonly<Record<string, unknown>> = raw as Readonly<Record<string, unknown>>
 		const capture = typeof obj.capture === "boolean" ? obj.capture : true
-		const pricing =
-			typeof obj.pricing === "string" && isValidPricingTier(obj.pricing)
-				? obj.pricing
-				: undefined
-		return { capture, ...(pricing ? { pricing } : {}) }
+		const plan = isSubscriptionPlan(obj.plan) ? obj.plan : undefined
+		const pricing = readLegacyPricing(obj.pricing)
+		return {
+			capture,
+			...(plan ? { plan } : {}),
+			...(pricing ? { pricing } : {}),
+		}
 	} catch {
 		return DEFAULT_CONFIG
 	}
@@ -33,30 +37,35 @@ const readConfig = (projectDir: string): ClensConfig => {
 
 const validateConfigBody = (
 	body: unknown,
-): { readonly ok: true; readonly config: ClensConfig } | { readonly ok: false; readonly error: string } => {
+): { readonly ok: true; readonly config: WebClensConfig } | { readonly ok: false; readonly error: string } => {
 	if (typeof body !== "object" || body === null) {
 		return { ok: false, error: "Request body must be a JSON object" }
 	}
 
-	const obj = body as Record<string, unknown>
+	const obj: Readonly<Record<string, unknown>> = body as Readonly<Record<string, unknown>>
 
 	if ("capture" in obj && typeof obj.capture !== "boolean") {
 		return { ok: false, error: "\"capture\" must be a boolean" }
 	}
 
-	if ("pricing" in obj && obj.pricing !== undefined) {
-		if (typeof obj.pricing !== "string" || !isValidPricingTier(obj.pricing)) {
-			return { ok: false, error: `"pricing" must be one of: ${VALID_PRICING_TIERS.join(", ")}` }
-		}
+	if ("plan" in obj && obj.plan !== undefined && !isSubscriptionPlan(obj.plan)) {
+		return { ok: false, error: "\"plan\" must be one of: pro, max5x, max20x, api" }
 	}
 
 	const capture = typeof obj.capture === "boolean" ? obj.capture : true
-	const pricing =
-		typeof obj.pricing === "string" && isValidPricingTier(obj.pricing)
-			? obj.pricing
-			: undefined
+	const plan = isSubscriptionPlan(obj.plan) ? obj.plan : undefined
+	// Preserve a legacy `pricing` only if no new `plan` was supplied — once a plan is
+	// chosen it is the source of truth and the legacy tier is dropped on write.
+	const pricing = plan ? undefined : readLegacyPricing(obj.pricing)
 
-	return { ok: true, config: { capture, ...(pricing ? { pricing } : {}) } }
+	return {
+		ok: true,
+		config: {
+			capture,
+			...(plan ? { plan } : {}),
+			...(pricing ? { pricing } : {}),
+		},
+	}
 }
 
 // ── Config route factory ──────────────────────────────────────────

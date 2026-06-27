@@ -13,13 +13,18 @@ export const ChartEmpty: Component<{
 	readonly ariaLabel?: string;
 }> = (props) => (
 	<div
-		class={`flex w-full items-center justify-center border border-clens bg-surface-inset ${props.class ?? ""}`}
+		class={`flex w-full flex-col items-center justify-center gap-2 border border-clens bg-surface-inset ${props.class ?? ""}`}
 		style={{ height: `${props.height ?? 200}px` }}
 		role="img"
 		aria-label={props.ariaLabel ?? "No data"}
 	>
+		{/* Flat-line "no signal" trace — a hairline baseline reads as an idle
+		    instrument rather than a blank panel. */}
+		<svg width="56" height="9" viewBox="0 0 56 9" aria-hidden="true" class="opacity-70">
+			<line x1="0" y1="4.5" x2="56" y2="4.5" stroke="var(--clens-tick)" stroke-width="1" stroke-dasharray="2 3" />
+		</svg>
 		<span class="instrument-microcaps text-[10px] text-muted">
-			{props.label ?? "No data"}
+			{props.label ?? "No signal"}
 		</span>
 	</div>
 );

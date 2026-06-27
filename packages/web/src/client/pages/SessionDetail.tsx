@@ -265,6 +265,14 @@ export const SessionDetail: Component = () => {
 
 	const isNotDistilled = createMemo(() => sessionDetail()?.status === "not_distilled");
 
+	// Matching lightweight list row — carries the resolved display_name/label/color
+	// (sidecar-backed naming) that the distilled snapshot lacks, so the header can
+	// render rename + color controls (R18).
+	const summaryRow = createMemo(() => {
+		const sessions = sessionList() ?? [];
+		return sessions.find((s) => s.session_id === params.id);
+	});
+
 	/** Project info derived from session list (available in global mode). */
 	const projectInfo = createMemo(() => {
 		const sessions = sessionList();
@@ -338,19 +346,51 @@ export const SessionDetail: Component = () => {
 
 	// ── Re-distill handler ──────────────────────────────────────
 
+	// Tracks an in-flight (re-)analyze so the action buttons can show a busy
+	// state, and so the SSE effect below knows a refetch is genuinely wanted.
+	const [isRedistilling, setIsRedistilling] = createSignal(false);
+	// Set true when WE initiate a (re-)analyze; the SSE distill_complete effect
+	// consumes it to perform exactly one refetch. Without this gate, the effect
+	// refetches on every distill_complete signal — and since that signal is
+	// `equals: false` (so re-analyzing the same id re-fires) the SSE ring buffer
+	// replays it on each reconnect (reconnects happen on every route change),
+	// refetching an already-ready session in a tight loop. That loop is what made
+	// the analyzed session page appear to "reload all the time".
+	const [redistillPending, setRedistillPending] = createSignal(false);
+
 	const handleRedistill = async () => {
-		const res = await api.api.commands.sessions[":sessionId"].distill.$post({
-			param: { sessionId: params.id },
-		});
-		if (!res.ok) return;
-		// Poll for completion (SSE will also trigger refetch via lastDistilledSessionId)
-		await new Promise((resolve) => setTimeout(resolve, 2000));
-		refetchDetail();
+		if (isRedistilling()) return;
+		setIsRedistilling(true);
+		setRedistillPending(true);
+		try {
+			const res = await api.api.commands.sessions[":sessionId"].distill.$post({
+				param: { sessionId: params.id },
+			});
+			if (!res.ok) {
+				setRedistillPending(false);
+				return;
+			}
+			// SSE distill_complete is the primary completion signal; this delayed
+			// refetch is a fallback in case the event is missed.
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+			if (redistillPending()) {
+				setRedistillPending(false);
+				refetchDetail();
+			}
+		} finally {
+			setIsRedistilling(false);
+		}
 	};
 
-	// Watch for SSE distill_complete for this session
+	// Watch for SSE distill_complete for this session. Only refetch when a refetch
+	// is actually warranted — either the view is still showing the not-distilled
+	// state (first analysis just finished) or we initiated a re-analyze. This
+	// stops replayed/duplicate distill_complete signals from looping refetches on
+	// an already-current page (see redistillPending rationale above).
 	createEffect(() => {
-		if (lastDistilledSessionId() === params.id) {
+		if (lastDistilledSessionId() !== params.id) return;
+		if (isNotDistilled() || redistillPending()) {
+			setRedistillPending(false);
 			refetchDetail();
 		}
 	});
@@ -427,14 +467,25 @@ export const SessionDetail: Component = () => {
 					>
 						{(liveState) => (
 							<div class="flex flex-col h-full">
-								<LiveSessionView state={liveState()} elapsed={liveStore.elapsed()} />
+								<div class="min-h-0 flex-1 overflow-hidden">
+									<LiveSessionView state={liveState()} elapsed={liveStore.elapsed()} />
+								</div>
 								<Show when={liveState().status === "complete"}>
-									<div class="flex justify-center py-3">
+									{/* Pinned action bar — a footer separated from the timeline,
+									    not a pill floating over the log content (prior design).
+									    Carries a busy state so the click gives immediate feedback. */}
+									<div class="shrink-0 flex items-center justify-between gap-4 border-t border-clens bg-surface-inset px-4 py-3">
+										<div class="flex flex-col">
+											<span class="instrument-microcaps text-[10px] text-secondary">Session complete</span>
+											<span class="text-[11px] text-muted">Analyze to unlock conversation, diffs, backtracks &amp; cost.</span>
+										</div>
 										<button
-											class="instrument-microcaps px-4 py-2 text-[10px] rounded-none border border-brand-500 bg-brand-500 text-surface hover:bg-brand-600 transition"
 											onClick={handleRedistill}
+											disabled={isRedistilling()}
+											class="instrument-microcaps inline-flex shrink-0 items-center gap-2 rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
 										>
-											Analyze Session
+											<Show when={isRedistilling()}><Spinner size="sm" /></Show>
+											{isRedistilling() ? "Analyzing…" : "Analyze Session"}
 										</button>
 									</div>
 								</Show>
@@ -448,7 +499,7 @@ export const SessionDetail: Component = () => {
 								backLabel="Sessions"
 								backHref="/"
 								id={params.id.slice(0, 12)}
-								header={<SessionHeader session={s()} status={rawStatus()} onRedistill={handleRedistill} />}
+								header={<SessionHeader session={s()} status={rawStatus()} summary={summaryRow()} onRedistill={handleRedistill} />}
 								badge={
 									<Show when={projectInfo()}>
 										{(info) => (

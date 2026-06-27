@@ -1,5 +1,21 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import type { DistilledSession, AnalyticsSummaryRow } from "../types";
+import type { CostBasis, CostEstimate, DistilledSession, AnalyticsSummaryRow } from "../types";
+
+/**
+ * Derive the cost provenance for a summary row from a distilled session's cost estimate.
+ *
+ * Prefers the explicit `cost_basis` stamped at distill time. For rows distilled before the
+ * cost-truth work (no `cost_basis` tag), `is_estimated === false` historically meant
+ * token-grounded — i.e. "estimated", NEVER measured `total_cost_usd` (the measured tier did
+ * not exist yet). Mapping it to "measured" would inflate measured_fraction and under-report
+ * the "X% estimated" badge, so legacy token-grounded rows are "estimated" and the rest
+ * "heuristic". Only an explicit tag can claim "measured".
+ */
+const deriveCostBasis = (ce: CostEstimate | undefined): CostBasis => {
+	if (!ce) return "heuristic";
+	if (ce.cost_basis) return ce.cost_basis;
+	return ce.is_estimated === false ? "estimated" : "heuristic";
+};
 
 /**
  * Format a timestamp as a LOCAL calendar day "YYYY-MM-DD".
@@ -84,12 +100,20 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 	// Date: use start_time, fallback to now — bucketed by LOCAL calendar day (B18)
 	const dateStr = localDayKey(d.start_time ?? Date.now());
 
+	// Cost-truth provenance. cost_usd is the API-equivalent value (full list price);
+	// measured_cost_usd is the portion of it backed by a real measured cost (else 0).
+	const costUsd = ce?.estimated_cost_usd ?? 0;
+	const costBasis = deriveCostBasis(ce);
+	const measuredCostUsd = costBasis === "measured" ? costUsd : 0;
+
 	return {
 		session_id: d.session_id,
 		date: dateStr,
 		duration_ms: stats.duration_ms,
 		model: stats.model ?? ce?.model,
-		cost_usd: ce?.estimated_cost_usd ?? 0,
+		cost_usd: costUsd,
+		cost_basis: costBasis,
+		measured_cost_usd: measuredCostUsd,
 		input_tokens: inputTokens,
 		output_tokens: outputTokens,
 		cache_read_tokens: cacheRead,

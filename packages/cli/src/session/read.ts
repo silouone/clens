@@ -3,6 +3,8 @@ import type { DistilledSession, LinkEvent, SessionSummary, SpawnLink, StoredEven
 import { BROADCAST_EVENTS, deriveSessionStatus } from "../types";
 import { computeEffectiveDuration, deduplicateSpawns, isGhostSession, logError } from "../utils";
 import { parseDistilledSession, parseLinkEvent } from "./parsers";
+import { computeSessionName, resolveDisplayName } from "./session-name";
+import { readSessionMeta } from "./session-meta";
 import { readSessionName } from "./transcript";
 
 /** Parse a JSON line into a StoredEvent, returning undefined for invalid data. */
@@ -209,6 +211,31 @@ const resolveTranscriptPathFromSession = (sessionId: string, projectDir: string)
 };
 
 /**
+ * Extract the first substantive user prompt from a session JSONL file.
+ * Scans for the first `UserPromptSubmit` event with a string `data.prompt`.
+ * Returns null if the file is missing/empty or no such event exists. The raw
+ * prompt is returned verbatim; cleaning/truncation is done by computeSessionName.
+ */
+const readFirstPrompt = (sessionId: string, projectDir: string): string | null => {
+	const filePath = `${projectDir}/.clens/sessions/${sessionId}.jsonl`;
+	try {
+		if (!existsSync(filePath)) return null;
+		const content = readFileSync(filePath, "utf-8").trim();
+		if (!content) return null;
+		const lines = content.split("\n").filter(Boolean);
+		return lines.reduce<string | null>((acc, line) => {
+			if (acc !== null) return acc;
+			const event = parseEvent(line);
+			if (event?.event !== "UserPromptSubmit") return null;
+			const prompt = event.data?.prompt;
+			return typeof prompt === "string" ? prompt : null;
+		}, null);
+	} catch {
+		return null;
+	}
+};
+
+/**
  * Enrich session summaries with agent count, distill status, spec presence, and session name.
  * Reads links once and scans the distilled directory to annotate each session.
  */
@@ -217,6 +244,8 @@ export const enrichSessionSummaries = (
 	projectDir: string,
 ): readonly SessionSummary[] => {
 	const links = readLinks(projectDir);
+	// Load the cLens sidecar ONCE per listing, not per session (R16).
+	const sessionMeta = readSessionMeta(projectDir);
 	// Deduplicate by agent_id so resumed agents (which emit multiple spawn events)
 	// count once. This must match the web list route exactly (bug B15 — CLI counted
 	// raw spawn links while the API counted distinct agents, so they disagreed).
@@ -271,15 +300,30 @@ export const enrichSessionSummaries = (
 				})()
 			: false;
 
-		// Resolve session name from transcript custom-title event
-		const session_name = (() => {
+		// Resolve session name from transcript custom-title event (legacy field kept).
+		const customTitle = (() => {
 			const tPath = resolveTranscriptPathFromSession(session.session_id, projectDir);
 			return tPath ? readSessionName(tPath) ?? undefined : undefined;
 		})();
 
+		// Resolve the display name by precedence: sidecar label > CC custom-title >
+		// computed first-prompt > short id (R1/R5). Sidecar carries label + color.
+		const meta = sessionMeta[session.session_id];
+		const computed = computeSessionName(readFirstPrompt(session.session_id, projectDir));
+		const { display_name, name_source } = resolveDisplayName({
+			label: meta?.label ?? null,
+			customTitle: customTitle ?? null,
+			computed,
+			id: session.session_id,
+		});
+
 		return {
 			...session,
-			...(session_name ? { session_name } : {}),
+			...(customTitle ? { session_name: customTitle } : {}),
+			display_name,
+			name_source,
+			...(meta?.label ? { label: meta.label } : {}),
+			...(meta?.color ? { color: meta.color } : {}),
 			agent_count: agentCount,
 			is_distilled: isDistilled,
 			has_spec: hasSpec,

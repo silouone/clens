@@ -12,7 +12,7 @@ export const Toggle: Component<ToggleProps> = (props) => (
 		role="switch"
 		aria-checked={props.checked}
 		disabled={props.disabled}
-		class="relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50"
+		class="relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50"
 		classList={{
 			"bg-brand-500": props.checked,
 			"bg-surface-muted": !props.checked,

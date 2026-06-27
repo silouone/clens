@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import type { BacktrackResult, CostEstimate, DistilledSession } from "../types/distill";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import type { BacktrackResult, CostEstimate, DistilledSession, GlobalSessionSummary } from "../types/distill";
+import type { PricingTier } from "../types";
 import { fmtDuration } from "./format-helpers";
 import { bold, cyan, dim, green, red, yellow } from "./shared";
 
@@ -173,4 +174,167 @@ export const distillCommand = async (args: {
 	].join("\n");
 
 	console.log(output);
+};
+
+// ── Batch drivers ────────────────────────────────────────
+
+/** Tally of a batch distill run. */
+export type BatchDistillCounts = {
+	readonly distilled: number;
+	readonly skipped: number;
+	readonly failed: number;
+};
+
+/** Cross-repo batch tally (adds project span). */
+export type GlobalDistillCounts = BatchDistillCounts & {
+	readonly projectCount: number;
+};
+
+/**
+ * True iff `distilledFile` exists and is at least as new as `sessionFile`.
+ * Raw `.jsonl` is append-only, so a distilled artifact newer than its source
+ * session is up to date and can be skipped on an incremental run.
+ */
+export const isDistilledFresh = (sessionFile: string, distilledFile: string): boolean => {
+	if (!existsSync(distilledFile) || !existsSync(sessionFile)) return false;
+	return statSync(distilledFile).mtimeMs >= statSync(sessionFile).mtimeMs;
+};
+
+const sessionFilePath = (captureDir: string, sessionId: string): string =>
+	`${captureDir}/.clens/sessions/${sessionId}.jsonl`;
+
+const distilledFilePath = (captureDir: string, sessionId: string): string =>
+	`${captureDir}/.clens/distilled/${sessionId}.json`;
+
+/**
+ * Distill every session captured in a single project dir (cwd batch).
+ * Skips sessions whose distilled artifact is already fresh unless `force`.
+ * One bad session is counted, never fatal. Returns the run tally.
+ */
+export const distillAllInDir = async (args: {
+	readonly projectDir: string;
+	readonly deep: boolean;
+	readonly pricingTier?: PricingTier;
+	readonly force: boolean;
+}): Promise<BatchDistillCounts> => {
+	const { listSessions } = await import("../session/read");
+	const sessions = listSessions(args.projectDir);
+	if (sessions.length === 0) {
+		console.log("No sessions found.");
+		return { distilled: 0, skipped: 0, failed: 0 };
+	}
+
+	console.log(`Distilling ${sessions.length} session(s)...`);
+	const counts = await sessions.reduce<Promise<BatchDistillCounts>>(
+		async (accP, session, idx) => {
+			const acc = await accP;
+			const progress = `[${idx + 1}/${sessions.length}]`;
+			const prefix = session.session_id.slice(0, 8);
+			const fresh =
+				!args.force &&
+				isDistilledFresh(
+					sessionFilePath(args.projectDir, session.session_id),
+					distilledFilePath(args.projectDir, session.session_id),
+				);
+			if (fresh) {
+				console.log(`${progress} ${prefix}… (up to date, skipped)`);
+				return { ...acc, skipped: acc.skipped + 1 };
+			}
+			console.log(`${progress} ${prefix}...`);
+			try {
+				await distillCommand({
+					sessionId: session.session_id,
+					projectDir: args.projectDir,
+					deep: args.deep,
+					json: false,
+					pricingTier: args.pricingTier,
+				});
+				return { ...acc, distilled: acc.distilled + 1 };
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error(`  Error: ${msg}`);
+				return { ...acc, failed: acc.failed + 1 };
+			}
+		},
+		Promise.resolve({ distilled: 0, skipped: 0, failed: 0 }),
+	);
+
+	console.log(
+		`\nDistilled ${counts.distilled}, skipped ${counts.skipped}, failed ${counts.failed} of ${sessions.length} session(s).`,
+	);
+	return counts;
+};
+
+/**
+ * Distill every session across every registered project, writing each result
+ * into its own (possibly nested) `.clens/distilled/`. Sessions are grouped by
+ * project for readable output. Incremental by default; `force` re-distills all.
+ *
+ * `sessions` is injectable for testing; it defaults to `listGlobalSessions()`.
+ */
+export const distillAllGlobal = async (args: {
+	readonly deep: boolean;
+	readonly pricingTier?: PricingTier;
+	readonly force: boolean;
+	readonly sessions?: readonly GlobalSessionSummary[];
+}): Promise<GlobalDistillCounts> => {
+	const sessions =
+		args.sessions ?? (await import("../session/global-read")).listGlobalSessions();
+	if (sessions.length === 0) {
+		throw new Error(
+			"No sessions found across registered projects. Run 'clens init --global' or 'clens list --global' first.",
+		);
+	}
+
+	console.log(`Distilling ${sessions.length} session(s) across registered projects...`);
+
+	type Acc = BatchDistillCounts & { readonly lastProject?: string };
+	const final = await sessions.reduce<Promise<Acc>>(
+		async (accP, s, idx) => {
+			const acc = await accP;
+			const progress = `[${idx + 1}/${sessions.length}]`;
+			const prefix = s.session_id.slice(0, 8);
+			const header = acc.lastProject !== s.project_name ? [`\n── ${s.project_name} ──`] : [];
+			header.forEach((h) => console.log(h));
+			const base: Acc = { ...acc, lastProject: s.project_name };
+
+			const fresh =
+				!args.force &&
+				isDistilledFresh(
+					sessionFilePath(s.capture_dir, s.session_id),
+					distilledFilePath(s.capture_dir, s.session_id),
+				);
+			if (fresh) {
+				console.log(`${progress} ${prefix}… (up to date, skipped)`);
+				return { ...base, skipped: base.skipped + 1 };
+			}
+			console.log(`${progress} ${prefix}...`);
+			try {
+				await distillCommand({
+					sessionId: s.session_id,
+					projectDir: s.capture_dir,
+					deep: args.deep,
+					json: false,
+					pricingTier: args.pricingTier,
+				});
+				return { ...base, distilled: base.distilled + 1 };
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error(`  Error (${prefix}): ${msg}`);
+				return { ...base, failed: base.failed + 1 };
+			}
+		},
+		Promise.resolve({ distilled: 0, skipped: 0, failed: 0 }),
+	);
+
+	const projectCount = new Set(sessions.map((s) => s.project_name)).size;
+	console.log(
+		`\nDistilled ${final.distilled}, skipped ${final.skipped}, failed ${final.failed} across ${projectCount} projects.`,
+	);
+	return {
+		distilled: final.distilled,
+		skipped: final.skipped,
+		failed: final.failed,
+		projectCount,
+	};
 };

@@ -1,8 +1,13 @@
 import { Hono } from "hono"
-import { closeSync, existsSync, openSync, readSync, readdirSync } from "node:fs"
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync } from "node:fs"
 import { resolve } from "node:path"
 import { readAnalyticsSummary, rebuildAnalyticsSummary } from "@clens/cli/src/distill/analytics-summary"
 import type { AnalyticsSummaryRow, ProjectEntry } from "@clens/cli"
+import {
+	PLAN_MONTHLY_USD,
+	resolvePlan,
+	type SubscriptionPlan,
+} from "../../shared/types"
 import { createLogger } from "../logger"
 
 const log = createLogger("analytics")
@@ -30,7 +35,8 @@ interface DailyUsageMetrics {
 	readonly total_output_tokens: number
 	readonly cache_read_tokens: number
 	readonly cache_creation_tokens: number
-	readonly cache_hit_rate: number
+	/** Cache-read share, or `null` when no fresh input was captured (AC9). */
+	readonly cache_hit_rate: number | null
 	readonly avg_duration_ms: number
 	readonly median_duration_ms: number
 	readonly avg_agent_count: number
@@ -40,12 +46,28 @@ interface DailyUsageMetrics {
 
 interface UsageTotals {
 	readonly sessions: number
+	/** API-equivalent value at full list price (retained for back-compat; == value_usd). */
 	readonly cost_usd: number
+	/** API-equivalent value at full list price (Σ cost_usd). */
+	readonly value_usd: number
+	/** What was actually paid over the window: subscription rate × (D / 30), or value for `api`. */
+	readonly paid_usd: number
+	/** value_usd / paid_usd (1 for `api`; 0 when paid is 0 and plan isn't `api`). */
+	readonly roi: number
+	/** Σ cost_usd for rows whose cost_basis === "measured". */
+	readonly measured_cost_usd: number
+	/** measured_cost_usd / value_usd (0 when value is 0) — drives the "X% estimated" badge. */
+	readonly measured_fraction: number
 	readonly input_tokens: number
 	readonly output_tokens: number
 	readonly cache_read_tokens: number
 	readonly cache_creation_tokens: number
-	readonly cache_hit_rate: number
+	/**
+	 * Cache-read share of total read tokens (cache_read / (input + cache_read)). `null`
+	 * means n/a — there was no fresh input captured, so a "100%" reading would be a
+	 * formula artifact rather than a real hit rate (AC9).
+	 */
+	readonly cache_hit_rate: number | null
 	readonly avg_duration_ms: number
 	readonly median_duration_ms: number
 	readonly avg_agents_per_session: number
@@ -175,10 +197,41 @@ const median = (values: readonly number[]): number => {
 	return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
-const filterByRange = (
-	rows: readonly AnalyticsSummaryRow[],
-	range: Range,
-): { readonly current: readonly AnalyticsSummaryRow[]; readonly previous: readonly AnalyticsSummaryRow[] } => {
+/**
+ * Cache-read share guard (AC9). The KPI is cache_read / (input + cache_read), but a
+ * day whose fresh `input` is 0 would always read 100% — a pure formula artifact, not
+ * a real hit rate. In that case report `null` (n/a) so the UI can label it honestly
+ * rather than printing a misleading 100%.
+ */
+export const cacheHitRate = (input: number, cacheRead: number): number | null => {
+	if (input <= 0) return null
+	const denom = input + cacheRead
+	return denom > 0 ? cacheRead / denom : null
+}
+
+/**
+ * The cost-attribution tier for a summary row, written by the distill layer
+ * (F1, tasks 1.1/1.2). Rows persisted before that change lack the field; readers
+ * treat a missing/unknown basis as not-measured so `measured_cost_usd` only ever
+ * counts rows the distiller positively marked as measured.
+ */
+type CostBasis = "measured" | "estimated" | "heuristic"
+
+const readCostBasis = (row: AnalyticsSummaryRow): CostBasis | undefined => {
+	const basis: unknown = (row as unknown as Readonly<Record<string, unknown>>).cost_basis
+	return basis === "measured" || basis === "estimated" || basis === "heuristic" ? basis : undefined
+}
+
+/** Σ cost_usd for rows the distiller marked as `cost_basis === "measured"`. */
+const sumMeasuredCost = (rows: readonly AnalyticsSummaryRow[]): number =>
+	rows.reduce((s, r) => (readCostBasis(r) === "measured" ? s + r.cost_usd : s), 0)
+
+type WindowSplit = {
+	readonly current: readonly AnalyticsSummaryRow[]
+	readonly previous: readonly AnalyticsSummaryRow[]
+}
+
+const filterByRange = (rows: readonly AnalyticsSummaryRow[], range: Range): WindowSplit => {
 	const days = RANGE_DAYS[range]
 	if (!days) return { current: rows, previous: [] }
 
@@ -193,12 +246,86 @@ const filterByRange = (
 	return { current, previous }
 }
 
+/** A custom inclusive day window [from..to] (both "YYYY-MM-DD", local days). */
+export interface CustomWindow {
+	readonly from: string
+	readonly to: string
+}
+
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Parse `from`/`to` query params into a normalized CustomWindow, or undefined. */
+export const parseCustomWindow = (
+	from: string | undefined,
+	to: string | undefined,
+): CustomWindow | undefined => {
+	if (!from || !to || !DAY_KEY_RE.test(from) || !DAY_KEY_RE.test(to)) return undefined
+	// Tolerate a reversed selection (drag right-to-left) by ordering the bounds.
+	return from <= to ? { from, to } : { from: to, to: from }
+}
+
+/** Inclusive day-span of a custom window (D in the derived-totals formulas). */
+export const windowDaySpan = (window: CustomWindow): number => {
+	const start = new Date(`${window.from}T00:00:00`)
+	const end = new Date(`${window.to}T00:00:00`)
+	const diffDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+	return diffDays + 1
+}
+
+/** The day key D days before `dayKey` (local-day arithmetic on the calendar). */
+const dayKeyMinus = (dayKey: string, days: number): string => {
+	const d = new Date(`${dayKey}T00:00:00`)
+	d.setDate(d.getDate() - days)
+	return localDayString(d)
+}
+
+/**
+ * Split rows for a custom [from..to] window. Current = rows whose local day is in
+ * [from..to] inclusive. Previous = the immediately preceding equal-length span:
+ * [from-D .. from-1] where D is the inclusive day-span of the current window.
+ */
+export const splitByCustomWindow = (
+	rows: readonly AnalyticsSummaryRow[],
+	window: CustomWindow,
+): WindowSplit => {
+	const span = windowDaySpan(window)
+	const prevFrom = dayKeyMinus(window.from, span)
+	const prevTo = dayKeyMinus(window.from, 1)
+	const current = rows.filter((r) => r.date >= window.from && r.date <= window.to)
+	const previous = rows.filter((r) => r.date >= prevFrom && r.date <= prevTo)
+	return { current, previous }
+}
+
+/** Number of inclusive local days covered by the active window (D in the formulas). */
+const windowDays = (range: Range, window: CustomWindow | undefined, rows: readonly AnalyticsSummaryRow[]): number => {
+	if (window) return windowDaySpan(window)
+	const days = RANGE_DAYS[range]
+	// "all" has no fixed span — approximate D from the observed date extent so the
+	// per-window paid_usd stays proportional to the time actually covered.
+	if (days) return days
+	if (rows.length === 0) return 0
+	const dates = rows.map((r) => r.date)
+	const min = dates.reduce((a, b) => (a < b ? a : b))
+	const max = dates.reduce((a, b) => (a > b ? a : b))
+	return windowDaySpan({ from: min, to: max })
+}
+
 /**
  * Count raw session files (the source of truth, not just distilled ones) whose
  * local start day falls inside the current window. Pairs with the analyzed count
  * to expose analysis coverage (B10).
  */
-const countRawSessionsInWindow = (startTimes: readonly number[], range: Range): number => {
+const countRawSessionsInWindow = (
+	startTimes: readonly number[],
+	range: Range,
+	window: CustomWindow | undefined,
+): number => {
+	if (window) {
+		return startTimes.filter((ms) => {
+			const day = localDayString(new Date(ms))
+			return day >= window.from && day <= window.to
+		}).length
+	}
 	const days = RANGE_DAYS[range]
 	if (!days) return startTimes.length
 	const cutoff = dateNDaysAgo(days - 1)
@@ -209,9 +336,10 @@ const computePopulation = (
 	rawStartTimes: readonly number[],
 	analyzedRows: readonly AnalyticsSummaryRow[],
 	range: Range,
+	window: CustomWindow | undefined,
 ): Population => ({
 	analyzed: analyzedRows.length,
-	total: countRawSessionsInWindow(rawStartTimes, range),
+	total: countRawSessionsInWindow(rawStartTimes, range, window),
 })
 
 // ── Usage metrics computation ──────────────────────────────────────
@@ -231,7 +359,6 @@ const computeDailyUsage = (byDate: ReadonlyMap<string, readonly AnalyticsSummary
 		.map(([date, rows]) => {
 			const totalInput = rows.reduce((s, r) => s + r.input_tokens, 0)
 			const totalCacheRead = rows.reduce((s, r) => s + r.cache_read_tokens, 0)
-			const cacheHitDenom = totalInput + totalCacheRead
 			return {
 				date,
 				session_count: rows.length,
@@ -240,7 +367,7 @@ const computeDailyUsage = (byDate: ReadonlyMap<string, readonly AnalyticsSummary
 				total_output_tokens: rows.reduce((s, r) => s + r.output_tokens, 0),
 				cache_read_tokens: totalCacheRead,
 				cache_creation_tokens: rows.reduce((s, r) => s + r.cache_creation_tokens, 0),
-				cache_hit_rate: cacheHitDenom > 0 ? totalCacheRead / cacheHitDenom : 0,
+				cache_hit_rate: cacheHitRate(totalInput, totalCacheRead),
 				avg_duration_ms: rows.length > 0 ? rows.reduce((s, r) => s + r.duration_ms, 0) / rows.length : 0,
 				median_duration_ms: median(rows.map((r) => r.duration_ms)),
 				avg_agent_count: rows.length > 0 ? rows.reduce((s, r) => s + r.agent_count, 0) / rows.length : 0,
@@ -249,11 +376,54 @@ const computeDailyUsage = (byDate: ReadonlyMap<string, readonly AnalyticsSummary
 			}
 		})
 
-const computeUsageTotals = (rows: readonly AnalyticsSummaryRow[]): UsageTotals => {
+/** Derived paid-vs-value-vs-ROI numbers for a window (see plan.md formulas). */
+export interface DerivedTotals {
+	readonly value_usd: number
+	readonly paid_usd: number
+	readonly roi: number
+	readonly measured_cost_usd: number
+	readonly measured_fraction: number
+}
+
+/**
+ * Pure derived-totals math (plan.md, AC4/AC5):
+ *   value_usd         = Σ cost_usd
+ *   measured_fraction = measured_cost_usd / value_usd   (0 if value 0)
+ *   paid_usd          = plan==="api" ? value_usd : PLAN_MONTHLY_USD[plan] * (D / 30)
+ *   roi               = plan==="api" ? 1 : (paid_usd>0 ? value_usd / paid_usd : 0)
+ */
+export const computeDerivedTotals = (
+	valueUsd: number,
+	measuredCostUsd: number,
+	plan: SubscriptionPlan,
+	windowDayCount: number,
+): DerivedTotals => {
+	const paidUsd = plan === "api" ? valueUsd : PLAN_MONTHLY_USD[plan] * (windowDayCount / 30)
+	const roi = plan === "api" ? 1 : paidUsd > 0 ? valueUsd / paidUsd : 0
+	return {
+		value_usd: valueUsd,
+		paid_usd: paidUsd,
+		roi,
+		measured_cost_usd: measuredCostUsd,
+		measured_fraction: valueUsd > 0 ? measuredCostUsd / valueUsd : 0,
+	}
+}
+
+const computeUsageTotals = (
+	rows: readonly AnalyticsSummaryRow[],
+	plan: SubscriptionPlan,
+	windowDayCount: number,
+): UsageTotals => {
+	const valueUsd = rows.reduce((s, r) => s + r.cost_usd, 0)
+	const derived = computeDerivedTotals(valueUsd, sumMeasuredCost(rows), plan, windowDayCount)
+
 	if (rows.length === 0) {
 		return {
-			sessions: 0, cost_usd: 0, input_tokens: 0, output_tokens: 0,
-			cache_read_tokens: 0, cache_creation_tokens: 0, cache_hit_rate: 0,
+			sessions: 0, cost_usd: 0, value_usd: derived.value_usd, paid_usd: derived.paid_usd,
+			roi: derived.roi, measured_cost_usd: derived.measured_cost_usd,
+			measured_fraction: derived.measured_fraction,
+			input_tokens: 0, output_tokens: 0,
+			cache_read_tokens: 0, cache_creation_tokens: 0, cache_hit_rate: null,
 			avg_duration_ms: 0, median_duration_ms: 0, avg_agents_per_session: 0,
 			total_tool_calls: 0, total_failures: 0, failure_rate: 0, sessions_with_cost: 0,
 		}
@@ -261,18 +431,22 @@ const computeUsageTotals = (rows: readonly AnalyticsSummaryRow[]): UsageTotals =
 
 	const totalInput = rows.reduce((s, r) => s + r.input_tokens, 0)
 	const totalCacheRead = rows.reduce((s, r) => s + r.cache_read_tokens, 0)
-	const cacheHitDenom = totalInput + totalCacheRead
 	const totalToolCalls = rows.reduce((s, r) => s + r.tool_call_count, 0)
 	const totalFailures = rows.reduce((s, r) => s + r.failure_count, 0)
 
 	return {
 		sessions: rows.length,
-		cost_usd: rows.reduce((s, r) => s + r.cost_usd, 0),
+		cost_usd: valueUsd,
+		value_usd: derived.value_usd,
+		paid_usd: derived.paid_usd,
+		roi: derived.roi,
+		measured_cost_usd: derived.measured_cost_usd,
+		measured_fraction: derived.measured_fraction,
 		input_tokens: totalInput,
 		output_tokens: rows.reduce((s, r) => s + r.output_tokens, 0),
 		cache_read_tokens: totalCacheRead,
 		cache_creation_tokens: rows.reduce((s, r) => s + r.cache_creation_tokens, 0),
-		cache_hit_rate: cacheHitDenom > 0 ? totalCacheRead / cacheHitDenom : 0,
+		cache_hit_rate: cacheHitRate(totalInput, totalCacheRead),
 		avg_duration_ms: rows.reduce((s, r) => s + r.duration_ms, 0) / rows.length,
 		median_duration_ms: median(rows.map((r) => r.duration_ms)),
 		avg_agents_per_session: rows.reduce((s, r) => s + r.agent_count, 0) / rows.length,
@@ -352,14 +526,19 @@ const computeUsageMetrics = (
 	rows: readonly AnalyticsSummaryRow[],
 	range: Range,
 	rawStartTimes: readonly number[],
+	plan: SubscriptionPlan,
+	window: CustomWindow | undefined,
 ): UsageResponse => {
-	const { current, previous } = filterByRange(rows, range)
+	const { current, previous } = window ? splitByCustomWindow(rows, window) : filterByRange(rows, range)
 	const byDate = groupByDate(current)
+	// paid_usd scales with the window's inclusive day-span (D). The previous window is
+	// equal-length by construction, so it reuses the same D.
+	const dayCount = windowDays(range, window, current)
 	return {
-		population: computePopulation(rawStartTimes, current, range),
+		population: computePopulation(rawStartTimes, current, range, window),
 		daily: computeDailyUsage(byDate),
-		totals: computeUsageTotals(current),
-		previous_totals: computeUsageTotals(previous),
+		totals: computeUsageTotals(current, plan, dayCount),
+		previous_totals: computeUsageTotals(previous, plan, dayCount),
 		by_model: computeModelBreakdown(current),
 		by_agent_type: computeAgentTypeBreakdown(current),
 	}
@@ -541,8 +720,9 @@ const computeInsightsMetrics = (
 	rows: readonly AnalyticsSummaryRow[],
 	range: Range,
 	rawStartTimes: readonly number[],
+	window: CustomWindow | undefined,
 ): InsightsResponse => {
-	const { current, previous } = filterByRange(rows, range)
+	const { current, previous } = window ? splitByCustomWindow(rows, window) : filterByRange(rows, range)
 	const byDate = groupByDate(current)
 
 	const planDriftPoints: readonly PlanDriftPoint[] = current
@@ -582,7 +762,7 @@ const computeInsightsMetrics = (
 		.slice(0, 10)
 
 	return {
-		population: computePopulation(rawStartTimes, current, range),
+		population: computePopulation(rawStartTimes, current, range, window),
 		daily: computeDailyInsights(byDate),
 		totals: computeInsightsTotals(current),
 		previous_totals: computeInsightsTotals(previous),
@@ -680,22 +860,48 @@ const loadRawStartTimes = (projectDir: string): readonly number[] => {
 	return starts
 }
 
+/**
+ * Read the subscription plan from a project's `.clens/config.json` (server-side —
+ * never a query param). Honors the new `plan` field and falls back to mapping the
+ * legacy `pricing` tier; defaults to max20x when no config exists. Not cached: the
+ * file is tiny and a stale plan would silently misreport paid_usd/roi after a
+ * Settings change.
+ */
+const loadPlan = (projectDir: string): SubscriptionPlan => {
+	const configPath = `${projectDir}/.clens/config.json`
+	if (!existsSync(configPath)) return resolvePlan({})
+	try {
+		const raw: unknown = JSON.parse(readFileSync(configPath, "utf-8"))
+		if (typeof raw !== "object" || raw === null) return resolvePlan({})
+		const obj: Readonly<Record<string, unknown>> = raw as Readonly<Record<string, unknown>>
+		return resolvePlan({ plan: obj.plan, pricing: obj.pricing })
+	} catch {
+		return resolvePlan({})
+	}
+}
+
+/** Parse the optional inline-brush custom window from the request query. */
+const windowFromQuery = (c: { req: { query: (k: string) => string | undefined } }): CustomWindow | undefined =>
+	parseCustomWindow(c.req.query("from"), c.req.query("to"))
+
 export const createAnalyticsRoute = (projectDir: string) => {
 	const app = new Hono()
 
 	app.get("/usage", (c) => {
 		const range = parseRange(c.req.query("range"))
-		log.info(`GET /api/analytics/usage range=${range}`)
+		const window = windowFromQuery(c)
+		log.info(`GET /api/analytics/usage range=${range}${window ? ` window=${window.from}..${window.to}` : ""}`)
 		const rows = loadRows(projectDir)
-		const data = computeUsageMetrics(rows, range, loadRawStartTimes(projectDir))
+		const data = computeUsageMetrics(rows, range, loadRawStartTimes(projectDir), loadPlan(projectDir), window)
 		return c.json({ data })
 	})
 
 	app.get("/insights", (c) => {
 		const range = parseRange(c.req.query("range"))
-		log.info(`GET /api/analytics/insights range=${range}`)
+		const window = windowFromQuery(c)
+		log.info(`GET /api/analytics/insights range=${range}${window ? ` window=${window.from}..${window.to}` : ""}`)
 		const rows = loadRows(projectDir)
-		const data = computeInsightsMetrics(rows, range, loadRawStartTimes(projectDir))
+		const data = computeInsightsMetrics(rows, range, loadRawStartTimes(projectDir), window)
 		return c.json({ data })
 	})
 
@@ -766,21 +972,30 @@ export const createGlobalAnalyticsRoute = (projects: readonly ProjectEntry[], fa
 	const loadAllRawStartTimes = (projectFilter?: string): readonly number[] =>
 		effectiveDirsFor(projectFilter).flatMap((dir) => loadRawStartTimes(dir))
 
+	// Plan is project-config-scoped. For a filtered project read that project's config;
+	// for the unfiltered/global view fall back to the active project's config (fallbackDir).
+	const planFor = (projectFilter?: string): SubscriptionPlan => {
+		const match = projectFilter ? projects.find((p) => p.id === projectFilter) : undefined
+		return loadPlan(match ? match.path : fallbackDir)
+	}
+
 	app.get("/usage", (c) => {
 		const range = parseRange(c.req.query("range"))
 		const project = c.req.query("project")
-		log.info(`GET /api/analytics/usage range=${range} project=${project ?? "all"}`)
+		const window = windowFromQuery(c)
+		log.info(`GET /api/analytics/usage range=${range} project=${project ?? "all"}${window ? ` window=${window.from}..${window.to}` : ""}`)
 		const rows = loadAllRows(project)
-		const data = computeUsageMetrics(rows, range, loadAllRawStartTimes(project))
+		const data = computeUsageMetrics(rows, range, loadAllRawStartTimes(project), planFor(project), window)
 		return c.json({ data })
 	})
 
 	app.get("/insights", (c) => {
 		const range = parseRange(c.req.query("range"))
 		const project = c.req.query("project")
-		log.info(`GET /api/analytics/insights range=${range} project=${project ?? "all"}`)
+		const window = windowFromQuery(c)
+		log.info(`GET /api/analytics/insights range=${range} project=${project ?? "all"}${window ? ` window=${window.from}..${window.to}` : ""}`)
 		const rows = loadAllRows(project)
-		const data = computeInsightsMetrics(rows, range, loadAllRawStartTimes(project))
+		const data = computeInsightsMetrics(rows, range, loadAllRawStartTimes(project), window)
 		return c.json({ data })
 	})
 

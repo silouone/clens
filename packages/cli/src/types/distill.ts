@@ -195,6 +195,15 @@ export interface TimelineEntry {
 	readonly msg_to?: string;
 }
 
+/**
+ * How `estimated_cost_usd` was derived (cost-truth tiers; see analytics-truth spec):
+ * - "measured"  — taken verbatim from a captured `total_cost_usd`/`costUSD` (>0).
+ * - "estimated" — computed from real token counts × API price table.
+ * - "heuristic" — computed from event/tool-call magic numbers (no real tokens).
+ */
+export const COST_BASES = ["measured", "estimated", "heuristic"] as const;
+export type CostBasis = (typeof COST_BASES)[number];
+
 export interface CostEstimate {
 	readonly model: string;
 	readonly estimated_input_tokens: number;
@@ -204,6 +213,12 @@ export interface CostEstimate {
 	readonly cache_creation_tokens?: number;
 	readonly is_estimated: boolean;
 	readonly pricing_tier?: string;
+	/**
+	 * Provenance of `estimated_cost_usd`. Optional because CostEstimate values
+	 * persisted before the cost-truth work lack it; readers derive a fallback
+	 * (measured-absent ⇒ estimated/heuristic from `is_estimated`).
+	 */
+	readonly cost_basis?: CostBasis;
 }
 
 export interface TokenUsage {
@@ -606,6 +621,13 @@ export interface DistilledSession {
 export interface GlobalSessionSummary extends SessionSummary {
 	readonly project_id: string;
 	readonly project_name: string;
+	/**
+	 * Directory containing the `.clens/sessions/<id>.jsonl` that owns this session.
+	 * Equals `project.path` in project mode; the nested capture dir in repository
+	 * mode (where a session may live below the git root, e.g. `gitRoot/packages/web`).
+	 * Used to route per-session distill to the correct (possibly nested) capture dir.
+	 */
+	readonly capture_dir: string;
 }
 
 export interface GlobalWorkUnit extends WorkUnit {
@@ -660,7 +682,18 @@ export interface AnalyticsSummaryRow {
 	readonly date: string; // "2026-03-15" (LOCAL calendar day; see B18)
 	readonly duration_ms: number;
 	readonly model?: string;
+	/** API-equivalent value at full list price (never multiplied by subscription factor). */
 	readonly cost_usd: number;
+	/**
+	 * How `cost_usd` was derived. Optional because rows persisted before the cost-truth
+	 * work lack it; readers default to deriving from `is_estimated`.
+	 */
+	readonly cost_basis?: CostBasis;
+	/**
+	 * Portion of `cost_usd` that is genuinely measured (cost_basis === "measured" ⇒
+	 * equals cost_usd; otherwise 0). Optional for the same back-compat reason.
+	 */
+	readonly measured_cost_usd?: number;
 	readonly input_tokens: number;
 	readonly output_tokens: number;
 	readonly cache_read_tokens: number;

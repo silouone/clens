@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	globalConfigPath,
 	registerProject,
 	unregisterProject,
+	writeGlobalConfig,
 } from "../src/session/registry";
 import {
 	listGlobalSessions,
@@ -121,6 +123,15 @@ describe("global-read", () => {
 			expect(session?.start_time).toBe(1000);
 			expect(session?.status).toBe("complete");
 		});
+
+		test("attaches capture_dir pointing at the owning dir", () => {
+			const sessions = listGlobalSessions();
+			const alphaSession = sessions.find((s) => s.session_id === SESSION_A1);
+			expect(alphaSession?.capture_dir).toBe(projectA);
+
+			const betaSession = sessions.find((s) => s.session_id === SESSION_B1);
+			expect(betaSession?.capture_dir).toBe(projectB);
+		});
 	});
 
 	describe("listGlobalWorkUnits", () => {
@@ -185,5 +196,82 @@ describe("global-read", () => {
 			const result = resolveProjectForSession("nonexistent-session-id-12345");
 			expect(result).toBeUndefined();
 		});
+	});
+});
+
+const SESSION_PROJ = "cccccccc-1111-1111-1111-111111111111";
+const SESSION_NESTED = "dddddddd-1111-1111-1111-111111111111";
+
+describe("global-read capture_dir routing", () => {
+	let tempDir: string;
+	let projModeDir: string;
+	let gitRootDir: string;
+	let nestedCaptureDir: string;
+	let savedConfig: string | undefined;
+
+	beforeEach(() => {
+		// Preserve the real global config so the mode override is non-destructive.
+		const cfgPath = globalConfigPath();
+		savedConfig = existsSync(cfgPath) ? readFileSync(cfgPath, "utf-8") : undefined;
+
+		tempDir = join(
+			tmpdir(),
+			`clens-test-capdir-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
+
+		// Project-mode source: `.clens/sessions/` directly at the registered path.
+		projModeDir = join(tempDir, "proj-mode");
+		mkdirSync(join(projModeDir, ".clens", "sessions"), { recursive: true });
+		writeFileSync(
+			join(projModeDir, ".clens", "sessions", `${SESSION_PROJ}.jsonl`),
+			[
+				makeEvent("SessionStart", 1000, { source: "cli" }, SESSION_PROJ),
+				makeEvent("SessionEnd", 2000, { reason: "done" }, SESSION_PROJ),
+			].join("\n") + "\n",
+		);
+
+		// Repository-mode source: `.clens/sessions/` nested below the git root.
+		gitRootDir = join(tempDir, "repo-root");
+		nestedCaptureDir = join(gitRootDir, "packages", "x");
+		mkdirSync(join(nestedCaptureDir, ".clens", "sessions"), { recursive: true });
+		writeFileSync(
+			join(nestedCaptureDir, ".clens", "sessions", `${SESSION_NESTED}.jsonl`),
+			[
+				makeEvent("SessionStart", 3000, { source: "cli" }, SESSION_NESTED),
+				makeEvent("SessionEnd", 4000, { reason: "done" }, SESSION_NESTED),
+			].join("\n") + "\n",
+		);
+	});
+
+	afterEach(() => {
+		unregisterProject(projModeDir);
+		unregisterProject(gitRootDir);
+		// Restore original global config.
+		const cfgPath = globalConfigPath();
+		if (savedConfig === undefined) {
+			rmSync(cfgPath, { force: true });
+		} else {
+			writeFileSync(cfgPath, savedConfig);
+		}
+		rmSync(tempDir, { recursive: true, force: true });
+	});
+
+	test("project mode: capture_dir equals project.path", () => {
+		writeGlobalConfig({ global_mode: "project" });
+		registerProject(projModeDir);
+
+		const session = listGlobalSessions().find((s) => s.session_id === SESSION_PROJ);
+		expect(session).toBeDefined();
+		expect(session?.capture_dir).toBe(projModeDir);
+	});
+
+	test("repository mode: capture_dir is the nested capture dir, not the git root", () => {
+		writeGlobalConfig({ global_mode: "repository" });
+		registerProject(gitRootDir);
+
+		const session = listGlobalSessions().find((s) => s.session_id === SESSION_NESTED);
+		expect(session).toBeDefined();
+		expect(session?.capture_dir).toBe(nestedCaptureDir);
+		expect(session?.capture_dir).not.toBe(gitRootDir);
 	});
 });

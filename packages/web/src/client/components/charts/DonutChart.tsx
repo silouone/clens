@@ -19,18 +19,32 @@ interface DonutChartProps extends BaseChartProps {
 	readonly centerValue?: string;
 }
 
-const describeArc = (
-	cx: number, cy: number, r: number,
-	startAngle: number, endAngle: number,
+/** Polar point on a circle, with 0° at 12 o'clock (SVG y grows downward). */
+const polar = (cx: number, cy: number, r: number, angleDeg: number): readonly [number, number] => {
+	const rad = (angleDeg - 90) * (Math.PI / 180);
+	return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+};
+
+/**
+ * Build a closed donut-segment (ring sector) path between two radii.
+ * The outer arc is swept clockwise (flag 1) and the inner arc back
+ * counter-clockwise (flag 0); BOTH use the same large-arc flag derived from the
+ * sweep. The previous implementation hard-coded sweep flag 1 on both arcs and
+ * recomputed large-arc from a negated angle delta (always 0), so any slice
+ * wider than 180° drew its inner edge the short way round — producing the
+ * lens/overlap artifact. This is the geometrically correct version.
+ */
+const donutSegment = (
+	cx: number, cy: number, outerR: number, innerR: number,
+	startAngle: number, sweep: number,
 ): string => {
-	const startRad = (startAngle - 90) * (Math.PI / 180);
-	const endRad = (endAngle - 90) * (Math.PI / 180);
-	const x1 = cx + r * Math.cos(startRad);
-	const y1 = cy + r * Math.sin(startRad);
-	const x2 = cx + r * Math.cos(endRad);
-	const y2 = cy + r * Math.sin(endRad);
-	const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-	return `M${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2}`;
+	const endAngle = startAngle + sweep;
+	const largeArc = sweep > 180 ? 1 : 0;
+	const [ox0, oy0] = polar(cx, cy, outerR, startAngle);
+	const [ox1, oy1] = polar(cx, cy, outerR, endAngle);
+	const [ix1, iy1] = polar(cx, cy, innerR, endAngle);
+	const [ix0, iy0] = polar(cx, cy, innerR, startAngle);
+	return `M${ox0},${oy0} A${outerR},${outerR} 0 ${largeArc} 1 ${ox1},${oy1} L${ix1},${iy1} A${innerR},${innerR} 0 ${largeArc} 0 ${ix0},${iy0} Z`;
 };
 
 export const DonutChart: Component<DonutChartProps> = (props) => {
@@ -49,20 +63,17 @@ export const DonutChart: Component<DonutChartProps> = (props) => {
 		let currentAngle = 0;
 		return props.segments.map((seg) => {
 			const pct = seg.value / t;
-			const sweep = pct * 360;
+			// Clamp just below a full turn so a lone 100% slice still renders as a
+			// ring (a true 360° arc collapses to a zero-length path in SVG).
+			const sweep = Math.min(pct * 360, 359.999);
 			const startAngle = currentAngle;
 			const endAngle = currentAngle + sweep;
 			currentAngle = endAngle;
 
-			// For full circle, we need two arcs
-			const sweepClamped = Math.min(sweep, 359.99);
-			const path = describeArc(cx(), cy(), outerR(), startAngle, startAngle + sweepClamped);
-			const innerPath = describeArc(cx(), cy(), innerR(), startAngle + sweepClamped, startAngle);
-
 			return {
 				...seg,
 				pct,
-				d: `${path} L${cx() + innerR() * Math.cos((startAngle + sweepClamped - 90) * Math.PI / 180)},${cy() + innerR() * Math.sin((startAngle + sweepClamped - 90) * Math.PI / 180)} ${innerPath} Z`,
+				d: donutSegment(cx(), cy(), outerR(), innerR(), startAngle, sweep),
 				startAngle,
 				endAngle,
 			};

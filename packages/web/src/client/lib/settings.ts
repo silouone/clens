@@ -1,5 +1,5 @@
 import { createResource, createSignal } from "solid-js";
-import type { ClensConfig } from "../../shared/types";
+import { isSubscriptionPlan, type WebClensConfig } from "../../shared/types";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -114,17 +114,18 @@ const getTokenHeader = (): Record<string, string> => {
 
 // ── Config validation ───────────────────────────────────────────────
 
-const VALID_PRICING_TIERS: readonly string[] = ["api", "max", "auto"] as const;
+/** Read a legacy `pricing` tier value if present (kept only for back-compat surfacing). */
+const readLegacyPricing = (value: unknown): WebClensConfig["pricing"] =>
+	value === "api" || value === "max" || value === "auto" ? value : undefined;
 
-/** Validate and extract a ClensConfig from an unknown API response payload. */
-const validateConfig = (raw: unknown): ClensConfig | undefined => {
+/** Validate and extract a WebClensConfig from an unknown API response payload. */
+const validateConfig = (raw: unknown): WebClensConfig | undefined => {
 	if (!raw || typeof raw !== "object") return undefined;
 	const obj = raw as Record<string, unknown>;
 	const capture = typeof obj.capture === "boolean" ? obj.capture : true;
-	const pricing = typeof obj.pricing === "string" && VALID_PRICING_TIERS.includes(obj.pricing)
-		? (obj.pricing as ClensConfig["pricing"])
-		: undefined;
-	return { capture, ...(pricing ? { pricing } : {}) };
+	const plan = isSubscriptionPlan(obj.plan) ? obj.plan : undefined;
+	const pricing = readLegacyPricing(obj.pricing);
+	return { capture, ...(plan ? { plan } : {}), ...(pricing ? { pricing } : {}) };
 };
 
 /** Unwrap API response body — handles both `{ data: ... }` and direct payloads. */
@@ -136,7 +137,7 @@ const unwrapResponseData = (body: unknown): unknown => {
 
 // ── Project config resource ─────────────────────────────────────────
 
-const fetchProjectConfig = async (): Promise<ClensConfig | undefined> => {
+const fetchProjectConfig = async (): Promise<WebClensConfig | undefined> => {
 	console.debug(LOG_PREFIX, "Fetching project config");
 	try {
 		const res = await fetch("/api/config", {
@@ -162,7 +163,7 @@ const [projectConfig, { refetch: refetchProjectConfig }] =
 	createResource(fetchProjectConfig);
 
 /** Save updated project config via PUT /api/config. */
-const saveProjectConfig = async (config: ClensConfig): Promise<ClensConfig | undefined> => {
+const saveProjectConfig = async (config: WebClensConfig): Promise<WebClensConfig | undefined> => {
 	console.debug(LOG_PREFIX, "Saving project config");
 	try {
 		const res = await fetch("/api/config", {

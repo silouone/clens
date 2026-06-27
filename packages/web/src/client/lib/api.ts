@@ -1,5 +1,6 @@
 import { hc } from "hono/client";
 import type { AppType } from "../../server/app";
+import type { ColorName, SessionSummary } from "../../shared/types";
 
 // ── Token extraction ────────────────────────────────────────────────
 
@@ -46,4 +47,51 @@ const authHeaders = (): Readonly<Record<string, string>> => {
 	return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-export { api, getToken, authHeaders, createApiClient };
+// ── Session meta (rename + color flag) ──────────────────────────────
+
+/**
+ * Patch a session's user metadata (custom label + color flag).
+ *
+ * Body semantics mirror the server (D6): `label: string` sets, `label: null`
+ * clears (whitespace-only is treated as a clear server-side); `color: ColorName`
+ * sets, `color: null`/`"none"` clears. Only the keys present in `patch` are sent,
+ * so a label-only patch never touches color and vice-versa.
+ *
+ * Returns the server-resolved `SessionSummary` row (authoritative
+ * display_name/name_source/label/color) so the caller can reconcile an
+ * optimistic update against the real precedence outcome.
+ */
+type SessionMetaPatch = {
+	readonly label?: string | null;
+	readonly color?: ColorName | null;
+};
+
+const patchSessionMeta = async (
+	id: string,
+	patch: SessionMetaPatch,
+): Promise<SessionSummary> => {
+	// Raw fetch (not the typed client): the route reads an untyped JSON body via
+	// c.req.json(), so Hono RPC doesn't surface a `json` arg. Carry the auth token
+	// explicitly — /api PATCH returns 401 without it in production.
+	const res = await fetch(`/api/sessions/${id}/meta`, {
+		method: "PATCH",
+		headers: { ...authHeaders(), "Content-Type": "application/json" },
+		body: JSON.stringify(patch),
+	});
+	if (!res.ok) {
+		const body = await res.json().catch(() => ({ error: "Unknown error" }));
+		const msg =
+			body && typeof body === "object" && "error" in body
+				? String((body as { error: unknown }).error)
+				: `HTTP ${res.status}`;
+		throw new Error(msg);
+	}
+	const body = await res.json();
+	if (!body || typeof body !== "object" || !("data" in body)) {
+		throw new Error("Invalid meta response");
+	}
+	return (body as { data: SessionSummary }).data;
+};
+
+export { api, getToken, authHeaders, createApiClient, patchSessionMeta };
+export type { SessionMetaPatch };

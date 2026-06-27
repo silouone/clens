@@ -14,10 +14,10 @@ const TabBadge: Component<{
 }> = (props) => (
 	<Show when={props.count > 0}>
 		<span
-			class="rounded-full px-1.5 py-0.5 text-[11px] font-medium"
+			class="rounded-none border px-1 py-0 text-[10px] font-mono tabular-nums"
 			classList={{
-				"bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400": props.variant === "warning",
-				"bg-surface-muted text-muted": props.variant !== "warning",
+				"border-clens bg-surface-raised text-[var(--clens-warning)]": props.variant === "warning",
+				"border-clens bg-surface-inset text-muted": props.variant !== "warning",
 			}}
 		>
 			{props.count}
@@ -30,7 +30,7 @@ export const TabButton: Component<TabButtonProps> = (props) => (
 		role="tab"
 		aria-selected={props.active}
 		onClick={props.onClick}
-		class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors rounded-md"
+		class="flex items-center gap-1.5 rounded-none px-3 py-1.5 text-xs font-medium transition-colors focus-ring"
 		classList={{
 			"bg-surface-muted text-primary": props.active,
 			"text-muted hover:text-secondary hover:bg-surface-hover": !props.active,

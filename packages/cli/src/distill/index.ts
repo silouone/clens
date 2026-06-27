@@ -234,6 +234,12 @@ export const distill = async (
 	const configTier = options?.pricingTier ?? readClensConfig(projectDir)?.pricing ?? "api";
 	const resolvedTier = resolvePricingTier(configTier, transcriptData.user_type);
 
+	// Stored per-session cost is ALWAYS the API-equivalent value at full list price
+	// (analytics-truth invariant): a subscription is applied as a flat monthly fee in the
+	// web paid/ROI layer, never as a per-token multiplier. resolvedTier is kept only for the
+	// pricing_tier provenance stamp / staleness check — never for cost computation.
+	const costTier: PricingTier = "api";
+
 	// Layer 0: Link reading (needed early for decisions enrichment)
 	const links = readLinks(projectDir);
 	const sessionLinks = filterLinksForSession(sessionId, links);
@@ -247,7 +253,7 @@ export const distill = async (
 	const nameMap = effectiveSessionLinks.length > 0 ? buildNameMap(effectiveSessionLinks) : undefined;
 
 	// Layer 1: Hook-based extractors (stats receives reasoning + transcript token usage for cost)
-	const stats = extractStats(events, reasoning, token_usage, resolvedTier);
+	const stats = extractStats(events, reasoning, token_usage, costTier);
 	const feature_usage = extractFeatureUsage(events);
 	const backtracks = extractBacktracks(events);
 	const decisions = extractDecisions(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
@@ -329,7 +335,7 @@ export const distill = async (
 	const diffContext: DiffContext = { projectDir, parentEvents: events };
 	const rawAgents =
 		effectiveSessionLinks.length > 0
-			? buildAgentTree(sessionId, effectiveSessionLinks, events, readTranscript, readAgentEvents, diffContext, resolvedTier)
+			? buildAgentTree(sessionId, effectiveSessionLinks, events, readTranscript, readAgentEvents, diffContext, costTier)
 			: undefined;
 
 	// Merge spawn-based tree with comm-inferred agents (team teammates not captured by spawn links)
@@ -341,7 +347,7 @@ export const distill = async (
 		readAgentEvents,
 		readTranscriptFn: readTranscript,
 		diffContext,
-		tier: resolvedTier,
+		tier: costTier,
 	});
 
 	// Build effective nameMap that includes inferred agent names for downstream extractors
@@ -396,7 +402,7 @@ export const distill = async (
 								token_usage.output_tokens,
 								token_usage.cache_read_tokens,
 								token_usage.cache_creation_tokens,
-								resolvedTier,
+								costTier,
 							)
 						: stats.cost_estimate;
 					return {

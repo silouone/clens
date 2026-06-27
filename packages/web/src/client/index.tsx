@@ -7,6 +7,7 @@ import { SessionList } from "./pages/SessionList";
 import { SessionDetail } from "./pages/SessionDetail";
 import { WorkUnitDetail } from "./pages/WorkUnitDetail";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SHOW_WORK_UNITS } from "./lib/feature-flags";
 import { UsagePage } from "./pages/UsagePage";
 import { InsightsPage } from "./pages/InsightsPage";
 import "@fontsource-variable/ibm-plex-sans";
@@ -33,6 +34,16 @@ const AgentRedirect: Component = () => {
 	return null;
 };
 
+// Work Units is feature-flagged off (SHOW_WORK_UNITS). When hidden, the
+// /work-unit/:id route falls back to a redirect home so the feature is
+// unreachable by direct URL. The WorkUnitDetail page stays imported and intact —
+// flipping SHOW_WORK_UNITS to true restores the original route component.
+const WorkUnitRoute = SHOW_WORK_UNITS ? WorkUnitDetail : (() => {
+	const navigate = useNavigate();
+	onMount(() => navigate("/", { replace: true }));
+	return null;
+}) as Component;
+
 // ── Root ─────────────────────────────────────────────────────────────
 
 const root = document.getElementById("root");
@@ -46,7 +57,7 @@ render(
 		<Router root={App}>
 			<Route path="/" component={SessionList} />
 			<Route path="/session/:id" component={SessionDetail} />
-			<Route path="/work-unit/:id" component={WorkUnitDetail} />
+			<Route path="/work-unit/:id" component={WorkUnitRoute} />
 			<Route path="/usage" component={UsagePage} />
 			<Route path="/insights" component={InsightsPage} />
 			<Route path="/settings" component={SettingsPage} />

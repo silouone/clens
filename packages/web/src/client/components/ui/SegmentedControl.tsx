@@ -17,7 +17,7 @@ export const SegmentedControl = <T extends string>(props: SegmentedControlProps<
 		<For each={props.options}>
 			{(opt) => (
 				<button
-					class="instrument-microcaps rounded-none px-2.5 py-1 text-[10px] transition-colors"
+					class="instrument-microcaps rounded-none px-2.5 py-1 text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
 					classList={{
 						"bg-surface-muted text-primary": props.value === opt.value,
 						"text-muted hover:bg-surface-hover hover:text-secondary": props.value !== opt.value,

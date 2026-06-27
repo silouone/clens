@@ -47,6 +47,14 @@ html {
 	--clens-live: #0A8754;
 	--clens-grain: rgba(26, 28, 27, 0.015);
 	--app-header-height: 37px;
+	/* Session color flags — muted instrument hues (not raw rainbow). Light mode:
+	   deepened so swatches read on paper-white. `none` has no token (transparent). */
+	--clens-flag-red: #B4453A;
+	--clens-flag-amber: #9A6700;
+	--clens-flag-green: #0A8754;
+	--clens-flag-blue: #2C5E8A;
+	--clens-flag-violet: #6B4A9A;
+	--clens-flag-gray: #7A7E7B;
 }
 
 .dark {
@@ -79,6 +87,14 @@ html {
 	--clens-tick: #232826;
 	--clens-live: #33FF99;
 	--clens-grain: rgba(200, 209, 204, 0.012);
+	/* Session color flags — muted phosphor-adjacent hues for instrument black.
+	   Desaturated so a flagged row pops without breaking the restrained palette. */
+	--clens-flag-red: #FF6B5E;
+	--clens-flag-amber: #FFB000;
+	--clens-flag-green: #33FF99;
+	--clens-flag-blue: #5EA8E0;
+	--clens-flag-violet: #B08AE0;
+	--clens-flag-gray: #8A948F;
 }
 
 body {
@@ -152,7 +168,8 @@ body {
 /* ── Focus ring utility ──────────────────────────────────────────── */
 
 .focus-ring {
-	@apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900;
+	@apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
+	--tw-ring-offset-color: var(--clens-surface);
 }
 
 /* ── diff2html overrides ───────────────────────────────────────── */

@@ -1,20 +1,34 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
-import { ArrowUp, ArrowDown, ChevronRight, Users, Layers } from "lucide-solid";
+import { ArrowUp, ArrowDown, ChevronRight, Users, Layers, Pencil, Flag } from "lucide-solid";
 import { FeatureBadges } from "../components/FeatureBadges";
 import { createEffect, createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { useKeyboard } from "../lib/keyboard";
-import { sessionList, refetchSessions, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
-import type { SessionSummary, WorkUnit } from "../../shared/types";
+import { sessionList, refetchSessions, setSessionMeta, globalError, clearError, workUnitList, refetchWorkUnits } from "../lib/stores";
+import type { ColorName, SessionSummary, WorkUnit } from "../../shared/types";
 import { formatDuration, formatDate } from "../lib/format";
 import { preferences } from "../lib/settings";
+import { SHOW_WORK_UNITS } from "../lib/feature-flags";
 
 import { StatusBadge } from "../components/ui/StatusBadge";
+import { ColorFlag } from "../components/ui/ColorFlag";
 import { WorkUnitCard } from "../components/WorkUnitCard";
 import { FilterBar } from "../components/FilterBar";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
 import { ProjectBadge } from "../components/ProjectFilter";
 import { isGlobalMode, selectedProjectId, setSelectedProjectId, projectList } from "../lib/project-store";
 
+
+// ── Naming / color-flag accessors ───────────────────────────────────
+
+/** Resolved display name for a row, falling back through the API precedence. */
+const displayName = (s: SessionSummary): string =>
+	s.display_name ?? s.session_name ?? s.session_id.slice(0, 8);
+
+/** The row's color flag, normalized to a ColorName ("none" when unflagged). */
+const flagColor = (s: SessionSummary): ColorName => s.color ?? "none";
+
+/** A session is flagged when it carries a non-"none" color. */
+const isFlagged = (s: SessionSummary): boolean => flagColor(s) !== "none";
 
 const formatSize = (bytes: number): string => {
 	if (bytes < 1024) return `${bytes} B`;
@@ -53,13 +67,17 @@ const LoadingSkeleton: Component = () => (
 
 const EmptyState: Component = () => (
 	<tr>
-		<td colspan="9" class="px-4 py-12 text-center text-muted">
-			<div class="flex flex-col items-center gap-2">
+		<td colspan="9" class="px-4 py-14 text-center text-muted">
+			<div class="flex flex-col items-center gap-3">
 				<TelescopeIllustration class="h-12 w-12 text-muted" />
-				<p class="instrument-microcaps text-sm text-secondary">No sessions found</p>
-				<p class="text-xs">
+				<p class="instrument-microcaps text-sm tracking-[0.14em] text-secondary">No sessions found</p>
+				<p class="max-w-xs text-xs leading-relaxed">
 					Run a Claude Code session with cLens hooks to capture data.
 				</p>
+				<div class="mt-1 inline-flex items-center gap-2 border border-clens bg-surface-inset px-2 py-1">
+					<span class="instrument-led bg-surface-muted" />
+					<span class="instrument-microcaps text-[10px] text-muted">awaiting signal</span>
+				</div>
 			</div>
 		</td>
 	</tr>
@@ -155,9 +173,9 @@ const buildSortComparator = (sort: { readonly field: SortField; readonly dir: So
 			return (aVal - bVal) * multiplier;
 		}
 
-		// String sort (session_name)
-		const aName = a.session_name ?? a.session_id;
-		const bName = b.session_name ?? b.session_id;
+		// String sort (display name)
+		const aName = displayName(a);
+		const bName = displayName(b);
 		return aName.localeCompare(bName) * multiplier;
 	};
 
@@ -246,6 +264,112 @@ export const buildCountLabel = (shown: number, total: number): string => {
 	return shown < total ? `of ${total} ${noun}` : noun;
 };
 
+// ── Inline rename + color controls (NAME cell) ──────────────────────
+
+/**
+ * NAME cell for a session row. Shows `display_name` as the primary line with the
+ * short id as a secondary (R17). A pencil affordance (visible on row hover)
+ * switches the name into an inline input: Enter saves, Esc cancels, and a blank /
+ * whitespace-only value clears the custom label (R6/R7/R8 — the server reverts to
+ * the next precedence source). A per-row color dot + swatch picker sets/clears the
+ * flag (R10/R13). All controls stopPropagation so they never trigger row navigation.
+ */
+const SessionRowName: Component<{ readonly session: SessionSummary }> = (props) => {
+	const [editing, setEditing] = createSignal(false);
+	const [draft, setDraft] = createSignal("");
+	let inputRef: HTMLInputElement | undefined;
+
+	const beginEdit = () => {
+		// Seed with the current custom label only (not the computed name) so saving
+		// an untouched field is a no-op rather than freezing a computed name as a label.
+		setDraft(props.session.label ?? "");
+		setEditing(true);
+		queueMicrotask(() => inputRef?.focus());
+	};
+
+	const commit = () => {
+		if (!editing()) return;
+		setEditing(false);
+		const value = draft();
+		const trimmed = value.trim();
+		// Blank/whitespace clears the label (null); otherwise set the trimmed label.
+		// Skip the call when nothing changed versus the stored label.
+		const currentLabel = props.session.label ?? "";
+		if (trimmed === currentLabel.trim()) return;
+		void setSessionMeta(props.session.session_id, { label: trimmed.length > 0 ? trimmed : null });
+	};
+
+	const cancel = () => {
+		setEditing(false);
+		setDraft("");
+	};
+
+	const onColor = (color: ColorName) => {
+		void setSessionMeta(props.session.session_id, { color });
+	};
+
+	return (
+		<div class="flex items-center gap-2">
+			{/* Color flag picker — dot + swatch popover */}
+			<ColorFlag value={flagColor(props.session)} onChange={onColor} />
+
+			<Show
+				when={!editing()}
+				fallback={
+					<input
+						ref={inputRef}
+						type="text"
+						value={draft()}
+						placeholder="Name this session…"
+						onClick={(e) => e.stopPropagation()}
+						onInput={(e) => setDraft(e.currentTarget.value)}
+						onKeyDown={(e: KeyboardEvent) => {
+							e.stopPropagation();
+							if (e.key === "Enter") { e.preventDefault(); commit(); }
+							else if (e.key === "Escape") { e.preventDefault(); cancel(); }
+						}}
+						onBlur={commit}
+						class="w-56 rounded-none border border-brand-500 bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-primary focus:outline-none"
+					/>
+				}
+			>
+				<div class="flex min-w-0 flex-col leading-tight">
+					<div class="flex items-center gap-1.5">
+						<A
+							href={`/session/${props.session.session_id}`}
+							class="truncate font-mono text-secondary hover:text-brand-500 hover:underline"
+							onClick={(e: MouseEvent) => e.stopPropagation()}
+							title={displayName(props.session)}
+						>
+							{displayName(props.session)}
+						</A>
+						<button
+							type="button"
+							onClick={(e) => { e.stopPropagation(); beginEdit(); }}
+							class="rounded-none p-0.5 text-muted opacity-0 transition group-hover:opacity-100 hover:text-brand-500"
+							title="Rename session"
+							aria-label="Rename session"
+						>
+							<Pencil class="h-3 w-3" />
+						</button>
+					</div>
+					{/* Secondary: short id (R17) */}
+					<span class="font-mono text-[10px] tabular-nums text-muted">
+						{props.session.session_id.slice(0, 8)}
+					</span>
+				</div>
+			</Show>
+
+			<Show when={props.session.is_distilled}>
+				<span class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-brand-500" title="Distilled"><span class="instrument-led bg-brand-500" />
+					analyzed
+				</span>
+			</Show>
+			<FeatureBadges features={props.session.features} />
+		</div>
+	);
+};
+
 // ── Main component ──────────────────────────────────────────────────
 
 export const SessionList: Component = () => {
@@ -262,11 +386,15 @@ export const SessionList: Component = () => {
 		lifecycle?: string;
 		link_type?: string;
 		date?: string;
+		flagged?: string;
 	}>();
 
-	// viewMode is derived from URL params (header nav controls it)
+	// viewMode is derived from URL params (header nav controls it).
+	// Work Units is feature-flagged off: when hidden, force "sessions" so the
+	// work-units view, its toggle, and its refetch are all unreachable even via a
+	// direct ?view=work_units URL. The work-unit render blocks below stay intact.
 	const viewMode = (): ViewMode =>
-		isValidViewMode(searchParams.view) ? searchParams.view : "sessions";
+		SHOW_WORK_UNITS && isValidViewMode(searchParams.view) ? searchParams.view : "sessions";
 	const [search, setSearch] = createSignal(searchParams.q ?? "");
 	const [statusFilter, setStatusFilter] = createSignal<StatusFilter>(
 		isValidStatus(searchParams.status) ? searchParams.status : "all",
@@ -279,6 +407,10 @@ export const SessionList: Component = () => {
 	);
 	const [featuresFilter, setFeaturesFilter] = createSignal<FeaturesFilter>(
 		isValidFeatures(searchParams.features) ? searchParams.features : "all",
+	);
+	// Flagged-only filter (R12): narrows the list to sessions with a non-"none" color.
+	const [flaggedFilter, setFlaggedFilter] = createSignal<boolean>(
+		searchParams.flagged === "1",
 	);
 	const [lifecycleFilter, setLifecycleFilter] = createSignal<LifecycleFilter>(
 		isValidLifecycle(searchParams.lifecycle) ? searchParams.lifecycle : "all",
@@ -307,6 +439,7 @@ export const SessionList: Component = () => {
 		const analyzed = analyzedFilter();
 		const agents = agentsFilter();
 		const features = featuresFilter();
+		const flagged = flaggedFilter();
 		const lifecycle = lifecycleFilter();
 		const linkType = linkTypeFilter();
 		const sort = sortState();
@@ -317,6 +450,7 @@ export const SessionList: Component = () => {
 		params.analyzed = analyzed !== "all" ? analyzed : undefined;
 		params.agents = agents !== "top_level" ? agents : undefined;
 		params.features = features !== "all" ? features : undefined;
+		params.flagged = flagged ? "1" : undefined;
 		params.lifecycle = lifecycle !== "all" ? lifecycle : undefined;
 		params.link_type = linkType !== "all" ? linkType : undefined;
 		params.sort = serializeSortParam(sort);
@@ -339,6 +473,7 @@ export const SessionList: Component = () => {
 		const analyzed = analyzedFilter();
 		const agents = agentsFilter();
 		const features = featuresFilter();
+		const flagged = flaggedFilter();
 		const projectId = selectedProjectId();
 
 		return sessions.filter((s) => {
@@ -357,8 +492,9 @@ export const SessionList: Component = () => {
 			if (agents === "solo" && (s.agent_count ?? 0) > 1) return false;
 			if (features === "any" && (s.features?.length ?? 0) === 0) return false;
 			if ((features === "loop" || features === "goal" || features === "workflow") && !s.features?.includes(features)) return false;
+			if (flagged && !isFlagged(s)) return false;
 			if (q) {
-				const name = (s.session_name ?? s.session_id).toLowerCase();
+				const name = displayName(s).toLowerCase();
 				const branch = (s.git_branch ?? "").toLowerCase();
 				return name.includes(q) || branch.includes(q) || s.session_id.includes(q);
 			}
@@ -416,6 +552,20 @@ export const SessionList: Component = () => {
 		});
 	});
 
+	// ── Header KPI readouts (derived from already-loaded session store; no fetch) ──
+	const kpis = createMemo(() => {
+		const sessions = sessionList() ?? [];
+		const projectId = selectedProjectId();
+		const scoped = projectId === undefined
+			? sessions
+			: sessions.filter((s) => getProjectId(s) === projectId);
+		const active = scoped.filter((s) => s.status === "active").length;
+		const analyzed = scoped.filter((s) => s.is_distilled).length;
+		const events = scoped.reduce((sum, s) => sum + s.event_count, 0);
+		const duration = scoped.reduce((sum, s) => sum + s.duration_ms, 0);
+		return { total: scoped.length, active, analyzed, events, duration };
+	});
+
 	const handleRowClick = (session: SessionSummary) => {
 		navigate(`/session/${session.session_id}`);
 	};
@@ -467,6 +617,42 @@ export const SessionList: Component = () => {
 
 	return (
 		<div class="mx-auto max-w-[1440px] p-4">
+			{/* Console header — title + KPI readout band */}
+			<div class="border border-clens bg-surface-inset">
+				<div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-3 pb-2.5">
+					<div class="flex items-baseline gap-2.5">
+						<span class="instrument-led instrument-led--live bg-[var(--clens-live)]" />
+						<h1 class="instrument-microcaps text-[13px] tracking-[0.14em] text-primary">
+							{viewMode() === "work_units" ? "Work Units" : "Sessions"}
+						</h1>
+						<span class="instrument-microcaps text-[10px] text-muted">cLens console</span>
+					</div>
+					<dl class="flex items-stretch gap-px overflow-hidden border border-clens bg-surface-muted text-right">
+						<div class="bg-surface px-3 py-1">
+							<dt class="instrument-microcaps text-[9px] text-muted">Sessions</dt>
+							<dd class="font-mono text-sm tabular-nums text-primary">{kpis().total}</dd>
+						</div>
+						<div class="bg-surface px-3 py-1">
+							<dt class="instrument-microcaps text-[9px] text-muted">Active</dt>
+							<dd class="font-mono text-sm tabular-nums text-brand-500">{kpis().active}</dd>
+						</div>
+						<div class="bg-surface px-3 py-1">
+							<dt class="instrument-microcaps text-[9px] text-muted">Analyzed</dt>
+							<dd class="font-mono text-sm tabular-nums text-secondary">{kpis().analyzed}</dd>
+						</div>
+						<div class="bg-surface px-3 py-1">
+							<dt class="instrument-microcaps text-[9px] text-muted">Events</dt>
+							<dd class="font-mono text-sm tabular-nums text-secondary">{kpis().events.toLocaleString()}</dd>
+						</div>
+						<div class="bg-surface px-3 py-1">
+							<dt class="instrument-microcaps text-[9px] text-muted">Total time</dt>
+							<dd class="font-mono text-sm tabular-nums text-secondary">{formatDuration(kpis().duration)}</dd>
+						</div>
+					</dl>
+				</div>
+				<div class="instrument-ruler" />
+			</div>
+
 			{/* Error banner */}
 			<Show when={globalError()}>
 				{(err) => (
@@ -507,6 +693,23 @@ export const SessionList: Component = () => {
 					resultLabel={buildCountLabel(filtered().length, scopedTotal())}
 					onRefresh={() => { refetchSessions(); refetchWorkUnits(); }}
 				/>
+				{/* Flagged-only toggle chip (R12) — narrows to color !== "none" */}
+				<div class="mt-2 flex items-center">
+					<button
+						type="button"
+						aria-pressed={flaggedFilter()}
+						onClick={() => { setFlaggedFilter((v) => !v); setPage(1); setSelectedRow(-1); }}
+						class={`instrument-microcaps inline-flex items-center gap-1.5 rounded-none border px-2 py-1 text-[10px] transition ${
+							flaggedFilter()
+								? "border-brand-500 bg-surface-selected text-primary"
+								: "border-clens text-muted hover:border-brand-500 hover:text-secondary"
+						}`}
+						title="Show only flagged sessions"
+					>
+						<Flag class="h-3 w-3" classList={{ "fill-current": flaggedFilter() }} />
+						Flagged
+					</button>
+				</div>
 				<Show when={dateFilter()}>
 					<div class="flex items-center gap-2 border-b border-clens bg-surface-inset px-4 py-1.5 text-xs text-secondary">
 						<span class="instrument-microcaps text-[10px] text-muted">
@@ -544,10 +747,10 @@ export const SessionList: Component = () => {
 					<Show
 						when={filteredWorkUnits().length > 0}
 						fallback={
-							<div class="flex flex-col items-center gap-2 py-12 text-muted">
+							<div class="flex flex-col items-center gap-3 border border-clens bg-surface-inset py-14 text-muted">
 								<Layers class="h-8 w-8 text-muted" />
-								<p class="instrument-microcaps text-sm text-secondary">No work units found</p>
-								<p class="text-xs">Distill sessions with spec files to generate work units.</p>
+								<p class="instrument-microcaps text-sm tracking-[0.14em] text-secondary">No work units found</p>
+								<p class="max-w-xs text-center text-xs leading-relaxed">Distill sessions with spec files to generate work units.</p>
 							</div>
 						}
 					>
@@ -594,28 +797,20 @@ export const SessionList: Component = () => {
 												}
 											}}
 											tabIndex={0}
-											class={`cursor-pointer transition ${
+											// Flagged rows get a colored left-rule so they pop out (R11). Use a
+											// left BORDER (not box-shadow) for the flag so it coexists with the
+											// selected/hover brand inset-shadow rule instead of overriding it.
+											style={isFlagged(session)
+												? { "border-left": `2px solid var(--clens-flag-${flagColor(session)})` }
+												: undefined}
+											class={`group cursor-pointer transition-colors duration-150 focus:outline-none focus-visible:bg-surface-hover ${
 												selectedRow() === idx()
 													? "bg-surface-selected shadow-[inset_2px_0_0_0_var(--clens-brand)]"
-													: "hover:bg-surface-hover"
+													: "hover:bg-surface-hover hover:shadow-[inset_2px_0_0_0_var(--clens-border)]"
 											}`}
 										>
 											<td class="px-4 py-2 font-medium text-primary">
-												<div class="flex items-center gap-2">
-													<A
-														href={`/session/${session.session_id}`}
-														class="font-mono text-secondary hover:text-brand-500 hover:underline"
-														onClick={(e: MouseEvent) => e.stopPropagation()}
-													>
-														{session.session_name ?? session.session_id.slice(0, 8)}
-													</A>
-													<Show when={session.is_distilled}>
-														<span class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens px-1.5 py-0.5 text-[9px] text-brand-500" title="Distilled"><span class="instrument-led bg-brand-500" />
-															analyzed
-														</span>
-													</Show>
-													<FeatureBadges features={session.features} />
-												</div>
+												<SessionRowName session={session} />
 											</td>
 											<Show when={isGlobalMode()}>
 											<td class="px-4 py-2">
@@ -665,7 +860,7 @@ export const SessionList: Component = () => {
 												{formatDate(session.start_time, preferences().showTimestamps)}
 											</td>
 											<td class="w-8 px-2 py-2 text-muted">
-												<ChevronRight class="h-4 w-4" />
+												<ChevronRight class="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-brand-500" />
 											</td>
 										</tr>
 									)}

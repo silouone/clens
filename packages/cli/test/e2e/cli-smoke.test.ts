@@ -1,4 +1,7 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { cleanupTestProject, createTestProject, runCli, stripAnsi } from "./helpers";
 
 describe("CLI Smoke Tests", () => {
@@ -217,5 +220,72 @@ describe("CLI Smoke Tests", () => {
 		} finally {
 			cleanupTestProject(emptyDir);
 		}
+	});
+});
+
+// ── distill --global (cross-repo batch) ─────────────────
+// Isolated via a temp HOME so the seeded registry/config drive `--global`
+// without touching the real `~/.clens`. A subprocess reads HOME at startup,
+// so the override is honored (unlike an in-process os.homedir() override).
+describe("CLI distill --global", () => {
+	let tempHome: string;
+	let projA: string;
+	let projB: string;
+
+	const seedRegistry = (paths: readonly string[], mode: string): void => {
+		const clensDir = join(tempHome, ".clens");
+		mkdirSync(clensDir, { recursive: true });
+		writeFileSync(
+			join(clensDir, "projects.json"),
+			JSON.stringify({
+				version: 1,
+				projects: paths.map((p) => ({
+					id: p.split("/").pop() ?? p,
+					path: p,
+					name: p.split("/").pop() ?? p,
+					added_at: Date.now(),
+				})),
+			}),
+		);
+		writeFileSync(join(clensDir, "config.json"), JSON.stringify({ global_mode: mode }));
+	};
+
+	beforeEach(() => {
+		tempHome = join(tmpdir(), `clens-e2e-home-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		mkdirSync(tempHome, { recursive: true });
+		// Two project-mode repos with sessions but no distilled artifacts yet.
+		projA = createTestProject({ sessionCount: 2, withLinks: false, withDistilled: false });
+		projB = createTestProject({ sessionCount: 1, withLinks: false, withDistilled: false });
+		seedRegistry([projA, projB], "project");
+	});
+
+	afterEach(() => {
+		cleanupTestProject(projA);
+		cleanupTestProject(projB);
+		rmSync(tempHome, { recursive: true, force: true });
+	});
+
+	test("distill --global runs, prints cross-project summary, exits 0", async () => {
+		const r = await runCli(["distill", "--global"], projA, { HOME: tempHome });
+		expect(r.exitCode).toBe(0);
+		const plain = stripAnsi(r.stdout);
+		expect(plain).toMatch(/across \d+ projects\./);
+		// Each repo's distilled artifacts now exist.
+		expect(existsSync(join(projA, ".clens", "distilled"))).toBe(true);
+		expect(existsSync(join(projB, ".clens", "distilled"))).toBe(true);
+	});
+
+	test("second distill --global skips fresh sessions", async () => {
+		await runCli(["distill", "--global"], projA, { HOME: tempHome });
+		const r = await runCli(["distill", "--global"], projA, { HOME: tempHome });
+		expect(r.exitCode).toBe(0);
+		const plain = stripAnsi(r.stdout);
+		expect(plain).toMatch(/skipped [1-9]/);
+	});
+
+	test("distill --global --bogus rejected with unknown-flag message", async () => {
+		const r = await runCli(["distill", "--global", "--bogus"], projA, { HOME: tempHome });
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("Unknown flag --bogus");
 	});
 });

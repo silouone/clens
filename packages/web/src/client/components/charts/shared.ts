@@ -1,3 +1,5 @@
+import { createSignal, type Accessor } from "solid-js";
+
 // ── Chart utilities ─────────────────────────────────────────────────
 
 export interface BaseChartProps {
@@ -5,6 +7,24 @@ export interface BaseChartProps {
 	readonly class?: string;
 	readonly ariaLabel: string;
 	readonly onClickPoint?: (datum: unknown, index: number) => void;
+}
+
+/**
+ * Inline drag-brush contract (analytics-truth-and-brush, AC7/AC11).
+ *
+ * Time charts (StackedArea / LineChart / BarChart) opt in by accepting this
+ * prop. On a drag across the plot rect the chart maps the pixel span back to
+ * the covered calendar days and emits an inclusive `YYYY-MM-DD` window. The
+ * page wires `onBrushSelect={(r) => setCustomRange({ from: r.start, to: r.end })}`
+ * so every KPI/chart/table re-scopes to exactly that window.
+ */
+export type BrushRange = {
+	readonly start: string;
+	readonly end: string;
+};
+
+export interface BrushableChartProps {
+	readonly onBrushSelect?: (range: BrushRange) => void;
 }
 
 // ── Color palette ──────────────────────────────────────────────────
@@ -31,6 +51,32 @@ export const CHART_COLORS = {
 	red: "var(--clens-danger)",
 	pink: "var(--clens-text-muted)",
 } as const;
+
+// Categorical palette for breakdowns with many discrete series (e.g. cost by
+// model). The restrained CHART_COLORS ramp collapses to ~3 visible tones
+// (brand green / graphite / amber), so a 10-category donut renders as
+// indistinguishable repeats. This palette keeps an instrument-readout feel —
+// cool greens, teals and cyans anchored by amber/gold — while giving every
+// slice a legibly distinct hue on both paper (light) and instrument-black
+// (dark). Index-stable: callers pass sorted-by-magnitude series so a given
+// rank always maps to the same swatch. Tail series collapse to MODEL_OTHER.
+export const MODEL_PALETTE = [
+	"var(--clens-brand)", // phosphor green — dominant series
+	"#2dd4bf", // teal
+	"#38bdf8", // sky
+	"#fbbf24", // amber/gold
+	"#a78bfa", // violet
+	"#22d3ee", // cyan
+	"#fb7185", // rose
+	"#f97316", // orange
+	"#84cc16", // lime
+] as const;
+
+export const MODEL_OTHER = "var(--clens-text-muted)";
+
+/** Stable swatch for the Nth-ranked categorical series. */
+export const modelColor = (index: number): string =>
+	MODEL_PALETTE[index % MODEL_PALETTE.length];
 
 // Distinct graphite/green/amber tones for stacked token series — kept
 // separable without leaving the instrument palette.
@@ -73,6 +119,93 @@ export const linearScale = (
 	const span = d1 - d0;
 	return (value: number): number =>
 		span === 0 ? r0 : r0 + ((value - d0) / span) * (r1 - r0);
+};
+
+// ── Continuous time x-scale (AC11) ─────────────────────────────────
+//
+// Date points were previously plotted by ARRAY INDEX, so a calendar gap (e.g.
+// 3/28 → 5/18 with nothing between) compressed into one evenly-spaced step and
+// read as "adjacent". A continuous time scale instead positions each point by
+// its actual calendar day, so missing days render as proportional horizontal
+// gaps. Charts share one accessor here so axes + brush agree exactly.
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Parse a `YYYY-MM-DD` calendar date to an integer day-epoch (days since the
+ * Unix epoch). UTC-anchored so the value is purely the calendar day with no
+ * timezone drift — equal date strings always yield equal numbers. Returns NaN
+ * for unparseable input so callers can guard.
+ */
+export const parseDay = (dateStr: string): number => {
+	const [y, m, d] = dateStr.split("-").map((p) => parseInt(p, 10));
+	if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return NaN;
+	return Math.floor(Date.UTC(y, m - 1, d) / MS_PER_DAY);
+};
+
+/** Inverse of {@link parseDay}: integer day-epoch → `YYYY-MM-DD`. */
+export const dayToDate = (dayEpoch: number): string => {
+	const date = new Date(Math.round(dayEpoch) * MS_PER_DAY);
+	const y = date.getUTCFullYear();
+	const m = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+	const d = `${date.getUTCDate()}`.padStart(2, "0");
+	return `${y}-${m}-${d}`;
+};
+
+/**
+ * Calendar-day domain `[minDayEpoch, maxDayEpoch]` covered by a set of
+ * `YYYY-MM-DD` strings. Unparseable dates are ignored. Returns undefined when
+ * no usable date exists so callers can fall back (e.g. single-point centering).
+ */
+export const dateDomain = (
+	dates: readonly string[],
+): readonly [number, number] | undefined => {
+	const days = dates.map(parseDay).filter((n) => Number.isFinite(n));
+	if (days.length === 0) return undefined;
+	return [Math.min(...days), Math.max(...days)];
+};
+
+/**
+ * Continuous time x-scale. Maps a `YYYY-MM-DD` string to an x pixel by ACTUAL
+ * calendar time across [r0, r1]. A zero-width domain (single distinct day, or
+ * all points on the same date) centres the reading in the plot — matching the
+ * existing single-point convention in the line/area charts rather than pinning
+ * it to the left axis. Out-of-domain dates are positioned proportionally (the
+ * caller is responsible for clamping if needed).
+ */
+export const timeScale = (
+	domain: readonly [number, number],
+	range: readonly [number, number],
+) => {
+	const [d0, d1] = domain;
+	const [r0, r1] = range;
+	const span = d1 - d0;
+	const mid = r0 + (r1 - r0) / 2;
+	return (dateStr: string): number => {
+		const day = parseDay(dateStr);
+		if (!Number.isFinite(day) || span === 0) return mid;
+		return r0 + ((day - d0) / span) * (r1 - r0);
+	};
+};
+
+/**
+ * Inverse of {@link timeScale}: map a pixel x back to the covered calendar day,
+ * clamped to the domain, returned as `YYYY-MM-DD`. Used by the drag-brush to
+ * resolve a pixel span into inclusive dates. A zero-width domain resolves every
+ * pixel to that single day.
+ */
+export const pixelToDate = (
+	px: number,
+	domain: readonly [number, number],
+	range: readonly [number, number],
+): string => {
+	const [d0, d1] = domain;
+	const [r0, r1] = range;
+	const pxSpan = r1 - r0;
+	if (pxSpan === 0 || d1 === d0) return dayToDate(d0);
+	const frac = Math.min(1, Math.max(0, (px - r0) / pxSpan));
+	const day = Math.round(d0 + frac * (d1 - d0));
+	return dayToDate(day);
 };
 
 export const niceMax = (max: number): number => {
@@ -128,3 +261,143 @@ export const CHART_SURFACE = "var(--clens-surface-overlay)";
  * not a wall.
  */
 export const MAX_BAND = 56;
+
+// ── Drag-brush overlay (AC7) ───────────────────────────────────────
+//
+// Shared so StackedArea / LineChart / BarChart get identical brush behavior.
+// The PURE half (band geometry + selection resolution) lives as plain
+// functions so it is unit-testable without Solid; the REACTIVE half
+// (`createBrush`) wires pointer events and exposes the live band signal.
+
+/** Live selection band geometry in plot-local coordinates. */
+export type BrushBand = {
+	readonly x: number;
+	readonly width: number;
+};
+
+/** Translucent fill for the in-progress selection band. */
+export const BRUSH_FILL = "var(--clens-brand)";
+
+/**
+ * Pure: the selection rect for a drag between two pixel x positions, clamped
+ * to the plot range [r0, r1]. Works regardless of drag direction (a
+ * right-to-left drag yields the same band). `x` is the left edge.
+ */
+export const brushBand = (
+	downX: number,
+	moveX: number,
+	range: readonly [number, number],
+): BrushBand => {
+	const [r0, r1] = range;
+	const lo = Math.max(r0, Math.min(downX, moveX));
+	const hi = Math.min(r1, Math.max(downX, moveX));
+	return { x: lo, width: Math.max(0, hi - lo) };
+};
+
+/** Smallest drag (px) that counts as a brush rather than a click. */
+export const BRUSH_MIN_PX = 4;
+
+/**
+ * Pure: resolve a pixel drag span into an inclusive `{ start, end }` date
+ * window over the supplied date strings. Returns undefined when the drag is too
+ * small (a click, not a brush) or no usable date domain exists — the caller
+ * should then leave the existing window untouched. Direction-agnostic.
+ */
+export const resolveBrushSelection = (
+	downX: number,
+	upX: number,
+	dates: readonly string[],
+	range: readonly [number, number],
+): BrushRange | undefined => {
+	if (Math.abs(upX - downX) < BRUSH_MIN_PX) return undefined;
+	const domain = dateDomain(dates);
+	if (!domain) return undefined;
+	const lo = Math.min(downX, upX);
+	const hi = Math.max(downX, upX);
+	const start = pixelToDate(lo, domain, range);
+	const end = pixelToDate(hi, domain, range);
+	return start <= end ? { start, end } : { start: end, end: start };
+};
+
+/** Inputs the reactive brush needs from its host chart. */
+export interface CreateBrushArgs {
+	/** Inclusive date strings currently plotted (drive the resolved window). */
+	readonly dates: Accessor<readonly string[]>;
+	/** Plot-local x range [0, chartWidth]. */
+	readonly range: Accessor<readonly [number, number]>;
+	/** Emit the resolved inclusive window on a completed drag. */
+	readonly onSelect: ((range: BrushRange) => void) | undefined;
+}
+
+/**
+ * Reactive drag-brush controller for an SVG plot. Attach the returned handlers
+ * to a full-plot transparent <rect> and render the band <rect> when `band()`
+ * is set. Pointer x is taken relative to the overlay rect, then shifted into
+ * plot-local space by the chart's left padding via the rect's own bbox — the
+ * overlay rect is expected to sit inside the padded <g>, so its client x is the
+ * plot origin. mousedown→move tracks; mouseup resolves and clears.
+ *
+ *   const brush = createBrush({ dates, range, onSelect: props.onBrushSelect });
+ *   <rect ... onMouseDown={brush.onMouseDown}
+ *             onMouseMove={brush.onMouseMove}
+ *             onMouseUp={brush.onMouseUp}
+ *             onMouseLeave={brush.onMouseLeave} />
+ *   <Show when={brush.band()}>{(b) => <rect x={b().x} width={b().width} ... />}</Show>
+ */
+export const createBrush = (args: CreateBrushArgs) => {
+	const [origin, setOrigin] = createSignal<number | undefined>();
+	const [band, setBand] = createSignal<BrushBand | undefined>();
+
+	// Pointer x in plot-local coordinates: clientX minus the overlay's own left
+	// edge (the overlay rect spans exactly the plot, so its left is x=0).
+	const localX = (e: MouseEvent): number => {
+		const rect = (e.currentTarget as SVGGraphicsElement | null)?.getBoundingClientRect();
+		return rect ? e.clientX - rect.left : 0;
+	};
+
+	const enabled = (): boolean => args.onSelect !== undefined;
+
+	const onMouseDown = (e: MouseEvent): void => {
+		if (!enabled()) return;
+		e.preventDefault();
+		setOrigin(localX(e));
+		setBand(undefined);
+	};
+
+	const onMouseMove = (e: MouseEvent): void => {
+		const start = origin();
+		if (start === undefined) return;
+		setBand(brushBand(start, localX(e), args.range()));
+	};
+
+	const finish = (e: MouseEvent): void => {
+		const start = origin();
+		setOrigin(undefined);
+		setBand(undefined);
+		if (start === undefined) return;
+		const selection = resolveBrushSelection(start, localX(e), args.dates(), args.range());
+		if (selection) args.onSelect?.(selection);
+	};
+
+	const onMouseUp = (e: MouseEvent): void => {
+		if (origin() === undefined) return;
+		finish(e);
+	};
+
+	// Releasing outside the plot still completes the drag with whatever span was
+	// reached, so a brush dragged off the right edge selects to the last day.
+	const onMouseLeave = (e: MouseEvent): void => {
+		if (origin() === undefined) return;
+		finish(e);
+	};
+
+	return {
+		band: band as Accessor<BrushBand | undefined>,
+		active: (): boolean => origin() !== undefined,
+		enabled,
+		onMouseDown,
+		onMouseMove,
+		onMouseUp,
+		onMouseLeave,
+	} as const;
+};
