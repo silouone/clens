@@ -7,6 +7,8 @@ export { StackedArea } from "./StackedArea";
 export { StackedBar } from "./StackedBar";
 export { DensityRibbon } from "./DensityRibbon";
 export type { DensityRibbonEvent } from "./DensityRibbon";
+export { AgentGraph } from "./AgentGraph";
+export type { AgentGraphNode, AgentGraphEdge } from "./AgentGraph";
 export { ChartTooltip } from "./ChartTooltip";
 export { ChartEmpty } from "./ChartEmpty";
 export { CHART_COLORS, CHART_CATEGORICAL, categoricalColor, TOKEN_COLORS, BACKTRACK_COLORS, REASONING_COLORS, DRIFT_COLORS, MODEL_OTHER, modelColor, formatCompact, formatShortDate } from "./shared";
