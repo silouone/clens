@@ -12,7 +12,7 @@
 npm install -g clens       # or: bun install -g clens
 ```
 
-![cLens web dashboard](.github/assets/dashboard.gif)
+![cLens web dashboard](.github/assets/dashboard-sessions.png)
 
 ```sh
 clens init                 # 1. install hooks into this project
@@ -27,7 +27,7 @@ That's it. `clens init` wires the capture hooks, your sessions land as local JSO
 
 `clens web` serves a browser dashboard for everything cLens captures — session list, per-session detail, multi-agent trees, decision and backtrack timelines, edit chains, plan drift, and cross-session insights. The web server is bundled into the CLI binary at build time, so npm consumers need nothing extra to run it.
 
-![Session detail](.github/assets/session-detail.png)
+![Session detail](.github/assets/dashboard-detail.png)
 
 ```sh
 clens web                      # launch on http://127.0.0.1:3700, opens your browser
