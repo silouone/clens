@@ -58,8 +58,12 @@ export const HeroBand: Component<HeroBandProps> = (props) => {
 	});
 
 	// -- Health strip values --------------------------------------------
+	// Wall span is the headline (matches the session list, locked B2 semantic);
+	// active = idle-trimmed working time, surfaced as a sub-line so the tile
+	// reconciles with the "what happened" narrative instead of contradicting it.
 	const durationMs = () =>
 		session().stats.wall_duration_ms ?? session().stats.duration_ms;
+	const activeMs = () => session().summary?.key_metrics.active_duration_ms;
 	const cost = () =>
 		(session().cost_estimate ?? session().stats.cost_estimate)?.estimated_cost_usd;
 	const costIsEstimated = () =>
@@ -135,7 +139,12 @@ export const HeroBand: Component<HeroBandProps> = (props) => {
 
 				{/* Health strip — category StatTiles */}
 				<div class="flex flex-wrap gap-2 pt-1">
-					<StatTile category="timing" label="Duration" value={formatDuration(durationMs())} />
+					<StatTile
+						category="timing"
+						label="Duration"
+						value={formatDuration(durationMs())}
+						sub={activeMs() !== undefined ? `${formatDuration(activeMs() ?? 0)} active` : undefined}
+					/>
 					<Show when={cost() !== undefined}>
 						<StatTile
 							category="cost"

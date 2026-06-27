@@ -14,6 +14,8 @@ type StatTileProps = {
 	readonly value: string | number;
 	/** Optional trend/delta indicator rendered next to the value. */
 	readonly delta?: JSX.Element;
+	/** Optional muted sub-line (mono numerals) rendered under the value. */
+	readonly sub?: string;
 	/** Optional sparkline / micro-chart slot rendered under the value. */
 	readonly spark?: JSX.Element;
 	readonly class?: string;
@@ -32,6 +34,9 @@ export const StatTile: Component<StatTileProps> = (props) => {
 				<span class="font-mono text-sm tabular-nums text-primary">{props.value}</span>
 				<Show when={props.delta}>{props.delta}</Show>
 			</div>
+			<Show when={props.sub}>
+				<span class="font-mono text-[9px] tabular-nums text-muted">{props.sub}</span>
+			</Show>
 			<Show when={props.spark}>{props.spark}</Show>
 		</div>
 	);
