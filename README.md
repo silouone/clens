@@ -212,7 +212,58 @@ All data is local. No network calls. No telemetry. Full tool call payloads -- in
 This is a Bun workspace monorepo (`packages/cli` + `packages/web`).
 
 ```sh
+bun run dev       # launch the full dashboard (API + Vite) with one command
 bun test          # run the test suite
 bun run typecheck
 bun run build
+```
+
+### Running the dashboard locally
+
+`bun run dev` starts a single **supervised** launcher (`scripts/dev.ts`) that owns
+the whole process tree:
+
+- It is the sole **port authority** — it picks a free API port and a free web port,
+  so two `bun run dev` instances never collide. If 3117/3701 are busy it transparently
+  moves to the next free pair.
+- The Vite proxy is wired to whatever API port was actually bound (`CLENS_API_PORT`),
+  and the API binds that port in strict mode or fails loudly — they can never drift apart.
+- Ctrl-C reaps the **entire group**, including the `esbuild` daemons Vite spawns —
+  no orphaned background processes left behind.
+- It health-checks the API, then opens your browser at the web URL automatically.
+
+```sh
+bun run dev                 # global mode (all repos), auto-open browser
+bun run dev --local         # current project only
+bun run dev --no-open       # don't open a browser
+bun run dev --api-port 4000 --web-port 4001   # seed specific ports (still auto-bumps if busy)
+bun run dev:clean           # kill stale orphan dev processes first, then launch
+bun run dev:doctor          # report/clean orphaned dev processes (see below)
+```
+
+Escape hatches (the old split commands) are still available if you want to run the
+halves in separate terminals: `bun run dev:api`, `bun run dev:api:global`, `bun run dev:web`.
+
+### Orphan doctor
+
+If a previous dev session left processes behind (or you hit the macOS "unkillable
+esbuild" state where daemons wedge in uninterruptible-wait), run:
+
+```sh
+bun run dev:doctor
+```
+
+It prints a table of every dev-server process (pid, type, port, state, killable?),
+cleans the killable ones, and tells you plainly if any are **unkillable** — those
+cannot be signalled away and require a **reboot** to clear.
+
+### Production port behaviour (`clens web`)
+
+`clens web` prefers **3700** and **auto-bumps** to the next free port if it's busy,
+printing a note (`port 3700 busy → started on 3701`). To force an exact port and fail
+loudly instead of bumping, set `CLENS_PORT_STRICT=1`:
+
+```sh
+clens web --port 8080                 # prefer 8080, bump if busy
+CLENS_PORT_STRICT=1 clens web --port 8080   # bind exactly 8080 or fail
 ```

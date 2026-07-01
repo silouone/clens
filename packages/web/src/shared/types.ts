@@ -6,92 +6,81 @@
 import type { ClensConfig } from "clens";
 
 export type {
-	// Session
-	SessionSummary,
-	SessionStatus,
-
+	AgentLifetime,
+	// Conversation
+	AgentMessageEntry,
+	AgentNode,
+	// Analytics
+	AnalyticsSummaryRow,
+	BacktrackResult,
+	// Config
+	ClensConfig,
+	ColorName,
+	CommunicationEdge,
+	// Communication
+	CommunicationSequenceEntry,
+	// Distill extras
+	ContextConsumption,
+	ContextConsumptionPoint,
+	ConversationEntry,
+	CostEstimate,
+	DecisionPoint,
+	DetectionSource,
+	DiffLine,
+	// Distill results
+	DistilledSession,
+	DistilledSummary,
+	EditChain,
+	EditChainsResult,
+	EditStep,
+	FeatureFlag,
+	FeatureUsage,
+	FileDiffAttribution,
+	FileMapEntry,
+	FileMapResult,
+	// Risk
+	FileRiskScore,
+	GitDiffResult,
+	// Global mode
+	GlobalSessionSummary,
+	GoalEntry,
+	GoalUsage,
+	// Links
+	LinkEvent,
+	LinkEventType,
+	LoopUsage,
+	LoopWakeup,
+	MessageLink,
 	// Naming / color flag (session-naming-flags) — SessionSummary already carries
 	// display_name / name_source / label / color; these mirror the supporting types
 	// so client + server can type rename/color controls without re-deriving them.
 	NameSource,
-	ColorName,
-	SessionMeta,
-
-	// Distill results
-	DistilledSession,
-	BacktrackResult,
-	FileMapEntry,
-	FileMapResult,
-	GitDiffResult,
-	WorkingTreeChange,
-	AgentNode,
-	CommunicationEdge,
-	EditChain,
-	EditChainsResult,
-	EditStep,
-	DiffLine,
-	FileDiffAttribution,
 	PhaseInfo,
-	CostEstimate,
-	TokenUsage,
-	TimelineEntry,
 	PlanDriftReport,
-
-	// Communication
-	CommunicationSequenceEntry,
-	AgentLifetime,
-
-	// Events
-	StoredEvent,
-
-	// Links
-	LinkEvent,
-	SpawnLink,
-	StopLink,
-	MessageLink,
-	LinkEventType,
-
-	// Conversation
-	AgentMessageEntry,
-	ConversationEntry,
-
-	// Risk
-	FileRiskScore,
-	RiskLevel,
-
-	// Transcript
-	TranscriptReasoning,
-	TranscriptUserMessage,
-
-	// Distill extras
-	ContextConsumption,
-	ContextConsumptionPoint,
-	FeatureFlag,
-	FeatureUsage,
-	LoopUsage,
-	LoopWakeup,
-	GoalUsage,
-	WorkflowRun,
-	WorkflowUsage,
-	DistilledSummary,
-	TeamMetrics,
-	DecisionPoint,
-	TaskRecord,
-	TaskListResult,
-
-	// Config
-	ClensConfig,
 	PricingTier,
-
 	// Project Registry
 	ProjectEntry,
 	ProjectRegistry,
-
-	// Global mode
-	GlobalSessionSummary,
-
-	// Analytics
-	AnalyticsSummaryRow,
+	RiskLevel,
+	SessionMeta,
+	SessionStatus,
+	// Session
+	SessionSummary,
+	SpawnLink,
+	StopLink,
+	// Events
+	StoredEvent,
+	TaskListResult,
+	TaskRecord,
+	TeamMetrics,
+	TimelineEntry,
+	TokenUsage,
+	// Transcript
+	TranscriptReasoning,
+	TranscriptUserMessage,
+	WorkflowRun,
+	WorkflowUsage,
+	WorkingTreeChange,
 } from "clens";
 
 /**

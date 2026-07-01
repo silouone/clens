@@ -13,9 +13,11 @@
     "lint:web": "bun run --filter @clens/web lint",
     "lint": "bun run lint:cli && bun run lint:web",
     "typecheck": "bun run --filter clens typecheck && bun run --filter @clens/web typecheck",
+    "dev": "bun run scripts/dev.ts",
+    "dev:clean": "bun run scripts/dev.ts --clean",
+    "dev:doctor": "bun run scripts/dev.ts --doctor",
     "dev:api": "bun run --filter @clens/web dev:api",
     "dev:api:global": "bun run --filter @clens/web dev:api:global",
-    "dev:web": "bun run --filter @clens/web dev:web",
-    "dev": "bun run dev:api:global & bun run dev:web"
+    "dev:web": "bun run --filter @clens/web dev:web"
   }
 }

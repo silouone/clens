@@ -44,16 +44,20 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 		readonly result: readonly DiffLine[];
 		readonly oldLine: number;
 		readonly newLine: number;
+		// True once we're inside a hunk (after the first @@). File-header lines
+		// (--- / +++ / index) only appear OUTSIDE a hunk; inside one, a line
+		// beginning with --- / +++ is real content (e.g. `--option`, `-- sql`,
+		// `++count`) and must NOT be skipped as a header.
+		readonly inHunk: boolean;
 	}>(
 		(acc, line) => {
-			// Skip file headers, empty lines, diff --git lines
-			if (
-				line.startsWith("diff --git") ||
-				line.startsWith("---") ||
-				line.startsWith("+++") ||
-				line.startsWith("index ") ||
-				line === ""
-			) {
+			// A new file's header block — reset hunk state.
+			if (line.startsWith("diff --git")) {
+				return { ...acc, inHunk: false };
+			}
+
+			// File headers / metadata: only valid before the first @@ of the file.
+			if (!acc.inHunk && (line.startsWith("---") || line.startsWith("+++") || line.startsWith("index ") || line === "")) {
 				return acc;
 			}
 
@@ -64,10 +68,11 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 					...acc,
 					oldLine: parseInt(hunkMatch[1], 10),
 					newLine: parseInt(hunkMatch[2], 10),
+					inHunk: true,
 				};
 			}
 
-			// Addition line (but not +++ header, already handled above)
+			// Addition line (inside a hunk; +++ headers are handled above)
 			if (line.startsWith("+")) {
 				return {
 					result: [
@@ -80,10 +85,11 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 					],
 					oldLine: acc.oldLine,
 					newLine: acc.newLine + 1,
+					inHunk: acc.inHunk,
 				};
 			}
 
-			// Removal line (but not --- header, already handled above)
+			// Removal line (inside a hunk; --- headers are handled above)
 			if (line.startsWith("-")) {
 				return {
 					result: [
@@ -96,6 +102,7 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 					],
 					oldLine: acc.oldLine + 1,
 					newLine: acc.newLine,
+					inHunk: acc.inHunk,
 				};
 			}
 
@@ -111,13 +118,14 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 					],
 					oldLine: acc.oldLine + 1,
 					newLine: acc.newLine + 1,
+					inHunk: acc.inHunk,
 				};
 			}
 
 			// Skip any other line (e.g., "\ No newline at end of file")
 			return acc;
 		},
-		{ result: [], oldLine: 0, newLine: 0 },
+		{ result: [], oldLine: 0, newLine: 0, inHunk: false },
 	);
 
 	return result;

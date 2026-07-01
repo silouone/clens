@@ -1,10 +1,7 @@
-import { createMemo, createSignal, For, Show, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import type { DistilledSession } from "../../../shared/types";
 import type { DetailTabId } from "../../lib/categories";
 import { BottomPanel } from "../BottomPanel";
-import { DashboardGrid } from "../ui/DashboardGrid";
-import { TabBar } from "../ui/TabBar";
-import { TabButton } from "../ui/TabButton";
 import { HeroBand } from "../overview/HeroBand";
 import {
 	ActivityWidget,
@@ -14,11 +11,15 @@ import {
 	CostWidget,
 	EditsWidget,
 	FilesWidget,
+	HarnessFeaturesWidget,
 	OutcomeWidget,
 	ReasoningWidget,
 	RiskWidget,
 	TaskPlanWidget,
 } from "../overview/widgets";
+import { DashboardGrid } from "../ui/DashboardGrid";
+import { TabBar } from "../ui/TabBar";
+import { TabButton } from "../ui/TabButton";
 
 // -- Types ----------------------------------------------------------------
 
@@ -63,7 +64,11 @@ const OverviewContent: Component<{
 
 			<DashboardGrid>
 				<Show when={session().context_consumption}>
-					<ContextWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					<ContextWidget
+						session={session()}
+						isMultiAgent={isMultiAgent()}
+						onNavigate={onNavigate}
+					/>
 				</Show>
 
 				<RiskWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
@@ -73,7 +78,11 @@ const OverviewContent: Component<{
 				</Show>
 
 				<Show when={(session().timeline?.length ?? 0) > 0}>
-					<ActivityWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					<ActivityWidget
+						session={session()}
+						isMultiAgent={isMultiAgent()}
+						onNavigate={onNavigate}
+					/>
 				</Show>
 
 				<Show when={isMultiAgent()}>
@@ -89,11 +98,27 @@ const OverviewContent: Component<{
 				</Show>
 
 				<Show when={(session().task_list?.tasks.length ?? 0) > 0}>
-					<TaskPlanWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					<TaskPlanWidget
+						session={session()}
+						isMultiAgent={isMultiAgent()}
+						onNavigate={onNavigate}
+					/>
+				</Show>
+
+				<Show when={session().feature_usage}>
+					<HarnessFeaturesWidget
+						session={session()}
+						isMultiAgent={isMultiAgent()}
+						onNavigate={onNavigate}
+					/>
 				</Show>
 
 				<Show when={session().reasoning.length > 0}>
-					<ReasoningWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					<ReasoningWidget
+						session={session()}
+						isMultiAgent={isMultiAgent()}
+						onNavigate={onNavigate}
+					/>
 				</Show>
 			</DashboardGrid>
 		</div>

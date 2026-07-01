@@ -20,7 +20,7 @@
     }
   },
   "files": {
-    "includes": ["src/**", "test/**"]
+    "includes": ["packages/*/src/**/*.{ts,tsx,js,jsx}", "packages/*/test/**/*.{ts,tsx,js,jsx}"]
   },
   "javascript": {
     "formatter": {

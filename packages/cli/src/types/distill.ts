@@ -622,6 +622,24 @@ export interface GlobalSessionSummary extends SessionSummary {
 
 export type FeatureFlag = "loop" | "goal" | "workflow";
 
+/**
+ * How a feature signal was detected, strongest → weakest precedence:
+ *  - "command"     — a literal /goal|/loop token typed in a free-text prompt (UserPromptSubmit event).
+ *  - "tool"        — a structural tool call (ScheduleWakeup, Workflow, Skill{loop}, …); highest precision.
+ *  - "command_tag" — a `<command-name>/goal</command-name>` slash-command in the transcript. NOTE: slash
+ *                    commands never reach cLens raw events, so this tier is transcript-only (distill-time).
+ *  - "inferred"    — a heuristic semantic match in the agent's own thinking/text ("the goal is…",
+ *                    "loop until…", "fan out N agents"). Real but fuzzy; always visually labeled.
+ */
+export type DetectionSource = "command" | "command_tag" | "tool" | "inferred";
+
+/** A single detected goal with its provenance. Replaces the old bare `string`. */
+export interface GoalEntry {
+	readonly text: string;
+	readonly source: DetectionSource;
+	readonly t?: number;
+}
+
 export interface LoopWakeup {
 	readonly t: number;
 	readonly delay_seconds: number;
@@ -634,10 +652,17 @@ export interface LoopUsage {
 	readonly autonomous: boolean;
 	readonly skill_invocations: number;
 	readonly wakeups: readonly LoopWakeup[];
+	/** Strongest tier that fired for this loop signal. Absent on pre-source distills. */
+	readonly source?: DetectionSource;
 }
 
 export interface GoalUsage {
-	readonly goals: readonly string[];
+	/**
+	 * Union for backward-compat: distills written before the GoalEntry change carry
+	 * `string[]`; freshly distilled sessions carry `GoalEntry[]`. Readers must tolerate
+	 * both (see `normalizeGoal` on the web side).
+	 */
+	readonly goals: readonly (string | GoalEntry)[];
 }
 
 export interface WorkflowRun {
@@ -649,6 +674,8 @@ export interface WorkflowRun {
 export interface WorkflowUsage {
 	readonly invocation_count: number;
 	readonly runs: readonly WorkflowRun[];
+	/** Strongest tier that fired for this workflow signal. Absent on pre-source distills. */
+	readonly source?: DetectionSource;
 }
 
 export interface FeatureUsage {
@@ -656,6 +683,8 @@ export interface FeatureUsage {
 	readonly loop?: LoopUsage;
 	readonly goal?: GoalUsage;
 	readonly workflow?: WorkflowUsage;
+	/** True when at least one detected feature's sole provenance is the heuristic "inferred" tier. */
+	readonly inferred?: boolean;
 }
 
 // --- Analytics Summary Types ---

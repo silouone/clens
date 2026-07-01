@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs"
-import { resolve, dirname } from "node:path"
 import type { ProjectEntry } from "clens"
+import { serveOnFreePort } from "clens/src/utils/net"
+import { resolveProjectRoot } from "clens/src/utils"
 import { createApp } from "./app"
 import { startLiveWatcher } from "./live"
 import { log, currentLevel } from "./logger"
@@ -14,6 +14,13 @@ type StartServerOptions = {
 	readonly projects?: readonly ProjectEntry[]
 	/** Directory holding the built static client bundle (see AppOptions.distDir). */
 	readonly distDir?: string
+	/**
+	 * When true, bind exactly `port` or fail loudly — never auto-bump. The dev
+	 * launcher sets this (it is the sole port authority); also triggered by the
+	 * `CLENS_PORT_STRICT=1` env var. Standalone `clens web` leaves it false so a
+	 * busy port falls through to the next free one.
+	 */
+	readonly strict?: boolean
 }
 
 type ServerHandle = {
@@ -40,6 +47,7 @@ const generateToken = (): string => {
 const startServer = (options: StartServerOptions): ServerHandle => {
 	const port = options.port ?? 3117
 	const token = options.token ?? generateToken()
+	const strict = options.strict ?? process.env.CLENS_PORT_STRICT === "1"
 	const mode = process.env.NODE_ENV === "production" ? "production" as const : "development" as const
 
 	log.info(`Starting server mode=${mode} logLevel=${currentLevel}`)
@@ -51,16 +59,24 @@ const startServer = (options: StartServerOptions): ServerHandle => {
 		...(options.distDir ? { distDir: options.distDir } : {}),
 	})
 
-	const server = Bun.serve({
+	// Bind-and-retry (no probe-then-bind TOCTOU). In strict mode this binds
+	// exactly `port` or throws StrictPortUnavailableError.
+	const { server, port: actualPort } = serveOnFreePort(
+		(p) => ({
+			port: p,
+			hostname: "127.0.0.1",
+			idleTimeout: 255, // max value (seconds) — prevents SSE connections from being killed
+			fetch: app.fetch,
+		}),
 		port,
-		hostname: "127.0.0.1",
-		idleTimeout: 255, // max value (seconds) — prevents SSE connections from being killed
-		fetch: app.fetch,
-	})
+		{ strict },
+	)
 
-	const actualPort = server.port ?? port
 	const url = `http://127.0.0.1:${actualPort}`
 
+	if (actualPort !== port) {
+		log.warn(`Port ${port} busy — requested ${port}, bound ${actualPort}`)
+	}
 	log.info(`Server bound to ${url}`)
 	log.info(`Project dir: ${options.projectDir}`)
 
@@ -87,23 +103,13 @@ export type { AppType } from "./app"
 // ── Project dir resolution ─────────────────────────────────────────
 
 /**
- * Walk up from `start` to find the git root (contains `.git/`).
- * This is the project root where `.clens/` data lives.
- * Falls back to nearest `.clens/` parent, then `start`.
+ * Resolve the project root (where `.clens/` data lives) from `start`.
+ * Delegates to the canonical `resolveProjectRoot` so the dashboard reads from
+ * exactly the root the capture hook writes to — `.clens`-first, then `.git`,
+ * then `start`. (Re-implementing this with `.git`-first precedence desynced the
+ * two in repos with a parent `.git` and a sub-dir `.clens`.)
  */
-const findProjectDir = (start: string): string => {
-	const findGitRoot = (dir: string): string | undefined => {
-		if (existsSync(resolve(dir, ".git"))) return dir
-		const parent = dirname(dir)
-		return parent === dir ? undefined : findGitRoot(parent)
-	}
-	const findClensRoot = (dir: string): string | undefined => {
-		if (existsSync(resolve(dir, ".clens"))) return dir
-		const parent = dirname(dir)
-		return parent === dir ? undefined : findClensRoot(parent)
-	}
-	return findGitRoot(start) ?? findClensRoot(start) ?? start
-}
+const findProjectDir = (start: string): string => resolveProjectRoot(start)
 
 // ── Direct execution ───────────────────────────────────────────────
 

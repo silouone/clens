@@ -1,4 +1,14 @@
 export type {
+	AgentMessageEntry,
+	BacktrackEntry,
+	ConversationEntry,
+	PhaseBoundaryEntry,
+	ThinkingEntry,
+	ToolCallEntry,
+	ToolResultEntry,
+	UserPromptEntry,
+} from "./conversation";
+export type {
 	ActiveDurationResult,
 	AgentCommunicationPartner,
 	AgentDistillResult,
@@ -13,15 +23,16 @@ export type {
 	AnalyticsSummaryRow,
 	BacktrackResult,
 	CommunicationEdge,
-	ContextConsumption,
-	ContextConsumptionPoint,
 	CommunicationEdgeType,
 	CommunicationSequenceEntry,
+	ContextConsumption,
+	ContextConsumptionPoint,
 	ConversationGroup,
 	CostBasis,
 	CostEstimate,
 	CumulativeStats,
 	DecisionPoint,
+	DetectionSource,
 	DiffLine,
 	DistilledSession,
 	DistilledSummary,
@@ -35,6 +46,8 @@ export type {
 	FileMapResult,
 	GitDiffHunk,
 	GitDiffResult,
+	GlobalSessionSummary,
+	GoalEntry,
 	GoalUsage,
 	Journey,
 	JourneyPhase,
@@ -60,7 +73,6 @@ export type {
 	WorkflowRun,
 	WorkflowUsage,
 	WorkingTreeChange,
-	GlobalSessionSummary,
 } from "./distill";
 export { COST_BASES } from "./distill";
 export {
@@ -101,6 +113,7 @@ export {
 	type WorktreeCreateLink,
 	type WorktreeRemoveLink,
 } from "./links";
+export type { FileRiskScore, RiskLevel } from "./risk";
 export {
 	ACTIVE_THRESHOLD_MS,
 	CAPTURE_MODES,
@@ -133,14 +146,3 @@ export type {
 	TranscriptReasoning,
 	TranscriptUserMessage,
 } from "./transcript";
-export type {
-	AgentMessageEntry,
-	BacktrackEntry,
-	ConversationEntry,
-	PhaseBoundaryEntry,
-	ThinkingEntry,
-	ToolCallEntry,
-	ToolResultEntry,
-	UserPromptEntry,
-} from "./conversation";
-export type { FileRiskScore, RiskLevel } from "./risk";

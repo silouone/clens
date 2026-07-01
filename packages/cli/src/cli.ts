@@ -308,7 +308,9 @@ const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	config: new Set(["--pricing", "--json", "--global-mode"]),
 	explore: new Set([]),
 	clean: new Set(["--last", "--all", "--force", "--yes"]),
-	export: new Set(["--last"]),
+	// --otel is accepted for back-compat (the otel export was removed); it no
+	// longer changes output but must not hard-error existing scripts.
+	export: new Set(["--last", "--otel"]),
 	what: new Set(["--last", "--json", "--pricing", "--global"]),
 	web: new Set(["--port", "--no-open", "--global"]),
 };

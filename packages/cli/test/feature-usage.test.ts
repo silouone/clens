@@ -1,14 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { detectFeatureFlags, extractFeatureUsage } from "../src/distill/feature-usage";
-import type { StoredEvent } from "../src/types";
+import type { GoalEntry, StoredEvent } from "../src/types";
 
 const SID = "test-session";
 
-const event = (
-	eventType: string,
-	data: Record<string, unknown>,
-	t = 1000,
-): StoredEvent => ({
+// GoalUsage.goals is a (string | GoalEntry)[] union (back-compat); freshly
+// extracted goals are always GoalEntry. Read `.text` regardless of shape.
+const goalText = (g: string | GoalEntry | undefined): string =>
+	g === undefined ? "" : typeof g === "string" ? g : g.text;
+
+const event = (eventType: string, data: Record<string, unknown>, t = 1000): StoredEvent => ({
 	t,
 	event: eventType as StoredEvent["event"],
 	sid: SID,
@@ -30,8 +31,16 @@ describe("extractFeatureUsage", () => {
 
 	test("detects loop from ScheduleWakeup events", () => {
 		const events = [
-			preTool("ScheduleWakeup", { delaySeconds: 270, reason: "watching CI", prompt: "<<autonomous-loop-dynamic>>" }, 1000),
-			preTool("ScheduleWakeup", { delaySeconds: 180, reason: "deploy in progress", prompt: "/loop check status" }, 2000),
+			preTool(
+				"ScheduleWakeup",
+				{ delaySeconds: 270, reason: "watching CI", prompt: "<<autonomous-loop-dynamic>>" },
+				1000,
+			),
+			preTool(
+				"ScheduleWakeup",
+				{ delaySeconds: 180, reason: "deploy in progress", prompt: "/loop check status" },
+				2000,
+			),
 		];
 		const usage = extractFeatureUsage(events);
 		expect(usage?.flags).toEqual(["loop"]);
@@ -64,7 +73,8 @@ describe("extractFeatureUsage", () => {
 			prompt("fix the doc limit. /goal make sure tests pass and the biome check is green"),
 		]);
 		expect(usage?.flags).toEqual(["goal"]);
-		expect(usage?.goal?.goals[0]).toStartWith("/goal make sure tests pass");
+		expect(usage?.goal?.goals[0]).toMatchObject({ source: "command" });
+		expect(goalText(usage?.goal?.goals[0])).toStartWith("/goal make sure tests pass");
 	});
 
 	test("does not flag goal for paths containing /goal", () => {
@@ -77,17 +87,22 @@ describe("extractFeatureUsage", () => {
 
 	test("truncates long goal text", () => {
 		const usage = extractFeatureUsage([prompt(`/goal ${"x".repeat(500)}`)]);
-		const goal = usage?.goal?.goals[0] ?? "";
+		const goal = goalText(usage?.goal?.goals[0]);
 		expect(goal.length).toBeLessThanOrEqual(201);
 		expect(goal.endsWith("…")).toBe(true);
 	});
 
 	test("detects workflow and extracts meta from script", () => {
-		const script = "export const meta = {\n  name: 'pr-audit',\n  description: 'Audit the PR',\n  phases: [],\n}\nconst x = await agent('go')";
+		const script =
+			"export const meta = {\n  name: 'pr-audit',\n  description: 'Audit the PR',\n  phases: [],\n}\nconst x = await agent('go')";
 		const usage = extractFeatureUsage([preTool("Workflow", { script }, 5000)]);
 		expect(usage?.flags).toEqual(["workflow"]);
 		expect(usage?.workflow?.invocation_count).toBe(1);
-		expect(usage?.workflow?.runs[0]).toEqual({ t: 5000, name: "pr-audit", description: "Audit the PR" });
+		expect(usage?.workflow?.runs[0]).toEqual({
+			t: 5000,
+			name: "pr-audit",
+			description: "Audit the PR",
+		});
 	});
 
 	test("workflow run from named workflow and scriptPath", () => {

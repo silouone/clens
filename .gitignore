@@ -51,8 +51,14 @@ deliberation/
 
 specs/
 
-# Internal analytics
-scripts/
+# Internal analytics scripts stay private, BUT the supervised dev launcher under
+# scripts/ ships (README/CONTRIBUTING document `bun run dev`). Ignore the dir's
+# contents, then re-include the launcher files. (Cannot ignore `scripts/` wholesale
+# and re-include children — git won't descend into a fully-ignored dir.)
+scripts/*
+!scripts/dev.ts
+!scripts/lib/
+!scripts/tsconfig.json
 report_kpi_33_sessions.md
 
 # Test artifacts

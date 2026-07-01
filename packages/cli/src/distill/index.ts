@@ -3,7 +3,12 @@
 // be passed in from the CLI caller so this module stays pure.
 import { existsSync, readFileSync } from "node:fs";
 import { readLinks, readSessionEvents } from "../session/read";
-import { readTranscript, readTranscriptWithMeta, resolveTranscriptPath } from "../session/transcript";
+import { scanSessionFiles } from "../session/synthetic-scan";
+import {
+	readTranscript,
+	readTranscriptWithMeta,
+	resolveTranscriptPath,
+} from "../session/transcript";
 import type {
 	AgentNode,
 	ClensConfig,
@@ -18,32 +23,50 @@ import type {
 	TranscriptUserMessage,
 	WorkingTreeChange,
 } from "../types";
-import { buildNameMap, buildTeamMemberSessionMap, filterLinksForSession, isUuidLike } from "../utils";
+import {
+	buildNameMap,
+	buildTeamMemberSessionMap,
+	filterLinksForSession,
+	isUuidLike,
+} from "../utils";
 import { computeActiveDuration } from "./active-duration";
-import { type DiffContext, extractAgentModel, extractTokenUsage, extractUserType } from "./agent-distill";
+import {
+	type DiffContext,
+	extractAgentModel,
+	extractTokenUsage,
+	extractUserType,
+} from "./agent-distill";
 import { enrichNodeWithLinks } from "./agent-enrich";
-import { buildAgentTree, enrichNodeFromSessionEvents, enrichNodeWithTranscript, inferAgentsFromComms } from "./agent-tree";
+import {
+	buildAgentTree,
+	enrichNodeFromSessionEvents,
+	enrichNodeWithTranscript,
+	inferAgentsFromComms,
+} from "./agent-tree";
 import { aggregateTeamData } from "./aggregate";
 import { extractBacktracks } from "./backtracks";
 import { buildCommGraph } from "./comm-graph";
 import { extractAgentLifetimes, extractCommSequence } from "./comm-sequence";
+import { extractContextConsumption } from "./context-consumption";
 import { extractDecisions, extractPhases, extractRawTimingGaps } from "./decisions";
-import { captureMissingDiffs, computeToolSourcedDiff, extractGitDiffAttribution } from "./diff-attribution";
+import {
+	captureMissingDiffs,
+	computeToolSourcedDiff,
+	extractGitDiffAttribution,
+} from "./diff-attribution";
 import { extractEditChains } from "./edit-chains";
-import { extractFeatureUsage } from "./feature-usage";
+import { extractFeatureUsage, type FeatureTextSpan, harvestTranscriptSpans } from "./feature-usage";
 import { extractFileMap } from "./file-map";
 import { extractGitDiff, extractNetChanges } from "./git-diff";
 import { computePlanDrift, detectSpecRef } from "./plan-drift";
-import { extractContextConsumption } from "./context-consumption";
 import { extractReasoning } from "./reasoning";
 import { extractSessionConfig } from "./session-config";
 import { estimateCostFromTokens, extractStats } from "./stats";
 import { extractSummary } from "./summary";
-import { extractTeamMetrics } from "./team";
-import { extractTaskList } from "./task-list";
-import { extractTimeline } from "./timeline";
-import { scanSessionFiles } from "../session/synthetic-scan";
 import { synthesizeSpawnLinks } from "./synthetic-links";
+import { extractTaskList } from "./task-list";
+import { extractTeamMetrics } from "./team";
+import { extractTimeline } from "./timeline";
 import { extractUserMessages } from "./user-messages";
 
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
@@ -60,9 +83,8 @@ const readClensConfig = (projectDir: string): ClensConfig | undefined => {
 		if (typeof raw !== "object" || raw === null) return undefined;
 		const obj = raw as Record<string, unknown>;
 		if (typeof obj.capture !== "boolean") return undefined;
-		const pricing = typeof obj.pricing === "string" && isValidPricingTier(obj.pricing)
-			? obj.pricing
-			: undefined;
+		const pricing =
+			typeof obj.pricing === "string" && isValidPricingTier(obj.pricing) ? obj.pricing : undefined;
 		return { capture: obj.capture, ...(pricing ? { pricing } : {}) };
 	} catch {
 		return undefined;
@@ -112,29 +134,38 @@ const mergeSpawnAndInferredAgents = ({
 }: MergeAgentsParams): readonly AgentNode[] | undefined => {
 	const fromTree = rawAgents?.map((node) => enrichNodeWithLinks(node, sessionLinks, nameMap));
 
-	const teamMemberSessions = sessionLinks.length > 0 ? buildTeamMemberSessionMap(sessionLinks) : undefined;
-	const inferred = sessionLinks.length > 0
-		? inferAgentsFromComms(sessionId, sessionLinks, teamMemberSessions)
-		: [];
+	const teamMemberSessions =
+		sessionLinks.length > 0 ? buildTeamMemberSessionMap(sessionLinks) : undefined;
+	const inferred =
+		sessionLinks.length > 0
+			? inferAgentsFromComms(sessionId, sessionLinks, teamMemberSessions)
+			: [];
 
 	const enrichInferredAgent = (node: AgentNode): AgentNode => {
 		if (!isUuidLike(node.session_id)) return node;
 
 		const agentEvents = readAgentEvents(node.session_id);
-		const fromEvents = agentEvents.length > 0
-			? enrichNodeFromSessionEvents(node, agentEvents, tier)
-			: node;
+		const fromEvents =
+			agentEvents.length > 0 ? enrichNodeFromSessionEvents(node, agentEvents, tier) : node;
 
 		const transcriptPath = resolveTranscriptPath(agentEvents);
 		if (transcriptPath) {
-			return enrichNodeWithTranscript(fromEvents, transcriptPath, readTranscriptFn, diffContext, tier);
+			return enrichNodeWithTranscript(
+				fromEvents,
+				transcriptPath,
+				readTranscriptFn,
+				diffContext,
+				tier,
+			);
 		}
 		return fromEvents;
 	};
 
 	const enrichAndLink = (agents: readonly AgentNode[]): readonly AgentNode[] => {
 		const enriched = agents.map(enrichInferredAgent);
-		const inferredNameMap = new Map(enriched.map((a) => [a.session_id, a.agent_name ?? a.agent_type]));
+		const inferredNameMap = new Map(
+			enriched.map((a) => [a.session_id, a.agent_name ?? a.agent_type]),
+		);
 		const mergedNameMap = nameMap ? new Map([...nameMap, ...inferredNameMap]) : inferredNameMap;
 		return enriched.map((node) => enrichNodeWithLinks(node, sessionLinks, mergedNameMap));
 	};
@@ -151,7 +182,9 @@ const mergeSpawnAndInferredAgents = ({
 		const enrichedNew = enrichAndLink(newAgents);
 
 		const withMostComms = fromTree.reduce((best, node) =>
-			(node.communication_partners?.length ?? 0) > (best.communication_partners?.length ?? 0) ? node : best,
+			(node.communication_partners?.length ?? 0) > (best.communication_partners?.length ?? 0)
+				? node
+				: best,
 		);
 		return fromTree.map((node) =>
 			node.session_id === withMostComms.session_id
@@ -191,6 +224,7 @@ export const distill = async (
 		session_name: string | undefined;
 		user_type: string | undefined;
 		context_consumption: import("../types").ContextConsumption | undefined;
+		feature_spans: readonly FeatureTextSpan[];
 	} = (() => {
 		const tPath = resolveTranscriptPath(events);
 		if (!tPath)
@@ -203,6 +237,7 @@ export const distill = async (
 				session_name: undefined,
 				user_type: undefined,
 				context_consumption: undefined,
+				feature_spans: [],
 			};
 
 		// Single read of the parent transcript yields both entries and the custom title,
@@ -219,6 +254,7 @@ export const distill = async (
 				session_name: sessionName,
 				user_type: undefined,
 				context_consumption: undefined,
+				feature_spans: [],
 			};
 
 		const usage = extractTokenUsage(entries);
@@ -232,11 +268,18 @@ export const distill = async (
 			session_name: sessionName,
 			user_type: extractUserType(entries),
 			context_consumption: extractContextConsumption(entries, model),
+			feature_spans: harvestTranscriptSpans(entries),
 		};
 	})();
 
-	const { reasoning, user_messages, transcript_path, token_usage, transcript_model, context_consumption } =
-		transcriptData;
+	const {
+		reasoning,
+		user_messages,
+		transcript_path,
+		token_usage,
+		transcript_model,
+		context_consumption,
+	} = transcriptData;
 
 	// Resolve pricing tier: CLI override > config file > default "api"
 	const configTier = options?.pricingTier ?? readClensConfig(projectDir)?.pricing ?? "api";
@@ -253,21 +296,38 @@ export const distill = async (
 	const sessionLinks = filterLinksForSession(sessionId, links);
 
 	// Synthesize spawn/stop links for background sub-agents that lack SubagentStart/SubagentStop
-	const syntheticResult = synthesizeSpawnLinks(events, sessionLinks, projectDir, sessionId, scanSessionFiles);
-	const effectiveSessionLinks = syntheticResult.spawns.length > 0
-		? [...sessionLinks, ...syntheticResult.spawns, ...syntheticResult.stops] as readonly LinkEvent[]
-		: sessionLinks;
+	const syntheticResult = synthesizeSpawnLinks(
+		events,
+		sessionLinks,
+		projectDir,
+		sessionId,
+		scanSessionFiles,
+	);
+	const effectiveSessionLinks =
+		syntheticResult.spawns.length > 0
+			? ([
+					...sessionLinks,
+					...syntheticResult.spawns,
+					...syntheticResult.stops,
+				] as readonly LinkEvent[])
+			: sessionLinks;
 
-	const nameMap = effectiveSessionLinks.length > 0 ? buildNameMap(effectiveSessionLinks) : undefined;
+	const nameMap =
+		effectiveSessionLinks.length > 0 ? buildNameMap(effectiveSessionLinks) : undefined;
 
 	// Layer 1: Hook-based extractors (stats receives reasoning + transcript token usage for cost)
 	const stats = extractStats(events, reasoning, token_usage, costTier);
-	const feature_usage = extractFeatureUsage(events);
+	const feature_usage = extractFeatureUsage(events, transcriptData.feature_spans);
 	const session_config = extractSessionConfig(events);
 	const backtracks = extractBacktracks(events);
-	const decisions = extractDecisions(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
+	const decisions = extractDecisions(
+		events,
+		effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined,
+	);
 	const file_map = extractFileMap(events);
-	const git_diff = deep ? await extractGitDiff(sessionId, projectDir, events) : { commits: [], hunks: [] };
+	const git_diff = deep
+		? await extractGitDiff(sessionId, projectDir, events)
+		: { commits: [], hunks: [] };
 
 	// Plan drift detection
 	const allPrompts: readonly string[] = [
@@ -310,8 +370,14 @@ export const distill = async (
 
 	// Also capture diffs for working tree / staged changes not covered by edit chains (--deep only)
 	const git_net_changes = deep ? extractNetChanges(projectDir, events) : [];
-	const allChangedFiles = [...(git_diff.working_tree_changes ?? []), ...(git_diff.staged_changes ?? []), ...git_net_changes];
-	const extraDiffs = deep ? captureMissingDiffs(projectDir, events, git_diffs, allChangedFiles) : [];
+	const allChangedFiles = [
+		...(git_diff.working_tree_changes ?? []),
+		...(git_diff.staged_changes ?? []),
+		...git_net_changes,
+	];
+	const extraDiffs = deep
+		? captureMissingDiffs(projectDir, events, git_diffs, allChangedFiles)
+		: [];
 	const all_git_diffs = [...git_diffs, ...extraDiffs];
 
 	// Tool-sourced is the source of truth for stats and attribution.
@@ -321,9 +387,12 @@ export const distill = async (
 	// Net changes: compute from tool-sourced diffs instead of git
 	const net_changes: readonly WorkingTreeChange[] = tool_sourced_diffs.map((attr) => ({
 		file_path: attr.file_path,
-		status: attr.total_deletions > 0 && attr.total_additions > 0 ? "modified" as const
-			: attr.total_additions > 0 ? "added" as const
-			: "deleted" as const,
+		status:
+			attr.total_deletions > 0 && attr.total_additions > 0
+				? ("modified" as const)
+				: attr.total_additions > 0
+					? ("added" as const)
+					: ("deleted" as const),
 		additions: attr.total_additions,
 		deletions: attr.total_deletions,
 	}));
@@ -347,7 +416,15 @@ export const distill = async (
 	const diffContext: DiffContext = { projectDir, parentEvents: events };
 	const rawAgents =
 		effectiveSessionLinks.length > 0
-			? buildAgentTree(sessionId, effectiveSessionLinks, events, readTranscript, readAgentEvents, diffContext, costTier)
+			? buildAgentTree(
+					sessionId,
+					effectiveSessionLinks,
+					events,
+					readTranscript,
+					readAgentEvents,
+					diffContext,
+					costTier,
+				)
 			: undefined;
 
 	// Merge spawn-based tree with comm-inferred agents (team teammates not captured by spawn links)
@@ -389,13 +466,21 @@ export const distill = async (
 			? new Set(effectiveSessionLinks.filter(isSpawnLink).map((s) => s.agent_id))
 			: undefined;
 	const team_metrics =
-		effectiveSessionLinks.length > 0 ? extractTeamMetrics(effectiveSessionLinks, allAgentIds, sessionId) : undefined;
+		effectiveSessionLinks.length > 0
+			? extractTeamMetrics(effectiveSessionLinks, allAgentIds, sessionId)
+			: undefined;
 	const communication_graph =
-		effectiveSessionLinks.length > 0 ? buildCommGraph(effectiveSessionLinks, finalNameMap) : undefined;
+		effectiveSessionLinks.length > 0
+			? buildCommGraph(effectiveSessionLinks, finalNameMap)
+			: undefined;
 	const comm_sequence =
-		effectiveSessionLinks.length > 0 ? extractCommSequence(effectiveSessionLinks, finalNameMap) : undefined;
+		effectiveSessionLinks.length > 0
+			? extractCommSequence(effectiveSessionLinks, finalNameMap)
+			: undefined;
 	const agent_lifetimes =
-		effectiveSessionLinks.length > 0 ? extractAgentLifetimes(effectiveSessionLinks, finalNameMap) : undefined;
+		effectiveSessionLinks.length > 0
+			? extractAgentLifetimes(effectiveSessionLinks, finalNameMap)
+			: undefined;
 	const task_list =
 		effectiveSessionLinks.length > 0 ? extractTaskList(effectiveSessionLinks) : undefined;
 
@@ -468,7 +553,10 @@ export const distill = async (
 			: rawActiveDuration;
 
 	// Layer 3: Synthesis
-	const phases = extractPhases(events, effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined);
+	const phases = extractPhases(
+		events,
+		effectiveSessionLinks.length > 0 ? effectiveSessionLinks : undefined,
+	);
 	const summary = extractSummary({
 		stats: effectiveStats,
 		backtracks: effectiveBacktracks,

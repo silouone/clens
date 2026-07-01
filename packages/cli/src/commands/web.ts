@@ -58,6 +58,9 @@ export const webCommand = async (options: WebCommandOptions): Promise<void> => {
 	const authUrl = `${handle.url}?token=${handle.token}`;
 
 	console.log(`${bold("cLens Web")} started on ${cyan(handle.url)}`);
+	if (handle.port !== options.port) {
+		console.log(`${dim(`port ${options.port} busy → started on ${handle.port}`)}`);
+	}
 	if (projects && projects.length > 0) {
 		console.log(`${dim("Mode:")}  global (${projects.length} project${projects.length === 1 ? "" : "s"})`);
 	}

@@ -76,13 +76,26 @@ Note: `bun run build` (the JS bundle) is **not** the same as the live compiled b
 
 The dashboard is a SolidJS client served by a Hono API.
 
-Run both together from the repo root with live reload:
+Run both together from the repo root with one supervised command:
 
 ```sh
-bun run dev          # API (global mode) + Vite dev server
+bun run dev          # supervised launcher: API + Vite dev server, auto-ports, auto-open
 ```
 
-Or run the pieces individually:
+`bun run dev` (`scripts/dev.ts`) is the **sole port authority** — it allocates a free
+API port and a free web port, wires the Vite proxy to the API it actually bound
+(`CLENS_API_PORT`), and reaps the **entire process group** (including Vite's `esbuild`
+daemons) on Ctrl-C, so nothing is orphaned. Useful flags:
+
+```sh
+bun run dev --local         # current project only (default is global)
+bun run dev --no-open       # do not auto-open a browser
+bun run dev --api-port N --web-port N   # seed ports (still auto-bumps if busy)
+bun run dev:clean           # clean stale orphan dev processes, then launch
+bun run dev:doctor          # report + clean orphaned dev processes; flags unkillable zombies (reboot to clear)
+```
+
+If you'd rather run the halves in separate terminals (escape hatches, still supported):
 
 ```sh
 bun run dev:api          # Hono API, current project only

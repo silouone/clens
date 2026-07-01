@@ -209,6 +209,31 @@ describe("parseUnifiedDiff", () => {
 		// Then add "inserted" is at newLine=11
 		// Then context "line11" at old=11, new=12
 	});
+
+	test("does not drop add/remove lines whose content begins with -- or ++", async () => {
+		const { parseUnifiedDiff } = await importModule();
+
+		// Inside a hunk, `---`/`+++` prefixes are real content (e.g. CLI flag docs,
+		// SQL/Lua `--` comments, C++ `++count`), NOT file headers.
+		const diff = [
+			"--- a/src/cli-docs.md",
+			"+++ b/src/cli-docs.md",
+			"@@ -1,3 +1,3 @@",
+			" usage:",
+			"--- old flag line",
+			"-- sql comment removed",
+			"+++ new flag line",
+			"++count added",
+		].join("\n");
+
+		const result = parseUnifiedDiff(diff);
+
+		const removes = result.filter((l) => l.type === "remove").map((l) => l.content);
+		const adds = result.filter((l) => l.type === "add").map((l) => l.content);
+
+		expect(removes).toEqual(["-- old flag line", "- sql comment removed"]);
+		expect(adds).toEqual(["++ new flag line", "+count added"]);
+	});
 });
 
 // ---------------------------------------------------------------------------
