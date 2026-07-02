@@ -1,5 +1,6 @@
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import type { DistilledSession } from "../../../shared/types";
+import { anyOverviewWidgetShown, shown } from "../../lib/archived-widgets";
 import type { DetailTabId } from "../../lib/categories";
 import { BottomPanel } from "../BottomPanel";
 import { HeroBand } from "../overview/HeroBand";
@@ -37,14 +38,15 @@ type TabDef = {
 	readonly visible: boolean;
 };
 
-// -- Overview content (HeroBand + bento widget grid) ----------------------
+// -- Overview content (answer card + archived widget grid) -----------------
 //
-// Wave 0 scaffold: the dominant HeroBand on top, then a DashboardGrid of
-// category-channelled widgets wired to real session data. Each widget is a
-// Wave-0 stub (minimal body); Wave 1 builders flesh out one file each. Sparse
-// data is Show-guarded so the sparse fixture renders no empty colored shells
-// (R-E1). `onNavigate` gives every glanceable signal a single-click jump to its
-// sibling tab (R-A5).
+// Session-detail v6 (slice #3): the Overview IS the answer card (HeroBand) —
+// the four tabs own all detail. The former bento grid is dissolved behind the
+// reversible ARCHIVED_WIDGETS flag (lib/archived-widgets.ts): every widget
+// render site is additionally gated by `shown("w_<id>")`, and the grid
+// container itself disappears while every id is archived. Nothing is deleted;
+// removing one id from the set restores that card, its original data guard
+// (Show on session shape) intact.
 
 const OverviewContent: Component<{
 	readonly session: DistilledSession;
@@ -62,65 +64,97 @@ const OverviewContent: Component<{
 		<div class="space-y-3">
 			<HeroBand session={session()} />
 
-			<DashboardGrid>
-				<Show when={session().context_consumption}>
-					<ContextWidget
-						session={session()}
-						isMultiAgent={isMultiAgent()}
-						onNavigate={onNavigate}
-					/>
-				</Show>
+			<Show when={anyOverviewWidgetShown()}>
+				<DashboardGrid>
+					<Show when={shown("w_context") && session().context_consumption}>
+						<ContextWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
 
-				<RiskWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					<Show when={shown("w_risk")}>
+						<RiskWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					</Show>
 
-				<Show when={(session().edit_chains?.chains.length ?? 0) > 0}>
-					<EditsWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
-				</Show>
+					<Show when={shown("w_edits") && (session().edit_chains?.chains.length ?? 0) > 0}>
+						<EditsWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
 
-				<Show when={(session().timeline?.length ?? 0) > 0}>
-					<ActivityWidget
-						session={session()}
-						isMultiAgent={isMultiAgent()}
-						onNavigate={onNavigate}
-					/>
-				</Show>
+					<Show when={shown("w_activity") && (session().timeline?.length ?? 0) > 0}>
+						<ActivityWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
 
-				<Show when={isMultiAgent()}>
-					<AgentsWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
-				</Show>
+					<Show when={shown("w_agents") && isMultiAgent()}>
+						<AgentsWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
 
-				<CostWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
-				<OutcomeWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
-				<FilesWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					<Show when={shown("w_cost")}>
+						<CostWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
+					</Show>
 
-				<Show when={session().session_config}>
-					<ConfigWidget session={session()} isMultiAgent={isMultiAgent()} onNavigate={onNavigate} />
-				</Show>
+					<Show when={shown("w_outcome")}>
+						<OutcomeWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
 
-				<Show when={(session().task_list?.tasks.length ?? 0) > 0}>
-					<TaskPlanWidget
-						session={session()}
-						isMultiAgent={isMultiAgent()}
-						onNavigate={onNavigate}
-					/>
-				</Show>
+					<Show when={shown("w_files")}>
+						<FilesWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
 
-				<Show when={session().feature_usage}>
-					<HarnessFeaturesWidget
-						session={session()}
-						isMultiAgent={isMultiAgent()}
-						onNavigate={onNavigate}
-					/>
-				</Show>
+					<Show when={shown("w_config") && session().session_config}>
+						<ConfigWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
 
-				<Show when={session().reasoning.length > 0}>
-					<ReasoningWidget
-						session={session()}
-						isMultiAgent={isMultiAgent()}
-						onNavigate={onNavigate}
-					/>
-				</Show>
-			</DashboardGrid>
+					<Show when={shown("w_taskplan") && (session().task_list?.tasks.length ?? 0) > 0}>
+						<TaskPlanWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
+
+					<Show when={shown("w_harness") && session().feature_usage}>
+						<HarnessFeaturesWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
+
+					<Show when={shown("w_reasoning") && session().reasoning.length > 0}>
+						<ReasoningWidget
+							session={session()}
+							isMultiAgent={isMultiAgent()}
+							onNavigate={onNavigate}
+						/>
+					</Show>
+				</DashboardGrid>
+			</Show>
 		</div>
 	);
 };

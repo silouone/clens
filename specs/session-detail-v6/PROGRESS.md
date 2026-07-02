@@ -1,0 +1,1 @@
+- [2026-07-02 07:10 UTC] #3 I1 built: Overview grid dissolved behind reversible ARCHIVED_WIDGETS flag (lib/archived-widgets.ts); all 12 widgets gated via shown(), grid container gated via anyOverviewWidgetShown(); nothing deleted; 11-test grid-dissolution gate green.
