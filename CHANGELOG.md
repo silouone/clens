@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-04
+
+First public npm release. Builds on the 0.3.0 monorepo + web dashboard foundation
+with an "instrument"-style dashboard redesign, richer session detail, cross-repo
+mode, and a wave of distill-accuracy fixes.
+
+### Added
+
+#### Instrument Dashboard Redesign
+- Reworked the web overview into an instrument-panel layout: `StatTile` and `Widget`
+  primitives, a consolidated `HeroBand`, and data-driven widget composition
+- Overview grid now hides empty/low-signal widgets behind an `archived_widgets`
+  fold so solo and lightweight sessions stay uncluttered
+- Sibling-tab rework: Backtracks / Timeline / Edits / Communication restyled for a
+  consistent instrument aesthetic
+- Session-detail v6 pass: tighter panel hierarchy, removed redundant nested
+  scrollers, calmer typographic rhythm
+
+#### Session Config / Environment Panel
+- New per-session Config / Environment surface (git branch, commit, model, pricing
+  tier, worktree) captured at hook time and rendered in `report`, `what`, and the
+  web detail view
+- `session-config` distiller expanded to aggregate MCP servers and settings context
+
+#### Global Multi-Repo Mode
+- `--global` across `list`, `distill`, `what`, and `web` aggregates sessions from
+  every registered project
+- `config --global-mode <repository|project>` controls discovery granularity
+- New `session/global-read` module for cross-project session enumeration
+
+#### Landing Page
+- `landing/index.html` — static clens.dev marketing page (local-first messaging,
+  dashboard screenshots, dark/light aware), zero external runtime dependencies
+
+### Fixed
+
+#### Distill Accuracy
+- Narrative now leads with wall span and reconciles with the DURATION tile
+  (span vs active no longer disagree)
+- Duration/active-duration, pricing, and cost wiring corrected end-to-end
+- Debugging-loop detection gate tightened; ghost sessions and torn last-lines handled
+- Global analytics fallback and child-session live-filtering fixes
+
+#### Web
+- Auth token now persists across SPA navigation (no more prod-mode 401s after routing)
+- Removed a redundant nested scroller in the session-detail tabs
+
+### Changed
+- Supervised dev launcher (`scripts/dev.ts` + `scripts/lib/`) is the sole port
+  authority — picks free API/web ports, wires the Vite proxy, and group-reaps the
+  entire process tree (incl. esbuild daemons) on Ctrl-C
+- `bun run dev:doctor` reports and cleans orphaned dev processes
+
 ## [0.3.0] - 2026-03-08
 
 ### Breaking Changes
@@ -281,7 +334,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero-dependency, local-first architecture
 - Compiled binary support via `bun build --compile`
 
-[Unreleased]: https://github.com/silouone/clens/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/silouone/clens/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/silouone/clens/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/silouone/clens/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/silouone/clens/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/silouone/clens/compare/v0.1.0...v0.2.0
