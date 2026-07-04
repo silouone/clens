@@ -59,6 +59,7 @@ scripts/*
 !scripts/dev.ts
 !scripts/lib/
 !scripts/tsconfig.json
+!scripts/verify-pack.mjs
 report_kpi_33_sessions.md
 
 # Test artifacts
