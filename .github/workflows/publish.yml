@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # OIDC token for npm publish provenance (--provenance). An explicit
+      # permissions block replaces the default set, so id-token must be listed
+      # alongside contents or provenance is silently disabled.
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -20,6 +24,15 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - run: bun install
+      - name: Verify tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./packages/cli/package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match packages/cli version '$PKG'"
+            exit 1
+          fi
+          echo "Tag and version agree: $PKG"
       - name: Typecheck
         run: bun run typecheck
       - name: Test
@@ -28,7 +41,10 @@ jobs:
         run: bun run lint
       - name: Build
         run: bun run build
-      - name: Publish
-        run: npm publish
+      - name: Verify pack contents (web bundle + types)
+        run: node scripts/verify-pack.mjs packages/cli
+      - name: Publish (packages/cli only — root is private)
+        working-directory: packages/cli
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

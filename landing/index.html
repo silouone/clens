@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>cLens — See how your coding agent actually reasoned</title>
+  <meta name="description" content="Local-first observability for Claude Code. Zero instrumentation, never phones home. Reconstruct any coding session from local JSONL — backtracks, decision trace, edit-chains, plan-drift." />
+  <link rel="canonical" href="https://clens.dev/" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230A0C0B'/%3E%3Crect x='4' y='4' width='8' height='8' rx='1' fill='%2333FF99'/%3E%3C/svg%3E" />
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="cLens — See how your coding agent actually reasoned" />
+  <meta property="og:description" content="Local-first observability for Claude Code. Zero instrumentation, never phones home." />
+  <meta property="og:url" content="https://clens.dev/" />
+  <meta property="og:image" content="https://clens.dev/assets/dashboard-detail.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="cLens — See how your coding agent actually reasoned" />
+  <meta name="twitter:description" content="Local-first observability for Claude Code. Zero instrumentation, never phones home." />
+
+  <!-- No-flash theme bootstrap: default to stored pref, else prefers-color-scheme -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("clens-theme");
+        var theme = stored || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {}
+    })();
+  </script>
+
+  <style>
+    /* ── INSTRUMENT tokens (ported verbatim from packages/web/src/client/index.css) ── */
+    :root {
+      --clens-brand: #0A8754;
+      --clens-surface: #F7F7F5;
+      --clens-surface-raised: #FCFCFB;
+      --clens-surface-overlay: #FFFFFF;
+      --clens-muted: #6B6F6C;
+      --clens-accent: #0A8754;
+      --clens-success: #0A8754;
+      --clens-warning: #9A6700;
+      --clens-danger: #B42318;
+      --clens-text-primary: #1A1C1B;
+      --clens-text-secondary: #3D413F;
+      --clens-text-muted: #767A77;
+      --clens-border: #D8D8D4;
+      --clens-surface-hover: #EFEFEC;
+      --clens-surface-selected: #E6F2EC;
+      --clens-surface-inset: #F1F1EE;
+      --clens-hairline: #D8D8D4;
+      --clens-tick: #C4C4BF;
+      --clens-live: #0A8754;
+      --clens-grain: rgba(26, 28, 27, 0.015);
+    }
+    [data-theme="dark"] {
+      --clens-brand: #33FF99;
+      --clens-surface: #0A0C0B;
+      --clens-surface-raised: #0F1211;
+      --clens-surface-overlay: #141816;
+      --clens-muted: #7E8A84;
+      --clens-accent: #33FF99;
+      --clens-success: #33FF99;
+      --clens-warning: #FFB000;
+      --clens-danger: #FF6B5E;
+      --clens-text-primary: #C8D1CC;
+      --clens-text-secondary: #9BA7A1;
+      --clens-text-muted: #6E7A74;
+      --clens-border: #1E2220;
+      --clens-surface-hover: #161A18;
+      --clens-surface-selected: #0E2A1E;
+      --clens-surface-inset: #0D100F;
+      --clens-hairline: #1E2220;
+      --clens-tick: #232826;
+      --clens-live: #33FF99;
+      --clens-grain: rgba(200, 209, 204, 0.012);
+    }
+
+    /* ── Reset / base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-feature-settings: "tnum", "cv02";
+      background-color: var(--clens-surface);
+      color: var(--clens-text-primary);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      /* Faint scanline + grain — gated by prefers-reduced-motion below */
+      background-image: repeating-linear-gradient(0deg, var(--clens-grain) 0px, var(--clens-grain) 1px, transparent 1px, transparent 3px);
+      background-attachment: fixed;
+    }
+    @media (prefers-reduced-motion: reduce) { body { background-image: none; } }
+
+    .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+    a { color: inherit; }
+    img { max-width: 100%; height: auto; display: block; }
+
+    h1, h2, h3 { margin: 0 0 .4em; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; }
+    p { margin: 0 0 1rem; }
+
+    /* ── Motifs ── */
+    .microcaps {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+      font-size: .72rem;
+      color: var(--clens-text-muted);
+    }
+    .ruler {
+      height: 6px;
+      background-image: repeating-linear-gradient(90deg, var(--clens-tick) 0px, var(--clens-tick) 1px, transparent 1px, transparent 8px);
+      opacity: .9;
+    }
+    .led {
+      display: inline-block; width: 7px; height: 7px; border-radius: 1px;
+      background: var(--clens-live);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--clens-live) 35%, transparent);
+    }
+
+    /* ── Layout ── */
+    .wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; }
+    section { padding: 4.5rem 0; border-top: 1px solid var(--clens-hairline); }
+    section:first-of-type { border-top: none; }
+    .section-head { margin-bottom: 2rem; }
+    .section-head .ruler { margin-top: .6rem; max-width: 140px; }
+
+    /* ── Nav ── */
+    header.nav {
+      position: sticky; top: 0; z-index: 50;
+      background: color-mix(in srgb, var(--clens-surface) 88%, transparent);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--clens-hairline);
+    }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+    .brand { display: flex; align-items: center; gap: .5rem; font-weight: 600; letter-spacing: -0.02em; font-size: 1.05rem; text-decoration: none; }
+    .nav-links { display: flex; align-items: center; gap: 1.25rem; }
+    .nav-links a { text-decoration: none; color: var(--clens-text-secondary); font-size: .9rem; }
+    .nav-links a:hover { color: var(--clens-text-primary); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: .45rem;
+      padding: .6rem 1.1rem; border-radius: 2px; font-size: .92rem; font-weight: 500;
+      text-decoration: none; cursor: pointer; border: 1px solid var(--clens-border);
+      background: var(--clens-surface-raised); color: var(--clens-text-primary);
+      transition: background .12s ease, border-color .12s ease;
+    }
+    .btn:hover { background: var(--clens-surface-hover); }
+    .btn-primary { background: var(--clens-brand); border-color: var(--clens-brand); color: #06120C; font-weight: 600; }
+    [data-theme="light"] .btn-primary { color: #FFFFFF; }
+    .btn-primary:hover { background: color-mix(in srgb, var(--clens-brand) 88%, #000); }
+    .btn-sm { padding: .4rem .7rem; font-size: .82rem; }
+
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 2px; border: 1px solid var(--clens-border);
+      background: var(--clens-surface-raised); cursor: pointer; color: var(--clens-text-secondary);
+    }
+    .icon-btn:hover { background: var(--clens-surface-hover); color: var(--clens-text-primary); }
+
+    :focus-visible { outline: 2px solid var(--clens-brand); outline-offset: 2px; }
+
+    /* ── Hero ── */
+    .hero { padding-top: 4rem; }
+    .eyebrow { display: inline-block; margin-bottom: 1.1rem; }
+    .hero h1 { font-size: clamp(2rem, 5.5vw, 3.4rem); max-width: 16ch; }
+    .hero .sub { font-size: clamp(1.05rem, 2.2vw, 1.3rem); color: var(--clens-text-secondary); max-width: 56ch; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1.6rem 0 1.4rem; }
+
+    /* ── Code / install block ── */
+    .code-block {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      background: var(--clens-surface-inset); border: 1px solid var(--clens-border);
+      border-radius: 2px; padding: .85rem 1rem; max-width: 460px;
+    }
+    .code-block code { font-size: .95rem; color: var(--clens-text-primary); min-width: 0; overflow-x: auto; white-space: nowrap; }
+    .code-block code .prompt { color: var(--clens-text-muted); }
+    .copy-note { font-size: .75rem; color: var(--clens-text-muted); margin-top: .55rem; }
+
+    .codeblock-multi {
+      background: var(--clens-surface-inset); border: 1px solid var(--clens-border);
+      border-radius: 2px; padding: 1rem 1.1rem; overflow-x: auto;
+    }
+    .codeblock-multi pre { margin: 0; }
+    .codeblock-multi .prompt { color: var(--clens-text-muted); }
+    .codeblock-multi .comment { color: var(--clens-text-muted); }
+
+    /* ── Hero image bezel ── */
+    .bezel { margin-top: 3rem; border: 1px solid var(--clens-border); border-radius: 2px; background: var(--clens-surface-raised); overflow: hidden; }
+    .bezel-bar { display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; border-bottom: 1px solid var(--clens-hairline); }
+    .bezel-bar .led { width: 6px; height: 6px; }
+    .bezel-bar .label { font-size: .72rem; }
+    .bezel img { width: 100%; }
+
+    /* ── Trust strip ── */
+    .badges { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .badge { font-size: .76rem; padding: .3rem .6rem; border: 1px solid var(--clens-border); border-radius: 2px; color: var(--clens-text-secondary); background: var(--clens-surface-raised); }
+
+    /* ── Value props ── */
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--clens-hairline); border: 1px solid var(--clens-hairline); border-radius: 2px; overflow: hidden; }
+    .grid-3 > .cell { background: var(--clens-surface); padding: 1.5rem; }
+    .cell .stat { font-size: 1.05rem; color: var(--clens-brand); margin: .35rem 0 .6rem; }
+    .cell h3 { font-size: 1rem; }
+    .cell p { font-size: .92rem; color: var(--clens-text-secondary); margin: 0; }
+
+    /* ── Feature blocks ── */
+    .features { display: grid; gap: 2.5rem; }
+    .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+    .feature:nth-child(even) .feature-media { order: -1; }
+    .feature h3 { font-size: 1.3rem; }
+    .feature p { color: var(--clens-text-secondary); margin: 0; }
+    .feature .tag { margin-bottom: .6rem; }
+    .feature-media { border: 1px solid var(--clens-border); border-radius: 2px; overflow: hidden; background: var(--clens-surface-raised); }
+
+    /* ── Steps ── */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    .step { border: 1px solid var(--clens-hairline); border-radius: 2px; padding: 1.25rem; background: var(--clens-surface-raised); }
+    .step .num { font-size: .85rem; color: var(--clens-brand); }
+    .step code { font-size: .9rem; }
+    .step p { font-size: .9rem; color: var(--clens-text-secondary); margin: .5rem 0 0; }
+
+    /* ── Pricing ── */
+    .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .plan { border: 1px solid var(--clens-border); border-radius: 2px; padding: 1.5rem; background: var(--clens-surface-raised); display: flex; flex-direction: column; }
+    .plan.featured { border-color: var(--clens-brand); }
+    .plan .price { font-size: 2rem; margin: .5rem 0 .15rem; }
+    .plan .price small { font-size: .9rem; color: var(--clens-text-muted); font-weight: 400; }
+    .plan .yr { font-size: .8rem; color: var(--clens-text-muted); margin-bottom: 1rem; }
+    .plan .for { font-size: .85rem; color: var(--clens-text-secondary); min-height: 2.4em; }
+    .plan ul { list-style: none; padding: 0; margin: 1rem 0 1.25rem; flex: 1; }
+    .plan li { font-size: .86rem; padding: .35rem 0; border-top: 1px solid var(--clens-hairline); color: var(--clens-text-secondary); }
+    .plan li::before { content: "+ "; color: var(--clens-brand); }
+    .plan li.off { color: var(--clens-text-muted); }
+    .plan li.off::before { content: "— "; color: var(--clens-text-muted); }
+    .plan .btn { width: 100%; justify-content: center; }
+    .pricing-note { font-size: .8rem; color: var(--clens-text-muted); margin-top: 1.25rem; }
+
+    /* ── FAQ ── */
+    .faq details { border-top: 1px solid var(--clens-hairline); padding: 1rem 0; }
+    .faq details:last-child { border-bottom: 1px solid var(--clens-hairline); }
+    .faq summary { cursor: pointer; font-weight: 500; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; color: var(--clens-brand); font-family: "IBM Plex Mono", monospace; }
+    .faq details[open] summary::after { content: "−"; }
+    .faq p { margin: .75rem 0 0; color: var(--clens-text-secondary); font-size: .92rem; }
+
+    /* ── Final CTA ── */
+    .final { text-align: center; }
+    .final .code-block { margin: 1.5rem auto 0; }
+    .final .cta-row { justify-content: center; }
+
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--clens-hairline); padding: 2.5rem 0; }
+    .footer-inner { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; align-items: center; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+    .footer-links a { text-decoration: none; color: var(--clens-text-secondary); font-size: .88rem; }
+    .footer-links a:hover { color: var(--clens-text-primary); }
+    .footer-note { font-size: .8rem; color: var(--clens-text-muted); }
+
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      .feature, .grid-3, .steps, .pricing { grid-template-columns: 1fr; }
+      .feature:nth-child(even) .feature-media { order: 0; }
+      .grid-3 { gap: 1px; }
+    }
+    @media (max-width: 600px) {
+      section { padding: 3rem 0; }
+      .nav-links .nav-hide { display: none; }
+      .cta-row .btn { flex: 1; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ── NAV ── -->
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top"><span class="led"></span><span class="mono">clens</span></a>
+      <nav class="nav-links">
+        <a class="nav-hide" href="https://github.com/silouone/clens#readme">Docs</a>
+        <a class="nav-hide" href="#pricing">Pricing</a>
+        <a href="https://github.com/silouone/clens">GitHub</a>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
+          <span aria-hidden="true" id="theme-icon">◐</span>
+        </button>
+        <a class="btn btn-sm btn-primary" href="#get-started">Get started</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ── HERO ── -->
+    <section class="hero">
+      <div class="wrap">
+        <span class="eyebrow microcaps">Local-first · Claude Code · MIT</span>
+        <h1>See how your coding agent actually reasoned.</h1>
+        <p class="sub">Local-first observability for Claude Code. Zero instrumentation, never phones home — cLens reconstructs any session from the JSONL Claude Code already writes.</p>
+
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#get-started">Get started</a>
+          <a class="btn" href="https://github.com/silouone/clens">View on GitHub</a>
+        </div>
+
+        <div class="code-block" id="install-hero">
+          <code class="mono"><span class="prompt">$ </span><span id="install-cmd">npm i -g clens &amp;&amp; clens init</span></code>
+          <button class="icon-btn btn-sm" data-copy="npm i -g clens &amp;&amp; clens init" aria-label="Copy install command">Copy</button>
+        </div>
+        <!-- BUILD NOTE (LAND-2 / D1): canonical npm name resolved to `clens` (the public name). Publish under `clens` is still pending — no creds in the autonomous run — so confirm `npm i -g clens` installs end-to-end BEFORE DNS cutover. -->
+        <p class="copy-note"><span class="mono">clens</span> is the public package name — npm publish is pending; verify it installs before relying on it.</p>
+
+        <div class="bezel">
+          <div class="bezel-bar">
+            <span class="led"></span><span class="led" style="background:var(--clens-warning);box-shadow:none"></span><span class="led" style="background:var(--clens-danger);box-shadow:none"></span>
+            <span class="label microcaps mono">clens — session detail</span>
+          </div>
+          <img src="assets/dashboard-detail.png" width="1440" height="900"
+               alt="cLens session detail — agent timeline with backtracks, decision points, and reasoning trace." loading="lazy" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TRUST STRIP ── -->
+    <section>
+      <div class="wrap">
+        <p class="microcaps" style="margin-bottom:1rem">What it is</p>
+        <div class="badges">
+          <span class="badge mono">MIT</span>
+          <span class="badge mono">100% LOCAL</span>
+          <span class="badge mono">ZERO NETWORK</span>
+          <span class="badge mono">~2ms / EVENT</span>
+          <span class="badge mono">20+ EXTRACTORS</span>
+          <span class="badge mono">CLI · TUI · DASHBOARD</span>
+        </div>
+        <p style="margin-top:1.25rem;color:var(--clens-text-secondary);max-width:60ch">
+          cLens reads the JSONL Claude Code already writes via native hooks, stores everything in a local
+          <code class="mono">.clens/</code> folder in your repo, and distills it offline. Nothing is uploaded, ever.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── VALUE PROPS ── -->
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Why cLens</h2>
+          <div class="ruler"></div>
+        </div>
+        <div class="grid-3">
+          <div class="cell">
+            <p class="microcaps">How, not just how much</p>
+            <p class="stat mono">decision trace</p>
+            <p>Other tools meter cost and tokens. cLens reconstructs the decision trace — backtracks, decision points, edit-chains, and plan-drift.</p>
+          </div>
+          <div class="cell">
+            <p class="microcaps">100% local</p>
+            <p class="stat mono">~2ms / event</p>
+            <p>No SDK to wire up, no collector, no server, no account. Native hooks append events to flat JSONL. Your traces never leave your machine.</p>
+          </div>
+          <div class="cell">
+            <p class="microcaps">Honest by design</p>
+            <p class="stat mono">estimated, labeled</p>
+            <p>Cost is labeled estimated, decisions are labeled structural, outcomes by completion + files touched. cLens never invents precision it doesn't have.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PROBLEM ── -->
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <h2>The transcript tells you what your agent typed. Not why.</h2>
+          <div class="ruler"></div>
+        </div>
+        <p style="max-width:62ch;color:var(--clens-text-secondary)">
+          When a Claude Code agent runs 40 minutes, edits a dozen files, backtracks twice and spawns sub-agents,
+          the chat log is a wall of text. You can't see where it changed its mind, which reasoning produced which
+          edit, or where it drifted from the plan. Production LLM-observability tools don't help — they're built to
+          meter tokens in deployed apps, not to reconstruct a coding session. So you scroll, and guess.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── FEATURES ── -->
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <h2>What it surfaces</h2>
+          <div class="ruler"></div>
+        </div>
+        <div class="features">
+          <article class="feature">
+            <div>
+              <p class="tag microcaps">Decision trace</p>
+              <h3>See where it changed course.</h3>
+              <p>Backtracks and structural decision points laid out on a timeline, traced to the reasoning text behind them. cLens surfaces where the run pivoted — it doesn't judge it.</p>
+            </div>
+            <div class="feature-media">
+              <img src="assets/dashboard-sessions.png" width="1440" height="900"
+                   alt="cLens dashboard session list — local Claude Code sessions with duration, tool counts, and estimated cost." loading="lazy" />
+            </div>
+          </article>
+
+          <article class="feature">
+            <div>
+              <p class="tag microcaps">Edit chains · plan drift</p>
+              <h3>Connect thinking to code.</h3>
+              <p>Each file change linked back to the thinking block that produced it — including edits the agent later abandoned. Point it at your spec and it diffs intended vs. actual.</p>
+            </div>
+            <div class="feature-media">
+              <img src="assets/dashboard-detail.png" width="1440" height="900"
+                   alt="cLens session detail — edit chains binding reasoning blocks to the file edits they produced." loading="lazy" />
+            </div>
+          </article>
+
+          <article class="feature">
+            <div>
+              <p class="tag microcaps">Multi-agent · cross-session</p>
+              <h3>Map the team, across every run.</h3>
+              <p>Communication graph and per-agent metrics when a session spawns sub-agents, plus cross-session analytics over your whole history. Cost shown is labeled estimated. <span style="color:var(--clens-text-muted)">(Multi-agent collaboration is a Team-tier feature.)</span></p>
+            </div>
+            <div class="feature-media">
+              <img src="assets/dashboard-insights.png" width="1440" height="900"
+                   alt="cLens insights — cross-session analytics including plan-drift scatter." loading="lazy" />
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PRIVACY ── -->
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Your code never leaves your machine.</h2>
+          <div class="ruler"></div>
+        </div>
+        <p style="max-width:62ch;color:var(--clens-text-secondary)">
+          cLens has no server, no cloud, no account, no telemetry. A compiled hook binary appends events to flat
+          JSONL in your repo at ~2ms per event. Full tool-call payloads are written locally, so you own the data —
+          and nothing is ever transmitted. MIT licensed: read the capture path yourself.
+        </p>
+        <div class="cta-row">
+          <a class="btn" href="https://github.com/silouone/clens/tree/main/packages/cli/src/capture">Read the capture code</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── HOW IT WORKS ── -->
+    <section id="get-started">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Get started in two commands</h2>
+          <div class="ruler"></div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <p class="num mono">01</p>
+            <code class="mono">npm i -g clens</code>
+            <p>Install the CLI.</p>
+          </div>
+          <div class="step">
+            <p class="num mono">02</p>
+            <code class="mono">clens init</code>
+            <p>Register the Claude Code hooks — one time, per repo.</p>
+          </div>
+          <div class="step">
+            <p class="num mono">03</p>
+            <code class="mono">clens</code>
+            <p>Open the local dashboard, or run <code class="mono">clens distill</code> / <code class="mono">clens what --last</code> in the terminal.</p>
+          </div>
+        </div>
+        <div class="codeblock-multi mono" style="margin-top:1.5rem;max-width:560px">
+          <pre><span class="prompt">$ </span>npm i -g clens
+<span class="prompt">$ </span>clens init
+<span class="comment"># use Claude Code normally, then…</span>
+<span class="prompt">$ </span>clens distill --last &amp;&amp; clens what --last</pre>
+        </div>
+        <!-- BUILD NOTE (LAND-2 / D1): canonical npm name resolved to `clens` (the public name). Publish under `clens` is still pending — no creds in the autonomous run — so confirm `npm i -g clens` installs end-to-end BEFORE DNS cutover. -->
+        <p class="copy-note"><span class="mono">clens</span> is the public package name — npm publish is pending; verify it installs before relying on it.</p>
+      </div>
+    </section>
+
+    <!-- ── PRICING ── -->
+    <section id="pricing">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Pricing</h2>
+          <div class="ruler"></div>
+        </div>
+        <div class="pricing">
+          <div class="plan">
+            <p class="microcaps">Free</p>
+            <p class="price mono">$0</p>
+            <p class="yr mono">forever · MIT</p>
+            <p class="for">Try it; capture sessions and read the raw timeline.</p>
+            <ul>
+              <li>Capture (hooks, JSONL, ~2ms)</li>
+              <li>Local raw viewer / <span class="mono">clens what</span></li>
+              <li class="off">Full distill (20+ extractors)</li>
+              <li class="off">Web dashboard + analytics</li>
+              <li class="off">Multi-agent + cloud sync</li>
+            </ul>
+            <a class="btn" href="https://github.com/silouone/clens">Get the binary</a>
+          </div>
+
+          <div class="plan featured">
+            <p class="microcaps">Individual</p>
+            <p class="price mono">$12<small> / mo</small></p>
+            <p class="yr mono">$120 / yr · 2 months free</p>
+            <p class="for">Solo devs who want the full local analysis suite.</p>
+            <ul>
+              <li>Everything in Free</li>
+              <li>Full distill (20+ extractors)</li>
+              <li>Backtracks · decision trace · edit-chains · plan-drift</li>
+              <li>Web dashboard + cross-session analytics</li>
+              <li>OTel GenAI export</li>
+            </ul>
+            <a class="btn btn-primary" href="mailto:silouane.galinou.dev@gmail.com?subject=cLens%20Individual%20—%20notify%20me&amp;body=I%27d%20like%20to%20be%20notified%20when%20the%20cLens%20Individual%20license%20is%20available.">Notify me</a>
+          </div>
+
+          <div class="plan">
+            <p class="microcaps">Team</p>
+            <p class="price mono">$24<small> / seat / mo</small></p>
+            <p class="yr mono">$240 / seat / yr · 3-seat min</p>
+            <p class="for">Teams running multi-agent workflows together.</p>
+            <ul>
+              <li>Everything in Individual</li>
+              <li>Multi-agent comm-graph + team metrics</li>
+              <li>Cloud sync + shared sessions</li>
+              <li>Collaboration (future)</li>
+            </ul>
+            <a class="btn" href="mailto:silouane.galinou.dev@gmail.com?subject=cLens%20Team%20—%20notify%20me&amp;body=I%27d%20like%20to%20be%20notified%20when%20cLens%20Team%20is%20available.">Notify me</a>
+          </div>
+        </div>
+        <p class="pricing-note">
+          Open-core: capture + raw viewing are free and MIT forever. Individual is a license key unlocking the full
+          local suite (zero backend). Team adds the cloud-sync/collab backend — that's what the ~2× seat premium funds.
+          Annual ≈ 17% off. Pricing is per seat, never per trace.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── FAQ ── -->
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <h2>FAQ</h2>
+          <div class="ruler"></div>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Does cLens send my code anywhere?</summary>
+            <p>No. Zero network; everything stays in a local <code class="mono">.clens/</code> folder in your repo.</p>
+          </details>
+          <details>
+            <summary>How is this different from ccusage?</summary>
+            <p>ccusage meters cost and tokens from the same local JSONL. cLens adds the decision analysis — backtracks, edit-chains, plan-drift — what it did, not just what it cost.</p>
+          </details>
+          <details>
+            <summary>How is this different from Langfuse / Phoenix / LangSmith?</summary>
+            <p>Those instrument production LLM apps and ship traces to a server. cLens is zero-setup, local, and Claude-Code-specific.</p>
+          </details>
+          <details>
+            <summary>Are the cost numbers exact?</summary>
+            <p>No — they're estimated (cache reads dominate token accounting). We label them as such throughout the UI.</p>
+          </details>
+          <details>
+            <summary>Is it really free / open source?</summary>
+            <p>Yes, MIT. Capture and raw viewing are free forever; paid tiers unlock the full analysis suite and team/cloud features.</p>
+          </details>
+          <details>
+            <summary>Do you support OpenAI / other agents?</summary>
+            <p>Today: Claude Code. OpenTelemetry GenAI export lets you interoperate with other tooling.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── FINAL CTA ── -->
+    <section class="final">
+      <div class="wrap">
+        <h2>See how your agent actually reasoned.</h2>
+        <p style="color:var(--clens-text-secondary);max-width:48ch;margin-inline:auto">Local-first, open source, two commands to start.</p>
+        <div class="code-block">
+          <code class="mono"><span class="prompt">$ </span>npm i -g clens &amp;&amp; clens init</code>
+          <button class="icon-btn btn-sm" data-copy="npm i -g clens &amp;&amp; clens init" aria-label="Copy install command">Copy</button>
+        </div>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/silouone/clens">View on GitHub</a>
+          <a class="btn" href="https://www.npmjs.com/package/clens">npm</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="wrap">
+      <div class="ruler" style="margin-bottom:1.5rem"></div>
+      <div class="footer-inner">
+        <div class="footer-links">
+          <a href="https://github.com/silouone/clens">GitHub</a>
+          <a href="https://www.npmjs.com/package/clens">npm</a>
+          <a href="https://github.com/silouone/clens#readme">Docs</a>
+          <a href="https://github.com/silouone/clens/blob/main/CHANGELOG.md">Changelog</a>
+          <a href="https://github.com/silouone/clens/blob/main/LICENSE">License (MIT)</a>
+        </div>
+        <div class="footer-note"><span class="mono">clens</span> · built for Claude Code · clens.dev</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ── Theme toggle (persists to the same key the dashboard uses) ──
+    (function () {
+      var root = document.documentElement;
+      var btn = document.getElementById("theme-toggle");
+      function apply(theme) { root.setAttribute("data-theme", theme); try { localStorage.setItem("clens-theme", theme); } catch (e) {} }
+      if (btn) {
+        btn.addEventListener("click", function () {
+          apply(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+        });
+      }
+    })();
+
+    // ── Copy-to-clipboard for install commands ──
+    (function () {
+      document.querySelectorAll("[data-copy]").forEach(function (el) {
+        el.addEventListener("click", function () {
+          var text = el.getAttribute("data-copy");
+          var done = function () { var t = el.textContent; el.textContent = "✓"; setTimeout(function () { el.textContent = t; }, 1200); };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(function () {});
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

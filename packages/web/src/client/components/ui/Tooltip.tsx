@@ -1,0 +1,21 @@
+import { Tooltip as KTooltip } from "@kobalte/core/tooltip";
+import type { Component, JSX } from "solid-js";
+
+type TooltipProps = {
+	readonly content: string;
+	readonly children: JSX.Element;
+};
+
+export const Tooltip: Component<TooltipProps> = (props) => (
+	<KTooltip>
+		<KTooltip.Trigger as="span" class="inline-flex">
+			{props.children}
+		</KTooltip.Trigger>
+		<KTooltip.Portal>
+			<KTooltip.Content class="z-50 rounded-none border border-clens bg-surface-overlay px-2.5 py-1.5 text-xs text-secondary">
+				<KTooltip.Arrow />
+				{props.content}
+			</KTooltip.Content>
+		</KTooltip.Portal>
+	</KTooltip>
+);

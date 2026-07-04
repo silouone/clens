@@ -43,11 +43,32 @@ ai_docs/
 docs/
 cli-review/
 
+# Internal deliberation / self-criticism (not part of the open source project)
+deliberation/
+
 # cLens local capture data
 .clens/
 
 specs/
 
-# Internal analytics
-scripts/
+# Internal analytics scripts stay private, BUT the supervised dev launcher under
+# scripts/ ships (README/CONTRIBUTING document `bun run dev`). Ignore the dir's
+# contents, then re-include the launcher files. (Cannot ignore `scripts/` wholesale
+# and re-include children — git won't descend into a fully-ignored dir.)
+scripts/*
+!scripts/dev.ts
+!scripts/lib/
+!scripts/tsconfig.json
+!scripts/verify-pack.mjs
 report_kpi_33_sessions.md
+
+# Test artifacts
+.playwright-cli/
+screenshots/
+ai_review/
+.verify.json
+
+# Generated/placeholder image assets (not real product assets)
+**/Gemini_Generated_Image*
+# Stray root-level asset dump (real product assets live in packages/web/src/client/assets)
+/assets/

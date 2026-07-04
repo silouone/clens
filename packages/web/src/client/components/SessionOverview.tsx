@@ -1,0 +1,242 @@
+import { type Component, createMemo, createSignal, Show } from "solid-js";
+import type { DistilledSession } from "../../shared/types";
+import { formatCost, formatDuration, formatPercentage, truncateMultiline } from "../lib/format";
+import { renderPlainText } from "../lib/markdown";
+import { CostDrilldown } from "./CostDrilldown";
+import { TimelineBar } from "./TimelineBar";
+import { Card } from "./ui/Card";
+import { MetaRow } from "./ui/MetaRow";
+
+// -- Types ----------------------------------------------------------------
+
+type SessionOverviewProps = {
+	readonly session: DistilledSession;
+	readonly onRedistill?: () => Promise<void>;
+};
+
+// -- Pure helpers ---------------------------------------------------------
+
+const stripHtml = (text: string): string => text.replace(/<[^>]+>/g, "");
+
+const findFirstPrompt = (messages: DistilledSession["user_messages"]): string | undefined => {
+	const msg = messages.find((m) => !m.message_type || m.message_type === "prompt");
+	if (!msg) return undefined;
+	const clean = stripHtml(msg.content).trim();
+	return clean.length > 0 ? clean : undefined;
+};
+
+const formatTokenCount = (tokens: number): string => {
+	if (tokens >= 1_000_000) return `${Math.round(tokens / 1_000)}K`;
+	if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K`;
+	return String(tokens);
+};
+
+const SECTION_HEADING = "instrument-microcaps text-[10px] text-muted mb-1.5";
+
+// -- Component ------------------------------------------------------------
+
+export const SessionOverview: Component<SessionOverviewProps> = (props) => {
+	const session = () => props.session;
+	const [expanded, setExpanded] = createSignal(false);
+	const [costOpen, setCostOpen] = createSignal(false);
+
+	// -- Request ----------------------------------------------------------
+	const rawPrompt = createMemo(() => findFirstPrompt(session().user_messages));
+	const truncated = createMemo(() => {
+		const text = rawPrompt();
+		if (!text) return { text: "", truncated: false };
+		return truncateMultiline(text, 3);
+	});
+	const displayText = () => (expanded() ? (rawPrompt() ?? "") : truncated().text);
+
+	// -- Duration ---------------------------------------------------------
+	// Wall-clock span so the detail page agrees with the session list (bug B2);
+	// older distills without wall_duration_ms fall back to the idle-trimmed value.
+	const totalMs = createMemo(() => session().stats.wall_duration_ms ?? session().stats.duration_ms);
+	const activeMs = createMemo(() => session().summary?.key_metrics.active_duration_ms);
+
+	// -- Cost -------------------------------------------------------------
+	const cost = createMemo(
+		() => (session().cost_estimate ?? session().stats.cost_estimate)?.estimated_cost_usd,
+	);
+	const costIsEstimated = createMemo(
+		() => (session().cost_estimate ?? session().stats.cost_estimate)?.is_estimated,
+	);
+	const pricingTier = createMemo(
+		() => (session().cost_estimate ?? session().stats.cost_estimate)?.pricing_tier,
+	);
+
+	// -- Quality ----------------------------------------------------------
+	const toolCallCount = createMemo(
+		() => session().summary?.key_metrics.tool_calls ?? session().stats.tool_call_count,
+	);
+	const backtrackCount = createMemo(() => session().backtracks.length);
+	const failureRatePct = createMemo(() => `${Math.round(session().stats.failure_rate * 100)}%`);
+
+	// -- Context ----------------------------------------------------------
+	const ctx = createMemo(() => session().context_consumption);
+	const hasContext = createMemo(() => ctx() !== undefined);
+
+	// -- Outcome ----------------------------------------------------------
+	const commitCount = createMemo(() => session().git_diff.commits.length);
+	const filesModified = createMemo(
+		() => session().file_map.files.filter((f) => f.edits > 0 || f.writes > 0).length,
+	);
+	const workingTreeChanges = createMemo(() => session().git_diff.working_tree_changes?.length ?? 0);
+
+	// -- Spec / Related ---------------------------------------------------
+	const specPath = createMemo(() => session().plan_drift?.spec_path);
+	const phases = createMemo(() => session().summary?.phases ?? []);
+
+	return (
+		<Card class="p-4">
+			{/* Spec bar */}
+			<Show when={specPath()}>
+				{(path) => (
+					<div class="mb-3 flex flex-wrap items-center justify-end gap-2">
+						<div class="inline-flex items-center gap-2 rounded-none border border-clens bg-surface-inset px-3 py-1.5">
+							<span class="instrument-microcaps text-[10px] text-muted">Spec</span>
+							<span class="truncate font-mono text-xs text-secondary" title={path()}>
+								{path()}
+							</span>
+						</div>
+					</div>
+				)}
+			</Show>
+
+			{/* Request section */}
+			<div class="mb-3">
+				<h4 class={SECTION_HEADING}>Request</h4>
+				<Show
+					when={rawPrompt()}
+					fallback={<p class="text-sm italic text-muted">No prompt captured</p>}
+				>
+					{/*
+					  The request is the raw user prompt — render it VERBATIM, not as
+					  markdown, so model ids like `claude-fable-5[1m]` and file paths
+					  like `src/_internal_/foo.ts` survive intact (bug B16).
+					*/}
+					<div
+						class="prose-sm-dark text-sm text-secondary whitespace-pre-wrap break-words"
+						innerHTML={renderPlainText(displayText())}
+					/>
+					<Show when={truncated().truncated}>
+						<button
+							type="button"
+							onClick={() => setExpanded((prev) => !prev)}
+							class="instrument-microcaps text-[10px] text-brand-500 transition hover:text-brand-600 dark:text-brand-400"
+						>
+							{expanded() ? "Show less" : "Show more"}
+						</button>
+					</Show>
+				</Show>
+			</div>
+
+			{/* KPI Grid - Row 1 */}
+			<div class="grid grid-cols-1 md:grid-cols-3">
+				{/* Timing: Span = wall-clock, Active = working time (idle excluded) */}
+				<div class="px-3 py-2 md:border-r border-clens">
+					<h4 class={SECTION_HEADING}>Timing</h4>
+					<div class="space-y-1">
+						<MetaRow label="Span" value={formatDuration(totalMs())} />
+						<Show when={activeMs() !== undefined}>
+							<MetaRow
+								label="Active"
+								value={`${formatDuration(activeMs() ?? 0)} (${formatPercentage(activeMs() ?? 0, totalMs())})`}
+							/>
+						</Show>
+					</div>
+				</div>
+
+				{/* Cost */}
+				<div class="px-3 py-2 md:border-r border-clens">
+					<h4 class={SECTION_HEADING}>Cost</h4>
+					<div class="space-y-1">
+						<Show when={cost() !== undefined}>
+							<div class="relative">
+								<button
+									type="button"
+									onClick={() => setCostOpen((prev) => !prev)}
+									class="cursor-pointer text-left w-full"
+								>
+									<MetaRow label="Cost" value={formatCost(cost() ?? 0, costIsEstimated())} />
+								</button>
+								<CostDrilldown
+									session={props.session}
+									open={costOpen()}
+									onClose={() => setCostOpen(false)}
+								/>
+							</div>
+						</Show>
+						<MetaRow label="Model" value={session().stats.model ?? "unknown"} />
+						<Show when={pricingTier()}>{(tier) => <MetaRow label="Tier" value={tier()} />}</Show>
+					</div>
+				</div>
+
+				{/* Quality */}
+				<div class="px-3 py-2">
+					<h4 class={SECTION_HEADING}>Quality</h4>
+					<div class="space-y-1">
+						<MetaRow label="Tool calls" value={toolCallCount()} />
+						<MetaRow label="Backtracks" value={backtrackCount()} />
+						<MetaRow label="Failure rate" value={failureRatePct()} />
+						<Show when={Object.keys(session().stats.failures_by_tool ?? {}).length > 0}>
+							<MetaRow
+								label="Failing tools"
+								value={Object.entries(session().stats.failures_by_tool ?? {})
+									.sort(([, a], [, b]) => (b as number) - (a as number))
+									.map(([tool, count]) => `${tool} (${count})`)
+									.join(", ")}
+							/>
+						</Show>
+					</div>
+				</div>
+			</div>
+
+			{/* KPI Grid - Row 2 */}
+			<div class={`grid grid-cols-1 border-t border-clens ${hasContext() ? "md:grid-cols-2" : ""}`}>
+				{/* Context (conditional) */}
+				<Show when={ctx()}>
+					{(consumption) => (
+						<div class="px-3 py-2 md:border-r border-clens">
+							<h4 class={SECTION_HEADING}>Context</h4>
+							<div class="space-y-1">
+								<MetaRow label="Peak" value={`${Math.round(consumption().peak_context_pct)}%`} />
+								<Show when={consumption().compaction_count > 0}>
+									<MetaRow label="Compactions" value={consumption().compaction_count} />
+								</Show>
+								<Show when={consumption().context_velocity_per_min > 0}>
+									<MetaRow
+										label="Velocity"
+										value={`${consumption().context_velocity_per_min.toFixed(1)}%/min`}
+									/>
+								</Show>
+								<MetaRow
+									label="Window"
+									value={formatTokenCount(consumption().model_context_window)}
+								/>
+							</div>
+						</div>
+					)}
+				</Show>
+
+				{/* Outcome */}
+				<div class="px-3 py-2">
+					<h4 class={SECTION_HEADING}>Outcome</h4>
+					<div class="space-y-1">
+						<MetaRow label="Commits" value={commitCount()} />
+						<MetaRow label="Files modified" value={filesModified()} />
+						<MetaRow label="Working tree" value={workingTreeChanges()} />
+					</div>
+				</div>
+			</div>
+
+			{/* Phase timeline */}
+			<Show when={phases().length > 0}>
+				<div class="border-t border-clens mt-3 pt-3">
+					<TimelineBar phases={phases()} totalDuration={totalMs()} />
+				</div>
+			</Show>
+		</Card>
+	);
+};
