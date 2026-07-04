@@ -1,4 +1,4 @@
-import { For, Show, type Component } from "solid-js";
+import { type Component, For, Show } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { Card } from "./ui/Card";
 import { MetaRow } from "./ui/MetaRow";
@@ -126,9 +126,7 @@ export const ConfigEnvironment: Component<ConfigEnvironmentProps> = (props) => {
 							<div class="px-3 py-2 md:border-r border-clens">
 								<h4 class={SECTION_HEADING}>Runtime</h4>
 								<div class="space-y-1">
-									<Show when={model()}>
-										{(m) => <ModelRow model={m()} />}
-									</Show>
+									<Show when={model()}>{(m) => <ModelRow model={m()} />}</Show>
 									<Show when={cfg().effort}>
 										{(effort) => <MetaRow label="Effort" value={effort()} />}
 									</Show>
@@ -143,11 +141,7 @@ export const ConfigEnvironment: Component<ConfigEnvironmentProps> = (props) => {
 								<h4 class={SECTION_HEADING}>MCP Servers</h4>
 								<Show
 									when={cfg().mcp_servers.length > 0}
-									fallback={
-										<p class="instrument-microcaps text-[10px] text-muted">
-											None used
-										</p>
-									}
+									fallback={<p class="instrument-microcaps text-[10px] text-muted">None used</p>}
 								>
 									<div class="space-y-1">
 										<For each={cfg().mcp_servers}>

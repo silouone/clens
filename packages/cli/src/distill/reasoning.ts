@@ -14,10 +14,8 @@ const classifyIntent = (thinking: string): TranscriptReasoning["intent_hint"] =>
 	if (/\b(should|decide|option|choose|between|alternative|trade.?off|pros and cons)\b/.test(lower))
 		return "deciding";
 	// Research
-	if (/\b(search|look up|investigate|find out|explore|understand)\b/.test(lower))
-		return "research";
-	if (/\bcheck\s+(if|how|whether|for|what|the|this|that|on|into)\b/.test(lower))
-		return "research";
+	if (/\b(search|look up|investigate|find out|explore|understand)\b/.test(lower)) return "research";
+	if (/\bcheck\s+(if|how|whether|for|what|the|this|that|on|into)\b/.test(lower)) return "research";
 	// Debugging (requires BOTH failure context + action word)
 	if (
 		/\b(error|bug|fail|crash|broken)\b/.test(lower) &&
@@ -46,12 +44,14 @@ const findCorrelatedTool = (
 	if (sameMessage) return sameMessage;
 
 	// Otherwise scan forward for the next assistant entry with tool_use blocks
-	const nextAssistant = entries.slice(entryIndex + 1).find(
-		(e) =>
-			e.type === "assistant" &&
-			Array.isArray(e.message?.content) &&
-			e.message.content.some((b) => b.type === "tool_use"),
-	);
+	const nextAssistant = entries
+		.slice(entryIndex + 1)
+		.find(
+			(e) =>
+				e.type === "assistant" &&
+				Array.isArray(e.message?.content) &&
+				e.message.content.some((b) => b.type === "tool_use"),
+		);
 	if (!nextAssistant || !Array.isArray(nextAssistant.message?.content)) return undefined;
 
 	const toolBlock = nextAssistant.message.content.find((b) => b.type === "tool_use");

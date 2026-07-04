@@ -84,7 +84,10 @@ describe("clean command — safety gating", () => {
 			logs.push(args.map(String).join(" "));
 		};
 
-		tempDir = join(tmpdir(), `clens-test-clean-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		tempDir = join(
+			tmpdir(),
+			`clens-test-clean-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
 		mkdirSync(join(tempDir, ".clens", "sessions"), { recursive: true });
 		mkdirSync(join(tempDir, ".clens", "distilled"), { recursive: true });
 		writeSession(tempDir, DISTILLED_ID, true);
@@ -96,10 +99,7 @@ describe("clean command — safety gating", () => {
 		rmSync(tempDir, { recursive: true, force: true });
 	});
 
-	const runClean = async (args: {
-		sessionArg?: string;
-		flags?: Partial<Flags>;
-	}): Promise<void> => {
+	const runClean = async (args: { sessionArg?: string; flags?: Partial<Flags> }): Promise<void> => {
 		const { cleanCommand } = await import("../src/commands/clean");
 		await cleanCommand({
 			sessionArg: args.sessionArg,
@@ -195,7 +195,10 @@ describe("clean command — e2e", () => {
 	let tempDir: string;
 
 	beforeEach(() => {
-		tempDir = join(tmpdir(), `clens-test-clean-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		tempDir = join(
+			tmpdir(),
+			`clens-test-clean-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
 		mkdirSync(join(tempDir, ".clens", "sessions"), { recursive: true });
 		mkdirSync(join(tempDir, ".clens", "distilled"), { recursive: true });
 		writeSession(tempDir, DISTILLED_ID, true);

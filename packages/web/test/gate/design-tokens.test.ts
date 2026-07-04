@@ -1,7 +1,7 @@
-import { Glob } from "bun";
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { Glob } from "bun";
 
 // Regression guard for B13 (`--clens-surface: é#fafaf9;`): an invalid token
 // value falls back silently in the browser, so only a source-level lint
@@ -280,9 +280,7 @@ describe("locked category palette (index.css)", () => {
 	});
 
 	const catValues = (tokens: Map<string, string>): string[] =>
-		CAT_KEYS.map((k) => tokens.get(`--clens-cat-${k}`)).filter(
-			(v): v is string => v !== undefined,
-		);
+		CAT_KEYS.map((k) => tokens.get(`--clens-cat-${k}`)).filter((v): v is string => v !== undefined);
 
 	test("all 8 category tokens are present in both themes", () => {
 		expect(catValues(root).length).toBe(8);
@@ -303,14 +301,8 @@ describe("locked category palette (index.css)", () => {
 		// The readability anchors are the surfaces and primary text — a category
 		// hue equal to one of these would be invisible on/against it. (Collisions
 		// with brand/status/flag tokens are intentional channel reuse, NOT checked.)
-		const lightAnchors = new Set([
-			root.get("--clens-surface"),
-			root.get("--clens-text-primary"),
-		]);
-		const darkAnchors = new Set([
-			dark.get("--clens-surface"),
-			dark.get("--clens-text-primary"),
-		]);
+		const lightAnchors = new Set([root.get("--clens-surface"), root.get("--clens-text-primary")]);
+		const darkAnchors = new Set([dark.get("--clens-surface"), dark.get("--clens-text-primary")]);
 		expect(catValues(root).filter((v) => lightAnchors.has(v))).toEqual([]);
 		expect(catValues(dark).filter((v) => darkAnchors.has(v))).toEqual([]);
 	});

@@ -251,7 +251,10 @@ describe("CLI distill --global", () => {
 	};
 
 	beforeEach(() => {
-		tempHome = join(tmpdir(), `clens-e2e-home-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		tempHome = join(
+			tmpdir(),
+			`clens-e2e-home-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
 		mkdirSync(tempHome, { recursive: true });
 		// Two project-mode repos with sessions but no distilled artifacts yet.
 		projA = createTestProject({ sessionCount: 2, withLinks: false, withDistilled: false });

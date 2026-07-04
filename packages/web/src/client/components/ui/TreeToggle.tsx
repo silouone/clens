@@ -1,5 +1,5 @@
-import { Show, type Component } from "solid-js";
 import { ChevronRight } from "lucide-solid";
+import { type Component, Show } from "solid-js";
 
 type TreeToggleProps = {
 	readonly expanded: boolean;

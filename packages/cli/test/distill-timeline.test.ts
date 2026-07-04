@@ -560,9 +560,7 @@ describe("extractTimeline", () => {
 		});
 
 		test("agent_stop entries carry agent_id", () => {
-			const events = [
-				makeEvent(2000, "SubagentStop", { agent_id: "uuid-abc-123" }),
-			];
+			const events = [makeEvent(2000, "SubagentStop", { agent_id: "uuid-abc-123" })];
 
 			const result = extractTimeline(events, [], [], [], []);
 
@@ -627,9 +625,7 @@ describe("extractTimeline", () => {
 		});
 
 		test("maps SubagentStop with nameMap to content_preview", () => {
-			const events = [
-				makeEvent(5000, "SubagentStop", { agent_id: "uuid-1" }),
-			];
+			const events = [makeEvent(5000, "SubagentStop", { agent_id: "uuid-1" })];
 			const nameMap = new Map([["uuid-1", "researcher-1"]]);
 
 			const result = extractTimeline(events, [], [], [], [], undefined, nameMap);

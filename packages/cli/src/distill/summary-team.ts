@@ -92,13 +92,17 @@ const sumChildToolCalls = (agent: AgentNode): number =>
 	);
 
 const estimateToolCalls = (agent: AgentNode): number =>
-	agent.tool_call_count > 0
-		? agent.tool_call_count
-		: sumChildToolCalls(agent);
+	agent.tool_call_count > 0 ? agent.tool_call_count : sumChildToolCalls(agent);
 
 export const extractAgentWorkload = (
 	agents: readonly AgentNode[],
-): readonly { name: string; id: string; tool_calls: number; files_modified: number; duration_ms: number }[] =>
+): readonly {
+	name: string;
+	id: string;
+	tool_calls: number;
+	files_modified: number;
+	duration_ms: number;
+}[] =>
 	agents.map((a) => ({
 		name: a.agent_name ?? a.agent_type,
 		id: a.session_id.slice(0, 8),
@@ -108,4 +112,3 @@ export const extractAgentWorkload = (
 			: 0,
 		duration_ms: a.duration_ms,
 	}));
-

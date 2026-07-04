@@ -1,8 +1,5 @@
-import { createMemo, For, Show, type Component } from "solid-js";
-import type {
-	CommunicationSequenceEntry,
-	AgentLifetime,
-} from "../../shared/types";
+import { type Component, createMemo, For, Show } from "solid-js";
+import type { AgentLifetime, CommunicationSequenceEntry } from "../../shared/types";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -24,8 +21,7 @@ const MSG_TYPE_COLORS: Readonly<Record<string, string>> = {
 	broadcast: "bg-[var(--clens-warning)]",
 };
 
-const getMsgColor = (msgType: string): string =>
-	MSG_TYPE_COLORS[msgType] ?? "bg-muted";
+const getMsgColor = (msgType: string): string => MSG_TYPE_COLORS[msgType] ?? "bg-muted";
 
 const getMsgBorderColor = (msgType: string): string =>
 	getMsgColor(msgType).replace("bg-", "border-");
@@ -59,7 +55,7 @@ const formatRelativeTime = (t: number, start: number): string => {
 // ── Component ────────────────────────────────────────────────────────
 
 export const CommunicationTimeline: Component<CommunicationTimelineProps> = (props) => {
-	const startTime = () => props.sessionStartTime ?? (props.sequence[0]?.t ?? 0);
+	const startTime = () => props.sessionStartTime ?? props.sequence[0]?.t ?? 0;
 
 	// Unique agent names from lifetimes or sequence
 	const agents = createMemo(() => {
@@ -70,9 +66,7 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 	});
 
 	// Lane index for each agent
-	const laneIndex = createMemo(
-		() => new Map(agents().map((name, idx) => [name, idx])),
-	);
+	const laneIndex = createMemo(() => new Map(agents().map((name, idx) => [name, idx])));
 
 	const getLane = (name: string): number => laneIndex().get(name) ?? 0;
 

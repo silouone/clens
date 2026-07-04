@@ -62,7 +62,11 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		description: "List captured sessions",
 		handler: async (ctx) => {
 			const { listCommand } = await import("./commands/list");
-			await listCommand({ projectDir: ctx.projectDir, json: ctx.flags.json, global: ctx.flags.global });
+			await listCommand({
+				projectDir: ctx.projectDir,
+				json: ctx.flags.json,
+				global: ctx.flags.global,
+			});
 		},
 	},
 	distill: {
@@ -118,9 +122,10 @@ const commands: Readonly<Record<string, CommandDef>> = {
 
 			// Extract --intent value
 			const intentIdx = ctx.rawArgs.indexOf("--intent");
-			const intent = intentIdx >= 0 && intentIdx + 1 < ctx.rawArgs.length
-				? ctx.rawArgs[intentIdx + 1]
-				: undefined;
+			const intent =
+				intentIdx >= 0 && intentIdx + 1 < ctx.rawArgs.length
+					? ctx.rawArgs[intentIdx + 1]
+					: undefined;
 
 			await reportCommand({
 				sessionId: resolveSessionId(sessionInput, ctx.flags.last, ctx.projectDir),
@@ -195,7 +200,9 @@ const commands: Readonly<Record<string, CommandDef>> = {
 			const { whatCommand } = await import("./commands/what");
 
 			if (ctx.flags.global && ctx.flags.last) {
-				const { listGlobalSessions, resolveProjectForSession } = await import("./session/global-read");
+				const { listGlobalSessions, resolveProjectForSession } = await import(
+					"./session/global-read"
+				);
 				const sessions = listGlobalSessions();
 				if (sessions.length === 0) throw new Error("No sessions found across registered projects.");
 				const sessionId = sessions[0].session_id;
@@ -224,9 +231,8 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		handler: async (ctx) => {
 			const { nameCommand } = await import("./commands/name");
 			const colorIdx = ctx.rawArgs.indexOf("--color");
-			const color = colorIdx >= 0 && colorIdx + 1 < ctx.rawArgs.length
-				? ctx.rawArgs[colorIdx + 1]
-				: undefined;
+			const color =
+				colorIdx >= 0 && colorIdx + 1 < ctx.rawArgs.length ? ctx.rawArgs[colorIdx + 1] : undefined;
 			nameCommand({
 				sessionArg: ctx.positional[1],
 				projectDir: ctx.projectDir,
@@ -242,9 +248,8 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		handler: async (ctx) => {
 			const { configCommand } = await import("./commands/config");
 			const gmIdx = ctx.rawArgs.indexOf("--global-mode");
-			const globalMode = gmIdx >= 0 && gmIdx + 1 < ctx.rawArgs.length
-				? ctx.rawArgs[gmIdx + 1]
-				: undefined;
+			const globalMode =
+				gmIdx >= 0 && gmIdx + 1 < ctx.rawArgs.length ? ctx.rawArgs[gmIdx + 1] : undefined;
 			configCommand({
 				projectDir: ctx.projectDir,
 				pricing: ctx.flags.pricing,
@@ -258,9 +263,10 @@ const commands: Readonly<Record<string, CommandDef>> = {
 		handler: async (ctx) => {
 			const { webCommand } = await import("./commands/web");
 			const portIdx = ctx.rawArgs.indexOf("--port");
-			const port = portIdx >= 0 && portIdx + 1 < ctx.rawArgs.length
-				? parseInt(ctx.rawArgs[portIdx + 1], 10)
-				: 3700;
+			const port =
+				portIdx >= 0 && portIdx + 1 < ctx.rawArgs.length
+					? parseInt(ctx.rawArgs[portIdx + 1], 10)
+					: 3700;
 			await webCommand({
 				projectDir: ctx.projectDir,
 				port,
@@ -317,16 +323,16 @@ const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 
 /** Find which command a flag belongs to, for suggestion messages. */
 const findFlagOwner = (flag: string): string | undefined =>
-	Object.entries(VALID_FLAGS_BY_COMMAND)
-		.find(([, validSet]) => validSet.has(flag))
-		?.[0];
+	Object.entries(VALID_FLAGS_BY_COMMAND).find(([, validSet]) => validSet.has(flag))?.[0];
 
 /** Validate that all --flags in argv are valid for the resolved command. Returns error message or undefined. */
 const validateFlags = (cmd: string, rawArgs: readonly string[]): string | undefined => {
 	const validSet = VALID_FLAGS_BY_COMMAND[cmd];
 	if (!validSet) return undefined;
 
-	const flagArgs = rawArgs.filter((a) => a.startsWith("--") || (a.startsWith("-") && a.length === 2));
+	const flagArgs = rawArgs.filter(
+		(a) => a.startsWith("--") || (a.startsWith("-") && a.length === 2),
+	);
 	// Skip values after --intent and --port (they're not flags)
 	const VALUE_FLAGS = new Set(["--intent", "--port", "--pricing", "--global-mode", "--color"]);
 	const actualFlags = flagArgs.reduce<readonly string[]>((acc, arg, i) => {
@@ -434,7 +440,8 @@ ${bold("Examples:")}
 const args = Bun.argv.slice(2);
 
 const pricingIdx = args.indexOf("--pricing");
-const pricingValue = pricingIdx >= 0 && pricingIdx + 1 < args.length ? args[pricingIdx + 1] : undefined;
+const pricingValue =
+	pricingIdx >= 0 && pricingIdx + 1 < args.length ? args[pricingIdx + 1] : undefined;
 
 const flags: Flags = {
 	last: args.includes("--last"),

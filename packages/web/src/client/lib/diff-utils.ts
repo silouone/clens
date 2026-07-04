@@ -38,7 +38,7 @@ const splitIntoHunks = (lines: readonly DiffLine[]): readonly Hunk[] => {
 	};
 
 	const result = rest.reduce<Acc>((acc, line) => {
-		const lineNo = line.line_number ?? (acc.prevLineNo + 1);
+		const lineNo = line.line_number ?? acc.prevLineNo + 1;
 		const expectedNext = acc.prevLineNo + 1;
 		const isGap = line.line_number !== undefined && lineNo > expectedNext + 1;
 
@@ -65,25 +65,16 @@ const linePrefix = (type: DiffLine["type"]): string =>
  * Convert DiffLine[] to unified diff string for diff2html.
  * Generates proper multi-hunk output based on line_number discontinuities.
  */
-export const diffLinesToUnified = (
-	filePath: string,
-	lines: readonly DiffLine[],
-): string => {
+export const diffLinesToUnified = (filePath: string, lines: readonly DiffLine[]): string => {
 	if (lines.length === 0) return "";
 	const header = `--- a/${filePath}\n+++ b/${filePath}`;
 
 	const hunks = splitIntoHunks(lines);
 	const hunkStrings = hunks.map((hunk) => {
-		const oldCount = hunk.lines.filter(
-			(l) => l.type === "remove" || l.type === "context",
-		).length;
-		const newCount = hunk.lines.filter(
-			(l) => l.type === "add" || l.type === "context",
-		).length;
+		const oldCount = hunk.lines.filter((l) => l.type === "remove" || l.type === "context").length;
+		const newCount = hunk.lines.filter((l) => l.type === "add" || l.type === "context").length;
 		const hunkHeader = `@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`;
-		const body = hunk.lines
-			.map((l) => `${linePrefix(l.type)}${l.content}`)
-			.join("\n");
+		const body = hunk.lines.map((l) => `${linePrefix(l.type)}${l.content}`).join("\n");
 		return `${hunkHeader}\n${body}`;
 	});
 

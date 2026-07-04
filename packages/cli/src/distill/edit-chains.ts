@@ -67,7 +67,7 @@ export const buildEditLookups = (
 	const failureSet = new Set(
 		events
 			.filter((e) => e.event === "PostToolUseFailure")
-			.map((e) => typeof e.data.tool_use_id === "string" ? e.data.tool_use_id : undefined)
+			.map((e) => (typeof e.data.tool_use_id === "string" ? e.data.tool_use_id : undefined))
 			.filter((id): id is string => id !== undefined),
 	);
 

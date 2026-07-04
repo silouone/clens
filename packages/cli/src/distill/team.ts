@@ -33,7 +33,12 @@ const inferAgentNamesFromComms = (
 ): ReadonlySet<string> => {
 	return new Set(
 		links.flatMap((link): readonly string[] => {
-			if (link.type === "msg_send" && sessionId && (link.from === sessionId || link.session_id === sessionId)) return [link.to];
+			if (
+				link.type === "msg_send" &&
+				sessionId &&
+				(link.from === sessionId || link.session_id === sessionId)
+			)
+				return [link.to];
 			if (link.type === "task" && link.owner) return [link.owner];
 			if (link.type === "task_complete" && link.agent) return [link.agent];
 			if (link.type === "teammate_idle" && link.teammate) return [link.teammate];
@@ -61,30 +66,32 @@ export const extractTeamMetrics = (
 	);
 
 	// Fallback: infer agent names from comms when no spawns exist
-	const inferredNames = spawns.length === 0 && agentIds.size === 0
-		? inferAgentNamesFromComms(links, sessionId)
-		: new Set<string>();
+	const inferredNames =
+		spawns.length === 0 && agentIds.size === 0
+			? inferAgentNamesFromComms(links, sessionId)
+			: new Set<string>();
 
 	// Combined set of names + IDs for matching teammate_idle events
 	// When agent_name is undefined, idle.teammate may contain the agent_id
 	const nameOrIdSet = new Set([...agentNames, ...agentIds, ...inferredNames]);
 
 	// Match set for task_complete.agent: includes subagent names, IDs, and parent sessionId
-	const taskAgentMatchSet = sessionId
-		? new Set([...nameOrIdSet, sessionId])
-		: nameOrIdSet;
+	const taskAgentMatchSet = sessionId ? new Set([...nameOrIdSet, sessionId]) : nameOrIdSet;
 
 	// Filter task_complete: match by agent name, agent ID, parent sessionId, or session_id field
 	const taskCompletes = links
 		.filter(isTaskComplete)
-		.filter((tc) => taskAgentMatchSet.has(tc.agent) || (sessionId !== undefined && tc.session_id === sessionId));
+		.filter(
+			(tc) =>
+				taskAgentMatchSet.has(tc.agent) || (sessionId !== undefined && tc.session_id === sessionId),
+		);
 
 	// Filter teammate_idle: match by name or ID (handles agent_name=undefined case)
-	const idles = links
-		.filter(isTeammateIdle)
-		.filter((idle) => nameOrIdSet.has(idle.teammate));
+	const idles = links.filter(isTeammateIdle).filter((idle) => nameOrIdSet.has(idle.teammate));
 
-	const spawnAgentCount = new Set(spawns.filter((s) => agentIds.has(s.agent_id)).map((s) => s.agent_id)).size;
+	const spawnAgentCount = new Set(
+		spawns.filter((s) => agentIds.has(s.agent_id)).map((s) => s.agent_id),
+	).size;
 	const agentCount = spawnAgentCount > 0 ? spawnAgentCount : inferredNames.size;
 
 	const spawnNames = spawns
@@ -92,7 +99,12 @@ export const extractTeamMetrics = (
 		.map((s) => s.agent_name ?? s.agent_id);
 	const taskAgentNames = taskCompletes.map((tc) => tc.agent);
 	const idleTeammateNames = idles.map((idle) => idle.teammate);
-	const teammateNames = uniqueStrings([...spawnNames, ...inferredNames, ...taskAgentNames, ...idleTeammateNames]);
+	const teammateNames = uniqueStrings([
+		...spawnNames,
+		...inferredNames,
+		...taskAgentNames,
+		...idleTeammateNames,
+	]);
 
 	// Build comprehensive task list by merging task create/assign/complete links
 	const taskLinks = links.filter(isTaskLink);
@@ -118,21 +130,23 @@ export const extractTeamMetrics = (
 
 	// subject-by-id: only real (non-empty) create ids carry a usable subject correlation.
 	const subjectById = new Map(
-		creates.filter((tl) => tl.task_id.length > 0).map((tl) => [tl.task_id, tl.subject ?? ""] as const),
+		creates
+			.filter((tl) => tl.task_id.length > 0)
+			.map((tl) => [tl.task_id, tl.subject ?? ""] as const),
 	);
 
 	const ownerMap = new Map(
-		taskLinks
-			.filter((tl) => tl.owner)
-			.map((tl) => [tl.task_id, tl.owner ?? ""] as const),
+		taskLinks.filter((tl) => tl.owner).map((tl) => [tl.task_id, tl.owner ?? ""] as const),
 	);
 	const completedSet = new Set(taskCompletes.map((tc) => tc.task_id));
 
 	// Collect all unique task_ids from update/complete links (skip empty create IDs)
-	const allTaskIds = [...new Set([
-		...taskLinks.filter((tl) => tl.task_id.length > 0).map((tl) => tl.task_id),
-		...taskCompletes.map((tc) => tc.task_id),
-	])].filter((id) => id.length > 0);
+	const allTaskIds = [
+		...new Set([
+			...taskLinks.filter((tl) => tl.task_id.length > 0).map((tl) => tl.task_id),
+			...taskCompletes.map((tc) => tc.task_id),
+		]),
+	].filter((id) => id.length > 0);
 
 	const tasks = allTaskIds.map((id) => {
 		const complete = taskCompletes.find((tc) => tc.task_id === id);
@@ -140,13 +154,12 @@ export const extractTeamMetrics = (
 		const subject = subjectById.get(id) ?? complete?.subject;
 		// Correlate creation time by id when the create carried one, else by subject —
 		// never by ordinal position, which breaks for persistent (non-1..N) ids.
-		const create =
-			createById.get(id) ?? (subject ? createBySubject.get(subject) : undefined);
+		const create = createById.get(id) ?? (subject ? createBySubject.get(subject) : undefined);
 		return {
 			task_id: id,
 			agent: ownerMap.get(id) ?? complete?.agent ?? "",
 			subject,
-			status: completedSet.has(id) ? "completed" as const : undefined,
+			status: completedSet.has(id) ? ("completed" as const) : undefined,
 			t: create?.t ?? complete?.t ?? 0,
 		};
 	});

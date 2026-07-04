@@ -1,4 +1,14 @@
-import type { AgentNode, LinkEvent, MessageLink, PricingTier, SpawnLink, StopLink, StoredEvent, TaskLink, TranscriptEntry } from "../types";
+import type {
+	AgentNode,
+	LinkEvent,
+	MessageLink,
+	PricingTier,
+	SpawnLink,
+	StopLink,
+	StoredEvent,
+	TaskLink,
+	TranscriptEntry,
+} from "../types";
 import { computeEffectiveDuration, deduplicateSpawns, IDLE_THRESHOLD_MS } from "../utils";
 import { type DiffContext, distillAgent } from "./agent-distill";
 import { extractFileMap } from "./file-map";
@@ -8,7 +18,11 @@ const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn
 const isStopLink = (link: LinkEvent): link is StopLink => link.type === "stop";
 
 /** Minimal event shape needed for tool-call attribution. */
-type AttributableEvent = { readonly t: number; readonly event: string; readonly data: Record<string, unknown> };
+type AttributableEvent = {
+	readonly t: number;
+	readonly event: string;
+	readonly data: Record<string, unknown>;
+};
 
 /** Read a string `data.agent_id` tag from an event, if present (untrusted JSON — narrow, never cast). */
 const eventAgentId = (event: AttributableEvent): string | undefined => {
@@ -36,7 +50,8 @@ const countAgentToolCalls = (
 	if (tagged.length > 0) return { count: tagged.length, tagged: true };
 
 	const windowCount = preEvents.filter(
-		(e) => eventAgentId(e) === undefined && e.t >= spawnT && (stopT !== undefined ? e.t <= stopT : true),
+		(e) =>
+			eventAgentId(e) === undefined && e.t >= spawnT && (stopT !== undefined ? e.t <= stopT : true),
 	).length;
 	return { count: windowCount, tagged: false };
 };
@@ -64,9 +79,8 @@ export const attributeEventsToAgents = (
 	// Build intervals: for each spawn, find matching stop
 	const intervals: readonly AgentInterval[] = spawns.map((spawn): AgentInterval => {
 		const stop = stops.find((s) => s.agent_id === spawn.agent_id);
-		const maxT = events.length > 0
-			? events.reduce((max, e) => Math.max(max, e.t), 0)
-			: stop?.t ?? spawn.t;
+		const maxT =
+			events.length > 0 ? events.reduce((max, e) => Math.max(max, e.t), 0) : (stop?.t ?? spawn.t);
 		return {
 			agentId: spawn.agent_id,
 			start: spawn.t,
@@ -79,9 +93,7 @@ export const attributeEventsToAgents = (
 
 	// For each event, find the innermost agent interval containing it
 	const findAgent = (t: number): string => {
-		const match = sortedIntervals.find(
-			(interval) => t >= interval.start && t <= interval.end,
-		);
+		const match = sortedIntervals.find((interval) => t >= interval.start && t <= interval.end);
 		return match?.agentId ?? sessionId;
 	};
 
@@ -174,7 +186,8 @@ export const enrichNodeFromSessionEvents = (
 
 	return {
 		...node,
-		tool_call_count: statsResult.tool_call_count > 0 ? statsResult.tool_call_count : node.tool_call_count,
+		tool_call_count:
+			statsResult.tool_call_count > 0 ? statsResult.tool_call_count : node.tool_call_count,
 		model: statsResult.model ?? node.model,
 		stats: {
 			tool_call_count: statsResult.tool_call_count,
@@ -218,13 +231,13 @@ export const buildAgentTree = (
 			const agentTimestamps = agentEvents.map((e) => e.t);
 			return computeEffectiveDuration(agentTimestamps).effective_duration_ms;
 		})();
-		const linkDuration = agentDurationMs > 0
-			? agentDurationMs
-			: computeLinkBasedDuration(spawn.agent_id, spawn.agent_name, spawn.t, links);
+		const linkDuration =
+			agentDurationMs > 0
+				? agentDurationMs
+				: computeLinkBasedDuration(spawn.agent_id, spawn.agent_name, spawn.t, links);
 		// Absolute fallback: if link-based duration is also 0 but stop event exists, use stop.t - spawn.t
-		const durationMs = linkDuration > 0
-			? linkDuration
-			: matchingStop ? Math.abs(matchingStop.t - spawn.t) : 0;
+		const durationMs =
+			linkDuration > 0 ? linkDuration : matchingStop ? Math.abs(matchingStop.t - spawn.t) : 0;
 
 		const childSpawns = spawns.filter((s) => s.parent_session === spawn.agent_id);
 		const children = childSpawns.map(buildNode);
@@ -246,12 +259,22 @@ export const buildAgentTree = (
 		// Auto-enrich when transcript path exists
 		const transcriptPath = matchingStop?.transcript_path;
 		if (transcriptPath) {
-			const enriched = enrichNodeWithTranscript(baseNode, transcriptPath, readTranscriptFn, diffContext, tier);
+			const enriched = enrichNodeWithTranscript(
+				baseNode,
+				transcriptPath,
+				readTranscriptFn,
+				diffContext,
+				tier,
+			);
 			// When hook-based toolCallCount is 0 but transcript enrichment produced stats, prefer transcript stats
-			const finalEnriched = enriched.tool_call_count === 0 && enriched.stats && enriched.stats.tool_call_count > 0
-				? { ...enriched, tool_call_count: enriched.stats.tool_call_count }
-				: enriched;
-			if (finalEnriched.tool_call_count > 0 || (finalEnriched.stats && finalEnriched.stats.tool_call_count > 0)) {
+			const finalEnriched =
+				enriched.tool_call_count === 0 && enriched.stats && enriched.stats.tool_call_count > 0
+					? { ...enriched, tool_call_count: enriched.stats.tool_call_count }
+					: enriched;
+			if (
+				finalEnriched.tool_call_count > 0 ||
+				(finalEnriched.stats && finalEnriched.stats.tool_call_count > 0)
+			) {
 				return finalEnriched;
 			}
 		}
@@ -305,15 +328,20 @@ export const inferAgentsFromComms = (
 	const nameToUuid: ReadonlyMap<string, string> = new Map(
 		links
 			.filter(isTaskLinkGuard)
-			.filter((link): link is typeof link & { owner: string; session_id: string } =>
-				typeof link.owner === "string" && typeof link.session_id === "string" && link.session_id !== sessionId)
+			.filter(
+				(link): link is typeof link & { owner: string; session_id: string } =>
+					typeof link.owner === "string" &&
+					typeof link.session_id === "string" &&
+					link.session_id !== sessionId,
+			)
 			.map((link) => [link.owner, link.session_id] as const),
 	);
 
 	// Compute first/last activity per agent name across all link types
 	const activityTimestamps = (agentName: string): readonly number[] =>
 		links.flatMap((link): readonly number[] => {
-			if (link.type === "msg_send" && (link.to === agentName || link.from_name === agentName)) return [link.t];
+			if (link.type === "msg_send" && (link.to === agentName || link.from_name === agentName))
+				return [link.t];
 			if (link.type === "task" && link.owner === agentName) return [link.t];
 			if (link.type === "task_complete" && link.agent === agentName) return [link.t];
 			if (link.type === "teammate_idle" && link.teammate === agentName) return [link.t];

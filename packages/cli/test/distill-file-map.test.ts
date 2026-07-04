@@ -6,13 +6,15 @@ import type { StoredEvent } from "../src/types";
 
 const CWD = "/Users/dev/repo";
 
-const mkToolEvent = (overrides: Partial<{
-	event: StoredEvent["event"];
-	tool_name: string;
-	file_path: string;
-	tool_use_id: string;
-	cwd: string;
-}> = {}): StoredEvent => ({
+const mkToolEvent = (
+	overrides: Partial<{
+		event: StoredEvent["event"];
+		tool_name: string;
+		file_path: string;
+		tool_use_id: string;
+		cwd: string;
+	}> = {},
+): StoredEvent => ({
 	t: 1000,
 	event: overrides.event ?? "PreToolUse",
 	sid: "s1",
@@ -69,7 +71,11 @@ describe("extractFileMap path normalization (B23)", () => {
 
 	test("normalizes absolute tool paths to repo-relative", () => {
 		const events: readonly StoredEvent[] = [
-			mkToolEvent({ tool_name: "Write", file_path: `${CWD}/packages/web/index.ts`, tool_use_id: "w1" }),
+			mkToolEvent({
+				tool_name: "Write",
+				file_path: `${CWD}/packages/web/index.ts`,
+				tool_use_id: "w1",
+			}),
 		];
 
 		const result = extractFileMap(events);
@@ -125,7 +131,12 @@ describe("extractFileMap path normalization (B23)", () => {
 				},
 				data: {},
 			},
-			mkToolEvent({ tool_name: "Edit", file_path: `${CWD}/main.ts`, tool_use_id: "t1", cwd: "/wrong/dir" }),
+			mkToolEvent({
+				tool_name: "Edit",
+				file_path: `${CWD}/main.ts`,
+				tool_use_id: "t1",
+				cwd: "/wrong/dir",
+			}),
 		];
 
 		const result = extractFileMap(events);
@@ -136,11 +147,13 @@ describe("extractFileMap path normalization (B23)", () => {
 // A failing tool op emits BOTH a PreToolUse and a PostToolUseFailure sharing the
 // same tool_use_id (confirmed in real sessions); a successful op emits a
 // PreToolUse + PostToolUse instead.
-const mkFailPair = (overrides: Partial<{
-	tool_name: string;
-	file_path: string;
-	tool_use_id: string;
-}> = {}): readonly StoredEvent[] => {
+const mkFailPair = (
+	overrides: Partial<{
+		tool_name: string;
+		file_path: string;
+		tool_use_id: string;
+	}> = {},
+): readonly StoredEvent[] => {
 	const tool_name = overrides.tool_name ?? "Edit";
 	const file_path = overrides.file_path ?? `${CWD}/src/app.ts`;
 	const tool_use_id = overrides.tool_use_id ?? "fail1";
@@ -181,7 +194,12 @@ describe("extractFileMap failed ops (file-map-failed-ops-counted-as-success-and-
 
 	test("a successful Edit still counts once with no error", () => {
 		const events: readonly StoredEvent[] = [
-			mkToolEvent({ event: "PreToolUse", tool_name: "Edit", file_path: `${CWD}/ok.ts`, tool_use_id: "ok1" }),
+			mkToolEvent({
+				event: "PreToolUse",
+				tool_name: "Edit",
+				file_path: `${CWD}/ok.ts`,
+				tool_use_id: "ok1",
+			}),
 		];
 
 		const result = extractFileMap(events);
@@ -192,7 +210,12 @@ describe("extractFileMap failed ops (file-map-failed-ops-counted-as-success-and-
 
 	test("mixed success and failure on the same file are counted independently", () => {
 		const events: readonly StoredEvent[] = [
-			mkToolEvent({ event: "PreToolUse", tool_name: "Edit", file_path: `${CWD}/m.ts`, tool_use_id: "okA" }),
+			mkToolEvent({
+				event: "PreToolUse",
+				tool_name: "Edit",
+				file_path: `${CWD}/m.ts`,
+				tool_use_id: "okA",
+			}),
 			...mkFailPair({ tool_name: "Edit", file_path: `${CWD}/m.ts`, tool_use_id: "failB" }),
 		];
 
@@ -205,7 +228,12 @@ describe("extractFileMap failed ops (file-map-failed-ops-counted-as-success-and-
 
 	test("an orphan PostToolUseFailure (no matching PreToolUse) still records the error", () => {
 		const events: readonly StoredEvent[] = [
-			mkToolEvent({ event: "PostToolUseFailure", tool_name: "Read", file_path: `${CWD}/orphan.ts`, tool_use_id: "orph1" }),
+			mkToolEvent({
+				event: "PostToolUseFailure",
+				tool_name: "Read",
+				file_path: `${CWD}/orphan.ts`,
+				tool_use_id: "orph1",
+			}),
 		];
 
 		const result = extractFileMap(events);

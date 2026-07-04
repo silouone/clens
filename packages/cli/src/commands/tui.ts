@@ -1,59 +1,56 @@
 // --- Barrel re-exports for backward compatibility ---
 
-// State types, constants, and state machine
-export type { ViewType, DetailTab, TuiState } from "./tui-state";
-export {
-	DETAIL_TABS,
-	CONTENT_SCROLL_TABS,
-	createInitialState,
-	nextTimelineFilter,
-	getVisibleTabs,
-	nextTab,
-	prevTab,
-	filterFilesByAgent,
-	getEditsFileList,
-	handleKey,
-} from "./tui-state";
-
-// Tab content formatters
-export type { CollapsedEntry } from "./tui-tabs";
-export {
-	formatOverviewTab,
-	formatCommsTab,
-	collapseConsecutive,
-	formatTimelineEntry,
-	formatCollapsedEntry,
-	formatSwimLaneEntry,
-	formatCollapsedSwimLaneEntry,
-	formatTimelineTab,
-	formatBacktracksTab,
-	formatReasoningTab,
-	formatDriftTab,
-	formatGraphTab,
-	formatDecisionDetail,
-	formatDecisionsTabFull,
-} from "./tui-tabs";
-
-// Row formatters and renderers
-export {
-	formatSessionRow,
-	formatAgentRow,
-	formatAgentDetail,
-	render,
-} from "./tui-renderers";
-
 // Re-exports from tui-formatters (existing, preserved for test imports)
 export {
 	colorizeTimelineType,
 	formatDecisionsSection,
 	formatGitDiffSection,
 } from "./tui-formatters";
+// Row formatters and renderers
+export {
+	formatAgentDetail,
+	formatAgentRow,
+	formatSessionRow,
+	render,
+} from "./tui-renderers";
+// State types, constants, and state machine
+export type { DetailTab, TuiState, ViewType } from "./tui-state";
+export {
+	CONTENT_SCROLL_TABS,
+	createInitialState,
+	DETAIL_TABS,
+	filterFilesByAgent,
+	getEditsFileList,
+	getVisibleTabs,
+	handleKey,
+	nextTab,
+	nextTimelineFilter,
+	prevTab,
+} from "./tui-state";
+// Tab content formatters
+export type { CollapsedEntry } from "./tui-tabs";
+export {
+	collapseConsecutive,
+	formatBacktracksTab,
+	formatCollapsedEntry,
+	formatCollapsedSwimLaneEntry,
+	formatCommsTab,
+	formatDecisionDetail,
+	formatDecisionsTabFull,
+	formatDriftTab,
+	formatGraphTab,
+	formatOverviewTab,
+	formatReasoningTab,
+	formatSwimLaneEntry,
+	formatTimelineEntry,
+	formatTimelineTab,
+} from "./tui-tabs";
 
 // --- Key parsing (stays here -- thin, I/O-adjacent) ---
 
 import { ansi } from "./tui-formatters";
-import { createInitialState as _createInitialState, handleKey as _handleKey } from "./tui-state";
 import { render as _render } from "./tui-renderers";
+import { createInitialState as _createInitialState, handleKey as _handleKey } from "./tui-state";
 
 export const parseKey = (data: Buffer): string | undefined => {
 	const str = data.toString();

@@ -1,8 +1,13 @@
 import { createResource, createRoot, createSignal } from "solid-js";
-import type { ColorName, ConversationEntry, DistilledSession, SessionSummary } from "../../shared/types";
+import type {
+	ColorName,
+	ConversationEntry,
+	DistilledSession,
+	SessionSummary,
+} from "../../shared/types";
 import { api, patchSessionMeta, type SessionMetaPatch } from "./api";
-import { preferences } from "./settings";
 import { isStaleConversationFetch } from "./fetch-guard";
+import { preferences } from "./settings";
 
 const LOG_PREFIX = "[cLens:api]";
 
@@ -45,8 +50,8 @@ const fetchSessionList = async (): Promise<readonly SessionSummary[]> => {
 // createRoot owns this app-lifetime resource so the computation it creates has a
 // reactive owner — avoids SolidJS "computations created outside createRoot" warnings
 // at module load (FE-31). The root is never disposed (the store lives for the app's life).
-const [sessionList, { refetch: refetchSessions, mutate: mutateSessions }] = createRoot(
-	() => createResource(fetchSessionList),
+const [sessionList, { refetch: refetchSessions, mutate: mutateSessions }] = createRoot(() =>
+	createResource(fetchSessionList),
 );
 
 // ── Session meta mutation (rename + color flag) ─────────────────────
@@ -67,8 +72,7 @@ const replaceRow = (
 	rows: readonly SessionSummary[] | undefined,
 	id: string,
 	next: SessionSummary,
-): readonly SessionSummary[] | undefined =>
-	rows?.map((s) => (s.session_id === id ? next : s));
+): readonly SessionSummary[] | undefined => rows?.map((s) => (s.session_id === id ? next : s));
 
 const optimisticRow = (row: SessionSummary, patch: SessionMetaPatch): SessionSummary => {
 	// Label: string sets; null or whitespace-only clears (mirrors server R7/R8).
@@ -144,9 +148,7 @@ type SessionDetailResult =
  * Lazily loaded — only fetches when sessionId signal changes.
  */
 const createSessionDetail = (sessionId: () => string | undefined) => {
-	const fetcher = async (
-		id: string,
-	): Promise<SessionDetailResult | undefined> => {
+	const fetcher = async (id: string): Promise<SessionDetailResult | undefined> => {
 		console.debug(LOG_PREFIX, `Fetching session detail: ${id.slice(0, 8)}`);
 		const res = await api.api.sessions[":sessionId"].$get({
 			param: { sessionId: id },
@@ -300,18 +302,23 @@ const createAgentConversationResource = (
 		return sid && aid ? `${sid}:${aid}` : undefined;
 	};
 
-	const fetcher = async (
-		compositeKey: string,
-	): Promise<readonly ConversationEntry[]> => {
+	const fetcher = async (compositeKey: string): Promise<readonly ConversationEntry[]> => {
 		const [sid, aid] = compositeKey.split(":");
-		console.debug(LOG_PREFIX, `Fetching agent conversation: session=${sid.slice(0, 8)} agent=${aid.slice(0, 8)}`);
+		console.debug(
+			LOG_PREFIX,
+			`Fetching agent conversation: session=${sid.slice(0, 8)} agent=${aid.slice(0, 8)}`,
+		);
 		const res = await api.api.sessions[":sessionId"].agents[":agentId"].conversation.$get({
 			param: { sessionId: sid, agentId: aid },
 		});
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({ error: "Unknown error" }));
 			const msg = "error" in body ? String(body.error) : `HTTP ${res.status}`;
-			console.error(LOG_PREFIX, `Agent conversation error (${sid.slice(0, 8)}/${aid.slice(0, 8)}):`, msg);
+			console.error(
+				LOG_PREFIX,
+				`Agent conversation error (${sid.slice(0, 8)}/${aid.slice(0, 8)}):`,
+				msg,
+			);
 			setGlobalError({ message: msg, code: String(res.status) });
 			return [];
 		}

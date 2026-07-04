@@ -1,8 +1,8 @@
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { GlobalSessionSummary, ProjectEntry, SessionSummary } from "../types";
+import { enrichSessionSummaries, listSessions } from "./read";
 import { readGlobalConfig, resolveProjectEntries } from "./registry";
-import { listSessions, enrichSessionSummaries } from "./read";
 
 /**
  * In repository mode, a single project (git root) may contain multiple
@@ -47,9 +47,10 @@ const listSessionsForProject = (
 	isRepoMode: boolean,
 ): readonly (SessionSummary & { readonly capture_dir: string })[] => {
 	if (!isRepoMode) {
-		return enrichSessionSummaries(listSessions(project.path), project.path).map(
-			(session) => ({ ...session, capture_dir: project.path }),
-		);
+		return enrichSessionSummaries(listSessions(project.path), project.path).map((session) => ({
+			...session,
+			capture_dir: project.path,
+		}));
 	}
 
 	// Repository mode: merge sessions from all .clens/ dirs in the repo. Each
@@ -74,11 +75,13 @@ export const listGlobalSessions = (): readonly GlobalSessionSummary[] => {
 	const isRepoMode = config.global_mode === "repository";
 
 	const allSessions = projects.flatMap((project): readonly GlobalSessionSummary[] =>
-		listSessionsForProject(project, isRepoMode).map((session): GlobalSessionSummary => ({
-			...session,
-			project_id: project.id,
-			project_name: project.name,
-		})),
+		listSessionsForProject(project, isRepoMode).map(
+			(session): GlobalSessionSummary => ({
+				...session,
+				project_id: project.id,
+				project_name: project.name,
+			}),
+		),
 	);
 
 	// Deduplicate by session_id — the same session can be captured into multiple

@@ -1,4 +1,10 @@
-import type { DiffLine, EditChainsResult, FileDiffAttribution, StoredEvent, WorkingTreeChange } from "../types";
+import type {
+	DiffLine,
+	EditChainsResult,
+	FileDiffAttribution,
+	StoredEvent,
+	WorkingTreeChange,
+} from "../types";
 
 // --- Helper types ---
 
@@ -17,9 +23,10 @@ export interface AgentEditEntry {
  * Falls back to InstructionsLoaded with load_reason "session_start" (sub-agents).
  */
 export const getStartCommit = (events: readonly StoredEvent[]): string | undefined =>
-	events.find((e) => e.event === "SessionStart" && e.context?.git_commit)?.context?.git_commit
-	?? events.find((e) => e.event === "InstructionsLoaded" && e.context?.git_commit)?.context?.git_commit
-	?? undefined;
+	events.find((e) => e.event === "SessionStart" && e.context?.git_commit)?.context?.git_commit ??
+	events.find((e) => e.event === "InstructionsLoaded" && e.context?.git_commit)?.context
+		?.git_commit ??
+	undefined;
 
 /**
  * Convert an absolute file path to a relative path by stripping the projectDir prefix.
@@ -57,7 +64,13 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 			}
 
 			// File headers / metadata: only valid before the first @@ of the file.
-			if (!acc.inHunk && (line.startsWith("---") || line.startsWith("+++") || line.startsWith("index ") || line === "")) {
+			if (
+				!acc.inHunk &&
+				(line.startsWith("---") ||
+					line.startsWith("+++") ||
+					line.startsWith("index ") ||
+					line === "")
+			) {
 				return acc;
 			}
 
@@ -421,7 +434,10 @@ export const toBag = (lines: readonly string[]): ReadonlyMap<string, number> =>
 	}, new Map());
 
 /** Multiset difference: lines in `a` that exceed their count in `b`. */
-export const bagDiff = (a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): readonly string[] =>
+export const bagDiff = (
+	a: ReadonlyMap<string, number>,
+	b: ReadonlyMap<string, number>,
+): readonly string[] =>
 	Array.from(a.entries()).flatMap(([line, count]) => {
 		const bCount = b.get(line) ?? 0;
 		const excess = count - bCount;
@@ -476,7 +492,8 @@ export const computeWriteDiffLines = (
 	const content = typeof toolInput.content === "string" ? toolInput.content : "";
 	if (content === "") return [];
 
-	return content.split("\n")
+	return content
+		.split("\n")
 		.filter((l) => l.trim().length > 0)
 		.map((line) => ({ type: "add" as const, content: line, agent_name: agentName }));
 };
@@ -505,7 +522,7 @@ export const computeToolSourcedDiff = (
 	const failureIds = new Set(
 		events
 			.filter((e) => e.event === "PostToolUseFailure")
-			.map((e) => typeof e.data.tool_use_id === "string" ? e.data.tool_use_id : undefined)
+			.map((e) => (typeof e.data.tool_use_id === "string" ? e.data.tool_use_id : undefined))
 			.filter((id): id is string => id !== undefined),
 	);
 
@@ -543,11 +560,13 @@ export const computeToolSourcedDiff = (
 
 		if (lines.length === 0) return [];
 
-		return [{
-			file_path: relativePath,
-			lines,
-			total_additions: lines.filter((l) => l.type === "add").length,
-			total_deletions: lines.filter((l) => l.type === "remove").length,
-		}];
+		return [
+			{
+				file_path: relativePath,
+				lines,
+				total_additions: lines.filter((l) => l.type === "add").length,
+				total_deletions: lines.filter((l) => l.type === "remove").length,
+			},
+		];
 	});
 };

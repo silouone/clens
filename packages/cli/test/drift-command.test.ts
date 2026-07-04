@@ -86,4 +86,3 @@ describe("renderDriftReport", () => {
 		expect(output).toContain("specs/my-feature.md");
 	});
 });
-

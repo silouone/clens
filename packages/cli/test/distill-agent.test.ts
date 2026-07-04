@@ -245,7 +245,12 @@ describe("transcriptToEvents - PostToolUseFailure synthesis", () => {
 				message: {
 					role: "user",
 					content: [
-						{ type: "tool_result", tool_use_id: "toolu_01", content: "Permission denied", is_error: true },
+						{
+							type: "tool_result",
+							tool_use_id: "toolu_01",
+							content: "Permission denied",
+							is_error: true,
+						},
 					],
 				},
 			}),
@@ -274,9 +279,7 @@ describe("transcriptToEvents - PostToolUseFailure synthesis", () => {
 				timestamp: "2024-01-01T00:00:02.000Z",
 				message: {
 					role: "user",
-					content: [
-						{ type: "tool_result", tool_use_id: "toolu_01", content: "file contents..." },
-					],
+					content: [{ type: "tool_result", tool_use_id: "toolu_01", content: "file contents..." }],
 				},
 			}),
 		];
@@ -292,9 +295,7 @@ describe("transcriptToEvents - PostToolUseFailure synthesis", () => {
 				timestamp: "2024-01-01T00:00:01.000Z",
 				message: {
 					role: "assistant",
-					content: [
-						{ type: "tool_use", id: "toolu_02", name: "Bash", input: { command: "test" } },
-					],
+					content: [{ type: "tool_use", id: "toolu_02", name: "Bash", input: { command: "test" } }],
 				},
 			}),
 			makeUserEntry({
@@ -830,9 +831,7 @@ describe("extractTaskPrompt", () => {
 			makeUserEntry({
 				message: {
 					role: "user",
-					content: [
-						{ type: "text", text: "Implement feature X" },
-					],
+					content: [{ type: "text", text: "Implement feature X" }],
 				},
 			}),
 		];
@@ -894,9 +893,7 @@ describe("extractTaskPrompt", () => {
 			makeUserEntry({
 				message: {
 					role: "user",
-					content: [
-						{ type: "tool_result", tool_use_id: "t1", content: "some result" },
-					],
+					content: [{ type: "tool_result", tool_use_id: "t1", content: "some result" }],
 				},
 			}),
 		];
@@ -918,7 +915,11 @@ describe("distillAgent with diffContext", () => {
 						type: "tool_use",
 						id: "t1",
 						name: "Edit",
-						input: { file_path: "/src/foo.ts", old_string: "const a = 1", new_string: "const a = 2" },
+						input: {
+							file_path: "/src/foo.ts",
+							old_string: "const a = 1",
+							new_string: "const a = 2",
+						},
 					},
 				],
 				model: "claude-sonnet-4-20250514",

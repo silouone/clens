@@ -1,13 +1,13 @@
-import { createSignal, For, Show, type Component } from "solid-js";
 import { LayoutDashboard, MessageSquare } from "lucide-solid";
+import { type Component, createSignal, For, Show } from "solid-js";
 import type { AgentNode, DistilledSession } from "../../shared/types";
 import { getTypeBadgeClass } from "../lib/agent-colors";
 import { countAllAgents, sumDiffStats } from "../lib/agent-utils";
 import { formatCost, formatDuration } from "../lib/format";
-import { NavButton } from "./ui/NavButton";
-import { TreeToggle } from "./ui/TreeToggle";
 import { DetailNav } from "./DetailNav";
 import { NavSection } from "./NavSection";
+import { NavButton } from "./ui/NavButton";
+import { TreeToggle } from "./ui/TreeToggle";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -51,6 +51,7 @@ const AgentNavRow: Component<{
 	return (
 		<div
 			role="treeitem"
+			tabIndex={-1}
 			aria-selected={isSelected()}
 			aria-expanded={hasChildren() ? expanded() : undefined}
 			class="relative"
@@ -59,6 +60,7 @@ const AgentNavRow: Component<{
 			}}
 		>
 			<button
+				type="button"
 				onClick={handleClick}
 				class="group flex w-full flex-col rounded-none mx-1.5 mb-0.5 border-l-2 text-left text-xs transition-colors duration-150 hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
 				classList={{

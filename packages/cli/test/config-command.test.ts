@@ -5,6 +5,7 @@ import type { SessionConfig } from "../src/types";
 
 // -- ANSI stripping helper --
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require the ESC control char
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const makeConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => ({
@@ -20,9 +21,7 @@ const makeConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => ({
 describe("formatConfigLine (clens what)", () => {
 	test("renders all segments joined with a dot separator", () => {
 		const line = formatConfigLine(makeConfig());
-		expect(line).toBe(
-			"perm:acceptEdits · effort:high · mcp:claude_ai_Atlassian,filesystem",
-		);
+		expect(line).toBe("perm:acceptEdits · effort:high · mcp:claude_ai_Atlassian,filesystem");
 	});
 
 	test("omits segments that have no data", () => {
@@ -53,7 +52,9 @@ describe("renderConfigSection (clens report)", () => {
 		expect(out.some((l) => l.includes("Config / Environment:"))).toBe(true);
 		expect(out.some((l) => l.includes("Permission: acceptEdits"))).toBe(true);
 		expect(out.some((l) => l.includes("Effort: high"))).toBe(true);
-		expect(out.some((l) => l.includes("MCP servers: claude_ai_Atlassian (5), filesystem (2)"))).toBe(true);
+		expect(
+			out.some((l) => l.includes("MCP servers: claude_ai_Atlassian (5), filesystem (2)")),
+		).toBe(true);
 	});
 
 	test("uses a green LED for safe permission modes", () => {

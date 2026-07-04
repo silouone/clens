@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { basename, resolve } from "node:path";
 import type { GlobalConfig, GlobalMode, ProjectEntry, ProjectRegistry } from "../types";
 
 // ── Paths ────────────────────────────────────────────────────────
@@ -271,9 +271,10 @@ export const discoverAndRegisterProjects = (maxDepth = 3): readonly ProjectEntry
 	const config = readGlobalConfig();
 	const clensDirs = scanForClensDirs(maxDepth);
 
-	const entries = config.global_mode === "project"
-		? resolveProjectMode(clensDirs)
-		: resolveRepositoryMode(clensDirs);
+	const entries =
+		config.global_mode === "project"
+			? resolveProjectMode(clensDirs)
+			: resolveRepositoryMode(clensDirs);
 
 	// Persist — full replace with fresh discovery
 	writeRegistry({ version: 1, projects: entries });

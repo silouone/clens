@@ -1,6 +1,14 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { AgentNode, DiffLine, LinkEvent, MessageLink, SpawnLink, StoredEvent, TeammateIdleLink } from "./types";
+import type {
+	AgentNode,
+	DiffLine,
+	LinkEvent,
+	MessageLink,
+	SpawnLink,
+	StoredEvent,
+	TeammateIdleLink,
+} from "./types";
 import { BROADCAST_EVENTS } from "./types";
 
 export const IDLE_THRESHOLD_MS = 300_000;
@@ -18,10 +26,7 @@ export const IDLE_THRESHOLD_MS = 300_000;
  * the ~2ms hook budget.
  */
 export const resolveProjectRoot = (start: string): string => {
-	const walkUp = (
-		dir: string,
-		marker: string,
-	): string | undefined => {
+	const walkUp = (dir: string, marker: string): string | undefined => {
 		if (existsSync(resolve(dir, marker))) return dir;
 		const parent = dirname(dir);
 		return parent === dir ? undefined : walkUp(parent, marker);
@@ -40,8 +45,15 @@ export const computeEffectiveDuration = (
 	timestamps: readonly number[],
 	idleThresholdMs: number = IDLE_THRESHOLD_MS,
 ): EffectiveDuration => {
-	if (timestamps.length === 0) return { effective_duration_ms: 0, idle_gaps_ms: 0, effective_end_t: 0, wall_duration_ms: 0 };
-	if (timestamps.length === 1) return { effective_duration_ms: 0, idle_gaps_ms: 0, effective_end_t: timestamps[0], wall_duration_ms: 0 };
+	if (timestamps.length === 0)
+		return { effective_duration_ms: 0, idle_gaps_ms: 0, effective_end_t: 0, wall_duration_ms: 0 };
+	if (timestamps.length === 1)
+		return {
+			effective_duration_ms: 0,
+			idle_gaps_ms: 0,
+			effective_end_t: timestamps[0],
+			wall_duration_ms: 0,
+		};
 
 	const sorted = [...timestamps].sort((a, b) => a - b);
 	const wall_duration_ms = sorted[sorted.length - 1] - sorted[0];
@@ -51,11 +63,14 @@ export const computeEffectiveDuration = (
 		return gap > idleThresholdMs ? acc + gap : acc;
 	}, 0);
 
-	const effective_end_t = sorted.reduceRight((end, t, i) => {
-		if (i === sorted.length - 1) return t;
-		const gap = sorted[i + 1] - t;
-		return gap > idleThresholdMs ? t : end;
-	}, sorted[sorted.length - 1]);
+	const effective_end_t = sorted.reduceRight(
+		(end, t, i) => {
+			if (i === sorted.length - 1) return t;
+			const gap = sorted[i + 1] - t;
+			return gap > idleThresholdMs ? t : end;
+		},
+		sorted[sorted.length - 1],
+	);
 
 	return {
 		effective_duration_ms: Math.max(0, wall_duration_ms - idle_gaps_ms),
@@ -67,9 +82,10 @@ export const computeEffectiveDuration = (
 
 /** Deduplicate spawn links by agent_id (resumed agents create multiple spawn events). */
 export const deduplicateSpawns = (spawns: readonly SpawnLink[]): readonly SpawnLink[] =>
-	spawns.reduce<readonly SpawnLink[]>((acc, spawn) =>
-		acc.some((s) => s.agent_id === spawn.agent_id) ? acc : [...acc, spawn],
-	[]);
+	spawns.reduce<readonly SpawnLink[]>(
+		(acc, spawn) => (acc.some((s) => s.agent_id === spawn.agent_id) ? acc : [...acc, spawn]),
+		[],
+	);
 
 /**
  * Recursively flatten an agent tree into a flat array of AgentNode.
@@ -86,10 +102,7 @@ export const isUuidLike = (s: string): boolean => /^[0-9a-f]{16,}$/i.test(s);
  * Return a human-friendly agent name. Falls back to 8-char truncated ID if the
  * raw name is undefined, empty, or looks like a UUID.
  */
-export const sanitizeAgentName = (
-	rawName: string | undefined,
-	agentId: string,
-): string =>
+export const sanitizeAgentName = (rawName: string | undefined, agentId: string): string =>
 	rawName && !isUuidLike(rawName) ? rawName : agentId.slice(0, 8);
 
 /** Find the last event that is not a broadcast/noise event. Falls back to last event if all are broadcast. */
@@ -100,7 +113,20 @@ export const findLastMeaningfulEvent = (events: readonly StoredEvent[]): StoredE
 export const isGhostSession = (events: readonly StoredEvent[]): boolean =>
 	events.length > 0 && events.every((e) => BROADCAST_EVENTS.has(e.event));
 
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const MONTH_NAMES = [
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
+] as const;
 
 /** Compact date for list/table views: "Feb 24 12:30" */
 export const formatSessionDate = (ms: number): string => {
@@ -147,8 +173,9 @@ const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn
 
 export const buildNameMap = (links: readonly LinkEvent[]): ReadonlyMap<string, string> => {
 	const uniqueSpawns = deduplicateSpawns(links.filter(isSpawnLink));
-	const entries: readonly (readonly [string, string])[] = uniqueSpawns
-		.map((s) => [s.agent_id, s.agent_name ?? s.agent_type] as const);
+	const entries: readonly (readonly [string, string])[] = uniqueSpawns.map(
+		(s) => [s.agent_id, s.agent_name ?? s.agent_type] as const,
+	);
 	return new Map(entries);
 };
 
@@ -158,8 +185,9 @@ export const resolveName = (id: string, nameMap: ReadonlyMap<string, string>): s
 export const resolveId = (name: string, nameMap: ReadonlyMap<string, string>): string =>
 	[...nameMap].find(([, n]) => n === name)?.[0] ?? name;
 
-export const buildReverseNameMap = (nameMap: ReadonlyMap<string, string>): ReadonlyMap<string, string> =>
-	new Map([...nameMap].map(([id, name]) => [name, id]));
+export const buildReverseNameMap = (
+	nameMap: ReadonlyMap<string, string>,
+): ReadonlyMap<string, string> => new Map([...nameMap].map(([id, name]) => [name, id]));
 
 /**
  * Resolve the parent session for a given agent name or id by searching spawn links.
@@ -170,9 +198,7 @@ export const resolveParentSession = (
 	spawns: readonly SpawnLink[],
 	nameMap?: ReadonlyMap<string, string>,
 ): { readonly id: string; readonly name: string } => {
-	const spawn = spawns.find(
-		(s) => s.agent_name === agentNameOrId || s.agent_id === agentNameOrId,
-	);
+	const spawn = spawns.find((s) => s.agent_name === agentNameOrId || s.agent_id === agentNameOrId);
 	if (spawn) {
 		const parentName = nameMap ? resolveName(spawn.parent_session, nameMap) : spawn.parent_session;
 		return { id: spawn.parent_session, name: parentName };
@@ -180,7 +206,8 @@ export const resolveParentSession = (
 	return { id: "leader", name: "leader" };
 };
 
-const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink => link.type === "teammate_idle";
+const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink =>
+	link.type === "teammate_idle";
 
 /**
  * Build a map from team member name to session_id using teammate_idle links.
@@ -192,8 +219,9 @@ export const buildTeamMemberSessionMap = (
 	new Map(
 		links
 			.filter(isTeammateIdleLink)
-			.filter((link): link is TeammateIdleLink & { readonly session_id: string } =>
-				link.teammate !== "" && link.session_id !== undefined && link.session_id !== "",
+			.filter(
+				(link): link is TeammateIdleLink & { readonly session_id: string } =>
+					link.teammate !== "" && link.session_id !== undefined && link.session_id !== "",
 			)
 			.map((link) => [link.teammate, link.session_id] as const),
 	);
@@ -220,9 +248,7 @@ export const filterLinksForSession = (
 	const expandAgentIds = (ids: ReadonlySet<string>): ReadonlySet<string> => {
 		const nextIds = new Set([
 			...ids,
-			...spawns
-				.filter((s) => ids.has(s.parent_session))
-				.map((s) => s.agent_id),
+			...spawns.filter((s) => ids.has(s.parent_session)).map((s) => s.agent_id),
 		]);
 		return nextIds.size === ids.size ? ids : expandAgentIds(nextIds);
 	};
@@ -232,7 +258,10 @@ export const filterLinksForSession = (
 	// Step 2: Build agent name set from spawn links whose agent_id is in the ID set
 	const agentNames: ReadonlySet<string> = new Set(
 		spawns
-			.filter((s): s is SpawnLink & { agent_name: string } => spawnAgentIds.has(s.agent_id) && s.agent_name !== undefined)
+			.filter(
+				(s): s is SpawnLink & { agent_name: string } =>
+					spawnAgentIds.has(s.agent_id) && s.agent_name !== undefined,
+			)
 			.map((s) => s.agent_name),
 	);
 
@@ -270,9 +299,15 @@ export const filterLinksForSession = (
 			case "task":
 				return agentIds.has(link.session_id);
 			case "task_complete":
-				return (link.session_id !== undefined && agentIds.has(link.session_id)) || agentNames.has(link.agent);
+				return (
+					(link.session_id !== undefined && agentIds.has(link.session_id)) ||
+					agentNames.has(link.agent)
+				);
 			case "teammate_idle":
-				return (link.session_id !== undefined && agentIds.has(link.session_id)) || agentNames.has(link.teammate);
+				return (
+					(link.session_id !== undefined && agentIds.has(link.session_id)) ||
+					agentNames.has(link.teammate)
+				);
 			case "team":
 				return agentIds.has(link.leader_session);
 			case "session_end":
@@ -293,18 +328,15 @@ export const filterLinksForSession = (
  * Log an error to `.clens/errors.log` with timestamp and context.
  * Uses sync I/O to be safe in hook context. Silently no-ops if logging itself fails.
  */
-export const logError = (
-	projectDir: string,
-	context: string,
-	err: unknown,
-): void => {
+export const logError = (projectDir: string, context: string, err: unknown): void => {
 	try {
 		const clensDir = `${projectDir}/.clens`;
 		mkdirSync(clensDir, { recursive: true });
 		const message = err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500);
-		const stack = err instanceof Error && err.stack
-			? err.stack.split("\n").slice(0, 3).join("\n  ")
-			: "no stack";
+		const stack =
+			err instanceof Error && err.stack
+				? err.stack.split("\n").slice(0, 3).join("\n  ")
+				: "no stack";
 		appendFileSync(
 			`${clensDir}/errors.log`,
 			`${new Date().toISOString()} [${context}] ${message}\n  stack: ${stack}\n`,
@@ -318,10 +350,7 @@ export const logError = (
  * Convert DiffLine[] back into a unified diff string with standard headers.
  * Groups consecutive lines into a single hunk per call.
  */
-export const diffLinesToUnified = (
-	filePath: string,
-	lines: readonly DiffLine[],
-): string => {
+export const diffLinesToUnified = (filePath: string, lines: readonly DiffLine[]): string => {
 	if (lines.length === 0) return "";
 
 	const header = `--- a/${filePath}\n+++ b/${filePath}`;
@@ -332,10 +361,12 @@ export const diffLinesToUnified = (
 	const newCount = lines.filter((l) => l.type === "add" || l.type === "context").length;
 	const hunkHeader = `@@ -${oldStart},${oldCount} +${oldStart},${newCount} @@`;
 
-	const body = lines.map((l) => {
-		const prefix = l.type === "add" ? "+" : l.type === "remove" ? "-" : " ";
-		return `${prefix}${l.content}`;
-	}).join("\n");
+	const body = lines
+		.map((l) => {
+			const prefix = l.type === "add" ? "+" : l.type === "remove" ? "-" : " ";
+			return `${prefix}${l.content}`;
+		})
+		.join("\n");
 
 	return `${header}\n${hunkHeader}\n${body}`;
 };

@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DISTILL_SCHEMA_VERSION, distillAllGlobal, isDistilledFresh } from "../src/commands/distill";
+import {
+	DISTILL_SCHEMA_VERSION,
+	distillAllGlobal,
+	isDistilledFresh,
+} from "../src/commands/distill";
 import type { GlobalSessionSummary } from "../src/types/distill";
 
 // Two-project fixture, injected directly (no registry / HOME dependency):
@@ -25,8 +29,17 @@ const writeSessionFile = (captureDir: string, sid: string): void => {
 		join(captureDir, ".clens", "sessions", `${sid}.jsonl`),
 		[
 			makeEvent("SessionStart", 1000, sid, { source: "cli" }),
-			makeEvent("PreToolUse", 1500, sid, { tool_name: "Read", tool_use_id: "u1", tool_input: { file_path: "a.ts" } }),
-			makeEvent("PostToolUse", 1600, sid, { tool_name: "Read", tool_use_id: "u1", tool_input: { file_path: "a.ts" }, tool_response: "ok" }),
+			makeEvent("PreToolUse", 1500, sid, {
+				tool_name: "Read",
+				tool_use_id: "u1",
+				tool_input: { file_path: "a.ts" },
+			}),
+			makeEvent("PostToolUse", 1600, sid, {
+				tool_name: "Read",
+				tool_use_id: "u1",
+				tool_input: { file_path: "a.ts" },
+				tool_response: "ok",
+			}),
 			makeEvent("SessionEnd", 2000, sid, { reason: "done" }),
 		].join("\n") + "\n",
 	);
@@ -93,7 +106,10 @@ describe("distill-global batch driver", () => {
 		writeFileSync(df, JSON.stringify({ schema_version: DISTILL_SCHEMA_VERSION + 1 }));
 		expect(isDistilledFresh(sf, df)).toBe(false);
 		// Pricing-tier drift relative to an explicit expected tier -> stale.
-		writeFileSync(df, JSON.stringify({ schema_version: DISTILL_SCHEMA_VERSION, pricing_tier: "max" }));
+		writeFileSync(
+			df,
+			JSON.stringify({ schema_version: DISTILL_SCHEMA_VERSION, pricing_tier: "max" }),
+		);
 		expect(isDistilledFresh(sf, df, "api")).toBe(false);
 		expect(isDistilledFresh(sf, df, "max")).toBe(true);
 	});
@@ -110,7 +126,9 @@ describe("distill-global batch driver", () => {
 		expect(existsSync(distilledPath(projAdir, SESSION_A))).toBe(true);
 		// Nested repo session routes to the nested capture dir, not the git root.
 		expect(existsSync(distilledPath(nestedDir, SESSION_B))).toBe(true);
-		expect(existsSync(join(tempDir, "repo-b", ".clens", "distilled", `${SESSION_B}.json`))).toBe(false);
+		expect(existsSync(join(tempDir, "repo-b", ".clens", "distilled", `${SESSION_B}.json`))).toBe(
+			false,
+		);
 	});
 
 	test("second run with no changes skips all (incremental)", async () => {

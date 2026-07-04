@@ -1,11 +1,19 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import type { AgentNode, CostEstimate, DistilledSession, LinkEvent, SessionSummary, SpawnLink, StoredEvent } from "../types";
-import { BROADCAST_EVENTS, deriveSessionStatus } from "../types";
 import { repriceCostEstimate } from "../distill/stats";
+import type {
+	AgentNode,
+	CostEstimate,
+	DistilledSession,
+	LinkEvent,
+	SessionSummary,
+	SpawnLink,
+	StoredEvent,
+} from "../types";
+import { BROADCAST_EVENTS, deriveSessionStatus } from "../types";
 import { computeEffectiveDuration, deduplicateSpawns, isGhostSession, logError } from "../utils";
 import { parseDistilledSession, parseLinkEvent } from "./parsers";
-import { computeSessionName, resolveDisplayName } from "./session-name";
 import { readSessionMeta } from "./session-meta";
+import { computeSessionName, resolveDisplayName } from "./session-name";
 import { readSessionName } from "./transcript";
 
 /** Parse a JSON line into a StoredEvent, returning undefined for invalid data. */
@@ -59,13 +67,16 @@ export const listSessions = (projectDir: string): SessionSummary[] => {
 				// Performance-optimized backward scan: parse only trailing broadcast events
 				const parsedLines: readonly (StoredEvent | undefined)[] = lines.map(parseEvent);
 				const meaningfulLast: StoredEvent | undefined =
-					parsedLines.findLast((e): e is StoredEvent => e !== undefined && !BROADCAST_EVENTS.has(e.event))
-					?? parsedLines.findLast((e): e is StoredEvent => e !== undefined);
+					parsedLines.findLast(
+						(e): e is StoredEvent => e !== undefined && !BROADCAST_EVENTS.has(e.event),
+					) ?? parsedLines.findLast((e): e is StoredEvent => e !== undefined);
 
 				if (!meaningfulLast) return [];
 				const startTime = firstEvent.t;
 				const endTime = meaningfulLast.t;
-				const timestamps = parsedLines.filter((e): e is StoredEvent => e !== undefined).map((e) => e.t);
+				const timestamps = parsedLines
+					.filter((e): e is StoredEvent => e !== undefined)
+					.map((e) => e.t);
 				const effectiveDuration = computeEffectiveDuration(timestamps);
 				// A clean SessionEnd marks completion. A trailing Stop no longer does
 				// (it fires after every turn — bug B6). Non-ended sessions are active
@@ -108,7 +119,9 @@ export const listSessions = (projectDir: string): SessionSummary[] => {
 export const readSessionEvents = (sessionId: string, projectDir: string): StoredEvent[] => {
 	const filePath = `${projectDir}/.clens/sessions/${sessionId}.jsonl`;
 	if (!existsSync(filePath)) {
-		throw new Error(`Session file not found: ${sessionId}. Run 'clens list' to see available sessions.`);
+		throw new Error(
+			`Session file not found: ${sessionId}. Run 'clens list' to see available sessions.`,
+		);
 	}
 	const content = readFileSync(filePath, "utf-8").trim();
 	return content
@@ -210,13 +223,19 @@ const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn
 const countDistilledAgents = (distilledPath: string): number => {
 	try {
 		const parsed: unknown = JSON.parse(readFileSync(distilledPath, "utf-8"));
-		const agents = parsed && typeof parsed === "object" ? (parsed as { agents?: unknown }).agents : undefined;
+		const agents =
+			parsed && typeof parsed === "object" ? (parsed as { agents?: unknown }).agents : undefined;
 		const countRecursive = (nodes: readonly { children?: readonly unknown[] }[]): number =>
 			nodes.reduce(
-				(sum, n) => sum + 1 + countRecursive((n.children ?? []) as readonly { children?: readonly unknown[] }[]),
+				(sum, n) =>
+					sum +
+					1 +
+					countRecursive((n.children ?? []) as readonly { children?: readonly unknown[] }[]),
 				0,
 			);
-		return Array.isArray(agents) ? countRecursive(agents as readonly { children?: readonly unknown[] }[]) : 0;
+		return Array.isArray(agents)
+			? countRecursive(agents as readonly { children?: readonly unknown[] }[])
+			: 0;
 	} catch {
 		return 0;
 	}
@@ -288,25 +307,23 @@ export const enrichSessionSummaries = (
 	const spawns = deduplicateSpawns(links.filter(isSpawnLink));
 
 	// Count deduplicated spawn links per parent_session
-	const spawnCountByParent: ReadonlyMap<string, number> = spawns.reduce<ReadonlyMap<string, number>>(
-		(acc, spawn) => {
-			const current = acc.get(spawn.parent_session) ?? 0;
-			return new Map([...acc, [spawn.parent_session, current + 1]]);
-		},
-		new Map(),
-	);
+	const spawnCountByParent: ReadonlyMap<string, number> = spawns.reduce<
+		ReadonlyMap<string, number>
+	>((acc, spawn) => {
+		const current = acc.get(spawn.parent_session) ?? 0;
+		return new Map([...acc, [spawn.parent_session, current + 1]]);
+	}, new Map());
 
 	// Fallback: count unique msg_send recipients per session when no spawns exist
 	const msgRecipientsBySession: ReadonlyMap<string, number> = (() => {
-		const msgSends = links.filter((l): l is Extract<LinkEvent, { type: "msg_send" }> => l.type === "msg_send");
-		const bySession = msgSends.reduce<ReadonlyMap<string, ReadonlySet<string>>>(
-			(acc, msg) => {
-				const sid = msg.session_id ?? msg.from;
-				const existing = acc.get(sid) ?? new Set<string>();
-				return new Map([...acc, [sid, new Set([...existing, msg.to])]]);
-			},
-			new Map(),
+		const msgSends = links.filter(
+			(l): l is Extract<LinkEvent, { type: "msg_send" }> => l.type === "msg_send",
 		);
+		const bySession = msgSends.reduce<ReadonlyMap<string, ReadonlySet<string>>>((acc, msg) => {
+			const sid = msg.session_id ?? msg.from;
+			const existing = acc.get(sid) ?? new Set<string>();
+			return new Map([...acc, [sid, new Set([...existing, msg.to])]]);
+		}, new Map());
 		return new Map([...bySession].map(([sid, recipients]) => [sid, recipients.size]));
 	})();
 
@@ -318,11 +335,12 @@ export const enrichSessionSummaries = (
 		// else deduplicated spawn links, else unique msg_send recipients.
 		const distilledCount = isDistilled ? countDistilledAgents(distilledPath) : 0;
 		const spawnCount = spawnCountByParent.get(session.session_id) ?? 0;
-		const agentCount = distilledCount > 0
-			? distilledCount
-			: spawnCount > 0
-				? spawnCount
-				: msgRecipientsBySession.get(session.session_id) ?? 0;
+		const agentCount =
+			distilledCount > 0
+				? distilledCount
+				: spawnCount > 0
+					? spawnCount
+					: (msgRecipientsBySession.get(session.session_id) ?? 0);
 
 		const hasSpec = isDistilled
 			? (() => {
@@ -339,7 +357,7 @@ export const enrichSessionSummaries = (
 		// Resolve session name from transcript custom-title event (legacy field kept).
 		const customTitle = (() => {
 			const tPath = resolveTranscriptPathFromSession(session.session_id, projectDir);
-			return tPath ? readSessionName(tPath) ?? undefined : undefined;
+			return tPath ? (readSessionName(tPath) ?? undefined) : undefined;
 		})();
 
 		// Resolve the display name by precedence: sidecar label > CC custom-title >

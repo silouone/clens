@@ -4,8 +4,8 @@ import type { DecisionPoint, DistilledSession } from "../src/types";
 
 // -- ANSI stripping helper --
 
-const stripAnsi = (s: string): string =>
-	s.replace(/\x1b\[[0-9;]*m/g, "");
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require the ESC control char
+const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 // -- Fixture factories --
 
@@ -40,9 +40,7 @@ const makePhaseBoundary = (
 	...overrides,
 });
 
-const makeDistilled = (
-	overrides: Partial<DistilledSession> = {},
-): DistilledSession => ({
+const makeDistilled = (overrides: Partial<DistilledSession> = {}): DistilledSession => ({
 	session_id: "test1234-5678-uuid",
 	stats: {
 		duration_ms: 60000,
@@ -153,18 +151,14 @@ describe("renderDecisionsSummary", () => {
 	});
 
 	test("tool pivot after failure shows 'after failure' marker", () => {
-		const decisions: readonly DecisionPoint[] = [
-			makeToolPivot({ after_failure: true }),
-		];
+		const decisions: readonly DecisionPoint[] = [makeToolPivot({ after_failure: true })];
 		const distilled = makeDistilled({ decisions: [...decisions] });
 		const output = stripAnsi(renderDecisionsSummary(distilled));
 		expect(output).toContain("after failure");
 	});
 
 	test("tool pivot without failure does not show 'after failure' on the pivot line", () => {
-		const decisions: readonly DecisionPoint[] = [
-			makeToolPivot({ after_failure: false }),
-		];
+		const decisions: readonly DecisionPoint[] = [makeToolPivot({ after_failure: false })];
 		const distilled = makeDistilled({ decisions: [...decisions] });
 		const output = stripAnsi(renderDecisionsSummary(distilled));
 		// The pivot line itself should not have "after failure"
@@ -296,10 +290,7 @@ describe("renderDecisionsSummary with agent decisions", () => {
 	});
 
 	test("agent sections are hidden when no agent decisions present", () => {
-		const decisions: readonly DecisionPoint[] = [
-			makeTimingGap({}),
-			makeToolPivot({}),
-		];
+		const decisions: readonly DecisionPoint[] = [makeTimingGap({}), makeToolPivot({})];
 		const distilled = makeDistilled({ decisions: [...decisions] });
 		const output = stripAnsi(renderDecisionsSummary(distilled));
 
@@ -310,7 +301,11 @@ describe("renderDecisionsSummary with agent decisions", () => {
 
 	test("agent spawn shows agent name, type, and truncated id", () => {
 		const decisions: readonly DecisionPoint[] = [
-			makeAgentSpawn({ agent_name: "my-builder", agent_type: "builder", agent_id: "abcdef12-3456-7890" }),
+			makeAgentSpawn({
+				agent_name: "my-builder",
+				agent_type: "builder",
+				agent_id: "abcdef12-3456-7890",
+			}),
 		];
 		const distilled = makeDistilled({ decisions: [...decisions] });
 		const output = stripAnsi(renderDecisionsSummary(distilled));
@@ -387,4 +382,3 @@ describe("renderDecisionsSummary with agent decisions", () => {
 		expect(output).toContain("3 tasks completed");
 	});
 });
-

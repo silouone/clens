@@ -1,4 +1,4 @@
-import { Show, type Component, type JSX } from "solid-js";
+import { type Component, type JSX, Show } from "solid-js";
 
 type SectionHeadingVariant = "default" | "muted";
 
@@ -20,12 +20,12 @@ export const SectionHeading: Component<SectionHeadingProps> = (props) => (
 				}}
 			</Show>
 			<h3
-			class="instrument-microcaps text-[11px]"
-			classList={{
-				"text-secondary": (props.variant ?? "default") === "default",
-				"text-muted": props.variant === "muted",
-			}}
-		>
+				class="instrument-microcaps text-[11px]"
+				classList={{
+					"text-secondary": (props.variant ?? "default") === "default",
+					"text-muted": props.variant === "muted",
+				}}
+			>
 				{props.title}
 			</h3>
 			<Show when={props.count !== undefined}>
@@ -34,8 +34,6 @@ export const SectionHeading: Component<SectionHeadingProps> = (props) => (
 				</span>
 			</Show>
 		</div>
-		<Show when={props.children}>
-			{props.children}
-		</Show>
+		<Show when={props.children}>{props.children}</Show>
 	</div>
 );

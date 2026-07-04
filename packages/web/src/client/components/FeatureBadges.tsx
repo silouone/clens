@@ -1,12 +1,15 @@
 import { Repeat, Target, Workflow } from "lucide-solid";
-import { For, Show, type Component } from "solid-js";
+import { type Component, For, Show } from "solid-js";
 import type { FeatureFlag } from "../../shared/types";
 
 // ── Feature badges (loop / goal / workflow) ─────────────────────────
 
 // Instrument style: square hairline tags, monochrome graphite/phosphor.
 // No colored pills — the tag reads like a panel-mounted label.
-const BADGE_STYLES: Record<FeatureFlag, { readonly label: string; readonly classes: string; readonly title: string }> = {
+const BADGE_STYLES: Record<
+	FeatureFlag,
+	{ readonly label: string; readonly classes: string; readonly title: string }
+> = {
 	loop: {
 		label: "loop",
 		classes: "border border-clens text-secondary bg-surface-inset",
@@ -26,9 +29,15 @@ const BADGE_STYLES: Record<FeatureFlag, { readonly label: string; readonly class
 
 const BadgeIcon: Component<{ readonly flag: FeatureFlag }> = (props) => (
 	<>
-		<Show when={props.flag === "loop"}><Repeat class="h-2.5 w-2.5" /></Show>
-		<Show when={props.flag === "goal"}><Target class="h-2.5 w-2.5" /></Show>
-		<Show when={props.flag === "workflow"}><Workflow class="h-2.5 w-2.5" /></Show>
+		<Show when={props.flag === "loop"}>
+			<Repeat class="h-2.5 w-2.5" />
+		</Show>
+		<Show when={props.flag === "goal"}>
+			<Target class="h-2.5 w-2.5" />
+		</Show>
+		<Show when={props.flag === "workflow"}>
+			<Workflow class="h-2.5 w-2.5" />
+		</Show>
 	</>
 );
 

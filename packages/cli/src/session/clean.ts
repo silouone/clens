@@ -39,9 +39,7 @@ export const cleanAll = (
 		? []
 		: sessions.filter((s) => !isDistilled(s.session_id)).map((s) => s.session_id);
 
-	const deletable = options?.force
-		? sessions
-		: sessions.filter((s) => isDistilled(s.session_id));
+	const deletable = options?.force ? sessions : sessions.filter((s) => isDistilled(s.session_id));
 
 	const deleted = deletable.flatMap((session) => {
 		const sessionPath = `${projectDir}/.clens/sessions/${session.session_id}.jsonl`;

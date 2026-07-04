@@ -1,5 +1,5 @@
-import { createSignal, For, Show, type Component } from "solid-js";
-import { Check, Circle, Clock, ListTodo, ChevronRight } from "lucide-solid";
+import { Check, ChevronRight, Circle, Clock, ListTodo } from "lucide-solid";
+import { type Component, createSignal, For, Show } from "solid-js";
 import type { TaskListResult, TaskRecord } from "../../shared/types";
 import { Card } from "./ui/Card";
 
@@ -30,22 +30,20 @@ const completionBadgeClass = (rate: number): string => {
 const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 	const [expanded, setExpanded] = createSignal(false);
 	const hasDetails = () =>
-		(props.task.description?.length ?? 0) > 0 ||
-		(props.task.blocked_by?.length ?? 0) > 0;
+		(props.task.description?.length ?? 0) > 0 || (props.task.blocked_by?.length ?? 0) > 0;
 
 	return (
 		<div class="group">
-			<div
-				class={`flex items-center gap-2 rounded-none px-1.5 py-1 text-sm ${hasDetails() ? "cursor-pointer hover:bg-surface-hover" : ""}`}
+			<button
+				type="button"
+				class={`flex w-full items-center gap-2 rounded-none px-1.5 py-1 text-left text-sm ${hasDetails() ? "cursor-pointer hover:bg-surface-hover" : ""}`}
 				onClick={() => hasDetails() && setExpanded((prev) => !prev)}
 			>
 				{statusIcon(props.task.status)}
 
 				<span
 					class={`flex-1 truncate ${
-						props.task.status === "completed"
-							? "text-muted line-through"
-							: "text-secondary"
+						props.task.status === "completed" ? "text-muted line-through" : "text-secondary"
 					}`}
 					title={props.task.subject}
 				>
@@ -65,16 +63,12 @@ const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 						class={`h-3 w-3 shrink-0 text-muted transition-transform ${expanded() ? "rotate-90" : ""}`}
 					/>
 				</Show>
-			</div>
+			</button>
 
 			<Show when={expanded()}>
 				<div class="ml-6 space-y-1 pb-1 pt-0.5">
 					<Show when={props.task.description}>
-						{(desc) => (
-							<p class="whitespace-pre-wrap text-xs text-muted">
-								{desc()}
-							</p>
-						)}
+						{(desc) => <p class="whitespace-pre-wrap text-xs text-muted">{desc()}</p>}
 					</Show>
 					<Show when={(props.task.blocked_by?.length ?? 0) > 0}>
 						<div class="flex flex-wrap gap-1">
@@ -108,9 +102,7 @@ export const TaskListSection: Component<TaskListSectionProps> = (props) => {
 			{/* Header */}
 			<div class="mb-2 flex items-center gap-2">
 				<ListTodo class="h-3.5 w-3.5 text-muted" />
-				<h3 class="instrument-microcaps text-[11px] text-muted">
-					Task Plan
-				</h3>
+				<h3 class="instrument-microcaps text-[11px] text-muted">Task Plan</h3>
 				<span
 					class={`instrument-microcaps rounded-none border px-1.5 py-0.5 font-mono text-[10px] tabular-nums ${completionBadgeClass(completionRate())}`}
 				>
@@ -128,9 +120,7 @@ export const TaskListSection: Component<TaskListSectionProps> = (props) => {
 
 			{/* Task rows */}
 			<div class="space-y-0.5">
-				<For each={tasks()}>
-					{(task) => <TaskRow task={task} />}
-				</For>
+				<For each={tasks()}>{(task) => <TaskRow task={task} />}</For>
 			</div>
 		</Card>
 	);

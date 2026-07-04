@@ -283,6 +283,7 @@ export const pluralize = (word: string, count: number): string => {
 /**
  * Strip ANSI escape codes from a string to get its visible length.
  */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require the ESC control char
 export const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 /**

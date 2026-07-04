@@ -1,4 +1,4 @@
-import { type Component } from "solid-js";
+import type { Component } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { BacktracksTab, CommunicationTab, EditsTab, TimelineTab } from "./tabs";
 

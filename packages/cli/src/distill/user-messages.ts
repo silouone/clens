@@ -38,7 +38,9 @@ const buildMessage = (t: number, rawContent: string): TranscriptUserMessage => {
 	return base;
 };
 
-export const extractUserMessages = (entries: readonly TranscriptEntry[]): readonly TranscriptUserMessage[] =>
+export const extractUserMessages = (
+	entries: readonly TranscriptEntry[],
+): readonly TranscriptUserMessage[] =>
 	entries.flatMap((entry): TranscriptUserMessage[] => {
 		if (entry.type !== "user" || !entry.message) return [];
 

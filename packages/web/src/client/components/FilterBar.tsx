@@ -1,5 +1,5 @@
-import { For, Show, createSignal, createEffect, onCleanup, type JSX } from "solid-js";
-import { Search, RefreshCw, ChevronDown, SlidersHorizontal, X } from "lucide-solid";
+import { ChevronDown, RefreshCw, Search, SlidersHorizontal, X } from "lucide-solid";
+import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { SegmentedControl } from "./ui/SegmentedControl";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -74,7 +74,9 @@ const FiltersPopover = (props: { readonly count: number; readonly children: JSX.
 	// Escape closes — matches the ColorFlag popover pattern.
 	createEffect(() => {
 		if (!open()) return;
-		const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+		const handler = (e: KeyboardEvent) => {
+			if (e.key === "Escape") setOpen(false);
+		};
 		document.addEventListener("keydown", handler);
 		onCleanup(() => document.removeEventListener("keydown", handler));
 	});
@@ -104,7 +106,13 @@ const FiltersPopover = (props: { readonly count: number; readonly children: JSX.
 
 			<Show when={open()}>
 				{/* Backdrop catches outside clicks. */}
-				<div class="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+				<button
+					type="button"
+					aria-label="Close filters"
+					tabIndex={-1}
+					class="fixed inset-0 z-40"
+					onClick={() => setOpen(false)}
+				/>
 				<div class="absolute top-full left-0 z-50 mt-1 rounded-none border border-clens bg-surface-overlay p-3">
 					{props.children}
 				</div>
@@ -158,6 +166,7 @@ export const FilterBar = (props: FilterBarProps) => (
 				{props.resultLabel}
 			</span>
 			<button
+				type="button"
 				onClick={() => props.onRefresh()}
 				class="ml-auto flex items-center gap-1 rounded-none border border-clens px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:border-strong hover:text-secondary"
 				title="Refresh"

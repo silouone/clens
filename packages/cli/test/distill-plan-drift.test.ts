@@ -149,11 +149,7 @@ describe("parseSpecExpectedFiles", () => {
 	});
 
 	test("rejects bold function signatures with parentheses", () => {
-		const content = [
-			"## Files",
-			"- **buildGraph(nodes)**",
-			"- **src/graph.ts**",
-		].join("\n");
+		const content = ["## Files", "- **buildGraph(nodes)**", "- **src/graph.ts**"].join("\n");
 		// buildGraph(nodes) has parens but also no file extension, so double-filtered
 		// src/graph.ts is valid
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/graph.ts"]);
@@ -251,30 +247,22 @@ describe("parseSpecExpectedFiles", () => {
 	});
 
 	test("does not double-extract backtick paths from bullet lines", () => {
-		const content = [
-			"## Files to Create",
-			"- `src/new-file.ts`",
-		].join("\n");
+		const content = ["## Files to Create", "- `src/new-file.ts`"].join("\n");
 		// Should not appear twice despite both bullet and inline extractors matching
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/new-file.ts"]);
 	});
 
 	test("skips command-like strings in inline backticks inside a files section", () => {
-		const content = [
-			"## Files",
-			"Run `bun test` and `npm install` then check `src/app.ts`.",
-		].join("\n");
+		const content = ["## Files", "Run `bun test` and `npm install` then check `src/app.ts`."].join(
+			"\n",
+		);
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/app.ts"]);
 	});
 
 	test("skips command-like lines in code blocks", () => {
-		const content = [
-			"```",
-			"bun run typecheck",
-			"git status",
-			"src/distill/stats.ts",
-			"```",
-		].join("\n");
+		const content = ["```", "bun run typecheck", "git status", "src/distill/stats.ts", "```"].join(
+			"\n",
+		);
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/distill/stats.ts"]);
 	});
 
@@ -306,10 +294,7 @@ describe("parseSpecExpectedFiles", () => {
 	});
 
 	test("inline backtick extraction requires / in path inside a files section", () => {
-		const content = [
-			"## Files",
-			"Check `README.md` and `src/app.ts` for details.",
-		].join("\n");
+		const content = ["## Files", "Check `README.md` and `src/app.ts` for details."].join("\n");
 		// README.md has no /, so only src/app.ts is extracted
 		expect(parseSpecExpectedFiles(content)).toEqual(["src/app.ts"]);
 	});
@@ -497,14 +482,8 @@ describe("computePlanDrift", () => {
 	});
 
 	test("does not match function signatures as expected files in drift", () => {
-		const spec = [
-			"## Files",
-			"- `src/app.ts`",
-			"- `aggregateTeamData(...)`",
-		].join("\n");
-		const fm = makeFileMapResult([
-			makeFileMapEntry({ file_path: "src/app.ts", edits: 1 }),
-		]);
+		const spec = ["## Files", "- `src/app.ts`", "- `aggregateTeamData(...)`"].join("\n");
+		const fm = makeFileMapResult([makeFileMapEntry({ file_path: "src/app.ts", edits: 1 })]);
 		const result = computePlanDrift("specs/plan.md", spec, [fm]);
 		// aggregateTeamData(...) is filtered out, so expected = [src/app.ts], actual = [src/app.ts]
 		expect(result.drift_score).toBe(0);

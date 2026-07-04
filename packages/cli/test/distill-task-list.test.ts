@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { extractTaskList } from "../src/distill/task-list";
-import type {
-	LinkEvent,
-	MessageLink,
-	SpawnLink,
-	TaskCompleteLink,
-	TaskLink,
-} from "../src/types";
+import type { LinkEvent, MessageLink, SpawnLink, TaskCompleteLink, TaskLink } from "../src/types";
 
 // -- Helper factories --
 

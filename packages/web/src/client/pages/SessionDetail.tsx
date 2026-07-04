@@ -1,5 +1,6 @@
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import {
+	type Component,
 	createEffect,
 	createMemo,
 	createSignal,
@@ -7,37 +8,30 @@ import {
 	onCleanup,
 	Show,
 	Switch,
-	type Component,
 } from "solid-js";
-import {
-	createSessionDetail,
-	sessionList,
-	globalError,
-	clearError,
-} from "../lib/stores";
-import { shouldAutoDistill } from "../lib/auto-distill";
-import { api } from "../lib/api";
-import { lastDistilledSessionId } from "../lib/events";
-import { useKeyboard } from "../lib/keyboard";
-import { formatDuration, formatDate } from "../lib/format";
-import { findAgentInTree, flattenAgents } from "../lib/agent-utils";
-import { Spinner } from "../components/ui/Spinner";
-import { FlaskIllustration } from "../components/ui/EmptyState";
-import { PageShell, LoadingSkeleton } from "../components/PageShell";
-import { SessionHeader } from "../components/SessionHeader";
-import { SessionDetailNav } from "../components/SessionDetailNav";
-import { OverviewPanel, AgentPanel } from "../components/panels";
+import type { SessionStatus, SessionSummary } from "../../shared/types";
 import { ConversationPanel } from "../components/ConversationPanel";
-import { DetailPageLayout } from "../components/layouts/DetailPageLayout";
 import { DetailHeader } from "../components/DetailHeader";
 import { DetailNav } from "../components/DetailNav";
-
 import { LiveSessionView } from "../components/LiveSessionView";
-import { createLiveSessionStore } from "../lib/live-store";
-import { preferences } from "../lib/settings";
-import type { SessionStatus, SessionSummary } from "../../shared/types";
-import { isGlobalMode } from "../lib/project-store";
+import { DetailPageLayout } from "../components/layouts/DetailPageLayout";
+import { LoadingSkeleton, PageShell } from "../components/PageShell";
 import { ProjectBadge } from "../components/ProjectFilter";
+import { AgentPanel, OverviewPanel } from "../components/panels";
+import { SessionDetailNav } from "../components/SessionDetailNav";
+import { SessionHeader } from "../components/SessionHeader";
+import { FlaskIllustration } from "../components/ui/EmptyState";
+import { Spinner } from "../components/ui/Spinner";
+import { findAgentInTree, flattenAgents } from "../lib/agent-utils";
+import { api } from "../lib/api";
+import { shouldAutoDistill } from "../lib/auto-distill";
+import { lastDistilledSessionId } from "../lib/events";
+import { formatDate, formatDuration } from "../lib/format";
+import { useKeyboard } from "../lib/keyboard";
+import { createLiveSessionStore } from "../lib/live-store";
+import { isGlobalMode } from "../lib/project-store";
+import { preferences } from "../lib/settings";
+import { clearError, createSessionDetail, globalError, sessionList } from "../lib/stores";
 
 // ── Not distilled state ─────────────────────────────────────────────
 
@@ -54,8 +48,14 @@ const NotDistilledState: Component<{
 	let timeoutTimer: ReturnType<typeof setTimeout> | undefined; // eslint-disable-line prefer-const
 
 	const stopPolling = () => {
-		if (pollTimer) { clearInterval(pollTimer); pollTimer = undefined; }
-		if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = undefined; }
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = undefined;
+		}
+		if (timeoutTimer) {
+			clearTimeout(timeoutTimer);
+			timeoutTimer = undefined;
+		}
 		setDistilling(false);
 	};
 
@@ -91,7 +91,9 @@ const NotDistilledState: Component<{
 				return;
 			}
 			// Poll for completion as fallback (SSE is primary signal)
-			pollTimer = setInterval(() => { if (!refetchTriggered()) props.onDistill(); }, 3000);
+			pollTimer = setInterval(() => {
+				if (!refetchTriggered()) props.onDistill();
+			}, 3000);
 			// Stop polling after 2 minutes max
 			timeoutTimer = setTimeout(stopPolling, 120_000);
 		} catch (err) {
@@ -118,6 +120,7 @@ const NotDistilledState: Component<{
 					</div>
 					<span class="instrument-microcaps text-[10px] text-muted">or</span>
 					<button
+						type="button"
 						onClick={handleDistill}
 						disabled={distilling()}
 						class="instrument-microcaps rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface transition hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -132,9 +135,7 @@ const NotDistilledState: Component<{
 					</div>
 				</Show>
 				<Show when={error()}>
-					{(e) => (
-						<p class="mt-3 font-mono text-xs text-[var(--clens-danger)]">{e()}</p>
-					)}
+					{(e) => <p class="mt-3 font-mono text-xs text-[var(--clens-danger)]">{e()}</p>}
 				</Show>
 				<Show when={summary()}>
 					{(s) => (
@@ -142,7 +143,9 @@ const NotDistilledState: Component<{
 							<span>{s().event_count} events</span>
 							<span>{formatDuration(s().duration_ms)}</span>
 							<Show when={s().git_branch}>
-								<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono">{s().git_branch}</span>
+								<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono">
+									{s().git_branch}
+								</span>
 							</Show>
 						</div>
 					)}
@@ -161,9 +164,11 @@ const AgentNotFound: Component<{
 	<div class="flex h-full items-center justify-center">
 		<div class="text-center">
 			<p class="text-xs text-muted">
-				Agent <code class="font-mono text-xs">{props.agentId.slice(0, 12)}</code> not found in this session.
+				Agent <code class="font-mono text-xs">{props.agentId.slice(0, 12)}</code> not found in this
+				session.
 			</p>
 			<button
+				type="button"
 				onClick={props.onGoOverview}
 				class="instrument-microcaps mt-3 rounded-none border border-clens px-3 py-1 text-[10px] text-secondary transition hover:bg-surface-hover hover:border-strong"
 			>
@@ -203,10 +208,14 @@ const StaleDistillBanner: Component<{
 				Re-analyze to refresh.
 			</span>
 			<button
+				type="button"
 				onClick={async () => {
 					setRefreshing(true);
-					try { await props.onRedistill(); }
-					finally { setRefreshing(false); }
+					try {
+						await props.onRedistill();
+					} finally {
+						setRefreshing(false);
+					}
 				}}
 				disabled={refreshing()}
 				class="instrument-microcaps shrink-0 rounded-none border border-[var(--clens-warning)] px-2 py-1 text-[10px] text-[var(--clens-warning)] transition hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed"
@@ -285,7 +294,10 @@ export const SessionDetail: Component = () => {
 		if (!sessions || !isGlobalMode()) return undefined;
 		const match = sessions.find((s) => s.session_id === params.id);
 		if (!match || !("project_id" in match) || !("project_name" in match)) return undefined;
-		const m = match as SessionSummary & { readonly project_id: string; readonly project_name: string };
+		const m = match as SessionSummary & {
+			readonly project_id: string;
+			readonly project_name: string;
+		};
 		return { project_id: m.project_id, project_name: m.project_name };
 	});
 
@@ -318,9 +330,13 @@ export const SessionDetail: Component = () => {
 		});
 		if (guard) {
 			setAutoDistilledId(params.id);
-			api.api.commands.sessions[":sessionId"].distill.$post({
-				param: { sessionId: params.id },
-			}).catch(() => { /* distill error handled by SSE / polling */ });
+			api.api.commands.sessions[":sessionId"].distill
+				.$post({
+					param: { sessionId: params.id },
+				})
+				.catch(() => {
+					/* distill error handled by SSE / polling */
+				});
 		}
 	});
 
@@ -417,12 +433,13 @@ export const SessionDetail: Component = () => {
 		const agents = flatAgents();
 		if (agents.length === 0) return;
 		const currentId = selectedAgentId();
-		const currentIdx = currentId
-			? agents.findIndex((a) => a.session_id === currentId)
-			: -1;
-		const nextIdx = currentIdx < 0
-			? (direction === 1 ? 0 : agents.length - 1)
-			: Math.max(0, Math.min(agents.length - 1, currentIdx + direction));
+		const currentIdx = currentId ? agents.findIndex((a) => a.session_id === currentId) : -1;
+		const nextIdx =
+			currentIdx < 0
+				? direction === 1
+					? 0
+					: agents.length - 1
+				: Math.max(0, Math.min(agents.length - 1, currentIdx + direction));
 		const next = agents[nextIdx];
 		if (next?.session_id) handleSelectView("agent", next.session_id);
 	};
@@ -430,86 +447,115 @@ export const SessionDetail: Component = () => {
 	// ── Panel transition key ────────────────────────────────────
 	const panelKey = createMemo(() => `${currentView()}:${selectedAgentId() ?? ""}`);
 
-	useKeyboard(() => [
-		{
-			key: "Escape",
-			description: "Go back to session list",
-			handler: () => navigate("/"),
-		},
-		{
-			key: "1",
-			description: "Overview panel",
-			handler: () => handleSelectView("overview"),
-		},
-		...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
-			key: String(n),
-			description: `Select agent ${n - 1}`,
-			handler: () => selectAgentByIndex(n - 2),
-		})),
-		{
-			key: "j",
-			description: "Next agent",
-			handler: () => navigateAgent(1),
-		},
-		{
-			key: "k",
-			description: "Previous agent",
-			handler: () => navigateAgent(-1),
-		},
-		{
-			key: "c",
-			description: "Conversation view",
-			handler: () => handleSelectView("conversation"),
-		},
-	], "Session Detail");
+	useKeyboard(
+		() => [
+			{
+				key: "Escape",
+				description: "Go back to session list",
+				handler: () => navigate("/"),
+			},
+			{
+				key: "1",
+				description: "Overview panel",
+				handler: () => handleSelectView("overview"),
+			},
+			...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
+				key: String(n),
+				description: `Select agent ${n - 1}`,
+				handler: () => selectAgentByIndex(n - 2),
+			})),
+			{
+				key: "j",
+				description: "Next agent",
+				handler: () => navigateAgent(1),
+			},
+			{
+				key: "k",
+				description: "Previous agent",
+				handler: () => navigateAgent(-1),
+			},
+			{
+				key: "c",
+				description: "Conversation view",
+				handler: () => handleSelectView("conversation"),
+			},
+		],
+		"Session Detail",
+	);
 
 	return (
 		<PageShell>
-			<Show when={!sessionDetail.loading || hasCurrentDetail()} fallback={<LoadingSkeleton label="Loading session..." />}>
-				<Show when={!isNotDistilled()} fallback={
-					<Show
-						when={(() => { const s = liveStore.state(); return s && s.event_count > 0 ? s : undefined })()}
-						fallback={<NotDistilledState sessionId={params.id} onDistill={refetchDetail} />}
-					>
-						{(liveState) => (
-							<div class="flex flex-col h-full">
-								<div class="min-h-0 flex-1 overflow-hidden">
-									<LiveSessionView state={liveState()} elapsed={liveStore.elapsed()} />
-								</div>
-								<Show when={liveState().status === "complete"}>
-									{/* Pinned action bar — a footer separated from the timeline,
+			<Show
+				when={!sessionDetail.loading || hasCurrentDetail()}
+				fallback={<LoadingSkeleton label="Loading session..." />}
+			>
+				<Show
+					when={!isNotDistilled()}
+					fallback={
+						<Show
+							when={(() => {
+								const s = liveStore.state();
+								return s && s.event_count > 0 ? s : undefined;
+							})()}
+							fallback={<NotDistilledState sessionId={params.id} onDistill={refetchDetail} />}
+						>
+							{(liveState) => (
+								<div class="flex flex-col h-full">
+									<div class="min-h-0 flex-1 overflow-hidden">
+										<LiveSessionView state={liveState()} elapsed={liveStore.elapsed()} />
+									</div>
+									<Show when={liveState().status === "complete"}>
+										{/* Pinned action bar — a footer separated from the timeline,
 									    not a pill floating over the log content (prior design).
 									    Carries a busy state so the click gives immediate feedback. */}
-									<div class="shrink-0 flex items-center justify-between gap-4 border-t border-clens bg-surface-inset px-4 py-3">
-										<div class="flex flex-col">
-											<span class="instrument-microcaps text-[10px] text-secondary">Session complete</span>
-											<span class="text-[11px] text-muted">Analyze to unlock conversation, diffs, backtracks &amp; cost.</span>
+										<div class="shrink-0 flex items-center justify-between gap-4 border-t border-clens bg-surface-inset px-4 py-3">
+											<div class="flex flex-col">
+												<span class="instrument-microcaps text-[10px] text-secondary">
+													Session complete
+												</span>
+												<span class="text-[11px] text-muted">
+													Analyze to unlock conversation, diffs, backtracks &amp; cost.
+												</span>
+											</div>
+											<button
+												type="button"
+												onClick={handleRedistill}
+												disabled={isRedistilling()}
+												class="instrument-microcaps inline-flex shrink-0 items-center gap-2 rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												<Show when={isRedistilling()}>
+													<Spinner size="sm" />
+												</Show>
+												{isRedistilling() ? "Analyzing…" : "Analyze Session"}
+											</button>
 										</div>
-										<button
-											onClick={handleRedistill}
-											disabled={isRedistilling()}
-											class="instrument-microcaps inline-flex shrink-0 items-center gap-2 rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-										>
-											<Show when={isRedistilling()}><Spinner size="sm" /></Show>
-											{isRedistilling() ? "Analyzing…" : "Analyze Session"}
-										</button>
-									</div>
-								</Show>
-							</div>
-						)}
-					</Show>
-				}>
+									</Show>
+								</div>
+							)}
+						</Show>
+					}
+				>
 					<Show when={session()}>
 						{(s) => (
 							<DetailPageLayout
 								backLabel="Sessions"
 								backHref="/"
 								id={params.id.slice(0, 12)}
-								header={<SessionHeader session={s()} status={rawStatus()} summary={summaryRow()} onRedistill={handleRedistill} />}
+								header={
+									<SessionHeader
+										session={s()}
+										status={rawStatus()}
+										summary={summaryRow()}
+										onRedistill={handleRedistill}
+									/>
+								}
 								badge={
 									<Show when={projectInfo()}>
 										{(info) => (
-											<ProjectBadge projectId={info().project_id} projectName={info().project_name} />
+											<ProjectBadge
+												projectId={info().project_id}
+												projectName={info().project_name}
+											/>
 										)}
 									</Show>
 								}
@@ -527,65 +573,68 @@ export const SessionDetail: Component = () => {
 								    container is a flex ROW, so without this wrapper the banner becomes
 								    a ghost sibling column beside the content panel */}
 								<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-								{/* Stale-distill banner (bug B5 + stale-tier mixing): raw file grew past
+									{/* Stale-distill banner (bug B5 + stale-tier mixing): raw file grew past
 								    the analyzed snapshot, or costs were priced under an outdated tier */}
-								<Show when={(() => { const st = staleness(); return st && (st.distill_stale || st.tier_stale) ? st : undefined; })()}>
-									{(st) => (
-										<StaleDistillBanner
-											analyzedEvents={s().stats.total_events}
-											rawEvents={st().raw_event_count}
-											distilledAt={st().distilled_at}
-											tierStale={st().tier_stale}
-											onRedistill={handleRedistill}
-										/>
-									)}
-								</Show>
-								{/* Right content panel -- keyed wrapper triggers fade on panel switch */}
-								<Show when={panelKey()} keyed>
-									{(_panelKey) => (
-									<div class="flex-1 overflow-hidden animate-page-fade">
-										<Switch fallback={
-											<OverviewPanel
-												session={s()}
-												sessionId={params.id}
-												isMultiAgent={isMultiAgent()}
+									<Show
+										when={(() => {
+											const st = staleness();
+											return st && (st.distill_stale || st.tier_stale) ? st : undefined;
+										})()}
+									>
+										{(st) => (
+											<StaleDistillBanner
+												analyzedEvents={s().stats.total_events}
+												rawEvents={st().raw_event_count}
+												distilledAt={st().distilled_at}
+												tierStale={st().tier_stale}
 												onRedistill={handleRedistill}
 											/>
-										}>
-											<Match when={currentView() === "overview"}>
-												<OverviewPanel
-													session={s()}
-													sessionId={params.id}
-													isMultiAgent={isMultiAgent()}
-													onRedistill={handleRedistill}
-												/>
-											</Match>
-											<Match when={currentView() === "agent" && selectedAgentId()}>
-												<Show
-													when={selectedAgent()}
+										)}
+									</Show>
+									{/* Right content panel -- keyed wrapper triggers fade on panel switch */}
+									<Show when={panelKey()} keyed>
+										{(_panelKey) => (
+											<div class="flex-1 overflow-hidden animate-page-fade">
+												<Switch
 													fallback={
-														<AgentNotFound
-															agentId={selectedAgentId() ?? ""}
-															onGoOverview={() => handleSelectView("overview")}
+														<OverviewPanel
+															session={s()}
+															sessionId={params.id}
+															isMultiAgent={isMultiAgent()}
+															onRedistill={handleRedistill}
 														/>
 													}
 												>
-													{(agent) => (
-														<AgentPanel
-															agent={agent()}
+													<Match when={currentView() === "overview"}>
+														<OverviewPanel
 															session={s()}
 															sessionId={params.id}
+															isMultiAgent={isMultiAgent()}
+															onRedistill={handleRedistill}
 														/>
-													)}
-												</Show>
-											</Match>
-											<Match when={currentView() === "conversation"}>
-												<ConversationPanel sessionId={params.id} />
-											</Match>
-										</Switch>
-									</div>
-									)}
-								</Show>
+													</Match>
+													<Match when={currentView() === "agent" && selectedAgentId()}>
+														<Show
+															when={selectedAgent()}
+															fallback={
+																<AgentNotFound
+																	agentId={selectedAgentId() ?? ""}
+																	onGoOverview={() => handleSelectView("overview")}
+																/>
+															}
+														>
+															{(agent) => (
+																<AgentPanel agent={agent()} session={s()} sessionId={params.id} />
+															)}
+														</Show>
+													</Match>
+													<Match when={currentView() === "conversation"}>
+														<ConversationPanel sessionId={params.id} />
+													</Match>
+												</Switch>
+											</div>
+										)}
+									</Show>
 								</div>
 							</DetailPageLayout>
 						)}

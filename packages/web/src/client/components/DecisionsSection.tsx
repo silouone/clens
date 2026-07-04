@@ -1,5 +1,5 @@
-import { For, Match, Show, Switch, type Component } from "solid-js";
-import { GitBranch, Clock, Users, Layers } from "lucide-solid";
+import { Clock, GitBranch, Layers, Users } from "lucide-solid";
+import { type Component, For, Match, Show, Switch } from "solid-js";
 import type { DecisionPoint } from "../../shared/types";
 import { Card } from "./ui/Card";
 
@@ -29,13 +29,12 @@ const gapClassificationColor = (
 	return colors[classification] ?? "text-muted";
 };
 
-const formatClassification = (c: string): string =>
-	c.replace(/_/g, " ");
+const formatClassification = (c: string): string => c.replace(/_/g, " ");
 
-const isDecisionType = <T extends DecisionPoint["type"]>(
-	type: T,
-) => (d: DecisionPoint): d is Extract<DecisionPoint, { readonly type: T }> =>
-	d.type === type;
+const isDecisionType =
+	<T extends DecisionPoint["type"]>(type: T) =>
+	(d: DecisionPoint): d is Extract<DecisionPoint, { readonly type: T }> =>
+		d.type === type;
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -49,9 +48,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 		<Card class="p-3">
 			<div class="flex items-center gap-2">
 				<GitBranch class="h-3.5 w-3.5 text-muted" />
-				<h3 class="instrument-microcaps text-[11px] text-muted">
-					Decision Points
-				</h3>
+				<h3 class="instrument-microcaps text-[11px] text-muted">Decision Points</h3>
 				<span class="rounded-none border border-clens bg-surface-muted px-2 py-0.5 font-mono text-[11px] tabular-nums text-muted">
 					{props.decisions.length}
 				</span>
@@ -69,13 +66,9 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 							<For each={toolPivots()}>
 								{(d) => (
 									<div class="flex items-center gap-2 text-xs">
-										<span class="font-mono text-muted">
-											{d.from_tool}
-										</span>
+										<span class="font-mono text-muted">{d.from_tool}</span>
 										<span class="text-muted">&rarr;</span>
-										<span class="font-mono text-secondary">
-											{d.to_tool}
-										</span>
+										<span class="font-mono text-secondary">{d.to_tool}</span>
 										<Show when={d.after_failure}>
 											<span class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens bg-surface-raised px-1.5 py-0.5 text-[10px] text-[var(--clens-danger)]">
 												<span class="instrument-led bg-[var(--clens-danger)]" />
@@ -124,13 +117,9 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 							<For each={taskDelegations()}>
 								{(d) => (
 									<div class="flex items-center gap-2 text-xs">
-										<span class="font-mono text-brand-500">
-											{d.agent_name}
-										</span>
+										<span class="font-mono text-brand-500">{d.agent_name}</span>
 										<Show when={d.subject}>
-											<span class="truncate text-muted">
-												{d.subject}
-											</span>
+											<span class="truncate text-muted">{d.subject}</span>
 										</Show>
 									</div>
 								)}
@@ -153,9 +142,7 @@ export const DecisionsSection: Component<DecisionsSectionProps> = (props) => {
 										<span class="instrument-microcaps rounded-none border border-clens bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted">
 											Phase {d.phase_index + 1}
 										</span>
-										<span class="text-secondary">
-											{d.phase_name}
-										</span>
+										<span class="text-secondary">{d.phase_name}</span>
 									</div>
 								)}
 							</For>

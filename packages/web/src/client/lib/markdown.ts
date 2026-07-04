@@ -2,11 +2,7 @@ import snarkdown from "snarkdown";
 
 /** Escape HTML entities to prevent XSS */
 const escapeHtml = (text: string): string =>
-	text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
+	text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /**
  * Render markdown to HTML.
@@ -29,10 +25,7 @@ export const renderMarkdown = (text: string): string => {
 	const rendered = snarkdown(stripped);
 
 	// 3. Re-insert code blocks
-	return blocks.reduce(
-		(html, block, i) => html.replace(placeholder(i), block),
-		rendered,
-	);
+	return blocks.reduce((html, block, i) => html.replace(placeholder(i), block), rendered);
 };
 
 /**
@@ -42,8 +35,7 @@ export const renderMarkdown = (text: string): string => {
  * survive intact (bug B16). Newlines become <br> so multi-line prompts still
  * read correctly.
  */
-export const renderPlainText = (text: string): string =>
-	escapeHtml(text).replace(/\r?\n/g, "<br>");
+export const renderPlainText = (text: string): string => escapeHtml(text).replace(/\r?\n/g, "<br>");
 
 /**
  * HTML-entity substitutions for the characters snarkdown treats as markdown
@@ -57,7 +49,7 @@ const MARKDOWN_ENTITY_MAP: Readonly<Record<string, string>> = {
 	"]": "&#93;",
 	"(": "&#40;",
 	")": "&#41;",
-	"_": "&#95;",
+	_: "&#95;",
 	"*": "&#42;",
 	"`": "&#96;",
 	"~": "&#126;",
@@ -79,4 +71,4 @@ const MARKDOWN_ENTITY_MAP: Readonly<Record<string, string>> = {
  * survive verbatim (bug B16).
  */
 export const escapeMarkdown = (text: string): string =>
-	text.replace(/[\[\]()_*`~#|!<>&\\]/g, (ch) => MARKDOWN_ENTITY_MAP[ch] ?? ch);
+	text.replace(/[[\]()_*`~#|!<>&\\]/g, (ch) => MARKDOWN_ENTITY_MAP[ch] ?? ch);

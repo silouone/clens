@@ -19,9 +19,11 @@ const isMessageLink = (link: LinkEvent): link is MessageLink => link.type === "m
 
 const isTaskLink = (link: LinkEvent): link is TaskLink => link.type === "task";
 
-const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink => link.type === "task_complete";
+const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink =>
+	link.type === "task_complete";
 
-const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink => link.type === "teammate_idle";
+const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink =>
+	link.type === "teammate_idle";
 
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
 
@@ -137,7 +139,9 @@ export const extractAgentCommunicationPartners = (
 
 	if (agentMessages.length === 0) return [];
 
-	const partnerIds = [...new Set(agentMessages.map((msg) => (msg.from === agentId ? msg.to : msg.from)))];
+	const partnerIds = [
+		...new Set(agentMessages.map((msg) => (msg.from === agentId ? msg.to : msg.from))),
+	];
 
 	return partnerIds
 		.map((partnerId): AgentCommunicationPartner => {

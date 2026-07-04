@@ -1,10 +1,10 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createServer } from "node:net";
 import {
 	findFreePort,
-	serveOnFreePort,
 	PortExhaustionError,
 	StrictPortUnavailableError,
+	serveOnFreePort,
 } from "../src/utils/net";
 
 // ── Helpers ────────────────────────────────────────────────────────

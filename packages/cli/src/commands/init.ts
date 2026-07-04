@@ -7,8 +7,8 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { type ClensConfig, type DelegatedHooks, HOOK_EVENTS } from "../types";
 import { registerProject } from "../session/registry";
+import { type ClensConfig, type DelegatedHooks, HOOK_EVENTS } from "../types";
 import type { Flags } from "./shared";
 import { dim, green, red, yellow } from "./shared";
 
@@ -119,9 +119,7 @@ const countClensHookEvents = (settingsPath: string): number => {
 		(entries) =>
 			Array.isArray(entries) &&
 			entries.some((entry) =>
-				getCommandsFromEntry(entry).some(
-					(cmd) => cmd.includes("clens") || cmd.includes("hook.ts"),
-				),
+				getCommandsFromEntry(entry).some((cmd) => cmd.includes("clens") || cmd.includes("hook.ts")),
 			),
 	).length;
 };
@@ -146,9 +144,7 @@ const removeClensHooksFromFile = (settingsPath: string): void => {
 	const newSettings =
 		Object.keys(cleanedHooks).length > 0
 			? { ...settings, hooks: cleanedHooks }
-			: Object.fromEntries(
-					Object.entries(settings).filter(([k]) => k !== "hooks"),
-				);
+			: Object.fromEntries(Object.entries(settings).filter(([k]) => k !== "hooks"));
 
 	writeFileSync(settingsPath, JSON.stringify(newSettings, null, 2));
 };
@@ -467,7 +463,9 @@ const renderStatus = (projectDir: string): void => {
 	}
 	if (legacyCount > 0) {
 		console.log(
-			yellow("  \u26a0 Legacy hooks in .claude/settings.json. Run 'clens init --remove --legacy' to clean up."),
+			yellow(
+				"  \u26a0 Legacy hooks in .claude/settings.json. Run 'clens init --remove --legacy' to clean up.",
+			),
 		);
 	}
 };

@@ -1,4 +1,12 @@
-import type { CostBasis, CostEstimate, PricingTier, StatsResult, StoredEvent, TokenUsage, TranscriptReasoning } from "../types";
+import type {
+	CostBasis,
+	CostEstimate,
+	PricingTier,
+	StatsResult,
+	StoredEvent,
+	TokenUsage,
+	TranscriptReasoning,
+} from "../types";
 import { computeEffectiveDuration, findLastMeaningfulEvent } from "../utils";
 
 // Per-MTok API rates (platform.claude.com pricing, verified 2026-06-11).
@@ -87,7 +95,6 @@ export const getPricing = (model: string, tier: PricingTier = "api"): ModelRates
 	};
 };
 
-
 /** Safely extract a model string from an unknown config value (type guard, no unsafe cast). */
 const extractModelFromConfig = (cfg: unknown): string | undefined => {
 	if (typeof cfg !== "object" || cfg === null) return undefined;
@@ -99,9 +106,8 @@ const extractModelFromConfig = (cfg: unknown): string | undefined => {
 /** Extract model identifier from events with multi-step fallback chain. */
 const extractModel = (events: readonly StoredEvent[]): string | undefined => {
 	// 1. Primary: SessionStart context.model
-	const sessionStartModel = events.find(
-		(e) => e.event === "SessionStart" && e.context?.model,
-	)?.context?.model;
+	const sessionStartModel = events.find((e) => e.event === "SessionStart" && e.context?.model)
+		?.context?.model;
 	if (sessionStartModel) return sessionStartModel;
 
 	// 2. Fallback: any event with a data.model string field
@@ -193,7 +199,10 @@ export const estimateCostFromTokens = (
 	// real tokens backed this call, the result is not measured usage and must not
 	// claim to be — fall back to is_estimated: true (heuristic-equivalent).
 	const hasRealUsage =
-		inputTokens > 0 || outputTokens > 0 || (cacheReadTokens ?? 0) > 0 || (cacheCreationTokens ?? 0) > 0;
+		inputTokens > 0 ||
+		outputTokens > 0 ||
+		(cacheReadTokens ?? 0) > 0 ||
+		(cacheCreationTokens ?? 0) > 0;
 
 	return {
 		model,
@@ -244,7 +253,9 @@ const measuredCostEstimate = (
 	// Verbatim measured value — never rounded away, never multiplied by a subscription factor.
 	estimated_cost_usd: measuredCostUsd,
 	...(tokenUsage?.cache_read_tokens ? { cache_read_tokens: tokenUsage.cache_read_tokens } : {}),
-	...(tokenUsage?.cache_creation_tokens ? { cache_creation_tokens: tokenUsage.cache_creation_tokens } : {}),
+	...(tokenUsage?.cache_creation_tokens
+		? { cache_creation_tokens: tokenUsage.cache_creation_tokens }
+		: {}),
 	is_estimated: false,
 	cost_basis: "measured",
 	pricing_tier: tier,
@@ -260,13 +271,13 @@ const extractTokenUsage = (events: readonly StoredEvent[]): TokenUsage | undefin
 			const input = typeof u.input_tokens === "number" ? u.input_tokens : 0;
 			const output = typeof u.output_tokens === "number" ? u.output_tokens : 0;
 			const cacheRead = typeof u.cache_read_tokens === "number" ? u.cache_read_tokens : 0;
-			const cacheCreation = typeof u.cache_creation_tokens === "number" ? u.cache_creation_tokens : 0;
-			return input > 0 || output > 0
-				? { input, output, cacheRead, cacheCreation }
-				: undefined;
+			const cacheCreation =
+				typeof u.cache_creation_tokens === "number" ? u.cache_creation_tokens : 0;
+			return input > 0 || output > 0 ? { input, output, cacheRead, cacheCreation } : undefined;
 		})
-		.filter((u): u is { input: number; output: number; cacheRead: number; cacheCreation: number } =>
-			u !== undefined,
+		.filter(
+			(u): u is { input: number; output: number; cacheRead: number; cacheCreation: number } =>
+				u !== undefined,
 		);
 
 	if (usageEntries.length === 0) return undefined;
@@ -377,7 +388,12 @@ export const extractStats = (
 	);
 
 	const failuresByTool = events
-		.filter((e) => e.event === "PostToolUseFailure" && typeof e.data.tool_name === "string" && !e.data.is_interrupt)
+		.filter(
+			(e) =>
+				e.event === "PostToolUseFailure" &&
+				typeof e.data.tool_name === "string" &&
+				!e.data.is_interrupt,
+		)
 		.reduce(
 			(acc, e) => {
 				const name = typeof e.data.tool_name === "string" ? e.data.tool_name : "";

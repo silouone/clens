@@ -12,7 +12,8 @@ export const sessionMetaPath = (dir: string): string => `${dir}/.clens/session-m
 const parseEntry = (raw: unknown): SessionMeta | null => {
 	if (typeof raw !== "object" || raw === null) return null;
 	const obj = raw as Record<string, unknown>;
-	const label = typeof obj.label === "string" && obj.label.trim().length > 0 ? obj.label : undefined;
+	const label =
+		typeof obj.label === "string" && obj.label.trim().length > 0 ? obj.label : undefined;
 	// Drop invalid colors silently (graceful degradation); "none" is normalized away.
 	const color =
 		isColorName(obj.color) && obj.color !== "none" ? (obj.color as ColorName) : undefined;
@@ -77,11 +78,17 @@ const isClearLabel = (label: string | null | undefined): boolean =>
  *  - An invalid color value is rejected and existing metadata is left unchanged (R14).
  * When the resulting entry holds no label and no color it is removed entirely.
  */
-export const setSessionMeta = (dir: string, id: string, patch: SessionMetaPatch): SessionMetaMap => {
+export const setSessionMeta = (
+	dir: string,
+	id: string,
+	patch: SessionMetaPatch,
+): SessionMetaMap => {
 	// Validate color first so an invalid value never mutates state (R14).
 	const colorTouched = "color" in patch;
 	if (colorTouched && patch.color !== null && !isColorName(patch.color)) {
-		throw new Error(`Invalid color "${String(patch.color)}". Valid: none, red, amber, green, blue, violet, gray.`);
+		throw new Error(
+			`Invalid color "${String(patch.color)}". Valid: none, red, amber, green, blue, violet, gray.`,
+		);
 	}
 
 	const current = readSessionMeta(dir);
@@ -89,11 +96,15 @@ export const setSessionMeta = (dir: string, id: string, patch: SessionMetaPatch)
 
 	const labelTouched = "label" in patch;
 	const nextLabel = labelTouched
-		? isClearLabel(patch.label) ? undefined : (patch.label as string)
+		? isClearLabel(patch.label)
+			? undefined
+			: (patch.label as string)
 		: existing?.label;
 
 	const nextColor = colorTouched
-		? patch.color === null || patch.color === "none" ? undefined : patch.color
+		? patch.color === null || patch.color === "none"
+			? undefined
+			: patch.color
 		: existing?.color;
 
 	const { [id]: _omit, ...rest } = current;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { diffLinesToUnified } from "../src/utils";
 import type { DiffLine } from "../src/types";
+import { diffLinesToUnified } from "../src/utils";
 
 describe("diffLinesToUnified", () => {
 	test("returns empty string for empty lines", () => {
@@ -8,9 +8,7 @@ describe("diffLinesToUnified", () => {
 	});
 
 	test("generates correct --- and +++ headers", () => {
-		const lines: readonly DiffLine[] = [
-			{ type: "add", content: "hello" },
-		];
+		const lines: readonly DiffLine[] = [{ type: "add", content: "hello" }];
 		const result = diffLinesToUnified("src/foo.ts", lines);
 		expect(result).toContain("--- a/src/foo.ts");
 		expect(result).toContain("+++ b/src/foo.ts");
@@ -50,25 +48,19 @@ describe("diffLinesToUnified", () => {
 	});
 
 	test("prefixes add lines with +", () => {
-		const lines: readonly DiffLine[] = [
-			{ type: "add", content: "new line" },
-		];
+		const lines: readonly DiffLine[] = [{ type: "add", content: "new line" }];
 		const result = diffLinesToUnified("f.ts", lines);
 		expect(result).toContain("+new line");
 	});
 
 	test("prefixes remove lines with -", () => {
-		const lines: readonly DiffLine[] = [
-			{ type: "remove", content: "old line" },
-		];
+		const lines: readonly DiffLine[] = [{ type: "remove", content: "old line" }];
 		const result = diffLinesToUnified("f.ts", lines);
 		expect(result).toContain("-old line");
 	});
 
 	test("prefixes context lines with space", () => {
-		const lines: readonly DiffLine[] = [
-			{ type: "context", content: "same line" },
-		];
+		const lines: readonly DiffLine[] = [{ type: "context", content: "same line" }];
 		const result = diffLinesToUnified("f.ts", lines);
 		expect(result).toContain(" same line");
 	});

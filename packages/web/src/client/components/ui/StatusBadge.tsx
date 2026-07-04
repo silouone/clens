@@ -1,4 +1,4 @@
-import { Match, Switch, type Component } from "solid-js";
+import { type Component, Match, Switch } from "solid-js";
 import type { SessionStatus } from "../../../shared/types";
 
 /**
@@ -57,7 +57,9 @@ export const StatusBadge: Component<StatusBadgeProps> = (props) => {
 	return (
 		<Switch>
 			<Match when={props.compact}>
-				<span class={`instrument-microcaps inline-flex items-center gap-1.5 text-[9px] ${TEXT_CLS[status()]}`}>
+				<span
+					class={`instrument-microcaps inline-flex items-center gap-1.5 text-[9px] ${TEXT_CLS[status()]}`}
+				>
 					<span class={`instrument-led ${LED_CLS[status()]}`} />
 					{COMPACT_LABEL[status()]}
 				</span>

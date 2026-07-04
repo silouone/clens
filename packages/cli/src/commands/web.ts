@@ -43,9 +43,9 @@ export const webCommand = async (options: WebCommandOptions): Promise<void> => {
 	// In global mode, discover + register projects, then pass to server
 	const projects = options.global
 		? await (async () => {
-			const { discoverAndRegisterProjects } = await import("../session/registry");
-			return discoverAndRegisterProjects();
-		})()
+				const { discoverAndRegisterProjects } = await import("../session/registry");
+				return discoverAndRegisterProjects();
+			})()
 		: undefined;
 
 	const handle = startServer({
@@ -62,7 +62,9 @@ export const webCommand = async (options: WebCommandOptions): Promise<void> => {
 		console.log(`${dim(`port ${options.port} busy → started on ${handle.port}`)}`);
 	}
 	if (projects && projects.length > 0) {
-		console.log(`${dim("Mode:")}  global (${projects.length} project${projects.length === 1 ? "" : "s"})`);
+		console.log(
+			`${dim("Mode:")}  global (${projects.length} project${projects.length === 1 ? "" : "s"})`,
+		);
 	}
 	console.log(`${dim("Token:")} ${handle.token}`);
 	console.log(`${dim("Open:")}  ${authUrl}`);

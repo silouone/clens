@@ -1,4 +1,4 @@
-import { splitProps, type Component, type JSX } from "solid-js";
+import { type Component, type JSX, splitProps } from "solid-js";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 type ButtonSize = "sm" | "md";

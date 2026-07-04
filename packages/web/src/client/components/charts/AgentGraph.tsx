@@ -1,6 +1,6 @@
-import { createMemo, For, Show, type Component } from "solid-js";
-import { hideTooltip, showTooltip } from "./ChartTooltip";
+import { type Component, createMemo, For, Show } from "solid-js";
 import { ChartEmpty } from "./ChartEmpty";
+import { hideTooltip, showTooltip } from "./ChartTooltip";
 
 // ── AgentGraph (overview-moat-refactor, Wave 2 — only CommunicationTab) ─
 //
@@ -93,9 +93,7 @@ export const AgentGraph: Component<AgentGraphProps> = (props) => {
 		const sorted = [...props.workers].sort((a, b) => b.weight - a.weight);
 		const top = sorted.slice(0, maxSpokes());
 		const topIds = new Set(top.map((w) => w.id));
-		const extra = sorted.filter(
-			(w) => !topIds.has(w.id) && edgeParticipants().has(w.id),
-		);
+		const extra = sorted.filter((w) => !topIds.has(w.id) && edgeParticipants().has(w.id));
 		return [...top, ...extra];
 	});
 
@@ -126,9 +124,7 @@ export const AgentGraph: Component<AgentGraphProps> = (props) => {
 		() =>
 			new Map<string, readonly [number, number]>([
 				[props.hubId, [cx(), cy()]],
-				...placed().map(
-					(p) => [p.node.id, [p.x, p.y]] as [string, readonly [number, number]],
-				),
+				...placed().map((p) => [p.node.id, [p.x, p.y]] as [string, readonly [number, number]]),
 			]),
 	);
 
@@ -166,9 +162,7 @@ export const AgentGraph: Component<AgentGraphProps> = (props) => {
 	return (
 		<Show
 			when={props.workers.length > 0}
-			fallback={
-				<ChartEmpty height={height()} ariaLabel={props.ariaLabel} label="No agents" />
-			}
+			fallback={<ChartEmpty height={height()} ariaLabel={props.ariaLabel} label="No agents" />}
 		>
 			<svg
 				width="100%"
@@ -216,6 +210,8 @@ export const AgentGraph: Component<AgentGraphProps> = (props) => {
 					<For each={placed()}>
 						{(p) => (
 							<rect
+								role="menuitem"
+								aria-label={`${p.node.label} · ${p.node.type}`}
 								x={p.x - p.side / 2}
 								y={p.y - p.side / 2}
 								width={p.side}
@@ -233,11 +229,7 @@ export const AgentGraph: Component<AgentGraphProps> = (props) => {
 									// to this generic chart (the consumer may pass tools OR a
 									// duration fallback), so labelling it "tools" could fabricate.
 									// The consumer's roster shows the real, honest figures.
-									showTooltip(
-										r.x + r.width / 2,
-										r.y,
-										`${p.node.label} · ${p.node.type}`,
-									);
+									showTooltip(r.x + r.width / 2, r.y, `${p.node.label} · ${p.node.type}`);
 								}}
 								onMouseLeave={hideTooltip}
 							/>
@@ -267,6 +259,8 @@ export const AgentGraph: Component<AgentGraphProps> = (props) => {
 
 				{/* Hub — synthetic orchestrator (a role marker, never a measured size). */}
 				<rect
+					role="menuitem"
+					aria-label={`${props.hubLabel} · orchestrator`}
 					x={cx() - hubHalf}
 					y={cy() - hubHalf}
 					width={HUB_SIDE}

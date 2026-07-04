@@ -20,14 +20,17 @@ import type { ClaudeMdInEffect, SettingsScope, SettingsSnapshot } from "../types
 const homeDir = (): string => process.env.HOME || process.env.USERPROFILE || "";
 
 /** Scopes in lowest→highest precedence order, so a later read overrides earlier keys. */
-const settingsFilesLowToHigh = (projectDir: string): ReadonlyArray<{
+const settingsFilesLowToHigh = (
+	projectDir: string,
+): ReadonlyArray<{
 	readonly scope: SettingsScope;
 	readonly path: string;
 }> => {
 	const home = homeDir();
-	const managed = process.platform === "darwin"
-		? "/Library/Application Support/ClaudeCode/managed-settings.json"
-		: "/etc/claude-code/managed-settings.json";
+	const managed =
+		process.platform === "darwin"
+			? "/Library/Application Support/ClaudeCode/managed-settings.json"
+			: "/etc/claude-code/managed-settings.json";
 	return [
 		{ scope: "user", path: home ? join(home, ".claude", "settings.json") : "" },
 		{ scope: "project", path: join(projectDir, ".claude", "settings.json") },

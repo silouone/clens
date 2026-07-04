@@ -1,14 +1,14 @@
 /* @refresh reload */
-import { Route, Router, useParams, useNavigate, useLocation } from "@solidjs/router";
-import { createEffect, onMount, type Component } from "solid-js";
+import { Route, Router, useLocation, useNavigate, useParams } from "@solidjs/router";
+import { type Component, createEffect, onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { App } from "./App";
-import { SessionList } from "./pages/SessionList";
-import { SessionDetail } from "./pages/SessionDetail";
 import { sessionList } from "./lib/stores";
+import { InsightsPage } from "./pages/InsightsPage";
+import { SessionDetail } from "./pages/SessionDetail";
+import { SessionList } from "./pages/SessionList";
 import { SettingsPage } from "./pages/SettingsPage";
 import { UsagePage } from "./pages/UsagePage";
-import { InsightsPage } from "./pages/InsightsPage";
 import "@fontsource-variable/ibm-plex-sans";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
@@ -21,7 +21,9 @@ import "./index.css";
 const AgentRedirect: Component = () => {
 	const params = useParams<{ id: string; agentId: string }>();
 	const navigate = useNavigate();
-	onMount(() => navigate(`/session/${params.id}?view=agent&agent=${params.agentId}`, { replace: true }));
+	onMount(() =>
+		navigate(`/session/${params.id}?view=agent&agent=${params.agentId}`, { replace: true }),
+	);
 	return null;
 };
 

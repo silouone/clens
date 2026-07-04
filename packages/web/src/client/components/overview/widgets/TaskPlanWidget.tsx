@@ -1,7 +1,7 @@
-import { createSignal, For, Show, type Component } from "solid-js";
 import { Check, ChevronRight, Circle, Clock } from "lucide-solid";
-import { Widget } from "../../ui/Widget";
+import { type Component, createSignal, For, Show } from "solid-js";
 import { CATEGORY } from "../../../lib/categories";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── TaskPlanWidget [outcome] — Wave 1 ────────────────────────────────
@@ -47,8 +47,9 @@ const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 
 	return (
 		<div class="group">
-			<div
-				class={`flex items-center gap-2 rounded-none px-1.5 py-1 text-sm ${
+			<button
+				type="button"
+				class={`flex w-full items-center gap-2 rounded-none px-1.5 py-1 text-left text-sm ${
 					hasDetails() ? "cursor-pointer hover:bg-surface-hover" : ""
 				}`}
 				onClick={() => hasDetails() && setExpanded((prev) => !prev)}
@@ -57,9 +58,7 @@ const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 
 				<span
 					class={`flex-1 truncate ${
-						props.task.status === "completed"
-							? "text-muted line-through"
-							: "text-secondary"
+						props.task.status === "completed" ? "text-muted line-through" : "text-secondary"
 					}`}
 					title={props.task.subject}
 				>
@@ -81,14 +80,12 @@ const TaskRow: Component<{ readonly task: TaskRecord }> = (props) => {
 						}`}
 					/>
 				</Show>
-			</div>
+			</button>
 
 			<Show when={expanded()}>
 				<div class="ml-6 space-y-1 pb-1 pt-0.5">
 					<Show when={props.task.description}>
-						{(desc) => (
-							<p class="whitespace-pre-wrap text-xs text-muted">{desc()}</p>
-						)}
+						{(desc) => <p class="whitespace-pre-wrap text-xs text-muted">{desc()}</p>}
 					</Show>
 					<Show when={(props.task.blocked_by?.length ?? 0) > 0}>
 						<div class="flex flex-wrap gap-1">
@@ -118,10 +115,7 @@ export const TaskPlanWidget: Component<WidgetProps> = (props) => {
 
 	return (
 		<Widget category="outcome" title="Task Plan" span={6}>
-			<Show
-				when={list()}
-				fallback={<p class="text-xs italic text-muted">No task plan</p>}
-			>
+			<Show when={list()} fallback={<p class="text-xs italic text-muted">No task plan</p>}>
 				{(l) => (
 					<Show
 						when={l().total_count > 0}
@@ -130,9 +124,7 @@ export const TaskPlanWidget: Component<WidgetProps> = (props) => {
 						<div class="space-y-2.5">
 							{/* Completion gauge + badge */}
 							<div class="flex items-center justify-between gap-2">
-								<span class="instrument-microcaps text-[10px] text-muted">
-									Completion
-								</span>
+								<span class="instrument-microcaps text-[10px] text-muted">Completion</span>
 								<span
 									class={`instrument-microcaps rounded-none border px-1.5 py-0.5 font-mono text-[10px] tabular-nums ${completionBadgeClass(
 										l().completion_rate,
@@ -173,9 +165,7 @@ export const TaskPlanWidget: Component<WidgetProps> = (props) => {
 							{/* Task rows */}
 							<Show when={open()}>
 								<div class="space-y-0.5 border-t border-clens pt-2">
-									<For each={l().tasks}>
-										{(task) => <TaskRow task={task} />}
-									</For>
+									<For each={l().tasks}>{(task) => <TaskRow task={task} />}</For>
 								</div>
 							</Show>
 						</div>

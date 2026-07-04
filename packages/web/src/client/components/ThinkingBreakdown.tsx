@@ -1,5 +1,5 @@
-import { createMemo, For, Show, type Component } from "solid-js";
 import { Brain } from "lucide-solid";
+import { type Component, createMemo, For, Show } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { formatPercentage } from "../lib/format";
 import { Card } from "./ui/Card";
@@ -69,9 +69,7 @@ export const ThinkingBreakdown: Component<ThinkingBreakdownProps> = (props) => {
 			<Card class="p-3">
 				<div class="mb-3 flex items-center gap-2">
 					<Brain class="h-4 w-4 text-muted" />
-					<h3 class="instrument-microcaps text-[11px] text-muted">
-						Thinking Patterns
-					</h3>
+					<h3 class="instrument-microcaps text-[11px] text-muted">Thinking Patterns</h3>
 					<span class="text-[11px] text-muted">(keyword heuristic)</span>
 				</div>
 

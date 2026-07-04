@@ -113,7 +113,9 @@ describe("CLI JSON Output Validation", () => {
 
 		test("tools_by_name values sum to at least tool_call_count", async () => {
 			const r = await runCli(["report", "--last", "--json"], projectDir);
-			const report = r.json as { stats: { tools_by_name: Record<string, number>; tool_call_count: number } };
+			const report = r.json as {
+				stats: { tools_by_name: Record<string, number>; tool_call_count: number };
+			};
 			const sum = Object.values(report.stats.tools_by_name).reduce((a, b) => a + b, 0);
 			expect(sum).toBeGreaterThanOrEqual(report.stats.tool_call_count);
 		});
@@ -250,7 +252,7 @@ describe("CLI JSON Output Validation", () => {
 			const r = await runCli(["what", "--last", "--json"], projectDir);
 			const what = r.json as { files_changed: unknown[] };
 			expect(Array.isArray(what.files_changed)).toBe(true);
-			what.files_changed.forEach((f) => expect(typeof f).toBe("string"));
+			for (const f of what.files_changed) expect(typeof f).toBe("string");
 		});
 	});
 
@@ -332,7 +334,6 @@ describe("CLI JSON Output Validation", () => {
 			}
 		});
 	});
-
 });
 
 // Drift tests use a separate project to avoid distill overwriting plan_drift

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { isValidGlobalMode, readGlobalConfig, writeGlobalConfig } from "../session/registry";
 import type { ClensConfig, PricingTier } from "../types";
-import { readGlobalConfig, writeGlobalConfig, isValidGlobalMode } from "../session/registry";
 import { bold, cyan, dim } from "./shared";
 
 const VALID_PRICING_TIERS: readonly PricingTier[] = ["api", "max", "auto"] as const;
@@ -16,9 +16,8 @@ const readConfig = (projectDir: string): ClensConfig => {
 		if (typeof raw !== "object" || raw === null) return { capture: true };
 		const obj = raw as Record<string, unknown>;
 		const capture = typeof obj.capture === "boolean" ? obj.capture : true;
-		const pricing = typeof obj.pricing === "string" && isValidPricingTier(obj.pricing)
-			? obj.pricing
-			: undefined;
+		const pricing =
+			typeof obj.pricing === "string" && isValidPricingTier(obj.pricing) ? obj.pricing : undefined;
 		return { capture, ...(pricing ? { pricing } : {}) };
 	} catch {
 		return { capture: true };
@@ -41,8 +40,8 @@ export const configCommand = (args: {
 		if (!isValidGlobalMode(args.globalMode)) {
 			throw new Error(
 				`Invalid global mode "${args.globalMode}". Valid values: repository, project\n` +
-				`  ${dim("repository")} — group sessions by git repo root (default)\n` +
-				`  ${dim("project")}    — every .clens/ directory is its own source`,
+					`  ${dim("repository")} — group sessions by git repo root (default)\n` +
+					`  ${dim("project")}    — every .clens/ directory is its own source`,
 			);
 		}
 		const globalConfig = readGlobalConfig();

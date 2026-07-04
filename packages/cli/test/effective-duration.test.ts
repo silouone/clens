@@ -57,12 +57,7 @@ describe("computeEffectiveDuration", () => {
 	});
 
 	test("mid-session gap: events, 1 hour gap, more events", () => {
-		const timestamps = [
-			BASE,
-			BASE + MIN,
-			BASE + MIN + HOUR,
-			BASE + MIN + HOUR + MIN,
-		];
+		const timestamps = [BASE, BASE + MIN, BASE + MIN + HOUR, BASE + MIN + HOUR + MIN];
 		const result = computeEffectiveDuration(timestamps);
 
 		const wall = MIN + HOUR + MIN;
@@ -104,7 +99,7 @@ describe("computeEffectiveDuration", () => {
 		const customThreshold = MIN; // 1 minute
 		const timestamps = [
 			BASE,
-			BASE + 30_000,          // 30s gap (under threshold)
+			BASE + 30_000, // 30s gap (under threshold)
 			BASE + 30_000 + 90_000, // 90s gap (over 60s threshold)
 			BASE + 30_000 + 90_000 + 30_000,
 		];
@@ -150,12 +145,7 @@ describe("computeEffectiveDuration", () => {
 	});
 
 	test("effective_end_t: trailing idle tail sets end to last active event", () => {
-		const timestamps = [
-			BASE,
-			BASE + MIN,
-			BASE + 2 * MIN,
-			BASE + 2 * MIN + TWO_HOURS,
-		];
+		const timestamps = [BASE, BASE + MIN, BASE + 2 * MIN, BASE + 2 * MIN + TWO_HOURS];
 		const result = computeEffectiveDuration(timestamps);
 
 		expect(result.effective_end_t).toBe(BASE + 2 * MIN);

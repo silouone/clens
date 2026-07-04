@@ -1,4 +1,4 @@
-import { createSignal, For, Show, type Component } from "solid-js";
+import { type Component, createSignal, For, Show } from "solid-js";
 import type { PhaseInfo } from "../../shared/types";
 
 // ── Phase color palette ──────────────────────────────────────────────
@@ -23,8 +23,7 @@ const PHASE_COLORS: Readonly<Record<string, string>> = {
 
 const DEFAULT_COLOR = "var(--clens-tick)";
 
-const getPhaseColor = (name: string): string =>
-	PHASE_COLORS[name.toLowerCase()] ?? DEFAULT_COLOR;
+const getPhaseColor = (name: string): string => PHASE_COLORS[name.toLowerCase()] ?? DEFAULT_COLOR;
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -64,6 +63,7 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 					<For each={props.phases}>
 						{(phase, i) => (
 							<button
+								type="button"
 								class={`relative transition-opacity ${
 									hoveredIndex() !== null && hoveredIndex() !== i() ? "opacity-40" : "opacity-90"
 								}`}
@@ -105,12 +105,8 @@ export const TimelineBar: Component<TimelineBarProps> = (props) => {
 								class="instrument-led"
 								style={{ "background-color": getPhaseColor(phase().name) }}
 							/>
-							<span class="instrument-microcaps text-[10px] text-muted">
-								{phase().name}
-							</span>
-							<span class="text-[10px] text-muted">
-								{phase().description}
-							</span>
+							<span class="instrument-microcaps text-[10px] text-muted">{phase().name}</span>
+							<span class="text-[10px] text-muted">{phase().description}</span>
 						</div>
 					)}
 				</Show>

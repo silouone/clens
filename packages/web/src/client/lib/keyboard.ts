@@ -57,18 +57,11 @@ const registerShortcuts = (entries: readonly ShortcutEntry[]): (() => void) => {
  * Ignores keystrokes in input/textarea/contentEditable elements.
  * Registers shortcut descriptions into the reactive registry for KeyboardHelp.
  */
-const useKeyboard = (
-	bindings: () => readonly KeyBinding[],
-	context = "Navigation",
-): void => {
+const useKeyboard = (bindings: () => readonly KeyBinding[], context = "Navigation"): void => {
 	const handler = (e: KeyboardEvent): void => {
 		// Skip if user is typing in an input
 		const target = e.target as HTMLElement;
-		if (
-			target.tagName === "INPUT" ||
-			target.tagName === "TEXTAREA" ||
-			target.isContentEditable
-		) {
+		if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
 			return;
 		}
 

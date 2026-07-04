@@ -1,33 +1,72 @@
 import type { RouteSectionProps } from "@solidjs/router";
-import { useNavigate, useLocation } from "@solidjs/router";
-import { createEffect, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, type Component } from "solid-js";
-import { Database, Calendar, Activity, Clock, DollarSign, BarChart3, Lightbulb, ChevronDown } from "lucide-solid";
+import { useLocation, useNavigate } from "@solidjs/router";
+import {
+	Activity,
+	BarChart3,
+	Calendar,
+	ChevronDown,
+	Clock,
+	Database,
+	DollarSign,
+	Lightbulb,
+} from "lucide-solid";
+import {
+	type Component,
+	createEffect,
+	createSignal,
+	ErrorBoundary,
+	For,
+	onCleanup,
+	onMount,
+	Show,
+} from "solid-js";
 import { ErrorFallback } from "./components/ErrorFallback";
 import { KeyboardHelp } from "./components/KeyboardHelp";
 import { headerStats } from "./lib/analytics-store";
 import { initSSE } from "./lib/events";
 import { formatCost, formatDuration } from "./lib/format";
-import { toggleHelp, setKeyboardNavigate } from "./lib/keyboard";
+import { setKeyboardNavigate, toggleHelp } from "./lib/keyboard";
 import { preferences } from "./lib/settings";
-import { theme, toggleTheme, initThemeListener } from "./lib/theme";
+import { initThemeListener, theme, toggleTheme } from "./lib/theme";
 
 // ── Icons ───────────────────────────────────────────────────────────
 
 const SunIcon: Component = () => (
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+	<svg
+		aria-hidden="true"
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+	>
 		<circle cx="12" cy="12" r="5" />
 		<path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
 	</svg>
 );
 
 const MoonIcon: Component = () => (
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+	<svg
+		aria-hidden="true"
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+	>
 		<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
 	</svg>
 );
 
 const GearIcon: Component = () => (
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+	<svg
+		aria-hidden="true"
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+	>
 		<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
 		<circle cx="12" cy="12" r="3" />
 	</svg>
@@ -125,7 +164,10 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 
 			{/* Dropdown panel */}
 			<Show when={open()}>
-				<div role="menu" class="absolute right-0 top-full z-50 mt-1.5 w-64 origin-top-right animate-dropdown rounded-none border border-clens bg-surface-raised">
+				<div
+					role="menu"
+					class="absolute right-0 top-full z-50 mt-1.5 w-64 origin-top-right animate-dropdown rounded-none border border-clens bg-surface-raised"
+				>
 					{/* KPI quick-view */}
 					<Show when={props.loaded}>
 						<div class="border-b border-clens">
@@ -139,22 +181,32 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 										    name this one "Reported" to make the distinct source explicit and
 										    never contradict the list total (NUM-10 / NUM-20).
 										    OPEN-DECISION: exact wording ("Reported" vs "In Analytics"). */}
-										<div class="instrument-microcaps text-[9px] text-muted leading-none">Reported</div>
-										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.sessionCount}</div>
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">
+											Reported
+										</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">
+											{props.sessionCount}
+										</div>
 									</div>
 								</div>
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Calendar class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
 										<div class="instrument-microcaps text-[9px] text-muted leading-none">Today</div>
-										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.todayCount}</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">
+											{props.todayCount}
+										</div>
 									</div>
 								</div>
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
 									<Activity class="h-3.5 w-3.5 text-muted shrink-0" />
 									<div class="min-w-0">
-										<div class="instrument-microcaps text-[9px] text-muted leading-none">Tool Calls</div>
-										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{props.totalEvents.toLocaleString()}</div>
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">
+											Tool Calls
+										</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">
+											{props.totalEvents.toLocaleString()}
+										</div>
 									</div>
 								</div>
 								<div class="flex items-center gap-2 bg-surface-raised px-3 py-2.5">
@@ -162,8 +214,12 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 									<div class="min-w-0">
 										{/* Active = working time (idle excluded); aggregate uses stats.duration_ms,
 										    per-session views use active_duration_ms — same concept, distinct computation. */}
-										<div class="instrument-microcaps text-[9px] text-muted leading-none">Avg Active</div>
-										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">{formatDuration(props.avgDuration)}</div>
+										<div class="instrument-microcaps text-[9px] text-muted leading-none">
+											Avg Active
+										</div>
+										<div class="font-mono text-xs font-semibold text-secondary tabular-nums mt-1">
+											{formatDuration(props.avgDuration)}
+										</div>
 									</div>
 								</div>
 							</div>
@@ -171,7 +227,9 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 							<div class="flex items-center gap-2 px-3 py-2.5 border-t border-clens">
 								<DollarSign class="h-3.5 w-3.5 text-muted shrink-0" />
 								<div class="min-w-0">
-									<div class="instrument-microcaps text-[9px] text-muted leading-none">Total Cost</div>
+									<div class="instrument-microcaps text-[9px] text-muted leading-none">
+										Total Cost
+									</div>
 									{/* LOCKED: never render $0.00. When no session carried a cost
 									    (sessions_with_cost === 0) show "-"; otherwise formatCost guards
 									    the sub-cent case with "<$0.01" (NUM-21). */}
@@ -193,8 +251,12 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 						>
 							<BarChart3 class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />
 							<div class="text-left">
-								<div class="font-medium text-secondary group-hover:text-primary transition-colors">Usage</div>
-								<div class="text-[10px] text-muted leading-tight mt-0.5">Cost, tokens, models & trends</div>
+								<div class="font-medium text-secondary group-hover:text-primary transition-colors">
+									Usage
+								</div>
+								<div class="text-[10px] text-muted leading-tight mt-0.5">
+									Cost, tokens, models & trends
+								</div>
 							</div>
 						</button>
 						<button
@@ -205,8 +267,12 @@ const AnalyticsDropdown: Component<AnalyticsDropdownProps> = (props) => {
 						>
 							<Lightbulb class="h-4 w-4 text-muted group-hover:text-brand-500 transition-colors shrink-0" />
 							<div class="text-left">
-								<div class="font-medium text-secondary group-hover:text-primary transition-colors">Insights</div>
-								<div class="text-[10px] text-muted leading-tight mt-0.5">Backtracks, drift & quality signals</div>
+								<div class="font-medium text-secondary group-hover:text-primary transition-colors">
+									Insights
+								</div>
+								<div class="text-[10px] text-muted leading-tight mt-0.5">
+									Backtracks, drift & quality signals
+								</div>
 							</div>
 						</button>
 					</div>
@@ -224,7 +290,15 @@ export const App: Component<RouteSectionProps> = (props) => {
 	setKeyboardNavigate(navigate);
 
 	// ── KPI derivations (from analytics API — server-aggregated, no limit) ──
-	const stats = () => headerStats() ?? { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
+	const stats = () =>
+		headerStats() ?? {
+			totalSessions: 0,
+			todaySessions: 0,
+			totalEvents: 0,
+			avgDurationMs: 0,
+			totalCostUsd: 0,
+			sessionsWithCost: 0,
+		};
 
 	let disconnectSSE: (() => void) | undefined;
 	let removeThemeListener: (() => void) | undefined;
@@ -248,6 +322,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 			<header class="sticky top-0 z-40 flex items-center border-b border-clens bg-surface px-4 py-2.5">
 				{/* Logo + wordmark */}
 				<button
+					type="button"
 					onClick={() => navigate("/")}
 					class="flex items-center gap-2 rounded-none px-1 py-0.5 transition hover:opacity-80"
 					title="Home"
@@ -265,11 +340,15 @@ export const App: Component<RouteSectionProps> = (props) => {
 						<For each={NAV_ITEMS}>
 							{(item) => (
 								<button
+									type="button"
 									onClick={() => navigate(item.path)}
 									class="instrument-microcaps rounded-none px-2.5 py-1 text-[10px] transition border-b-2"
 									classList={{
 										"text-primary border-brand-500": isNavActive(item, location.pathname),
-										"text-muted border-transparent hover:text-secondary": !isNavActive(item, location.pathname),
+										"text-muted border-transparent hover:text-secondary": !isNavActive(
+											item,
+											location.pathname,
+										),
 									}}
 								>
 									{item.label}
@@ -301,6 +380,7 @@ export const App: Component<RouteSectionProps> = (props) => {
 					<div class="mx-2 h-5 w-px bg-clens" />
 
 					<button
+						type="button"
 						onClick={toggleTheme}
 						class="rounded-none p-1.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title={`Switch to ${theme() === "dark" ? "light" : "dark"} mode`}
@@ -310,17 +390,20 @@ export const App: Component<RouteSectionProps> = (props) => {
 						</Show>
 					</button>
 					<button
+						type="button"
 						onClick={() => navigate("/settings")}
 						class="rounded-none p-1.5 transition"
 						classList={{
 							"text-primary bg-surface-muted": location.pathname === "/settings",
-							"text-muted hover:bg-surface-hover hover:text-secondary": location.pathname !== "/settings",
+							"text-muted hover:bg-surface-hover hover:text-secondary":
+								location.pathname !== "/settings",
 						}}
 						title="Settings"
 					>
 						<GearIcon />
 					</button>
 					<button
+						type="button"
 						onClick={() => toggleHelp()}
 						class="rounded-none px-2 py-1 text-xs text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title="Keyboard shortcuts"
@@ -332,22 +415,22 @@ export const App: Component<RouteSectionProps> = (props) => {
 			{/* Tick-mark ruler motif — oscilloscope graticule under the header */}
 			<div class="instrument-ruler" aria-hidden="true" />
 			<ErrorBoundary
-					fallback={(err, reset) => (
-						<main class="flex-1">
-							<ErrorFallback error={err} reset={reset} variant="full" />
-							<div class="mt-2 text-center">
-								<a
-									href="/"
-									class="text-sm text-brand-500 underline transition-colors duration-150 hover:text-brand-400"
-								>
-									Go Home
-								</a>
-							</div>
-						</main>
-					)}
-				>
-					<main class="animate-page-fade">{props.children}</main>
-				</ErrorBoundary>
+				fallback={(err, reset) => (
+					<main class="flex-1">
+						<ErrorFallback error={err} reset={reset} variant="full" />
+						<div class="mt-2 text-center">
+							<a
+								href="/"
+								class="text-sm text-brand-500 underline transition-colors duration-150 hover:text-brand-400"
+							>
+								Go Home
+							</a>
+						</div>
+					</main>
+				)}
+			>
+				<main class="animate-page-fade">{props.children}</main>
+			</ErrorBoundary>
 			<KeyboardHelp />
 		</div>
 	);

@@ -33,9 +33,30 @@ const isFunctionSignature = (s: string): boolean => s.includes("(");
 // --- Command detection ---
 
 const COMMAND_KEYWORDS = [
-	"bun", "npm", "npx", "git", "cd", "mkdir", "rm", "cp", "mv",
-	"echo", "cat", "grep", "curl", "wget", "docker", "yarn", "pnpm",
-	"node", "deno", "tsc", "eslint", "prettier", "jest", "vitest",
+	"bun",
+	"npm",
+	"npx",
+	"git",
+	"cd",
+	"mkdir",
+	"rm",
+	"cp",
+	"mv",
+	"echo",
+	"cat",
+	"grep",
+	"curl",
+	"wget",
+	"docker",
+	"yarn",
+	"pnpm",
+	"node",
+	"deno",
+	"tsc",
+	"eslint",
+	"prettier",
+	"jest",
+	"vitest",
 ] as const;
 
 const isCommandLike = (s: string): boolean => {
@@ -53,7 +74,14 @@ const extractCodeBlockPaths = (line: string): readonly string[] => {
 	const trimmed = line.trim();
 	if (!trimmed) return [];
 	// Skip lines with code syntax (imports, assignments, comments)
-	if (trimmed.includes("=") || trimmed.includes("(") || trimmed.includes("{") || trimmed.startsWith("//") || trimmed.startsWith("#!")) return [];
+	if (
+		trimmed.includes("=") ||
+		trimmed.includes("(") ||
+		trimmed.includes("{") ||
+		trimmed.startsWith("//") ||
+		trimmed.startsWith("#!")
+	)
+		return [];
 	// Take first whitespace-separated token as potential path
 	const firstToken = trimmed.split(/\s+/)[0];
 	if (!firstToken || !isValidFilePath(firstToken)) return [];
@@ -67,12 +95,14 @@ const TABLE_CELL_RE = /\|\s*([^|]+?)\s*(?=\|)/g;
 const extractTablePaths = (line: string): readonly string[] => {
 	if (!line.includes("|")) return [];
 	const matches = [...line.matchAll(TABLE_CELL_RE)];
-	return matches
-		.map((m) => m[1].trim())
-		// Strip surrounding backticks from table cells
-		.map((s) => s.startsWith("`") && s.endsWith("`") ? s.slice(1, -1) : s)
-		.filter((s) => isValidFilePath(s))
-		.map(normalizePath);
+	return (
+		matches
+			.map((m) => m[1].trim())
+			// Strip surrounding backticks from table cells
+			.map((s) => (s.startsWith("`") && s.endsWith("`") ? s.slice(1, -1) : s))
+			.filter((s) => isValidFilePath(s))
+			.map(normalizePath)
+	);
 };
 
 // --- Inline backtick path extraction ---

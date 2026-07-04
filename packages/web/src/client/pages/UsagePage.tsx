@@ -1,40 +1,48 @@
-import { createMemo, For, Show, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { RefreshCw, RotateCcw } from "lucide-solid";
+import { type Component, createMemo, For, Show } from "solid-js";
+import { CustomRangeChip } from "../components/CustomRangeChip";
 import {
-	analyticsRange,
-	setAnalyticsRange,
-	customRange,
-	setCustomRange,
-	clearCustomRange,
-	usageData,
-	refetchUsage,
-	dailyUsage,
-	usageTotals,
-	usagePreviousTotals,
-	modelBreakdown,
-	agentTypeBreakdown,
-	computeDelta,
-	computePpDelta,
-	rebuildAnalytics,
-	isRebuilding,
-	usagePopulation,
-	isValidDayKey,
-	type AnalyticsRange,
-	type DeltaResult,
-	type DailyUsageMetrics,
-} from "../lib/analytics-store";
-import { formatDuration, modelDisplayName } from "../lib/format";
+	CHART_COLORS,
+	ChartEmpty,
+	ChartTooltip,
+	formatCompact,
+	MODEL_OTHER,
+	modelColor,
+	TOKEN_COLORS,
+} from "../components/charts";
 import { BarChart } from "../components/charts/BarChart";
 import { LineChart } from "../components/charts/LineChart";
 import { StackedArea } from "../components/charts/StackedArea";
-import { ChartTooltip, ChartEmpty, TOKEN_COLORS, CHART_COLORS, MODEL_OTHER, modelColor, formatCompact } from "../components/charts";
-import { Tooltip } from "../components/ui/Tooltip";
+import type { BrushRange } from "../components/charts/shared";
+import { ProjectDropdown } from "../components/ProjectDropdown";
 import { TelescopeIllustration } from "../components/ui/EmptyState";
 import { Spinner } from "../components/ui/Spinner";
-import { ProjectDropdown } from "../components/ProjectDropdown";
-import type { BrushRange } from "../components/charts/shared";
-import { CustomRangeChip } from "../components/CustomRangeChip";
+import { Tooltip } from "../components/ui/Tooltip";
+import {
+	type AnalyticsRange,
+	agentTypeBreakdown,
+	analyticsRange,
+	clearCustomRange,
+	computeDelta,
+	computePpDelta,
+	customRange,
+	type DailyUsageMetrics,
+	type DeltaResult,
+	dailyUsage,
+	isRebuilding,
+	isValidDayKey,
+	modelBreakdown,
+	rebuildAnalytics,
+	refetchUsage,
+	setAnalyticsRange,
+	setCustomRange,
+	usageData,
+	usagePopulation,
+	usagePreviousTotals,
+	usageTotals,
+} from "../lib/analytics-store";
+import { formatDuration, modelDisplayName } from "../lib/format";
 
 // ── Range selector ──────────────────────────────────────────────────
 
@@ -52,12 +60,15 @@ const RangeSelector: Component = () => (
 		<For each={RANGES}>
 			{(r) => (
 				<button
+					type="button"
 					onClick={() => selectPreset(r)}
 					class="instrument-microcaps rounded-none border px-2.5 py-1 text-[10px] transition"
 					classList={{
 						// A preset reads as active only when no custom window overrides it.
-						"text-primary bg-surface-muted border-brand-500": !customRange() && analyticsRange() === r,
-						"text-muted border-clens hover:text-secondary hover:bg-surface-hover": Boolean(customRange()) || analyticsRange() !== r,
+						"text-primary bg-surface-muted border-brand-500":
+							!customRange() && analyticsRange() === r,
+						"text-muted border-clens hover:text-secondary hover:bg-surface-hover":
+							Boolean(customRange()) || analyticsRange() !== r,
 					}}
 				>
 					{r === "all" ? "All" : r}
@@ -108,14 +119,16 @@ const KpiCard: Component<KpiCardProps> = (props) => (
 		</Show>
 		<Show when={props.delta && props.delta.direction !== "flat"}>
 			<div class="mt-1 flex items-center gap-1 text-xs">
-				<span classList={{
-					"text-success": (props.invertColor
-						? props.delta?.direction === "down"
-						: props.delta?.direction === "up"),
-					"text-danger": (props.invertColor
-						? props.delta?.direction === "up"
-						: props.delta?.direction === "down"),
-				}}>
+				<span
+					classList={{
+						"text-success": props.invertColor
+							? props.delta?.direction === "down"
+							: props.delta?.direction === "up",
+						"text-danger": props.invertColor
+							? props.delta?.direction === "up"
+							: props.delta?.direction === "down",
+					}}
+				>
 					{props.delta?.direction === "up" ? "+" : "-"}
 					{props.delta?.value.toFixed(1)}
 					{props.deltaLabel ?? "%"}
@@ -148,6 +161,7 @@ const EmptyState: Component = () => (
 			If you have distilled sessions, click rebuild to extract analytics data.
 		</p>
 		<button
+			type="button"
 			onClick={() => rebuildAnalytics()}
 			disabled={isRebuilding()}
 			class="instrument-microcaps mt-4 rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface hover:bg-brand-600 transition disabled:opacity-50"
@@ -155,7 +169,11 @@ const EmptyState: Component = () => (
 			{isRebuilding() ? "Rebuilding..." : "Rebuild Analytics"}
 		</button>
 		<p class="mt-3 text-xs text-muted">
-			Or run <code class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-xs">clens distill --all</code> to distill and generate analytics.
+			Or run{" "}
+			<code class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-xs">
+				clens distill --all
+			</code>{" "}
+			to distill and generate analytics.
 		</p>
 	</div>
 );
@@ -171,8 +189,7 @@ const fmtRoi = (roi: number): string => `${roi < 10 ? roi.toFixed(1) : Math.roun
 // "X% estimated" badge text from measured_fraction (AC12). measured_fraction is
 // the share backed by Claude's own measured cost; the inverse is estimated. Only
 // surfaced when some of the window is NOT measured.
-const estimatedPct = (measuredFraction: number): number =>
-	Math.round((1 - measuredFraction) * 100);
+const estimatedPct = (measuredFraction: number): number => Math.round((1 - measuredFraction) * 100);
 
 // ── Main page ───────────────────────────────────────────────────────
 
@@ -214,16 +231,24 @@ export const UsagePage: Component = () => {
 
 	// KPI deltas. value/paid track API-equivalent value (cost_usd === value_usd).
 	const valueDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.value_usd, prevTotals()!.value_usd) : undefined,
+		totals() && prevTotals() && hasPrevBaseline()
+			? computeDelta(totals()!.value_usd, prevTotals()!.value_usd)
+			: undefined,
 	);
 	const paidDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.paid_usd, prevTotals()!.paid_usd) : undefined,
+		totals() && prevTotals() && hasPrevBaseline()
+			? computeDelta(totals()!.paid_usd, prevTotals()!.paid_usd)
+			: undefined,
 	);
 	const roiDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.roi, prevTotals()!.roi) : undefined,
+		totals() && prevTotals() && hasPrevBaseline()
+			? computeDelta(totals()!.roi, prevTotals()!.roi)
+			: undefined,
 	);
 	const sessionDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.sessions, prevTotals()!.sessions) : undefined,
+		totals() && prevTotals() && hasPrevBaseline()
+			? computeDelta(totals()!.sessions, prevTotals()!.sessions)
+			: undefined,
 	);
 	// Cache delta only when both windows have a real (non-null) reading.
 	const cacheDelta = createMemo(() => {
@@ -234,7 +259,9 @@ export const UsagePage: Component = () => {
 		return computePpDelta(t.cache_hit_rate, p.cache_hit_rate);
 	});
 	const durationDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline() ? computeDelta(totals()!.avg_duration_ms, prevTotals()!.avg_duration_ms) : undefined,
+		totals() && prevTotals() && hasPrevBaseline()
+			? computeDelta(totals()!.avg_duration_ms, prevTotals()!.avg_duration_ms)
+			: undefined,
 	);
 
 	// Estimated-fraction badge (AC12): only when the window is not fully measured.
@@ -298,6 +325,7 @@ export const UsagePage: Component = () => {
 					<ProjectDropdown />
 					<RangeSelector />
 					<button
+						type="button"
 						onClick={() => rebuildAnalytics()}
 						disabled={isRebuilding()}
 						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-strong transition disabled:opacity-50"
@@ -306,6 +334,7 @@ export const UsagePage: Component = () => {
 						<RotateCcw class="h-4 w-4" classList={{ "animate-spin": isRebuilding() }} />
 					</button>
 					<button
+						type="button"
 						onClick={() => refetchUsage()}
 						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-strong transition"
 						title="Refresh"
@@ -372,9 +401,11 @@ export const UsagePage: Component = () => {
 						delta={cacheNa() ? undefined : cacheDelta()}
 						deltaLabel="pp"
 						muted={cacheNa()}
-						tooltip={cacheNa()
-							? "n/a — no fresh input tokens were captured this window, so cache-read share is undefined (not 100%)."
-							: "Cache-read share: cache-read tokens ÷ (fresh input + cache-read). Higher means more context was served from cache."}
+						tooltip={
+							cacheNa()
+								? "n/a — no fresh input tokens were captured this window, so cache-read share is undefined (not 100%)."
+								: "Cache-read share: cache-read tokens ÷ (fresh input + cache-read). Higher means more context was served from cache."
+						}
 					/>
 					<KpiCard
 						label="Avg Active"
@@ -389,33 +420,42 @@ export const UsagePage: Component = () => {
 					<SectionHeader title="Token Composition" hint="drag to zoom a range" />
 					{/* No priced sessions ⇒ no token signal (every model-bearing session
 					    gets a cost_estimate). Empty state, not a flat-zero stack (NUM-16). */}
-					<Show when={hasCost()} fallback={<ChartEmpty height={220} ariaLabel="No token data" label="No priced sessions in range" />}>
-					<StackedArea
-						data={dailyUsage()}
-						x={(d) => d.date}
-						height={220}
-						ariaLabel="Daily token composition stacked area chart"
-						series={[
-							{ key: "cache_read", label: "Cache Read", color: TOKEN_COLORS.cache_read },
-							{ key: "input", label: "Input", color: TOKEN_COLORS.input },
-							{ key: "output", label: "Output", color: TOKEN_COLORS.output },
-							{ key: "cache_create", label: "Cache Create", color: TOKEN_COLORS.cache_create },
-						]}
-						getValue={(d, key) => {
-							const map: Record<string, number> = {
-								cache_read: d.cache_read_tokens,
-								input: d.total_input_tokens,
-								output: d.total_output_tokens,
-								cache_create: d.cache_creation_tokens,
-							};
-							return map[key] ?? 0;
-						}}
-						tooltipLabel={(d) =>
-							`${d.date}: ${formatCompact(d.total_input_tokens + d.total_output_tokens + d.cache_read_tokens + d.cache_creation_tokens)} tokens`
+					<Show
+						when={hasCost()}
+						fallback={
+							<ChartEmpty
+								height={220}
+								ariaLabel="No token data"
+								label="No priced sessions in range"
+							/>
 						}
-						onBrushSelect={onBrushSelect}
-						onClickPoint={(d) => navigateToDate(d)}
-					/>
+					>
+						<StackedArea
+							data={dailyUsage()}
+							x={(d) => d.date}
+							height={220}
+							ariaLabel="Daily token composition stacked area chart"
+							series={[
+								{ key: "cache_read", label: "Cache Read", color: TOKEN_COLORS.cache_read },
+								{ key: "input", label: "Input", color: TOKEN_COLORS.input },
+								{ key: "output", label: "Output", color: TOKEN_COLORS.output },
+								{ key: "cache_create", label: "Cache Create", color: TOKEN_COLORS.cache_create },
+							]}
+							getValue={(d, key) => {
+								const map: Record<string, number> = {
+									cache_read: d.cache_read_tokens,
+									input: d.total_input_tokens,
+									output: d.total_output_tokens,
+									cache_create: d.cache_creation_tokens,
+								};
+								return map[key] ?? 0;
+							}}
+							tooltipLabel={(d) =>
+								`${d.date}: ${formatCompact(d.total_input_tokens + d.total_output_tokens + d.cache_read_tokens + d.cache_creation_tokens)} tokens`
+							}
+							onBrushSelect={onBrushSelect}
+							onClickPoint={(d) => navigateToDate(d)}
+						/>
 					</Show>
 				</div>
 
@@ -424,20 +464,29 @@ export const UsagePage: Component = () => {
 					<SectionHeader title="Cost Trend" hint="drag to zoom a range" />
 					{/* Gate on hasCost(): no priced sessions ⇒ empty state, not a
 					    flat-zero cost series (NUM-16). */}
-					<Show when={hasCost()} fallback={<ChartEmpty height={180} ariaLabel="No cost data" label="No priced sessions in range" />}>
-					<LineChart
-						data={dailyUsage()}
-						x={(d) => d.date}
-						y={(d) => d.total_cost_usd}
-						height={180}
-						color={CHART_COLORS.pink}
-						fillArea
-						ariaLabel="Daily cost trend line chart"
-						formatY={(v) => `$${v.toFixed(2)}`}
-						tooltipLabel={(d) => `${d.date}: $${d.total_cost_usd.toFixed(2)}`}
-						onBrushSelect={onBrushSelect}
-						onClickPoint={(d) => navigateToDate(d)}
-					/>
+					<Show
+						when={hasCost()}
+						fallback={
+							<ChartEmpty
+								height={180}
+								ariaLabel="No cost data"
+								label="No priced sessions in range"
+							/>
+						}
+					>
+						<LineChart
+							data={dailyUsage()}
+							x={(d) => d.date}
+							y={(d) => d.total_cost_usd}
+							height={180}
+							color={CHART_COLORS.pink}
+							fillArea
+							ariaLabel="Daily cost trend line chart"
+							formatY={(v) => `$${v.toFixed(2)}`}
+							tooltipLabel={(d) => `${d.date}: $${d.total_cost_usd.toFixed(2)}`}
+							onBrushSelect={onBrushSelect}
+							onClickPoint={(d) => navigateToDate(d)}
+						/>
 					</Show>
 				</div>
 
@@ -493,13 +542,17 @@ export const UsagePage: Component = () => {
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Sessions</th>
 										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Avg Cost</th>
 										{/* Agent duration_ms is idle-trimmed effective working time → "Active" */}
-										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Avg Active</th>
+										<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">
+											Avg Active
+										</th>
 										<th class="instrument-microcaps py-2 text-[10px] text-right">
 											{/* Renamed from "Fail Rate" (AC10): this is tool-call error rate
 											    (failures ÷ tool calls), NOT how often the agent failed to
 											    spawn. A 1-spawn agent can't have a 3.1% spawn rate. */}
 											<Tooltip content="Tool-call error rate: failed tool calls ÷ total tool calls for this agent type. Not a spawn-failure rate.">
-												<span class="cursor-help border-b border-dotted border-muted">Tool Error Rate</span>
+												<span class="cursor-help border-b border-dotted border-muted">
+													Tool Error Rate
+												</span>
 											</Tooltip>
 										</th>
 									</tr>
@@ -509,11 +562,21 @@ export const UsagePage: Component = () => {
 										{(a) => (
 											<tr class="border-b border-clens/50 hover:bg-surface-hover transition">
 												<td class="py-2 pr-4 font-medium text-primary">{a.agent_type}</td>
-												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{a.spawn_count}</td>
-												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{a.sessions_appeared_in}</td>
-												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">${a.avg_cost_usd.toFixed(2)}</td>
-												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{formatDuration(a.avg_duration_ms)}</td>
-												<td class="py-2 text-right font-mono tabular-nums text-secondary">{(a.avg_failure_rate * 100).toFixed(1)}%</td>
+												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">
+													{a.spawn_count}
+												</td>
+												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">
+													{a.sessions_appeared_in}
+												</td>
+												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">
+													${a.avg_cost_usd.toFixed(2)}
+												</td>
+												<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">
+													{formatDuration(a.avg_duration_ms)}
+												</td>
+												<td class="py-2 text-right font-mono tabular-nums text-secondary">
+													{(a.avg_failure_rate * 100).toFixed(1)}%
+												</td>
 											</tr>
 										)}
 									</For>

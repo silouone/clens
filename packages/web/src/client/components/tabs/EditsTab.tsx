@@ -1,8 +1,8 @@
-import { For, Show, createMemo, createSignal, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import type { EditChain, EditStep, TranscriptReasoning } from "../../../shared/types";
-import { Widget } from "../ui/Widget";
-import { HorizontalBar } from "../charts";
 import { CATEGORY } from "../../lib/categories";
+import { HorizontalBar } from "../charts";
+import { Widget } from "../ui/Widget";
 import type { TabProps } from "./types";
 
 // ── EditsTab [edits] — churn overview + per-file chains (R-C3, AC8) ───
@@ -29,9 +29,7 @@ const buildReasoningLookup = (
 	reasoning: readonly TranscriptReasoning[],
 ): ReadonlyMap<string, TranscriptReasoning> =>
 	new Map(
-		reasoning.flatMap((r) =>
-			r.tool_use_id !== undefined ? ([[r.tool_use_id, r]] as const) : [],
-		),
+		reasoning.flatMap((r) => (r.tool_use_id !== undefined ? ([[r.tool_use_id, r]] as const) : [])),
 	);
 
 const truncateText = (text: string, maxLen: number): string =>
@@ -138,8 +136,7 @@ const ChurnSummary: Component<{ readonly chains: readonly EditChain[] }> = (prop
 	// Backtrack-flagged FILES (distinct paths), NOT chains — one file may be many
 	// chains; labeling the chain count "files" would mislabel (R-D4).
 	const flaggedFiles = createMemo(
-		() =>
-			new Set(props.chains.filter((c) => c.has_backtrack).map((c) => c.file_path)).size,
+		() => new Set(props.chains.filter((c) => c.has_backtrack).map((c) => c.file_path)).size,
 	);
 
 	const topFiles = createMemo<readonly FileChurn[]>(() => {
@@ -189,9 +186,7 @@ const ChurnSummary: Component<{ readonly chains: readonly EditChain[] }> = (prop
 				<div class="mt-3 border-t border-clens pt-3">
 					<div class="mb-1 flex items-baseline justify-between text-xs">
 						<span class="instrument-microcaps text-[10px] text-muted">Abandoned waste</span>
-						<span class="font-mono tabular-nums text-secondary">
-							{Math.round(abandonedPct())}%
-						</span>
+						<span class="font-mono tabular-nums text-secondary">{Math.round(abandonedPct())}%</span>
 					</div>
 					<div
 						class="h-2 w-full overflow-hidden rounded-none border border-clens bg-surface-inset"
@@ -234,8 +229,7 @@ const ChainRow: Component<{
 		const c = counts();
 		return c.success + c.failure + c.abandoned;
 	});
-	const isProblem = () =>
-		props.chain.has_backtrack || props.chain.abandoned_edit_ids.length > 0;
+	const isProblem = () => props.chain.has_backtrack || props.chain.abandoned_edit_ids.length > 0;
 
 	return (
 		<div class={`px-3 py-1.5 ${isProblem() ? CATEGORY.risk.ruleClass : ""}`}>
@@ -339,9 +333,7 @@ export const EditsTab: Component<TabProps> = (props) => {
 
 	const toggleChain = (idx: number) =>
 		setExpandedChains((prev) =>
-			prev.has(idx)
-				? new Set([...prev].filter((i) => i !== idx))
-				: new Set([...prev, idx]),
+			prev.has(idx) ? new Set([...prev].filter((i) => i !== idx)) : new Set([...prev, idx]),
 		);
 
 	// Problem-first, then churn-desc (derived ordering; allowed). The whole point

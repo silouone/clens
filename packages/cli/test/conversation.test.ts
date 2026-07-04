@@ -24,7 +24,9 @@ const makeDistilled = (overrides: Partial<DistilledSession> = {}): DistilledSess
 	...overrides,
 });
 
-const makeEvent = (overrides: Partial<StoredEvent> & Pick<StoredEvent, "t" | "event">): StoredEvent => ({
+const makeEvent = (
+	overrides: Partial<StoredEvent> & Pick<StoredEvent, "t" | "event">,
+): StoredEvent => ({
 	sid: "test-session",
 	data: {},
 	...overrides,
@@ -183,8 +185,20 @@ describe("buildConversation", () => {
 			summary: {
 				narrative: "Test session",
 				phases: [
-					{ name: "Setup", start_t: 1000, end_t: 3000, tool_types: ["Read"], description: "Reading files" },
-					{ name: "Build", start_t: 3000, end_t: 7000, tool_types: ["Edit", "Write"], description: "Writing code" },
+					{
+						name: "Setup",
+						start_t: 1000,
+						end_t: 3000,
+						tool_types: ["Read"],
+						description: "Reading files",
+					},
+					{
+						name: "Build",
+						start_t: 3000,
+						end_t: 7000,
+						tool_types: ["Edit", "Write"],
+						description: "Writing code",
+					},
 				],
 				key_metrics: {
 					duration_human: "6s",
@@ -197,8 +211,18 @@ describe("buildConversation", () => {
 		});
 		const result = buildConversation(distilled, []);
 		expect(result).toHaveLength(2);
-		expect(result[0]).toMatchObject({ type: "phase_boundary", t: 1000, phase_name: "Setup", phase_index: 0 });
-		expect(result[1]).toMatchObject({ type: "phase_boundary", t: 3000, phase_name: "Build", phase_index: 1 });
+		expect(result[0]).toMatchObject({
+			type: "phase_boundary",
+			t: 1000,
+			phase_name: "Setup",
+			phase_index: 0,
+		});
+		expect(result[1]).toMatchObject({
+			type: "phase_boundary",
+			t: 3000,
+			phase_name: "Build",
+			phase_index: 1,
+		});
 	});
 
 	test("handles missing summary gracefully", () => {
@@ -213,9 +237,7 @@ describe("buildConversation", () => {
 				{ t: 1000, content: "Start", is_tool_result: false, message_type: "prompt" },
 				{ t: 5000, content: "Next step", is_tool_result: false, message_type: "prompt" },
 			],
-			reasoning: [
-				{ t: 2000, thinking: "Planning...", intent_hint: "planning" },
-			],
+			reasoning: [{ t: 2000, thinking: "Planning...", intent_hint: "planning" }],
 			backtracks: [
 				{
 					type: "iteration_struggle",
@@ -228,9 +250,7 @@ describe("buildConversation", () => {
 			],
 			summary: {
 				narrative: "test",
-				phases: [
-					{ name: "Init", start_t: 500, end_t: 1000, tool_types: [], description: "init" },
-				],
+				phases: [{ name: "Init", start_t: 500, end_t: 1000, tool_types: [], description: "init" }],
 				key_metrics: {
 					duration_human: "5s",
 					tool_calls: 2,

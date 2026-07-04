@@ -33,10 +33,25 @@ const ENV_SECRET_ASSIGN =
 
 /** Structural string fields kept verbatim in `metadata` mode; all other strings are dropped. */
 const METADATA_STRING_KEYS: ReadonlySet<string> = new Set([
-	"hook_event_name", "session_id", "tool_name", "tool_use_id",
-	"agent_id", "agent_type", "agent_name", "permission_mode",
-	"memory_type", "load_reason", "source", "trigger", "model",
-	"file_path", "cwd", "transcript_path", "status", "end_reason", "effort",
+	"hook_event_name",
+	"session_id",
+	"tool_name",
+	"tool_use_id",
+	"agent_id",
+	"agent_type",
+	"agent_name",
+	"permission_mode",
+	"memory_type",
+	"load_reason",
+	"source",
+	"trigger",
+	"model",
+	"file_path",
+	"cwd",
+	"transcript_path",
+	"status",
+	"end_reason",
+	"effort",
 ]);
 
 const maskSecretString = (s: string): string =>
@@ -47,7 +62,8 @@ const maskSecretString = (s: string): string =>
 const redactValue = (value: unknown, mode: Exclude<CaptureMode, "full">): unknown => {
 	if (typeof value === "string") return mode === "metadata" ? REDACTED : maskSecretString(value);
 	if (Array.isArray(value)) return value.map((v) => redactValue(v, mode));
-	if (value !== null && typeof value === "object") return redactObject(value as Record<string, unknown>, mode);
+	if (value !== null && typeof value === "object")
+		return redactObject(value as Record<string, unknown>, mode);
 	return value; // number | boolean | null | undefined — structural, no cleartext
 };
 
@@ -55,19 +71,21 @@ const redactObject = (
 	obj: Record<string, unknown>,
 	mode: Exclude<CaptureMode, "full">,
 ): Record<string, unknown> => {
-	const entries = Object.entries(obj).flatMap(([key, value]): readonly (readonly [string, unknown])[] => {
-		if (mode === "metadata") {
-			if (value !== null && typeof value === "object") return [[key, redactValue(value, mode)]];
-			if (typeof value === "string") return METADATA_STRING_KEYS.has(key) ? [[key, value]] : [];
-			return [[key, value]]; // numbers / booleans / null kept as structural metadata
-		}
-		// redacted: mask values under sensitive key names, otherwise recurse.
-		if (SENSITIVE_KEY.test(key)) {
-			if (value !== null && typeof value === "object") return [[key, redactValue(value, mode)]];
-			return [[key, value === null || value === undefined ? value : REDACTED]];
-		}
-		return [[key, redactValue(value, mode)]];
-	});
+	const entries = Object.entries(obj).flatMap(
+		([key, value]): readonly (readonly [string, unknown])[] => {
+			if (mode === "metadata") {
+				if (value !== null && typeof value === "object") return [[key, redactValue(value, mode)]];
+				if (typeof value === "string") return METADATA_STRING_KEYS.has(key) ? [[key, value]] : [];
+				return [[key, value]]; // numbers / booleans / null kept as structural metadata
+			}
+			// redacted: mask values under sensitive key names, otherwise recurse.
+			if (SENSITIVE_KEY.test(key)) {
+				if (value !== null && typeof value === "object") return [[key, redactValue(value, mode)]];
+				return [[key, value === null || value === undefined ? value : REDACTED]];
+			}
+			return [[key, redactValue(value, mode)]];
+		},
+	);
 	return Object.fromEntries(entries);
 };
 
@@ -120,19 +138,20 @@ try {
 	mkdirSync(sessionsDir, { recursive: true });
 
 	// Build stored event (with optional context enrichment on SessionStart or InstructionsLoaded with session_start)
-	const shouldEnrichContext = event === "SessionStart"
-		|| (event === "InstructionsLoaded" && input.load_reason === "session_start");
+	const shouldEnrichContext =
+		event === "SessionStart" ||
+		(event === "InstructionsLoaded" && input.load_reason === "session_start");
 
 	const context = shouldEnrichContext
 		? await (async () => {
-			try {
-				const { enrichSessionStart } = await import("./capture/context");
-				return enrichSessionStart(input);
-			} catch (err) {
-				logError(projectDir, `hook:enrichSessionStart:${event}`, err);
-				return undefined;
-			}
-		})()
+				try {
+					const { enrichSessionStart } = await import("./capture/context");
+					return enrichSessionStart(input);
+				} catch (err) {
+					logError(projectDir, `hook:enrichSessionStart:${event}`, err);
+					return undefined;
+				}
+			})()
 		: undefined;
 
 	// Apply opt-in redaction to the persisted payload only (link detection below

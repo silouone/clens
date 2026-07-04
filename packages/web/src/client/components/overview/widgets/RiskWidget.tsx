@@ -1,9 +1,9 @@
-import { createMemo, Show, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
-import { StatTile } from "../../ui/StatTile";
-import { DonutChart, HorizontalBar, BACKTRACK_COLORS } from "../../charts";
+import { type Component, createMemo, Show } from "solid-js";
 import { CATEGORY } from "../../../lib/categories";
 import { classifySeverity } from "../../../lib/format";
+import { BACKTRACK_COLORS, DonutChart, HorizontalBar } from "../../charts";
+import { StatTile } from "../../ui/StatTile";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── RiskWidget [risk] — backtrack shape at a glance (R-C2, AC7) ───────
@@ -80,9 +80,7 @@ export const RiskWidget: Component<WidgetProps> = (props) => {
 							class="instrument-led"
 							style={{ "background-color": SEVERITY_VAR[severity().label] }}
 						/>
-						<span class="instrument-microcaps text-[9px] text-muted">
-							{severity().label}
-						</span>
+						<span class="instrument-microcaps text-[9px] text-muted">{severity().label}</span>
 					</span>
 				) : undefined
 			}
@@ -91,13 +89,8 @@ export const RiskWidget: Component<WidgetProps> = (props) => {
 				when={hasRisk()}
 				fallback={
 					<div class="flex items-center gap-2 py-1">
-						<span
-							class="instrument-led"
-							style={{ "background-color": "var(--clens-success)" }}
-						/>
-						<span class="text-xs text-secondary">
-							Clean run — no backtracks or failures
-						</span>
+						<span class="instrument-led" style={{ "background-color": "var(--clens-success)" }} />
+						<span class="text-xs text-secondary">Clean run — no backtracks or failures</span>
 					</div>
 				}
 			>

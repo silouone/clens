@@ -696,4 +696,3 @@ describe("cli killed commands", () => {
 		expect(stderr).toContain("clens agents");
 	});
 });
-

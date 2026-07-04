@@ -43,10 +43,10 @@ export interface MessageLink extends BaseLinkEvent {
 	readonly type: "msg_send";
 	readonly msg_id?: string;
 	readonly session_id: string;
-	readonly from: string;         // session UUID of sender
-	readonly from_name?: string;   // agent name of sender
-	readonly to: string;           // recipient agent name
-	readonly to_id?: string;       // recipient session UUID if resolvable
+	readonly from: string; // session UUID of sender
+	readonly from_name?: string; // agent name of sender
+	readonly to: string; // recipient agent name
+	readonly to_id?: string; // recipient session UUID if resolvable
 	readonly msg_type: string;
 	readonly summary?: string;
 	readonly content_hash?: string;

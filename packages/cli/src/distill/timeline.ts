@@ -63,7 +63,12 @@ const eventsToEntries = (events: readonly StoredEvent[]): readonly TimelineEntry
 		}
 		if (event.event === "TaskCompleted") {
 			const taskId = typeof event.data.task_id === "string" ? event.data.task_id : undefined;
-			const taskSubject = typeof event.data.task_subject === "string" ? event.data.task_subject : (typeof event.data.subject === "string" ? event.data.subject : undefined);
+			const taskSubject =
+				typeof event.data.task_subject === "string"
+					? event.data.task_subject
+					: typeof event.data.subject === "string"
+						? event.data.subject
+						: undefined;
 			return [
 				{
 					t: event.t,
@@ -211,9 +216,7 @@ const annotateAgentOwnership = (
 	if (entry.agent_id ?? entry.agent_name) return entry;
 
 	const match = lifetimes.find((lt) => entry.t >= lt.start_t && entry.t <= lt.end_t);
-	return match
-		? { ...entry, agent_id: match.agent_id, agent_name: match.agent_name }
-		: entry;
+	return match ? { ...entry, agent_id: match.agent_id, agent_name: match.agent_name } : entry;
 };
 
 // --- Phase index assignment ---
@@ -283,9 +286,8 @@ export const extractTimeline = (
 	const capped = capEntries(allEntries);
 
 	const lifetimes = links ? extractAgentLifetimes(links, nameMap) : [];
-	const annotated = lifetimes.length > 0
-		? capped.map((entry) => annotateAgentOwnership(entry, lifetimes))
-		: capped;
+	const annotated =
+		lifetimes.length > 0 ? capped.map((entry) => annotateAgentOwnership(entry, lifetimes)) : capped;
 
 	return annotated.map((entry) => assignPhaseIndex(entry, phases));
 };

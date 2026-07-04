@@ -8,7 +8,6 @@ import {
 	mergeStats,
 } from "../src/distill/aggregate";
 import { extractStats } from "../src/distill/stats";
-import { flattenAgents } from "../src/utils";
 import type {
 	AgentNode,
 	AgentStats,
@@ -23,6 +22,7 @@ import type {
 	TokenUsage,
 	TranscriptReasoning,
 } from "../src/types";
+import { flattenAgents } from "../src/utils";
 
 // ---------------------------------------------------------------------------
 // Helpers: minimal valid objects matching the type interfaces
@@ -67,9 +67,7 @@ const makeAgentStats = (overrides: Partial<AgentStats> = {}): AgentStats => ({
 	...overrides,
 });
 
-const makeBacktrack = (
-	overrides: Partial<BacktrackResult> = {},
-): BacktrackResult => ({
+const makeBacktrack = (overrides: Partial<BacktrackResult> = {}): BacktrackResult => ({
 	type: "failure_retry",
 	tool_name: "Edit",
 	attempts: 2,
@@ -79,9 +77,7 @@ const makeBacktrack = (
 	...overrides,
 });
 
-const makeEditChain = (
-	overrides: Partial<EditChain> = {},
-): EditChain => ({
+const makeEditChain = (overrides: Partial<EditChain> = {}): EditChain => ({
 	file_path: "/src/app.ts",
 	steps: [],
 	total_edits: 1,
@@ -94,9 +90,7 @@ const makeEditChain = (
 	...overrides,
 });
 
-const makeCostEstimate = (
-	overrides: Partial<CostEstimate> = {},
-): CostEstimate => ({
+const makeCostEstimate = (overrides: Partial<CostEstimate> = {}): CostEstimate => ({
 	model: "claude-sonnet-4-20250514",
 	estimated_input_tokens: 1000,
 	estimated_output_tokens: 500,
@@ -525,12 +519,8 @@ describe("mergeBacktracks", () => {
 		];
 
 		const agentBacktracks: (readonly BacktrackResult[])[] = [
-			[
-				makeBacktrack({ start_t: 2500, end_t: 3500, tool_name: "Bash", tool_use_ids: ["a1"] }),
-			],
-			[
-				makeBacktrack({ start_t: 500, end_t: 1500, tool_name: "Read", tool_use_ids: ["a2"] }),
-			],
+			[makeBacktrack({ start_t: 2500, end_t: 3500, tool_name: "Bash", tool_use_ids: ["a1"] })],
+			[makeBacktrack({ start_t: 500, end_t: 1500, tool_name: "Read", tool_use_ids: ["a2"] })],
 		];
 
 		const result = mergeBacktracks(parentBacktracks, agentBacktracks);
@@ -555,7 +545,10 @@ describe("mergeBacktracks", () => {
 
 	test("agents only returns agent backtracks sorted", () => {
 		const agentBacktracks: (readonly BacktrackResult[])[] = [
-			[makeBacktrack({ start_t: 8000, tool_use_ids: ["a1"] }), makeBacktrack({ start_t: 1000, tool_use_ids: ["a2"] })],
+			[
+				makeBacktrack({ start_t: 8000, tool_use_ids: ["a1"] }),
+				makeBacktrack({ start_t: 1000, tool_use_ids: ["a2"] }),
+			],
 		];
 
 		const result = mergeBacktracks([], agentBacktracks);
@@ -996,16 +989,12 @@ describe("aggregateTeamData", () => {
 				],
 			},
 			edit_chains: {
-				chains: [
-					makeEditChain({ file_path: "/src/types.ts", total_edits: 4 }),
-				],
+				chains: [makeEditChain({ file_path: "/src/types.ts", total_edits: 4 })],
 			},
 			backtracks: [
 				makeBacktrack({ start_t: 2000, end_t: 3000, tool_name: "Edit", tool_use_ids: ["a1-bt1"] }),
 			],
-			reasoning: [
-				{ t: 2000, thinking: "Checking type definitions" },
-			],
+			reasoning: [{ t: 2000, thinking: "Checking type definitions" }],
 			cost_estimate: makeCostEstimate({
 				model: "claude-sonnet-4-20250514",
 				estimated_input_tokens: 5000,
@@ -1036,16 +1025,18 @@ describe("aggregateTeamData", () => {
 				],
 			},
 			edit_chains: {
-				chains: [
-					makeEditChain({ file_path: "/test/app.test.ts", total_edits: 1 }),
-				],
+				chains: [makeEditChain({ file_path: "/test/app.test.ts", total_edits: 1 })],
 			},
 			backtracks: [
-				makeBacktrack({ start_t: 8000, end_t: 9000, type: "debugging_loop", tool_name: "Bash", tool_use_ids: ["a2-bt1"] }),
+				makeBacktrack({
+					start_t: 8000,
+					end_t: 9000,
+					type: "debugging_loop",
+					tool_name: "Bash",
+					tool_use_ids: ["a2-bt1"],
+				}),
 			],
-			reasoning: [
-				{ t: 7000, thinking: "Running tests and analyzing failures" },
-			],
+			reasoning: [{ t: 7000, thinking: "Running tests and analyzing failures" }],
 			cost_estimate: makeCostEstimate({
 				model: "claude-sonnet-4-20250514",
 				estimated_input_tokens: 3000,

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
-import { formatBytes, formatDuration, isUuidLike, resolveProjectRoot, sanitizeAgentName } from "../src/utils";
+import {
+	formatBytes,
+	formatDuration,
+	isUuidLike,
+	resolveProjectRoot,
+	sanitizeAgentName,
+} from "../src/utils";
 
 describe("formatDuration", () => {
 	test("0ms", () => {
@@ -121,7 +127,9 @@ describe("resolveProjectRoot", () => {
 
 	test("prefers a nearer .clens over a farther .clens parent", () => {
 		mkdirSync(`${ROOT}/packages/web/.clens`, { recursive: true });
-		expect(resolveProjectRoot(`${ROOT}/packages/web/src/client/assets`)).toBe(`${ROOT}/packages/web`);
+		expect(resolveProjectRoot(`${ROOT}/packages/web/src/client/assets`)).toBe(
+			`${ROOT}/packages/web`,
+		);
 	});
 
 	test("falls back to .git when no .clens exists on the path", () => {

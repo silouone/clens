@@ -1,11 +1,11 @@
-import { createMemo, createSignal, Show, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, Show } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
-import { formatDuration, formatPercentage, formatCost, truncateMultiline } from "../lib/format";
+import { formatCost, formatDuration, formatPercentage, truncateMultiline } from "../lib/format";
 import { renderPlainText } from "../lib/markdown";
-import { Card } from "./ui/Card";
-import { MetaRow } from "./ui/MetaRow";
 import { CostDrilldown } from "./CostDrilldown";
 import { TimelineBar } from "./TimelineBar";
+import { Card } from "./ui/Card";
+import { MetaRow } from "./ui/MetaRow";
 
 // -- Types ----------------------------------------------------------------
 
@@ -18,12 +18,8 @@ type SessionOverviewProps = {
 
 const stripHtml = (text: string): string => text.replace(/<[^>]+>/g, "");
 
-const findFirstPrompt = (
-	messages: DistilledSession["user_messages"],
-): string | undefined => {
-	const msg = messages.find(
-		(m) => !m.message_type || m.message_type === "prompt",
-	);
+const findFirstPrompt = (messages: DistilledSession["user_messages"]): string | undefined => {
+	const msg = messages.find((m) => !m.message_type || m.message_type === "prompt");
 	if (!msg) return undefined;
 	const clean = stripHtml(msg.content).trim();
 	return clean.length > 0 ? clean : undefined;
@@ -51,17 +47,13 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 		if (!text) return { text: "", truncated: false };
 		return truncateMultiline(text, 3);
 	});
-	const displayText = () => (expanded() ? rawPrompt() ?? "" : truncated().text);
+	const displayText = () => (expanded() ? (rawPrompt() ?? "") : truncated().text);
 
 	// -- Duration ---------------------------------------------------------
 	// Wall-clock span so the detail page agrees with the session list (bug B2);
 	// older distills without wall_duration_ms fall back to the idle-trimmed value.
-	const totalMs = createMemo(
-		() => session().stats.wall_duration_ms ?? session().stats.duration_ms,
-	);
-	const activeMs = createMemo(
-		() => session().summary?.key_metrics.active_duration_ms,
-	);
+	const totalMs = createMemo(() => session().stats.wall_duration_ms ?? session().stats.duration_ms);
+	const activeMs = createMemo(() => session().summary?.key_metrics.active_duration_ms);
 
 	// -- Cost -------------------------------------------------------------
 	const cost = createMemo(
@@ -79,9 +71,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 		() => session().summary?.key_metrics.tool_calls ?? session().stats.tool_call_count,
 	);
 	const backtrackCount = createMemo(() => session().backtracks.length);
-	const failureRatePct = createMemo(
-		() => `${Math.round(session().stats.failure_rate * 100)}%`,
-	);
+	const failureRatePct = createMemo(() => `${Math.round(session().stats.failure_rate * 100)}%`);
 
 	// -- Context ----------------------------------------------------------
 	const ctx = createMemo(() => session().context_consumption);
@@ -92,9 +82,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 	const filesModified = createMemo(
 		() => session().file_map.files.filter((f) => f.edits > 0 || f.writes > 0).length,
 	);
-	const workingTreeChanges = createMemo(
-		() => session().git_diff.working_tree_changes?.length ?? 0,
-	);
+	const workingTreeChanges = createMemo(() => session().git_diff.working_tree_changes?.length ?? 0);
 
 	// -- Spec / Related ---------------------------------------------------
 	const specPath = createMemo(() => session().plan_drift?.spec_path);
@@ -121,11 +109,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 				<h4 class={SECTION_HEADING}>Request</h4>
 				<Show
 					when={rawPrompt()}
-					fallback={
-						<p class="text-sm italic text-muted">
-							No prompt captured
-						</p>
-					}
+					fallback={<p class="text-sm italic text-muted">No prompt captured</p>}
 				>
 					{/*
 					  The request is the raw user prompt — render it VERBATIM, not as
@@ -138,6 +122,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 					/>
 					<Show when={truncated().truncated}>
 						<button
+							type="button"
 							onClick={() => setExpanded((prev) => !prev)}
 							class="instrument-microcaps text-[10px] text-brand-500 transition hover:text-brand-600 dark:text-brand-400"
 						>
@@ -169,16 +154,22 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 					<div class="space-y-1">
 						<Show when={cost() !== undefined}>
 							<div class="relative">
-								<button onClick={() => setCostOpen((prev) => !prev)} class="cursor-pointer text-left w-full">
+								<button
+									type="button"
+									onClick={() => setCostOpen((prev) => !prev)}
+									class="cursor-pointer text-left w-full"
+								>
 									<MetaRow label="Cost" value={formatCost(cost() ?? 0, costIsEstimated())} />
 								</button>
-								<CostDrilldown session={props.session} open={costOpen()} onClose={() => setCostOpen(false)} />
+								<CostDrilldown
+									session={props.session}
+									open={costOpen()}
+									onClose={() => setCostOpen(false)}
+								/>
 							</div>
 						</Show>
 						<MetaRow label="Model" value={session().stats.model ?? "unknown"} />
-						<Show when={pricingTier()}>
-							{(tier) => <MetaRow label="Tier" value={tier()} />}
-						</Show>
+						<Show when={pricingTier()}>{(tier) => <MetaRow label="Tier" value={tier()} />}</Show>
 					</div>
 				</div>
 
@@ -215,9 +206,15 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 									<MetaRow label="Compactions" value={consumption().compaction_count} />
 								</Show>
 								<Show when={consumption().context_velocity_per_min > 0}>
-									<MetaRow label="Velocity" value={`${consumption().context_velocity_per_min.toFixed(1)}%/min`} />
+									<MetaRow
+										label="Velocity"
+										value={`${consumption().context_velocity_per_min.toFixed(1)}%/min`}
+									/>
 								</Show>
-								<MetaRow label="Window" value={formatTokenCount(consumption().model_context_window)} />
+								<MetaRow
+									label="Window"
+									value={formatTokenCount(consumption().model_context_window)}
+								/>
 							</div>
 						</div>
 					)}
@@ -237,10 +234,7 @@ export const SessionOverview: Component<SessionOverviewProps> = (props) => {
 			{/* Phase timeline */}
 			<Show when={phases().length > 0}>
 				<div class="border-t border-clens mt-3 pt-3">
-					<TimelineBar
-						phases={phases()}
-						totalDuration={totalMs()}
-					/>
+					<TimelineBar phases={phases()} totalDuration={totalMs()} />
 				</div>
 			</Show>
 		</Card>

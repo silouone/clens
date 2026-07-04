@@ -67,9 +67,7 @@ export const resolveSessionId = (
 	// Partial UUID match
 	const matches = files.filter((f) => f.startsWith(input));
 	if (matches.length === 0) {
-		throw new Error(
-			`No session matching "${input}". Run 'clens list' to see available sessions.`,
-		);
+		throw new Error(`No session matching "${input}". Run 'clens list' to see available sessions.`);
 	}
 	if (matches.length > 1) {
 		throw new Error(

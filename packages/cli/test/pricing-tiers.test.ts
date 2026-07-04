@@ -42,7 +42,12 @@ describe("extractTokenUsage — requestId dedup", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 10, cache_creation_input_tokens: 5 },
+					usage: {
+						input_tokens: 100,
+						output_tokens: 50,
+						cache_read_input_tokens: 10,
+						cache_creation_input_tokens: 5,
+					},
 				},
 			}),
 			makeAssistantEntry({
@@ -51,7 +56,12 @@ describe("extractTokenUsage — requestId dedup", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 200, output_tokens: 100, cache_read_input_tokens: 20, cache_creation_input_tokens: 10 },
+					usage: {
+						input_tokens: 200,
+						output_tokens: 100,
+						cache_read_input_tokens: 20,
+						cache_creation_input_tokens: 10,
+					},
 				},
 			}),
 			makeAssistantEntry({
@@ -60,7 +70,12 @@ describe("extractTokenUsage — requestId dedup", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 300, output_tokens: 150, cache_read_input_tokens: 30, cache_creation_input_tokens: 15 },
+					usage: {
+						input_tokens: 300,
+						output_tokens: 150,
+						cache_read_input_tokens: 30,
+						cache_creation_input_tokens: 15,
+					},
 				},
 			}),
 			makeAssistantEntry({
@@ -69,7 +84,12 @@ describe("extractTokenUsage — requestId dedup", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 400, output_tokens: 200, cache_read_input_tokens: 40, cache_creation_input_tokens: 20 },
+					usage: {
+						input_tokens: 400,
+						output_tokens: 200,
+						cache_read_input_tokens: 40,
+						cache_creation_input_tokens: 20,
+					},
 				},
 			}),
 		];
@@ -225,10 +245,10 @@ describe("estimateCostFromTokens with tier", () => {
 	test("API tier: opus model with cache tokens", () => {
 		const result = estimateCostFromTokens(
 			"claude-opus-4-20250514",
-			500_000,   // input
-			200_000,   // output
+			500_000, // input
+			200_000, // output
 			1_000_000, // cache read
-			100_000,   // cache creation
+			100_000, // cache creation
 			"api",
 		);
 		expect(result).toBeDefined();
@@ -240,13 +260,27 @@ describe("estimateCostFromTokens with tier", () => {
 
 	test("default tier is api when omitted", () => {
 		const withDefault = estimateCostFromTokens("claude-sonnet-4-20250514", 1_000_000, 1_000_000);
-		const withExplicit = estimateCostFromTokens("claude-sonnet-4-20250514", 1_000_000, 1_000_000, undefined, undefined, "api");
+		const withExplicit = estimateCostFromTokens(
+			"claude-sonnet-4-20250514",
+			1_000_000,
+			1_000_000,
+			undefined,
+			undefined,
+			"api",
+		);
 		expect(withDefault?.estimated_cost_usd).toBe(withExplicit?.estimated_cost_usd);
 		expect(withDefault?.pricing_tier).toBe("api");
 	});
 
 	test("pricing_tier is included in CostEstimate", () => {
-		const result = estimateCostFromTokens("claude-sonnet-4-20250514", 1000, 500, undefined, undefined, "max");
+		const result = estimateCostFromTokens(
+			"claude-sonnet-4-20250514",
+			1000,
+			500,
+			undefined,
+			undefined,
+			"max",
+		);
 		expect(result?.pricing_tier).toBe("max");
 	});
 });
@@ -308,10 +342,7 @@ describe("extractUserType", () => {
 	});
 
 	test("returns undefined when no userType present", () => {
-		const entries: readonly TranscriptEntry[] = [
-			makeUserEntry(),
-			makeAssistantEntry(),
-		];
+		const entries: readonly TranscriptEntry[] = [makeUserEntry(), makeAssistantEntry()];
 
 		const result = extractUserType(entries);
 		expect(result).toBeUndefined();

@@ -11,8 +11,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import {
-	cleanupTestProject,
 	COMPILED_BIN_PATH,
+	cleanupTestProject,
 	createTestProject,
 	runCompiledCli,
 	stripAnsi,

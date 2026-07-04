@@ -31,7 +31,12 @@ const makeEvents = (): readonly StoredEvent[] => [
 		sid: SESSION_ID,
 		data: { tool_name: "Read", tool_use_id: "t1", tool_input: { file_path: "/src/a.ts" } },
 	},
-	{ t: T0 + 3 * MINUTE, event: "PostToolUse", sid: SESSION_ID, data: { tool_name: "Read", tool_use_id: "t1" } },
+	{
+		t: T0 + 3 * MINUTE,
+		event: "PostToolUse",
+		sid: SESSION_ID,
+		data: { tool_name: "Read", tool_use_id: "t1" },
+	},
 	{ t: WORK_1_END, event: "Stop", sid: SESSION_ID, data: {} },
 	// -- 40 minute pause --
 	{ t: WORK_2_START, event: "UserPromptSubmit", sid: SESSION_ID, data: { prompt: "continue" } },
@@ -47,7 +52,12 @@ const makeEvents = (): readonly StoredEvent[] => [
 			model: "claude-opus-4-6",
 		},
 	},
-	{ t: WORK_2_START + 3 * MINUTE, event: "PostToolUse", sid: SESSION_ID, data: { tool_name: "Edit", tool_use_id: "t2" } },
+	{
+		t: WORK_2_START + 3 * MINUTE,
+		event: "PostToolUse",
+		sid: SESSION_ID,
+		data: { tool_name: "Edit", tool_use_id: "t2" },
+	},
 	{ t: T_END, event: "SessionEnd", sid: SESSION_ID, data: {} },
 ];
 

@@ -1,5 +1,5 @@
-import { createSignal, type Component } from "solid-js";
 import { AlertTriangle } from "lucide-solid";
+import { type Component, createSignal } from "solid-js";
 
 type ErrorFallbackProps = {
 	readonly error: Error;
@@ -26,10 +26,7 @@ export const ErrorFallback: Component<ErrorFallbackProps> = (props) => {
 	const [copied, setCopied] = createSignal(false);
 	const variant = () => props.variant ?? "full";
 
-	console.error(
-		`[cLens] Error in ${props.componentName ?? "component"}:`,
-		props.error,
-	);
+	console.error(`[cLens] Error in ${props.componentName ?? "component"}:`, props.error);
 
 	const handleCopy = async () => {
 		const ok = await copyErrorToClipboard(props.error);
@@ -62,12 +59,14 @@ export const ErrorFallback: Component<ErrorFallbackProps> = (props) => {
 				</p>
 				<div class="mt-4 flex items-center justify-center gap-2">
 					<button
+						type="button"
 						onClick={props.reset}
 						class="instrument-microcaps rounded-none border border-brand-500 bg-brand-500 px-3 py-1.5 text-[10px] text-[var(--clens-surface)] transition-colors duration-150 hover:bg-brand-600"
 					>
 						Retry
 					</button>
 					<button
+						type="button"
 						onClick={handleCopy}
 						class="instrument-microcaps rounded-none border border-clens px-3 py-1.5 text-[10px] text-secondary transition-colors duration-150 hover:bg-surface-hover"
 					>

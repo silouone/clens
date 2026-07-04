@@ -50,7 +50,12 @@ describe("extractAgentDecisions", () => {
 	test("spawn links produce 0 decision points", () => {
 		const links: readonly LinkEvent[] = [
 			makeSpawnLink({ agent_id: "a1", agent_name: "builder-types", agent_type: "builder", t: 100 }),
-			makeSpawnLink({ agent_id: "a2", agent_name: "validator-lint", agent_type: "validator", t: 200 }),
+			makeSpawnLink({
+				agent_id: "a2",
+				agent_name: "validator-lint",
+				agent_type: "validator",
+				t: 200,
+			}),
 		];
 
 		const decisions = extractAgentDecisions(links);
@@ -84,9 +89,7 @@ describe("extractAgentDecisions", () => {
 	});
 
 	test("task_delegation without subject produces 0 decision points", () => {
-		const links: readonly LinkEvent[] = [
-			makeTaskAssignLink({ subject: undefined }),
-		];
+		const links: readonly LinkEvent[] = [makeTaskAssignLink({ subject: undefined })];
 
 		const decisions = extractAgentDecisions(links);
 		expect(decisions).toHaveLength(0);
@@ -151,9 +154,7 @@ describe("extractAgentDecisions", () => {
 	});
 
 	test("task_delegation with empty string subject produces 0 decision points", () => {
-		const links: readonly LinkEvent[] = [
-			makeTaskAssignLink({ subject: "" }),
-		];
+		const links: readonly LinkEvent[] = [makeTaskAssignLink({ subject: "" })];
 
 		const decisions = extractAgentDecisions(links);
 		expect(decisions).toHaveLength(0);
@@ -204,13 +205,12 @@ describe("extractDecisions with links", () => {
 	});
 
 	test("agent decisions do not appear when links is undefined", () => {
-		const events: readonly StoredEvent[] = [
-			makeEvent({ t: 1000 }),
-		];
+		const events: readonly StoredEvent[] = [makeEvent({ t: 1000 })];
 
 		const decisions = extractDecisions(events);
-		const agentTypes = decisions.filter((d) =>
-			d.type === "agent_spawn" || d.type === "task_delegation" || d.type === "task_completion",
+		const agentTypes = decisions.filter(
+			(d) =>
+				d.type === "agent_spawn" || d.type === "task_delegation" || d.type === "task_completion",
 		);
 		expect(agentTypes).toHaveLength(0);
 	});
@@ -226,9 +226,7 @@ describe("extractDecisions with links", () => {
 			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Edit" } }),
 			makeEvent({ t: 4000, event: "PreToolUse", data: { tool_name: "Edit" } }),
 		];
-		const links: readonly LinkEvent[] = [
-			makeTaskAssignLink({ t: 3000, subject: "Build it" }),
-		];
+		const links: readonly LinkEvent[] = [makeTaskAssignLink({ t: 3000, subject: "Build it" })];
 
 		const decisions = extractDecisions(events, links);
 		const phaseBoundaries = decisions.filter((d) => d.type === "phase_boundary");

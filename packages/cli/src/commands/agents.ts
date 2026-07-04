@@ -23,8 +23,7 @@ const buildTeamLeadRow = (distilled: DistilledSession): AgentRow => ({
 	files: distilled.file_map?.files.filter((f) => f.edits > 0 || f.writes > 0).length ?? 0,
 });
 
-const isGhostAgent = (agent: AgentNode): boolean =>
-	!agent.model && !agent.stats;
+const isGhostAgent = (agent: AgentNode): boolean => !agent.model && !agent.stats;
 
 const agentToRow = (agent: AgentNode): AgentRow => {
 	const filesCount = agent.file_map

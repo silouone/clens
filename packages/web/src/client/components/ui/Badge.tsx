@@ -1,4 +1,4 @@
-import { Show, type Component, type JSX } from "solid-js";
+import { type Component, type JSX, Show } from "solid-js";
 
 type BadgeVariant = "default" | "success" | "warning" | "danger" | "info";
 

@@ -1,4 +1,4 @@
-import { For, createMemo, type Component } from "solid-js";
+import { type Component, createMemo, For } from "solid-js";
 
 // ── DensityRibbon (overview-moat-refactor, Wave 0 cross-wave primitive) ─
 //
@@ -49,8 +49,7 @@ const DENSITY_COLORS: Readonly<Record<string, string>> = {
 	teammate_idle: "var(--clens-text-muted)",
 };
 
-const densityColor = (type: string): string =>
-	DENSITY_COLORS[type] ?? "var(--clens-text-muted)";
+const densityColor = (type: string): string => DENSITY_COLORS[type] ?? "var(--clens-text-muted)";
 
 export const DensityRibbon: Component<DensityRibbonProps> = (props) => {
 	const height = () => props.height ?? 24;

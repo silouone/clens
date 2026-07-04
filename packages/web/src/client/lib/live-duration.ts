@@ -8,16 +8,16 @@
 
 export type LiveElapsedArgs = {
 	/** Server timestamp (ms) of the earliest event seen; 0 if none yet. */
-	readonly firstEventTime: number
+	readonly firstEventTime: number;
 	/** Server timestamp (ms) of the most recent event seen; 0 if none yet. */
-	readonly lastEventTime: number
+	readonly lastEventTime: number;
 	/** Current session status. */
-	readonly status: "active" | "idle" | "complete"
+	readonly status: "active" | "idle" | "complete";
 	/** Local wall-clock instant (ms) the last event was received. */
-	readonly lastEventReceivedAt: number
+	readonly lastEventReceivedAt: number;
 	/** Current local wall-clock instant (ms). */
-	readonly localNow: number
-}
+	readonly localNow: number;
+};
 
 /**
  * Compute the live session duration in ms.
@@ -33,14 +33,14 @@ export type LiveElapsedArgs = {
  * keep ticking while nothing is happening.
  */
 export const computeLiveElapsed = (args: LiveElapsedArgs): number => {
-	const { firstEventTime, lastEventTime, status, lastEventReceivedAt, localNow } = args
-	if (firstEventTime === 0 || lastEventTime === 0) return 0
-	const span = lastEventTime - firstEventTime
+	const { firstEventTime, lastEventTime, status, lastEventReceivedAt, localNow } = args;
+	if (firstEventTime === 0 || lastEventTime === 0) return 0;
+	const span = lastEventTime - firstEventTime;
 	// Only an active session advances; complete and idle both freeze at the span.
-	if (deriveLiveStatus(status, lastEventTime, localNow) !== "active") return Math.max(0, span)
-	const sinceLastEvent = Math.max(0, localNow - lastEventReceivedAt)
-	return Math.max(0, span + sinceLastEvent)
-}
+	if (deriveLiveStatus(status, lastEventTime, localNow) !== "active") return Math.max(0, span);
+	const sinceLastEvent = Math.max(0, localNow - lastEventReceivedAt);
+	return Math.max(0, span + sinceLastEvent);
+};
 
 /**
  * A live session whose last event is older than this is "idle", not "active".
@@ -49,9 +49,9 @@ export const computeLiveElapsed = (args: LiveElapsedArgs): number => {
  * a quiet live session must not show "active" forever while the list says
  * "idle". Kept as a local literal so this leaf module imports nothing.
  */
-export const LIVE_ACTIVE_THRESHOLD_MS = 600_000 // 10 minutes
+export const LIVE_ACTIVE_THRESHOLD_MS = 600_000; // 10 minutes
 
-export type LiveStatus = "active" | "idle" | "complete"
+export type LiveStatus = "active" | "idle" | "complete";
 
 /**
  * Derive the DISPLAY status of a live session, aligned with the server's
@@ -71,7 +71,7 @@ export const deriveLiveStatus = (
 	lastEventTime: number,
 	now: number,
 ): LiveStatus => {
-	if (rawStatus === "complete") return "complete"
-	if (lastEventTime === 0) return "active"
-	return now - lastEventTime <= LIVE_ACTIVE_THRESHOLD_MS ? "active" : "idle"
-}
+	if (rawStatus === "complete") return "complete";
+	if (lastEventTime === 0) return "active";
+	return now - lastEventTime <= LIVE_ACTIVE_THRESHOLD_MS ? "active" : "idle";
+};

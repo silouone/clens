@@ -1,8 +1,8 @@
-import { createMemo, createSignal, For, Show, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import type { BacktrackResult } from "../../../shared/types";
-import { DonutChart, HorizontalBar, BACKTRACK_COLORS } from "../charts";
 import { CATEGORY } from "../../lib/categories";
 import { formatRelTime } from "../../lib/format";
+import { BACKTRACK_COLORS, DonutChart, HorizontalBar } from "../charts";
 import { StatTile } from "../ui/StatTile";
 import type { TabProps } from "./types";
 
@@ -73,7 +73,12 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 	);
 	const toolCount = createMemo(() => new Set(backtracks().map((b) => b.tool_name)).size);
 	const fileCount = createMemo(
-		() => new Set(backtracks().filter((b) => b.file_path).map((b) => b.file_path)).size,
+		() =>
+			new Set(
+				backtracks()
+					.filter((b) => b.file_path)
+					.map((b) => b.file_path),
+			).size,
 	);
 
 	// ── Shape: by type (donut) + by tool (bar) ────────────────────────
@@ -110,9 +115,7 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 				(t) =>
 					backtracks().filter(
 						(bt) =>
-							bt.type === t &&
-							bt.start_t >= lo &&
-							(isLast ? bt.start_t <= hi : bt.start_t < hi),
+							bt.type === t && bt.start_t >= lo && (isLast ? bt.start_t <= hi : bt.start_t < hi),
 					).length,
 			);
 			return { i, counts, total: counts.reduce((a, b) => a + b, 0) };
@@ -143,9 +146,10 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 
 	// Type chips reflect only types actually present (R-E1: no empty shells).
 	const presentTypes = createMemo(() =>
-		BT_TYPES.map((t) => ({ type: t, count: backtracks().filter((b) => b.type === t).length })).filter(
-			(c) => c.count > 0,
-		),
+		BT_TYPES.map((t) => ({
+			type: t,
+			count: backtracks().filter((b) => b.type === t).length,
+		})).filter((c) => c.count > 0),
 	);
 
 	const filtered = createMemo(() => {
@@ -244,10 +248,23 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 							role="img"
 							aria-label="Backtracks distributed over the session span"
 						>
-							<rect x={0} y={0} width={STRIP_BINS} height={STRIP_H} fill="var(--clens-surface-inset)" />
+							<rect
+								x={0}
+								y={0}
+								width={STRIP_BINS}
+								height={STRIP_H}
+								fill="var(--clens-surface-inset)"
+							/>
 							<For each={binnedRects()}>
 								{(r) => (
-									<rect x={r.x + 0.1} y={r.y} width={0.8} height={r.h} fill={r.color} opacity={0.85} />
+									<rect
+										x={r.x + 0.1}
+										y={r.y}
+										width={0.8}
+										height={r.h}
+										fill={r.color}
+										opacity={0.85}
+									/>
 								)}
 							</For>
 						</svg>
@@ -262,16 +279,17 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 				<div class="flex flex-wrap items-center gap-2 border-b border-clens px-3 py-1.5">
 					<span class="instrument-microcaps text-[9px] text-muted">Sort</span>
 					<div class="flex gap-1">
-						<button class={sortBtnClass("time")} onClick={() => setSortMode("time")}>
+						<button type="button" class={sortBtnClass("time")} onClick={() => setSortMode("time")}>
 							Time
 						</button>
-						<button class={sortBtnClass("type")} onClick={() => setSortMode("type")}>
+						<button type="button" class={sortBtnClass("type")} onClick={() => setSortMode("type")}>
 							By type
 						</button>
 					</div>
 					<Show when={presentTypes().length > 1}>
 						<span class="ml-2 h-3 w-px bg-clens" aria-hidden="true" />
 						<button
+							type="button"
 							class={`instrument-microcaps rounded-none border px-2 py-0.5 text-[9px] transition ${
 								typeFilter() === "all"
 									? "border-strong bg-surface-inset text-primary"
@@ -284,14 +302,13 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 						<For each={presentTypes()}>
 							{(chip) => (
 								<button
+									type="button"
 									class={`instrument-microcaps flex items-center gap-1 rounded-none border px-2 py-0.5 text-[9px] transition ${
 										typeFilter() === chip.type
 											? "border-strong bg-surface-inset text-primary"
 											: "border-clens text-muted hover:text-secondary"
 									}`}
-									onClick={() =>
-										setTypeFilter((cur) => (cur === chip.type ? "all" : chip.type))
-									}
+									onClick={() => setTypeFilter((cur) => (cur === chip.type ? "all" : chip.type))}
 								>
 									<span
 										class="instrument-led"
@@ -315,7 +332,10 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 										class="flex items-center gap-1.5 border-b border-clens bg-surface-inset px-3 py-1"
 										style={{ "box-shadow": `inset 2px 0 0 0 ${BACKTRACK_COLORS[t()]}` }}
 									>
-										<span class="instrument-led" style={{ "background-color": BACKTRACK_COLORS[t()] }} />
+										<span
+											class="instrument-led"
+											style={{ "background-color": BACKTRACK_COLORS[t()] }}
+										/>
 										<span class="instrument-microcaps text-[9px] text-secondary">
 											{humanizeType(t())}
 										</span>
@@ -329,6 +349,7 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 								<For each={group.items}>
 									{(bt) => (
 										<button
+											type="button"
 											onClick={() => props.onBacktrackClick?.(bt.start_t)}
 											class="flex w-full flex-col gap-0.5 px-3 py-1.5 text-left transition hover:bg-surface-hover"
 											title="Jump to this point in the timeline"

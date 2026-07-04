@@ -49,7 +49,8 @@ export const renderReasoningSummary = (distilled: DistilledSession): string => {
 	const distribution = buildIntentDistribution(blocks);
 	const intentHeader = bold("Intent distribution:");
 	const intentLines = distribution.map(
-		({ intent, count, pct }) => `  ${cyan(intent.padEnd(12))} ${String(count).padStart(4)}  (${pct}%)`,
+		({ intent, count, pct }) =>
+			`  ${cyan(intent.padEnd(12))} ${String(count).padStart(4)}  (${pct}%)`,
 	);
 
 	const withTool = countWhere(blocks, (b) => b.tool_use_id !== undefined);
@@ -77,10 +78,7 @@ export const renderReasoningSummary = (distilled: DistilledSession): string => {
 /**
  * Render the full detail of each reasoning block.
  */
-export const renderReasoningFull = (
-	distilled: DistilledSession,
-	intentFilter?: string,
-): string => {
+export const renderReasoningFull = (distilled: DistilledSession, intentFilter?: string): string => {
 	const blocks = intentFilter
 		? distilled.reasoning.filter((b) => b.intent_hint === intentFilter)
 		: distilled.reasoning;
@@ -114,4 +112,3 @@ export const renderReasoningFull = (
 
 	return [header, separator, ...renderedBlocks.flatMap((b) => [b, separator])].join("\n");
 };
-

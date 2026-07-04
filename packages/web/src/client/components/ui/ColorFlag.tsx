@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup, Show, type Component } from "solid-js";
+import { type Component, createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { COLOR_NAMES, type ColorName } from "../../../shared/types";
 
 // ── Palette mapping ──────────────────────────────────────────────────
@@ -21,9 +21,12 @@ const flagLabel = (color: ColorName): string =>
  * The standalone colored dot shown in a row's NAME cell. Renders a small filled
  * disc in the flag hue; for `none` it renders nothing (callers `Show`-gate it).
  */
-export const ColorDot: Component<{ readonly color: ColorName; readonly class?: string }> = (props) => (
+export const ColorDot: Component<{ readonly color: ColorName; readonly class?: string }> = (
+	props,
+) => (
 	<Show when={props.color !== "none"}>
 		<span
+			role="img"
 			class={`inline-block h-2 w-2 shrink-0 rounded-full ${props.class ?? ""}`}
 			style={{ "background-color": flagVar(props.color) ?? "transparent" }}
 			title={flagLabel(props.color)}
@@ -119,10 +122,7 @@ export const ColorFlag: Component<ColorFlagProps> = (props) => {
 					open() ? "border-brand-500" : "border-clens"
 				} ${props.class ?? ""}`}
 			>
-				<Show
-					when={flagged()}
-					fallback={<span class="h-2 w-2 rounded-full border border-clens" />}
-				>
+				<Show when={flagged()} fallback={<span class="h-2 w-2 rounded-full border border-clens" />}>
 					<span
 						class="h-2.5 w-2.5 rounded-full"
 						style={{ "background-color": flagVar(props.value) ?? "transparent" }}
@@ -132,7 +132,10 @@ export const ColorFlag: Component<ColorFlagProps> = (props) => {
 
 			<Show when={open()}>
 				{/* Backdrop catches outside clicks without navigating the row */}
-				<div
+				<button
+					type="button"
+					aria-label="Close color picker"
+					tabIndex={-1}
 					class="fixed inset-0 z-40"
 					onClick={(e) => {
 						e.stopPropagation();
@@ -140,6 +143,7 @@ export const ColorFlag: Component<ColorFlagProps> = (props) => {
 					}}
 				/>
 				<div
+					role="none"
 					class="absolute top-full left-0 z-50 mt-1 flex items-center gap-1 rounded-none border border-clens bg-surface-overlay p-1.5"
 					onClick={(e) => e.stopPropagation()}
 				>

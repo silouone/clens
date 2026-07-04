@@ -24,12 +24,11 @@ export const enrichSessionStart = (input: Record<string, unknown>): SessionStart
 		claude_entrypoint: getEnv("CLAUDE_CODE_ENTRYPOINT"),
 		model: (input.model as string) || null,
 		agent_type: (input.agent_type as string) || null,
-		source: source && validSources.has(source)
-			? (source as "startup" | "resume" | "clear" | "compact")
-			: undefined,
-		trigger: trigger && validTriggers.has(trigger)
-			? (trigger as "manual" | "auto")
-			: undefined,
+		source:
+			source && validSources.has(source)
+				? (source as "startup" | "resume" | "clear" | "compact")
+				: undefined,
+		trigger: trigger && validTriggers.has(trigger) ? (trigger as "manual" | "auto") : undefined,
 		...(settings_snapshot ? { settings_snapshot } : {}),
 	};
 };

@@ -1,4 +1,6 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { ChartEmpty } from "./ChartEmpty";
+import { hideTooltip, showTooltip } from "./ChartTooltip";
 import type { BaseChartProps, BrushableChartProps } from "./shared";
 import {
 	BRUSH_FILL,
@@ -16,8 +18,6 @@ import {
 	niceMax,
 	timeScale,
 } from "./shared";
-import { hideTooltip, showTooltip } from "./ChartTooltip";
-import { ChartEmpty } from "./ChartEmpty";
 
 interface LineChartProps<T> extends BaseChartProps, BrushableChartProps {
 	readonly data: readonly T[];
@@ -151,7 +151,14 @@ export const LineChart = <T,>(props: LineChartProps<T>): ReturnType<Component> =
 	return (
 		<Show
 			when={props.data.length > 0}
-			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+			fallback={
+				<ChartEmpty
+					height={props.height}
+					class={props.class}
+					ariaLabel={props.ariaLabel}
+					label="No data"
+				/>
+			}
 		>
 			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
 				<svg
@@ -161,101 +168,125 @@ export const LineChart = <T,>(props: LineChartProps<T>): ReturnType<Component> =
 					aria-label={props.ariaLabel}
 					class="overflow-visible"
 				>
-				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
-					<For each={ticks()}>
-						{(tick) => (
-							<>
-								<line
-									x1={0} y1={yScale()(tick)}
-									x2={cw()} y2={yScale()(tick)}
-									stroke={CHART_HAIRLINE}
-									stroke-opacity={tick === 0 ? 1 : 0.55}
-								/>
-								<text
-									x={-8} y={yScale()(tick)}
-									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{fmtY()(tick)}
-								</text>
-							</>
-						)}
-					</For>
+					<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
+						<For each={ticks()}>
+							{(tick) => (
+								<>
+									<line
+										x1={0}
+										y1={yScale()(tick)}
+										x2={cw()}
+										y2={yScale()(tick)}
+										stroke={CHART_HAIRLINE}
+										stroke-opacity={tick === 0 ? 1 : 0.55}
+									/>
+									<text
+										x={-8}
+										y={yScale()(tick)}
+										text-anchor="end"
+										dominant-baseline="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{fmtY()(tick)}
+									</text>
+								</>
+							)}
+						</For>
 
-					{/* Area fill */}
-					{props.fillArea && areaD() && (
-						<path d={areaD()} fill={color()} fill-opacity="0.1" />
-					)}
+						{/* Area fill */}
+						{props.fillArea && areaD() && <path d={areaD()} fill={color()} fill-opacity="0.1" />}
 
-					{/* Line */}
-					<path d={pathD()} fill="none" stroke={color()} stroke-width="2" />
+						{/* Line */}
+						<path d={pathD()} fill="none" stroke={color()} stroke-width="2" />
 
-					{/* Single-point guide: a faint horizontal rule from the y-axis to
+						{/* Single-point guide: a faint horizontal rule from the y-axis to
 					    the marker so a lone reading registers as an intentional level. */}
-					<Show when={props.data.length === 1 && props.data[0]}>
-						{(only) => (
-							<line
-								x1={0} y1={yScale()(props.y(only()))}
-								x2={pointX(only())} y2={yScale()(props.y(only()))}
-								stroke={color()} stroke-width="1" stroke-dasharray="2 3" stroke-opacity="0.5"
-							/>
-						)}
-					</Show>
+						<Show when={props.data.length === 1 && props.data[0]}>
+							{(only) => (
+								<line
+									x1={0}
+									y1={yScale()(props.y(only()))}
+									x2={pointX(only())}
+									y2={yScale()(props.y(only()))}
+									stroke={color()}
+									stroke-width="1"
+									stroke-dasharray="2 3"
+									stroke-opacity="0.5"
+								/>
+							)}
+						</Show>
 
-					{/* Points (visual only — the overlay rect below owns hover/click) */}
-					<For each={props.data}>
-						{(d) => (
-							<circle
-								cx={pointX(d)} cy={yScale()(props.y(d))} r={props.data.length === 1 ? 4 : 3}
-								fill={color()} stroke={CHART_SURFACE} stroke-width="1.5"
-								pointer-events="none"
-							/>
-						)}
-					</For>
+						{/* Points (visual only — the overlay rect below owns hover/click) */}
+						<For each={props.data}>
+							{(d) => (
+								<circle
+									cx={pointX(d)}
+									cy={yScale()(props.y(d))}
+									r={props.data.length === 1 ? 4 : 3}
+									fill={color()}
+									stroke={CHART_SURFACE}
+									stroke-width="1.5"
+									pointer-events="none"
+								/>
+							)}
+						</For>
 
-					{/* X-axis labels */}
-					<For each={props.data}>
-						{(d, i) => {
-							const n = props.data.length;
-							const step = Math.max(1, Math.floor(n / 8));
-							if (i() % step !== 0 && i() !== n - 1) return null;
-							return (
-								<text
-									x={pointX(d)}
-									y={ch() + 16}
-									text-anchor="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{formatShortDate(props.x(d))}
-								</text>
-							);
-						}}
-					</For>
+						{/* X-axis labels */}
+						<For each={props.data}>
+							{(d, i) => {
+								const n = props.data.length;
+								const step = Math.max(1, Math.floor(n / 8));
+								if (i() % step !== 0 && i() !== n - 1) return null;
+								return (
+									<text
+										x={pointX(d)}
+										y={ch() + 16}
+										text-anchor="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{formatShortDate(props.x(d))}
+									</text>
+								);
+							}}
+						</For>
 
-					{/* Drag-brush + hover overlay: one full-plot transparent rect is the
+						{/* Drag-brush + hover overlay: one full-plot transparent rect is the
 					    single interaction surface (rendered last, above the points). The
 					    brush owns drag; hover drives nearest-point tooltips; a non-drag
 					    mouseup is a click → onClickPoint still fires in brush mode. Sitting
 					    inside the padded <g>, its client x is the plot origin so the brush
 					    range is [0, cw()]. Mirrors StackedArea so both behave identically. */}
-					<rect
-						x={0} y={0} width={cw()} height={ch()}
-						fill="transparent"
-						class={brush.enabled() ? "cursor-crosshair" : "cursor-pointer"}
-						onMouseDown={onOverlayDown}
-						onMouseMove={onOverlayMove}
-						onMouseUp={onOverlayUp}
-						onMouseLeave={onOverlayLeave}
-					/>
-					<Show when={brush.band()}>
-						{(b) => (
-							<rect
-								x={b().x} width={b().width} y={0} height={ch()}
-								fill={BRUSH_FILL} fill-opacity="0.15" pointer-events="none"
-							/>
-						)}
-					</Show>
-				</g>
+						<rect
+							role="slider"
+							aria-label="Brush to select a range"
+							aria-valuemin={0}
+							aria-valuemax={100}
+							aria-valuenow={0}
+							x={0}
+							y={0}
+							width={cw()}
+							height={ch()}
+							fill="transparent"
+							class={brush.enabled() ? "cursor-crosshair" : "cursor-pointer"}
+							onMouseDown={onOverlayDown}
+							onMouseMove={onOverlayMove}
+							onMouseUp={onOverlayUp}
+							onMouseLeave={onOverlayLeave}
+						/>
+						<Show when={brush.band()}>
+							{(b) => (
+								<rect
+									x={b().x}
+									width={b().width}
+									y={0}
+									height={ch()}
+									fill={BRUSH_FILL}
+									fill-opacity="0.15"
+									pointer-events="none"
+								/>
+							)}
+						</Show>
+					</g>
 				</svg>
 			</div>
 		</Show>

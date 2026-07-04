@@ -1,8 +1,8 @@
-import { Show, createMemo, createSignal, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
-import { FileList, buildFileRows, type FileRow } from "../../FileList";
-import { computeClientRiskScores } from "../../../lib/risk";
+import { type Component, createMemo, createSignal, Show } from "solid-js";
 import type { RiskLevel } from "../../../../shared/types";
+import { computeClientRiskScores } from "../../../lib/risk";
+import { buildFileRows, FileList, type FileRow } from "../../FileList";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── FilesWidget [edits] — compact modified-files (overview-moat-refactor) ──
@@ -27,8 +27,7 @@ const riskRank = (level?: RiskLevel): number => (level ? RISK_RANK[level] : 0);
 // buildFileRows returns EVERY valid path in the file_map, including read-only
 // files. A widget titled "Modified Files" must count/show only files that were
 // actually changed, so we filter its output before counting, sorting, slicing.
-const isModified = (r: FileRow): boolean =>
-	r.edits > 0 || r.additions > 0 || r.deletions > 0;
+const isModified = (r: FileRow): boolean => r.edits > 0 || r.additions > 0 || r.deletions > 0;
 
 export const FilesWidget: Component<WidgetProps> = (props) => {
 	const riskMap = createMemo(() => computeClientRiskScores(props.session));
@@ -70,6 +69,7 @@ export const FilesWidget: Component<WidgetProps> = (props) => {
 					<Show when={overflow() > 0}>
 						<div class="border-t border-clens px-4 py-2">
 							<button
+								type="button"
 								onClick={() => setExpanded((prev) => !prev)}
 								class="instrument-microcaps rounded-none border border-clens px-2 py-0.5 text-[10px] text-muted transition hover:bg-surface-hover hover:text-secondary"
 							>

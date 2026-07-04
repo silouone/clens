@@ -1,5 +1,11 @@
+import type {
+	AgentNode,
+	DistilledSession,
+	StoredEvent,
+	TranscriptContentBlock,
+	TranscriptEntry,
+} from "../types";
 import type { ConversationEntry } from "../types/conversation";
-import type { AgentNode, DistilledSession, StoredEvent, TranscriptContentBlock, TranscriptEntry } from "../types";
 
 /** Truncate a value to a JSON preview of ~maxLen chars. */
 const truncatePreview = (value: unknown, maxLen: number = 100): string => {
@@ -126,28 +132,39 @@ const isContentBlockArray = (
 ): content is readonly TranscriptContentBlock[] => Array.isArray(content);
 
 /** Extract user prompt entries from transcript entries. */
-const mapTranscriptUserPrompts = (entries: readonly TranscriptEntry[]): readonly ConversationEntry[] =>
+const mapTranscriptUserPrompts = (
+	entries: readonly TranscriptEntry[],
+): readonly ConversationEntry[] =>
 	entries
 		.filter((e) => e.type === "user" && e.message?.role === "user")
 		.flatMap((e, i): readonly ConversationEntry[] => {
 			const content = e.message?.content;
 			if (!content) return [];
-			const text = typeof content === "string"
-				? content
-				: content
-						.filter((b): b is Extract<TranscriptContentBlock, { type: "text" }> => b.type === "text")
-						.map((b) => b.text)
-						.join("\n");
-			return text ? [{
-				type: "user_prompt" as const,
-				t: new Date(e.timestamp).getTime(),
-				text,
-				index: i,
-			}] : [];
+			const text =
+				typeof content === "string"
+					? content
+					: content
+							.filter(
+								(b): b is Extract<TranscriptContentBlock, { type: "text" }> => b.type === "text",
+							)
+							.map((b) => b.text)
+							.join("\n");
+			return text
+				? [
+						{
+							type: "user_prompt" as const,
+							t: new Date(e.timestamp).getTime(),
+							text,
+							index: i,
+						},
+					]
+				: [];
 		});
 
 /** Extract tool call entries from assistant transcript content blocks. */
-const mapTranscriptToolCalls = (entries: readonly TranscriptEntry[]): readonly ConversationEntry[] =>
+const mapTranscriptToolCalls = (
+	entries: readonly TranscriptEntry[],
+): readonly ConversationEntry[] =>
 	entries
 		.filter((e) => e.type === "assistant" && e.message?.content)
 		.flatMap((e): readonly ConversationEntry[] => {
@@ -155,14 +172,17 @@ const mapTranscriptToolCalls = (entries: readonly TranscriptEntry[]): readonly C
 			if (!content || !isContentBlockArray(content)) return [];
 			const t = new Date(e.timestamp).getTime();
 			return content
-				.filter((b): b is Extract<TranscriptContentBlock, { type: "tool_use" }> => b.type === "tool_use")
+				.filter(
+					(b): b is Extract<TranscriptContentBlock, { type: "tool_use" }> => b.type === "tool_use",
+				)
 				.map((b) => {
 					// b.input is Record<string, unknown> — bracket access is required
-					const filePath = typeof b.input["file_path"] === "string"
-						? b.input["file_path"]
-						: typeof b.input["path"] === "string"
-							? b.input["path"]
-							: undefined;
+					const filePath =
+						typeof b.input["file_path"] === "string"
+							? b.input["file_path"]
+							: typeof b.input["path"] === "string"
+								? b.input["path"]
+								: undefined;
 					return {
 						type: "tool_call" as const,
 						t,
@@ -175,7 +195,9 @@ const mapTranscriptToolCalls = (entries: readonly TranscriptEntry[]): readonly C
 		});
 
 /** Extract tool result entries from user transcript content blocks (tool results come back as user messages). */
-const mapTranscriptToolResults = (entries: readonly TranscriptEntry[]): readonly ConversationEntry[] =>
+const mapTranscriptToolResults = (
+	entries: readonly TranscriptEntry[],
+): readonly ConversationEntry[] =>
 	entries
 		.filter((e) => e.type === "user" && e.message?.content)
 		.flatMap((e): readonly ConversationEntry[] => {
@@ -183,7 +205,10 @@ const mapTranscriptToolResults = (entries: readonly TranscriptEntry[]): readonly
 			if (!content || !isContentBlockArray(content)) return [];
 			const t = new Date(e.timestamp).getTime();
 			return content
-				.filter((b): b is Extract<TranscriptContentBlock, { type: "tool_result" }> => b.type === "tool_result")
+				.filter(
+					(b): b is Extract<TranscriptContentBlock, { type: "tool_result" }> =>
+						b.type === "tool_result",
+				)
 				.map((b) => ({
 					type: "tool_result" as const,
 					t,
@@ -203,7 +228,9 @@ const mapTranscriptThinking = (entries: readonly TranscriptEntry[]): readonly Co
 			if (!content || !isContentBlockArray(content)) return [];
 			const t = new Date(e.timestamp).getTime();
 			return content
-				.filter((b): b is Extract<TranscriptContentBlock, { type: "thinking" }> => b.type === "thinking")
+				.filter(
+					(b): b is Extract<TranscriptContentBlock, { type: "thinking" }> => b.type === "thinking",
+				)
 				.map((b) => ({
 					type: "thinking" as const,
 					t,
@@ -264,12 +291,14 @@ export const buildConversationFromTranscript = (
 	const taskPrompt: readonly ConversationEntry[] = (() => {
 		if (!agent?.task_prompt) return [];
 		const startT = getAgentStartTime(agent) ?? 0;
-		return [{
-			type: "user_prompt" as const,
-			t: startT - 1, // before any other entries
-			text: agent.task_prompt,
-			index: 0,
-		}];
+		return [
+			{
+				type: "user_prompt" as const,
+				t: startT - 1, // before any other entries
+				text: agent.task_prompt,
+				index: 0,
+			},
+		];
 	})();
 
 	// Agent messages from link enrichment (inter-agent communication)

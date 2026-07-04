@@ -3,8 +3,8 @@ import {
 	buildSyntheticLinks,
 	extractUnlinkedAgentCalls,
 	matchAgentCallsToSessions,
-	synthesizeSpawnLinks,
 	type ScanSessionFilesFn,
+	synthesizeSpawnLinks,
 } from "../src/distill/synthetic-links";
 import type { LinkEvent, SpawnLink, StopLink, StoredEvent } from "../src/types";
 
@@ -82,9 +82,7 @@ interface AgentSessionMatch {
 describe("extractUnlinkedAgentCalls", () => {
 	test("returns empty when Agent call has matching SpawnLink within 2s", () => {
 		const events = [makeAgentPreToolUse(1000, "builder-data", "builder")];
-		const links: readonly LinkEvent[] = [
-			makeSpawnLink({ t: 1500, agent_type: "builder" }),
-		];
+		const links: readonly LinkEvent[] = [makeSpawnLink({ t: 1500, agent_type: "builder" })];
 
 		const result = extractUnlinkedAgentCalls(events, links);
 		expect(result).toEqual([]);
@@ -173,9 +171,7 @@ describe("extractUnlinkedAgentCalls", () => {
 
 	test("SpawnLink with wrong agent_type does not match", () => {
 		const events = [makeAgentPreToolUse(1000, "builder-x", "builder")];
-		const links: readonly LinkEvent[] = [
-			makeSpawnLink({ t: 1100, agent_type: "researcher" }),
-		];
+		const links: readonly LinkEvent[] = [makeSpawnLink({ t: 1100, agent_type: "researcher" })];
 
 		const result = extractUnlinkedAgentCalls(events, links);
 		expect(result).toHaveLength(1);
@@ -184,9 +180,7 @@ describe("extractUnlinkedAgentCalls", () => {
 
 	test("SpawnLink outside 2s window does not match", () => {
 		const events = [makeAgentPreToolUse(1000, "builder-x", "builder")];
-		const links: readonly LinkEvent[] = [
-			makeSpawnLink({ t: 5000, agent_type: "builder" }),
-		];
+		const links: readonly LinkEvent[] = [makeSpawnLink({ t: 5000, agent_type: "builder" })];
 
 		const result = extractUnlinkedAgentCalls(events, links);
 		expect(result).toHaveLength(1);
@@ -326,9 +320,10 @@ describe("matchAgentCallsToSessions", () => {
 	});
 
 	test("empty calls returns empty matches", () => {
-		const result = matchAgentCallsToSessions([], [
-			{ sessionId: "sess-1", startT: 1000, endT: 2000 },
-		]);
+		const result = matchAgentCallsToSessions(
+			[],
+			[{ sessionId: "sess-1", startT: 1000, endT: 2000 }],
+		);
 		expect(result).toEqual([]);
 	});
 
@@ -396,9 +391,11 @@ describe("buildSyntheticLinks", () => {
 	});
 
 	test("no StopLink when session endT is undefined", () => {
-		const matches = [makeMatch({
-			session: { sessionId: "child-sess", startT: 1200, endT: undefined },
-		})];
+		const matches = [
+			makeMatch({
+				session: { sessionId: "child-sess", startT: 1200, endT: undefined },
+			}),
+		];
 
 		const { spawns, stops } = buildSyntheticLinks(matches, "parent-sess");
 		expect(spawns).toHaveLength(1);
@@ -436,9 +433,11 @@ describe("buildSyntheticLinks", () => {
 	});
 
 	test("agent_name is undefined when call.name is empty string", () => {
-		const matches = [makeMatch({
-			call: { t: 1000, name: "", agentType: "builder", description: "" },
-		})];
+		const matches = [
+			makeMatch({
+				call: { t: 1000, name: "", agentType: "builder", description: "" },
+			}),
+		];
 
 		const { spawns } = buildSyntheticLinks(matches, "parent-sess");
 		expect(spawns[0].agent_name).toBeUndefined();

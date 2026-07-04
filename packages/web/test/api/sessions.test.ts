@@ -1,29 +1,33 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync } from "node:fs"
-import { createApp } from "../../src/server/app"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createApp } from "../../src/server/app";
 
-const TEST_TOKEN = "test-token-api"
-const TEST_DIR = "/tmp/clens-api-test"
-const SESSION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-const DISTILLED_SESSION_ID = "11111111-2222-3333-4444-555555555555"
-const DISTILL_CMD_SESSION_ID = "cccccccc-dddd-eeee-ffff-000000000000"
-const AGENT_ID = "22222222-3333-4444-5555-666666666666"
+const TEST_TOKEN = "test-token-api";
+const TEST_DIR = "/tmp/clens-api-test";
+const SESSION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const DISTILLED_SESSION_ID = "11111111-2222-3333-4444-555555555555";
+const DISTILL_CMD_SESSION_ID = "cccccccc-dddd-eeee-ffff-000000000000";
+const AGENT_ID = "22222222-3333-4444-5555-666666666666";
 // Broadcast-only ghost session (single Notification) — must be hidden from the list.
-const GHOST_SESSION_ID = "99999999-9999-9999-9999-999999999999"
+const GHOST_SESSION_ID = "99999999-9999-9999-9999-999999999999";
 // Session whose final JSONL line is torn (live write) — duration must use the last
 // PARSEABLE line, not collapse to the first event.
-const TRUNCATED_SESSION_ID = "77777777-7777-7777-7777-777777777777"
+const TRUNCATED_SESSION_ID = "77777777-7777-7777-7777-777777777777";
 
-const makeEvent = (event: string, t: number, data: Record<string, unknown> = {}, sid: string = SESSION_ID) =>
-	JSON.stringify({ event, t, sid, data, context: {} })
+const makeEvent = (
+	event: string,
+	t: number,
+	data: Record<string, unknown> = {},
+	sid: string = SESSION_ID,
+) => JSON.stringify({ event, t, sid, data, context: {} });
 
 describe("Session API endpoints", () => {
-	let app: ReturnType<typeof createApp>
+	let app: ReturnType<typeof createApp>;
 
 	beforeAll(() => {
 		// Create test fixture
-		mkdirSync(`${TEST_DIR}/.clens/sessions`, { recursive: true })
-		mkdirSync(`${TEST_DIR}/.clens/distilled`, { recursive: true })
+		mkdirSync(`${TEST_DIR}/.clens/sessions`, { recursive: true });
+		mkdirSync(`${TEST_DIR}/.clens/distilled`, { recursive: true });
 
 		// Write a test session JSONL
 		const events = [
@@ -31,27 +35,56 @@ describe("Session API endpoints", () => {
 			makeEvent("ToolUse", 1500, { tool: "Read" }),
 			makeEvent("ToolResult", 2000, { tool: "Read" }),
 			makeEvent("Stop", 3000, { reason: "user" }),
-		]
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, events.join("\n") + "\n")
+		];
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, events.join("\n") + "\n");
 
 		// Write a second session with distilled data + tool events for conversation
 		const distilledEvents = [
 			makeEvent("SessionStart", 5000, { source: "cli" }, DISTILLED_SESSION_ID),
-			makeEvent("PreToolUse", 5200, { tool_name: "Read", tool_use_id: "tu_001", tool_input: { file_path: "src/app.ts" } }, DISTILLED_SESSION_ID),
-			makeEvent("PostToolUse", 5300, { tool_name: "Read", tool_use_id: "tu_001" }, DISTILLED_SESSION_ID),
-			makeEvent("PreToolUse", 5500, { tool_name: "Edit", tool_use_id: "tu_002", tool_input: { file_path: "src/app.ts" } }, DISTILLED_SESSION_ID),
-			makeEvent("PostToolUse", 5600, { tool_name: "Edit", tool_use_id: "tu_002" }, DISTILLED_SESSION_ID),
+			makeEvent(
+				"PreToolUse",
+				5200,
+				{ tool_name: "Read", tool_use_id: "tu_001", tool_input: { file_path: "src/app.ts" } },
+				DISTILLED_SESSION_ID,
+			),
+			makeEvent(
+				"PostToolUse",
+				5300,
+				{ tool_name: "Read", tool_use_id: "tu_001" },
+				DISTILLED_SESSION_ID,
+			),
+			makeEvent(
+				"PreToolUse",
+				5500,
+				{ tool_name: "Edit", tool_use_id: "tu_002", tool_input: { file_path: "src/app.ts" } },
+				DISTILLED_SESSION_ID,
+			),
+			makeEvent(
+				"PostToolUse",
+				5600,
+				{ tool_name: "Edit", tool_use_id: "tu_002" },
+				DISTILLED_SESSION_ID,
+			),
 			makeEvent("Stop", 6000, { reason: "done" }, DISTILLED_SESSION_ID),
-		]
+		];
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${DISTILLED_SESSION_ID}.jsonl`,
 			distilledEvents.join("\n") + "\n",
-		)
+		);
 		writeFileSync(
 			`${TEST_DIR}/.clens/distilled/${DISTILLED_SESSION_ID}.json`,
 			JSON.stringify({
 				session_id: DISTILLED_SESSION_ID,
-				stats: { total_events: 6, duration_ms: 1000, events_by_type: {}, tools_by_name: {}, tool_call_count: 2, failure_count: 0, failure_rate: 0, unique_files: ["src/app.ts"] },
+				stats: {
+					total_events: 6,
+					duration_ms: 1000,
+					events_by_type: {},
+					tools_by_name: {},
+					tool_call_count: 2,
+					failure_count: 0,
+					failure_rate: 0,
+					unique_files: ["src/app.ts"],
+				},
 				backtracks: [],
 				decisions: [],
 				file_map: { files: [{ path: "src/app.ts", operations: ["edit"] }] },
@@ -71,33 +104,47 @@ describe("Session API endpoints", () => {
 						},
 					],
 				},
-				reasoning: [{ t: 5100, thinking: "I need to read the file first", intent_hint: "planning" }],
-				user_messages: [{ t: 5000, content: "Fix the bug in app.ts", message_type: "prompt", is_tool_result: false }],
+				reasoning: [
+					{ t: 5100, thinking: "I need to read the file first", intent_hint: "planning" },
+				],
+				user_messages: [
+					{
+						t: 5000,
+						content: "Fix the bug in app.ts",
+						message_type: "prompt",
+						is_tool_result: false,
+					},
+				],
 				agents: [{ session_id: AGENT_ID, agent_type: "builder", agent_name: "worker-1" }],
 				summary: { phases: [{ name: "build", start_t: 5000, end_t: 6000 }] },
 				complete: true,
 			}),
-		)
+		);
 
 		// Write a third session for distill command testing (isolated from SESSION_ID)
 		const distillCmdEvents = [
 			makeEvent("SessionStart", 7000, { source: "cli" }, DISTILL_CMD_SESSION_ID),
 			makeEvent("ToolUse", 7500, { tool: "Read" }, DISTILL_CMD_SESSION_ID),
 			makeEvent("Stop", 8000, { reason: "user" }, DISTILL_CMD_SESSION_ID),
-		]
+		];
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${DISTILL_CMD_SESSION_ID}.jsonl`,
 			distillCmdEvents.join("\n") + "\n",
-		)
+		);
 
 		// Write agent session events
 		const agentEvents = [
 			makeEvent("SessionStart", 5100, { source: "spawn" }, AGENT_ID),
-			makeEvent("PreToolUse", 5200, { tool_name: "Write", tool_use_id: "tu_a01", tool_input: { file_path: "src/utils.ts" } }, AGENT_ID),
+			makeEvent(
+				"PreToolUse",
+				5200,
+				{ tool_name: "Write", tool_use_id: "tu_a01", tool_input: { file_path: "src/utils.ts" } },
+				AGENT_ID,
+			),
 			makeEvent("PostToolUse", 5300, { tool_name: "Write", tool_use_id: "tu_a01" }, AGENT_ID),
 			makeEvent("Stop", 5500, { reason: "done" }, AGENT_ID),
-		]
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${AGENT_ID}.jsonl`, agentEvents.join("\n") + "\n")
+		];
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${AGENT_ID}.jsonl`, agentEvents.join("\n") + "\n");
 
 		// Ghost session: only broadcast events (Notification). Claude Code broadcasts
 		// these to every open session file, so a file containing nothing else is a
@@ -105,7 +152,7 @@ describe("Session API endpoints", () => {
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${GHOST_SESSION_ID}.jsonl`,
 			makeEvent("Notification", 9000, { message: "broadcast noise" }, GHOST_SESSION_ID) + "\n",
-		)
+		);
 
 		// Truncated session: a real first event, a real second event, then a torn
 		// final line (live write left it half-flushed). Duration must be derived from
@@ -115,233 +162,241 @@ describe("Session API endpoints", () => {
 			makeEvent("SessionStart", 8000, { source: "cli" }, TRUNCATED_SESSION_ID),
 			makeEvent("Stop", 10000, { reason: "user" }, TRUNCATED_SESSION_ID),
 			'{"event":"PostToolUse","t":11000,"sid":"' + TRUNCATED_SESSION_ID + '","data":{"tool_nam', // torn line
-		]
+		];
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${TRUNCATED_SESSION_ID}.jsonl`,
 			truncatedLines.join("\n") + "\n",
-		)
+		);
 
-		app = createApp({ token: TEST_TOKEN, mode: "development", projectDir: TEST_DIR })
-	})
+		app = createApp({ token: TEST_TOKEN, mode: "development", projectDir: TEST_DIR });
+	});
 
 	afterAll(() => {
-		rmSync(TEST_DIR, { recursive: true, force: true })
-	})
+		rmSync(TEST_DIR, { recursive: true, force: true });
+	});
 
-	const authHeaders = { Authorization: `Bearer ${TEST_TOKEN}` }
+	const authHeaders = { Authorization: `Bearer ${TEST_TOKEN}` };
 
 	const req = (path: string, init?: RequestInit) =>
-		app.request(path, { headers: authHeaders, ...init })
+		app.request(path, { headers: authHeaders, ...init });
 
 	// ── GET /api/sessions ──────────────────────────────────────────
 
 	test("GET /api/sessions returns paginated list", async () => {
-		const res = await req("/api/sessions")
-		expect(res.status).toBe(200)
+		const res = await req("/api/sessions");
+		expect(res.status).toBe(200);
 
-		const body = await res.json()
-		expect(body.data).toBeDefined()
-		expect(body.pagination).toBeDefined()
-		expect(body.pagination.page).toBe(1)
-		expect(body.pagination.limit).toBe(20)
-		expect(body.data.length).toBeGreaterThanOrEqual(1)
-	})
+		const body = await res.json();
+		expect(body.data).toBeDefined();
+		expect(body.pagination).toBeDefined();
+		expect(body.pagination.page).toBe(1);
+		expect(body.pagination.limit).toBe(20);
+		expect(body.data.length).toBeGreaterThanOrEqual(1);
+	});
 
 	test("GET /api/sessions validates bad page param", async () => {
-		const res = await req("/api/sessions?page=-1")
-		expect(res.status).toBe(400)
-		const body = await res.json()
-		expect(body.code).toBe("INVALID_PARAM")
-	})
+		const res = await req("/api/sessions?page=-1");
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body.code).toBe("INVALID_PARAM");
+	});
 
 	test("GET /api/sessions filters by status", async () => {
-		const res = await req("/api/sessions?status=complete")
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		body.data.forEach((s: { status: string }) => expect(s.status).toBe("complete"))
-	})
+		const res = await req("/api/sessions?status=complete");
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		body.data.forEach((s: { status: string }) => {
+			expect(s.status).toBe("complete");
+		});
+	});
 
 	test("GET /api/sessions rejects invalid status", async () => {
-		const res = await req("/api/sessions?status=invalid")
-		expect(res.status).toBe(400)
-	})
+		const res = await req("/api/sessions?status=invalid");
+		expect(res.status).toBe(400);
+	});
 
 	test("GET /api/sessions rejects invalid sort", async () => {
-		const res = await req("/api/sessions?sort=bad_field")
-		expect(res.status).toBe(400)
-	})
+		const res = await req("/api/sessions?sort=bad_field");
+		expect(res.status).toBe(400);
+	});
 
 	test("GET /api/sessions rejects invalid limit", async () => {
-		const res = await req("/api/sessions?limit=0")
-		expect(res.status).toBe(400)
-	})
+		const res = await req("/api/sessions?limit=0");
+		expect(res.status).toBe(400);
+	});
 
 	test("GET /api/sessions pagination has_next is correct", async () => {
-		const res = await req("/api/sessions?limit=1&page=1")
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.pagination.limit).toBe(1)
+		const res = await req("/api/sessions?limit=1&page=1");
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.pagination.limit).toBe(1);
 		// We have multiple sessions, so page 1 with limit 1 should have has_next=true
-		expect(body.pagination.has_next).toBe(true)
-	})
+		expect(body.pagination.has_next).toBe(true);
+	});
 
 	// ── Ghost-session filtering (sessions-list-ghost-sessions-shown) ─
 
 	test("GET /api/sessions hides broadcast-only ghost sessions", async () => {
-		const res = await req("/api/sessions?limit=5000")
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		const ids = body.data.map((s: { session_id: string }) => s.session_id)
-		expect(ids).not.toContain(GHOST_SESSION_ID)
+		const res = await req("/api/sessions?limit=5000");
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		const ids = body.data.map((s: { session_id: string }) => s.session_id);
+		expect(ids).not.toContain(GHOST_SESSION_ID);
 		// Real sessions still appear.
-		expect(ids).toContain(SESSION_ID)
-	})
+		expect(ids).toContain(SESSION_ID);
+	});
 
 	// ── Torn final line (web-truncated-last-line-falls-back-to-first…) ─
 
 	test("GET /api/sessions derives duration from last PARSEABLE line, not first event", async () => {
-		const res = await req("/api/sessions?limit=5000")
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		const truncated = body.data.find((s: { session_id: string }) => s.session_id === TRUNCATED_SESSION_ID)
-		expect(truncated).toBeDefined()
+		const res = await req("/api/sessions?limit=5000");
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		const truncated = body.data.find(
+			(s: { session_id: string }) => s.session_id === TRUNCATED_SESSION_ID,
+		);
+		expect(truncated).toBeDefined();
 		// Last parseable event is the Stop at t=10000; first event is t=8000 → 2000ms.
 		// The bug collapsed this to 0 by falling back to the first event.
-		expect(truncated.duration_ms).toBe(2000)
-		expect(truncated.duration_ms).toBeGreaterThan(0)
-		expect(truncated.end_reason).toBe("user")
-	})
+		expect(truncated.duration_ms).toBe(2000);
+		expect(truncated.duration_ms).toBeGreaterThan(0);
+		expect(truncated.end_reason).toBe("user");
+	});
 
 	// ── GET /api/sessions/:id ──────────────────────────────────────
 
 	test("GET /api/sessions/:id returns distilled data", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}`)
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.data).toBeDefined()
-		expect(body.data.session_id).toBe(DISTILLED_SESSION_ID)
-		expect(body.data.stats).toBeDefined()
-		expect(body.data.complete).toBe(true)
-	})
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}`);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.data).toBeDefined();
+		expect(body.data.session_id).toBe(DISTILLED_SESSION_ID);
+		expect(body.data.stats).toBeDefined();
+		expect(body.data.complete).toBe(true);
+	});
 
 	test("GET /api/sessions/:id returns 202 when not distilled", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}`)
-		expect(res.status).toBe(202)
-		const body = await res.json()
-		expect(body.status).toBe("not_distilled")
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}`);
+		expect(res.status).toBe(202);
+		const body = await res.json();
+		expect(body.status).toBe("not_distilled");
+	});
 
 	test("GET /api/sessions/:id returns 404 for unknown session", async () => {
-		const res = await req("/api/sessions/00000000-0000-0000-0000-000000000000")
-		expect(res.status).toBe(404)
-		const body = await res.json()
-		expect(body.code).toBe("NOT_FOUND")
-	})
+		const res = await req("/api/sessions/00000000-0000-0000-0000-000000000000");
+		expect(res.status).toBe(404);
+		const body = await res.json();
+		expect(body.code).toBe("NOT_FOUND");
+	});
 
 	test("GET /api/sessions/:id rejects non-UUID session ID", async () => {
-		const res = await req("/api/sessions/not-a-uuid")
-		expect(res.status).toBe(400)
-		const body = await res.json()
-		expect(body.code).toBe("INVALID_SESSION_ID")
-	})
+		const res = await req("/api/sessions/not-a-uuid");
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body.code).toBe("INVALID_SESSION_ID");
+	});
 
 	// ── GET /api/sessions/:id/events ───────────────────────────────
 
 	test("GET /api/sessions/:id/events returns paginated events", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}/events`)
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.data.length).toBe(4)
-		expect(body.pagination.total).toBe(4)
-		expect(body.pagination.has_next).toBe(false)
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}/events`);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.data.length).toBe(4);
+		expect(body.pagination.total).toBe(4);
+		expect(body.pagination.has_next).toBe(false);
+	});
 
 	test("GET /api/sessions/:id/events supports pagination", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}/events?offset=1&limit=2`)
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.data.length).toBe(2)
-		expect(body.data[0].event).toBe("ToolUse")
-		expect(body.pagination.has_next).toBe(true)
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}/events?offset=1&limit=2`);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.data.length).toBe(2);
+		expect(body.data[0].event).toBe("ToolUse");
+		expect(body.pagination.has_next).toBe(true);
+	});
 
 	test("GET /api/sessions/:id/events returns 404 for unknown session", async () => {
-		const res = await req("/api/sessions/00000000-0000-0000-0000-000000000000/events")
-		expect(res.status).toBe(404)
-	})
+		const res = await req("/api/sessions/00000000-0000-0000-0000-000000000000/events");
+		expect(res.status).toBe(404);
+	});
 
 	test("GET /api/sessions/:id/events rejects invalid offset", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}/events?offset=-5`)
-		expect(res.status).toBe(400)
-		const body = await res.json()
-		expect(body.code).toBe("INVALID_PARAM")
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}/events?offset=-5`);
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body.code).toBe("INVALID_PARAM");
+	});
 
 	test("GET /api/sessions/:id/events rejects invalid limit", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}/events?limit=0`)
-		expect(res.status).toBe(400)
-		const body = await res.json()
-		expect(body.code).toBe("INVALID_PARAM")
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}/events?limit=0`);
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body.code).toBe("INVALID_PARAM");
+	});
 
 	// ── POST /api/commands/sessions/:id/distill ────────────────────
 
 	test("POST /api/commands/sessions/:id/distill returns started", async () => {
-		const res = await req(`/api/commands/sessions/${DISTILL_CMD_SESSION_ID}/distill`, { method: "POST" })
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.status).toBe("started")
-	})
+		const res = await req(`/api/commands/sessions/${DISTILL_CMD_SESSION_ID}/distill`, {
+			method: "POST",
+		});
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.status).toBe("started");
+	});
 
 	test("POST /api/commands/sessions/:id/distill returns 404 for unknown", async () => {
-		const res = await req("/api/commands/sessions/00000000-0000-0000-0000-000000000000/distill", { method: "POST" })
-		expect(res.status).toBe(404)
-	})
+		const res = await req("/api/commands/sessions/00000000-0000-0000-0000-000000000000/distill", {
+			method: "POST",
+		});
+		expect(res.status).toBe(404);
+	});
 
 	test("POST /api/commands/sessions/:id/distill rejects non-UUID session ID", async () => {
-		const res = await req("/api/commands/sessions/not-a-uuid/distill", { method: "POST" })
-		expect(res.status).toBe(400)
-		const body = await res.json()
-		expect(body.code).toBe("INVALID_SESSION_ID")
-	})
+		const res = await req("/api/commands/sessions/not-a-uuid/distill", { method: "POST" });
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body.code).toBe("INVALID_SESSION_ID");
+	});
 
 	// ── Auth (production mode enforces tokens) ───────────────────
 
 	test("auth skipped in development mode", async () => {
 		// dev app is the default `app` — no token needed
-		const res = await app.request("/api/sessions")
-		expect(res.status).toBe(200)
-	})
+		const res = await app.request("/api/sessions");
+		expect(res.status).toBe(200);
+	});
 
 	test("production mode returns 401 without token", async () => {
-		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR })
-		const res = await prodApp.request("/api/sessions")
-		expect(res.status).toBe(401)
-	})
+		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR });
+		const res = await prodApp.request("/api/sessions");
+		expect(res.status).toBe(401);
+	});
 
 	test("production mode accepts token via query param", async () => {
-		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR })
-		const res = await prodApp.request(`/api/sessions?token=${TEST_TOKEN}`)
-		expect(res.status).toBe(200)
-	})
+		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR });
+		const res = await prodApp.request(`/api/sessions?token=${TEST_TOKEN}`);
+		expect(res.status).toBe(200);
+	});
 
 	test("production mode returns 401 with invalid token", async () => {
-		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR })
+		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR });
 		const res = await prodApp.request("/api/sessions", {
 			headers: { Authorization: "Bearer wrong-token" },
-		})
-		expect(res.status).toBe(401)
-		const body = await res.json()
-		expect(body.code).toBe("AUTH_REQUIRED")
-	})
+		});
+		expect(res.status).toBe(401);
+		const body = await res.json();
+		expect(body.code).toBe("AUTH_REQUIRED");
+	});
 
 	test("production mode returns 401 with malformed Authorization header", async () => {
-		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR })
+		const prodApp = createApp({ token: TEST_TOKEN, mode: "production", projectDir: TEST_DIR });
 		const res = await prodApp.request("/api/sessions", {
 			headers: { Authorization: "Basic abc123" },
-		})
-		expect(res.status).toBe(401)
-	})
+		});
+		expect(res.status).toBe(401);
+	});
 
 	// ── CORS ──────────────────────────────────────────────────────
 
@@ -351,10 +406,10 @@ describe("Session API endpoints", () => {
 				...authHeaders,
 				Origin: "http://localhost:5173",
 			},
-		})
-		expect(res.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:5173")
-		expect(res.headers.get("Access-Control-Allow-Methods")).toContain("GET")
-	})
+		});
+		expect(res.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:5173");
+		expect(res.headers.get("Access-Control-Allow-Methods")).toContain("GET");
+	});
 
 	test("CORS headers absent for disallowed origin in dev mode", async () => {
 		const res = await app.request("/api/sessions", {
@@ -362,127 +417,136 @@ describe("Session API endpoints", () => {
 				...authHeaders,
 				Origin: "http://evil.com",
 			},
-		})
-		expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull()
-	})
+		});
+		expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+	});
 
 	test("OPTIONS preflight returns 204 for allowed origin", async () => {
 		const res = await app.request("/api/sessions", {
 			method: "OPTIONS",
 			headers: { Origin: "http://localhost:5173" },
-		})
-		expect(res.status).toBe(204)
-	})
+		});
+		expect(res.status).toBe(204);
+	});
 
 	test("OPTIONS preflight returns 403 for disallowed origin", async () => {
 		const res = await app.request("/api/sessions", {
 			method: "OPTIONS",
 			headers: { Origin: "http://evil.com" },
-		})
-		expect(res.status).toBe(403)
-	})
+		});
+		expect(res.status).toBe(403);
+	});
 
 	// ── Health (unauthenticated) ──────────────────────────────────
 
 	test("GET /health is accessible without auth", async () => {
-		const res = await app.request("/health")
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.status).toBe("ok")
-	})
+		const res = await app.request("/health");
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.status).toBe("ok");
+	});
 
 	// ── GET /api/sessions/:id/conversation ─────────────────────────
 
 	test("GET /api/sessions/:id/conversation returns conversation entries", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/conversation`)
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.data.length).toBeGreaterThan(0)
-		expect(body.pagination).toBeDefined()
-		expect(body.pagination.total).toBeGreaterThan(0)
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/conversation`);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.data.length).toBeGreaterThan(0);
+		expect(body.pagination).toBeDefined();
+		expect(body.pagination.total).toBeGreaterThan(0);
 		// Verify entries have type field
 		body.data.forEach((entry: { type: string }) => {
-			expect(["user_prompt", "thinking", "tool_call", "tool_result", "backtrack", "phase_boundary"]).toContain(entry.type)
-		})
-	})
+			expect([
+				"user_prompt",
+				"thinking",
+				"tool_call",
+				"tool_result",
+				"backtrack",
+				"phase_boundary",
+			]).toContain(entry.type);
+		});
+	});
 
 	test("GET /api/sessions/:id/conversation supports pagination", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/conversation?offset=0&limit=2`)
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.data.length).toBeLessThanOrEqual(2)
-		expect(body.pagination.limit).toBe(2)
-	})
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/conversation?offset=0&limit=2`);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.data.length).toBeLessThanOrEqual(2);
+		expect(body.pagination.limit).toBe(2);
+	});
 
 	test("GET /api/sessions/:id/conversation returns 202 when not distilled", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}/conversation`)
-		expect(res.status).toBe(202)
-		const body = await res.json()
-		expect(body.code).toBe("NOT_DISTILLED")
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}/conversation`);
+		expect(res.status).toBe(202);
+		const body = await res.json();
+		expect(body.code).toBe("NOT_DISTILLED");
+	});
 
 	test("GET /api/sessions/:id/conversation returns 404 for unknown session", async () => {
-		const res = await req("/api/sessions/00000000-0000-0000-0000-000000000000/conversation")
-		expect(res.status).toBe(404)
-	})
+		const res = await req("/api/sessions/00000000-0000-0000-0000-000000000000/conversation");
+		expect(res.status).toBe(404);
+	});
 
 	test("GET /api/sessions/:id/conversation rejects invalid offset", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/conversation?offset=-1`)
-		expect(res.status).toBe(400)
-	})
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/conversation?offset=-1`);
+		expect(res.status).toBe(400);
+	});
 
 	// ── GET /api/sessions/:id/agents/:agentId/conversation ─────────
 
 	test("GET agent conversation returns entries from agent events", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/agents/${AGENT_ID}/conversation`)
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.data.length).toBeGreaterThan(0)
-		expect(body.pagination.total).toBeGreaterThan(0)
-	})
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/agents/${AGENT_ID}/conversation`);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.data.length).toBeGreaterThan(0);
+		expect(body.pagination.total).toBeGreaterThan(0);
+	});
 
 	test("GET agent conversation returns 404 for unknown agent", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/agents/99999999-0000-0000-0000-000000000000/conversation`)
-		expect(res.status).toBe(404)
-		const body = await res.json()
-		expect(body.code).toBe("NOT_FOUND")
-	})
+		const res = await req(
+			`/api/sessions/${DISTILLED_SESSION_ID}/agents/99999999-0000-0000-0000-000000000000/conversation`,
+		);
+		expect(res.status).toBe(404);
+		const body = await res.json();
+		expect(body.code).toBe("NOT_FOUND");
+	});
 
 	test("GET agent conversation returns 202 when parent not distilled", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}/agents/${AGENT_ID}/conversation`)
-		expect(res.status).toBe(202)
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}/agents/${AGENT_ID}/conversation`);
+		expect(res.status).toBe(202);
+	});
 
 	// ── GET /api/sessions/:id/diff/:filePath ───────────────────────
 
 	test("GET /api/sessions/:id/diff/:filePath returns unified diff", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/diff/src/app.ts`)
-		expect(res.status).toBe(200)
-		const body = await res.json()
-		expect(body.data.file_path).toBe("src/app.ts")
-		expect(body.data.unified_diff).toContain("--- a/src/app.ts")
-		expect(body.data.unified_diff).toContain("+++ b/src/app.ts")
-		expect(body.data.unified_diff).toContain("-const y = 2")
-		expect(body.data.unified_diff).toContain("+const y = 3")
-		expect(body.data.total_additions).toBe(1)
-		expect(body.data.total_deletions).toBe(1)
-	})
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/diff/src/app.ts`);
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.data.file_path).toBe("src/app.ts");
+		expect(body.data.unified_diff).toContain("--- a/src/app.ts");
+		expect(body.data.unified_diff).toContain("+++ b/src/app.ts");
+		expect(body.data.unified_diff).toContain("-const y = 2");
+		expect(body.data.unified_diff).toContain("+const y = 3");
+		expect(body.data.total_additions).toBe(1);
+		expect(body.data.total_deletions).toBe(1);
+	});
 
 	test("GET /api/sessions/:id/diff/:filePath returns 404 for unknown file", async () => {
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/diff/src/nonexistent.ts`)
-		expect(res.status).toBe(404)
-	})
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/diff/src/nonexistent.ts`);
+		expect(res.status).toBe(404);
+	});
 
 	test("GET /api/sessions/:id/diff/:filePath returns 202 when not distilled", async () => {
-		const res = await req(`/api/sessions/${SESSION_ID}/diff/src/app.ts`)
-		expect(res.status).toBe(202)
-	})
+		const res = await req(`/api/sessions/${SESSION_ID}/diff/src/app.ts`);
+		expect(res.status).toBe(202);
+	});
 
 	test("GET /api/sessions/:id/diff handles nested paths", async () => {
 		// The wildcard route should capture nested paths like src/deep/nested/file.ts
-		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/diff/src/deep/nested/file.ts`)
-		expect(res.status).toBe(404) // File doesn't exist in fixture, but path parsing should work
-		const body = await res.json()
-		expect(body.code).toBe("NOT_FOUND")
-	})
-})
+		const res = await req(`/api/sessions/${DISTILLED_SESSION_ID}/diff/src/deep/nested/file.ts`);
+		expect(res.status).toBe(404); // File doesn't exist in fixture, but path parsing should work
+		const body = await res.json();
+		expect(body.code).toBe("NOT_FOUND");
+	});
+});

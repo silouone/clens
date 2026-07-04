@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, Show, type Component } from "solid-js";
+import { type Component, createEffect, onCleanup, Show } from "solid-js";
 import type { CostEstimate, DistilledSession, TokenUsage } from "../../shared/types";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -47,9 +47,7 @@ const TokenRow: Component<{
 }> = (props) => (
 	<div class="flex items-center justify-between text-xs">
 		<span class="text-muted">{props.label}</span>
-		<span class="font-mono font-medium tabular-nums text-secondary">
-			{fmt(props.value)}
-		</span>
+		<span class="font-mono font-medium tabular-nums text-secondary">{fmt(props.value)}</span>
 	</div>
 );
 
@@ -75,7 +73,13 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 	return (
 		<Show when={props.open}>
 			{/* Invisible backdrop to catch outside clicks */}
-			<div class="fixed inset-0 z-40" onClick={props.onClose} />
+			<button
+				type="button"
+				aria-label="Close"
+				tabIndex={-1}
+				class="fixed inset-0 z-40"
+				onClick={props.onClose}
+			/>
 
 			{/* Popover */}
 			<div class="absolute top-full left-0 z-50 mt-1 w-72 rounded-none border border-clens bg-surface-overlay p-3">
@@ -91,9 +95,7 @@ export const CostDrilldown: Component<CostDrilldownProps> = (props) => {
 				<Show
 					when={tokens()}
 					fallback={
-						<p class="text-xs text-muted">
-							Token breakdown not available for this session
-						</p>
+						<p class="text-xs text-muted">Token breakdown not available for this session</p>
 					}
 				>
 					{(tu) => (

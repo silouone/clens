@@ -1,5 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
-import type { CostBasis, CostEstimate, DistilledSession, AnalyticsSummaryRow } from "../types";
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
+import type { AnalyticsSummaryRow, CostBasis, CostEstimate, DistilledSession } from "../types";
 
 /**
  * Atomically write content to a file: write to a unique temp sibling, then
@@ -112,7 +120,9 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 	}));
 
 	// Backtrack files
-	const backtrackFiles = [...new Set(d.backtracks.flatMap((b) => (b.file_path ? [b.file_path] : [])))];
+	const backtrackFiles = [
+		...new Set(d.backtracks.flatMap((b) => (b.file_path ? [b.file_path] : []))),
+	];
 
 	// Backtracks by type
 	const backtracksByType = d.backtracks.reduce<Record<string, number>>(
@@ -167,8 +177,7 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 	};
 };
 
-const summaryPath = (projectDir: string): string =>
-	`${projectDir}/.clens/analytics-summary.jsonl`;
+const summaryPath = (projectDir: string): string => `${projectDir}/.clens/analytics-summary.jsonl`;
 
 /** Parse JSONL summary content into rows, skipping malformed/non-row lines. */
 const parseSummaryRows = (content: string): AnalyticsSummaryRow[] =>
@@ -232,10 +241,8 @@ export const writeAnalyticsSummaryBatch = (
  * Write or replace a single session's analytics summary row. Thin wrapper over
  * the batch writer (one read + one atomic write).
  */
-export const writeAnalyticsSummary = (
-	distilled: DistilledSession,
-	projectDir: string,
-): void => writeAnalyticsSummaryBatch([distilled], projectDir);
+export const writeAnalyticsSummary = (distilled: DistilledSession, projectDir: string): void =>
+	writeAnalyticsSummaryBatch([distilled], projectDir);
 
 /** True iff the distilled file is strictly newer than the summary file. */
 const distilledNewerThanSummary = (distilledFilePath: string, summaryMtimeMs: number): boolean => {

@@ -105,10 +105,7 @@ type SessionMetaPatch = {
 	readonly color?: ColorName | null;
 };
 
-const patchSessionMeta = async (
-	id: string,
-	patch: SessionMetaPatch,
-): Promise<SessionSummary> => {
+const patchSessionMeta = async (id: string, patch: SessionMetaPatch): Promise<SessionSummary> => {
 	// Raw fetch (not the typed client): the route reads an untyped JSON body via
 	// c.req.json(), so Hono RPC doesn't surface a `json` arg. Carry the auth token
 	// explicitly — /api PATCH returns 401 without it in production.

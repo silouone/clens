@@ -61,15 +61,20 @@ export const formatPercentage = (value: number, total: number): string => {
 };
 
 /** Classify backtrack severity: green (<2), yellow (2-4), red (>4). */
-export const classifySeverity = (backtrackCount: number): { readonly label: string; readonly color: string } => {
+export const classifySeverity = (
+	backtrackCount: number,
+): { readonly label: string; readonly color: string } => {
 	if (backtrackCount < 2) return { label: "low", color: "text-emerald-600 dark:text-emerald-400" };
-	if (backtrackCount <= 4) return { label: "moderate", color: "text-amber-600 dark:text-amber-400" };
+	if (backtrackCount <= 4)
+		return { label: "moderate", color: "text-amber-600 dark:text-amber-400" };
 	return { label: "high", color: "text-red-600 dark:text-red-400" };
 };
 
-
 /** Truncate text to maxLines, returning whether it was truncated. */
-export const truncateMultiline = (text: string, maxLines: number): { readonly text: string; readonly truncated: boolean } => {
+export const truncateMultiline = (
+	text: string,
+	maxLines: number,
+): { readonly text: string; readonly truncated: boolean } => {
 	const lines = text.split("\n");
 	if (lines.length <= maxLines) return { text, truncated: false };
 	return { text: lines.slice(0, maxLines).join("\n"), truncated: true };
@@ -93,7 +98,11 @@ export const calendarDaysBetween = (laterTs: number, earlierTs: number): number 
 };
 
 /** Format a timestamp as either relative ("2d ago") or absolute ("Mar 5, 14:32") based on mode. */
-export const formatDate = (ts: number, mode: "relative" | "absolute", now: number = Date.now()): string => {
+export const formatDate = (
+	ts: number,
+	mode: "relative" | "absolute",
+	now: number = Date.now(),
+): string => {
 	const d = new Date(ts);
 	if (mode === "absolute") {
 		return d.toLocaleDateString(undefined, {

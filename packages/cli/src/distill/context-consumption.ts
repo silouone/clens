@@ -38,7 +38,9 @@ const buildPoint = (
 	const cacheCreationTokens = safeNumber(usage?.cache_creation_input_tokens);
 	const totalContextTokens = inputTokens + cacheReadTokens + cacheCreationTokens;
 	const contextPct = (totalContextTokens / modelContextWindow) * 100;
-	const isCompaction = prevTotalTokens !== undefined && totalContextTokens < prevTotalTokens * COMPACTION_DROP_THRESHOLD;
+	const isCompaction =
+		prevTotalTokens !== undefined &&
+		totalContextTokens < prevTotalTokens * COMPACTION_DROP_THRESHOLD;
 
 	return {
 		t: new Date(entry.timestamp).getTime(),
@@ -72,9 +74,7 @@ const computeVelocity = (points: readonly ContextConsumptionPoint[]): number => 
 	const timeSpanMs = last.t - first.t;
 	const timeSpanMin = timeSpanMs / 60_000;
 
-	return timeSpanMin > 0
-		? roundTo2((last.context_pct - first.context_pct) / timeSpanMin)
-		: 0;
+	return timeSpanMin > 0 ? roundTo2((last.context_pct - first.context_pct) / timeSpanMin) : 0;
 };
 
 /**
@@ -94,7 +94,10 @@ export const extractContextConsumption = (
 	if (dedupedEntries.length === 0) return undefined;
 
 	const points = buildPoints(dedupedEntries, modelContextWindow);
-	const peakPoint = points.reduce((max, p) => (p.total_context_tokens > max.total_context_tokens ? p : max), points[0]);
+	const peakPoint = points.reduce(
+		(max, p) => (p.total_context_tokens > max.total_context_tokens ? p : max),
+		points[0],
+	);
 	const finalPoint = points[points.length - 1];
 	const compactionCount = points.filter((p) => p.is_compaction).length;
 	const velocity = computeVelocity(points);

@@ -8,10 +8,7 @@ import { readLinks, readSessionEvents } from "./read";
 const extractTimestamp = (obj: Record<string, unknown>): number | undefined =>
 	typeof obj.t === "number" ? obj.t : undefined;
 
-export const exportSession = async (
-	sessionId: string,
-	projectDir: string,
-): Promise<string> => {
+export const exportSession = async (sessionId: string, projectDir: string): Promise<string> => {
 	const sessionsDir = `${projectDir}/.clens/sessions`;
 	const sessionPath = `${sessionsDir}/${sessionId}.jsonl`;
 	const distilledPath = `${projectDir}/.clens/distilled/${sessionId}.json`;
@@ -37,14 +34,18 @@ export const exportSession = async (
 	const isMultiAgent = spawnLinks.length > 0;
 
 	// Build child agent entries from spawn links
-	const readChildMetrics = (childPath: string): { readonly eventCount: number; readonly duration: number } => {
+	const readChildMetrics = (
+		childPath: string,
+	): { readonly eventCount: number; readonly duration: number } => {
 		if (!existsSync(childPath)) return { eventCount: 0, duration: 0 };
 		try {
 			const childContent = readFileSync(childPath, "utf-8").trim();
 			const childLines = childContent.split("\n").filter(Boolean);
 			if (childLines.length < 2) return { eventCount: childLines.length, duration: 0 };
 
-			const parsedEvents: readonly Record<string, unknown>[] = childLines.map((l: string) => JSON.parse(l));
+			const parsedEvents: readonly Record<string, unknown>[] = childLines.map((l: string) =>
+				JSON.parse(l),
+			);
 			const childTimestamps = parsedEvents
 				.map((e) => extractTimestamp(e))
 				.filter((t): t is number => t !== undefined);
@@ -119,14 +120,15 @@ export const exportSession = async (
 		mkdirSync(`${stageRoot}/agents`, { recursive: true });
 		copyFileSync(sessionPath, `${stageRoot}/agents/${sessionId}.jsonl`);
 
-		spawnLinks
-			.filter((spawn) => existsSync(`${sessionsDir}/${spawn.agent_id}.jsonl`))
-			.forEach((spawn) =>
-				copyFileSync(
-					`${sessionsDir}/${spawn.agent_id}.jsonl`,
-					`${stageRoot}/agents/${spawn.agent_id}.jsonl`,
-				),
+		const spawnsToCopy = spawnLinks.filter((spawn) =>
+			existsSync(`${sessionsDir}/${spawn.agent_id}.jsonl`),
+		);
+		for (const spawn of spawnsToCopy) {
+			copyFileSync(
+				`${sessionsDir}/${spawn.agent_id}.jsonl`,
+				`${stageRoot}/agents/${spawn.agent_id}.jsonl`,
 			);
+		}
 
 		if (existsSync(linksPath)) {
 			copyFileSync(linksPath, `${stageRoot}/links.jsonl`);

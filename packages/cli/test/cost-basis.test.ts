@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { toSummaryRow } from "../src/distill/analytics-summary";
-import { PRICING_VERSION, extractStats, repriceCostEstimate } from "../src/distill/stats";
+import { extractStats, PRICING_VERSION, repriceCostEstimate } from "../src/distill/stats";
 import type { CostEstimate, DistilledSession, StoredEvent } from "../src/types";
 
 // Cost-truth tiers (specs/analytics-truth-and-brush): the per-session cost is ALWAYS the
@@ -34,10 +34,7 @@ const makeEvent = (
 	...overrides,
 });
 
-const usageEvent = (
-	t: number,
-	usage: Readonly<Record<string, number>>,
-): StoredEvent =>
+const usageEvent = (t: number, usage: Readonly<Record<string, number>>): StoredEvent =>
 	makeEvent({
 		t,
 		event: "PostToolUse",
@@ -137,8 +134,16 @@ describe("extractStats — cost_basis resolution tiers", () => {
 	test("measured picks the largest captured value (cumulative session total, not a delta)", () => {
 		const events: StoredEvent[] = [
 			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: sessionContext }),
-			makeEvent({ t: 2000, event: "PostToolUse", data: { tool_name: "Read", tool_use_id: "t1", total_cost_usd: 1.0 } }),
-			makeEvent({ t: 3000, event: "PostToolUse", data: { tool_name: "Edit", tool_use_id: "t2", total_cost_usd: 4.0 } }),
+			makeEvent({
+				t: 2000,
+				event: "PostToolUse",
+				data: { tool_name: "Read", tool_use_id: "t1", total_cost_usd: 1.0 },
+			}),
+			makeEvent({
+				t: 3000,
+				event: "PostToolUse",
+				data: { tool_name: "Edit", tool_use_id: "t2", total_cost_usd: 4.0 },
+			}),
 			makeEvent({ t: 4000, event: "SessionEnd", data: {} }),
 		];
 
@@ -156,8 +161,10 @@ describe("extractStats — stored cost is full list price (no subscription multi
 	];
 
 	test("the 'max' tier does NOT change the stored API-equivalent cost", () => {
-		const apiCost = extractStats(buildTokenEvents(), [], undefined, "api").cost_estimate?.estimated_cost_usd;
-		const maxCost = extractStats(buildTokenEvents(), [], undefined, "max").cost_estimate?.estimated_cost_usd;
+		const apiCost = extractStats(buildTokenEvents(), [], undefined, "api").cost_estimate
+			?.estimated_cost_usd;
+		const maxCost = extractStats(buildTokenEvents(), [], undefined, "max").cost_estimate
+			?.estimated_cost_usd;
 		expect(apiCost).toBeGreaterThan(0);
 		expect(maxCost).toBe(apiCost);
 	});
@@ -301,14 +308,18 @@ describe("toSummaryRow — cost_basis + measured_cost_usd", () => {
 	});
 
 	test("measured_cost_usd is 0 for estimated rows", () => {
-		const row = toSummaryRow(makeDistilled(makeCostEstimate({ cost_basis: "estimated", estimated_cost_usd: 4.2 })));
+		const row = toSummaryRow(
+			makeDistilled(makeCostEstimate({ cost_basis: "estimated", estimated_cost_usd: 4.2 })),
+		);
 		expect(row.cost_usd).toBe(4.2);
 		expect(row.measured_cost_usd).toBe(0);
 	});
 
 	test("measured_cost_usd is 0 for heuristic rows", () => {
 		const row = toSummaryRow(
-			makeDistilled(makeCostEstimate({ cost_basis: "heuristic", is_estimated: true, estimated_cost_usd: 1.1 })),
+			makeDistilled(
+				makeCostEstimate({ cost_basis: "heuristic", is_estimated: true, estimated_cost_usd: 1.1 }),
+			),
 		);
 		expect(row.cost_basis).toBe("heuristic");
 		expect(row.measured_cost_usd).toBe(0);
@@ -321,7 +332,9 @@ describe("toSummaryRow — cost_basis + measured_cost_usd", () => {
 		// would inflate measured_cost_usd / measured_fraction and under-report the
 		// "X% estimated" badge; measured_cost_usd must therefore stay 0.
 		const row = toSummaryRow(
-			makeDistilled(makeCostEstimate({ cost_basis: undefined, is_estimated: false, estimated_cost_usd: 6.0 })),
+			makeDistilled(
+				makeCostEstimate({ cost_basis: undefined, is_estimated: false, estimated_cost_usd: 6.0 }),
+			),
 		);
 		expect(row.cost_basis).toBe("estimated");
 		expect(row.cost_usd).toBe(6.0);
@@ -330,7 +343,9 @@ describe("toSummaryRow — cost_basis + measured_cost_usd", () => {
 
 	test("back-compat: untagged estimate with is_estimated=true ⇒ heuristic", () => {
 		const row = toSummaryRow(
-			makeDistilled(makeCostEstimate({ cost_basis: undefined, is_estimated: true, estimated_cost_usd: 2.0 })),
+			makeDistilled(
+				makeCostEstimate({ cost_basis: undefined, is_estimated: true, estimated_cost_usd: 2.0 }),
+			),
 		);
 		expect(row.cost_basis).toBe("heuristic");
 		expect(row.measured_cost_usd).toBe(0);

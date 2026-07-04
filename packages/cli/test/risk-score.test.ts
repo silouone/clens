@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { computeFileRiskScores } from "../src/distill/risk-score";
 import type { DistilledSession } from "../src/types";
 
@@ -35,7 +35,14 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/clean.ts", reads: 2, edits: 1, writes: 0, errors: 0, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/clean.ts",
+							reads: 2,
+							edits: 1,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 			}),
@@ -53,11 +60,26 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/risky.ts", reads: 3, edits: 4, writes: 0, errors: 1, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/risky.ts",
+							reads: 3,
+							edits: 4,
+							writes: 0,
+							errors: 1,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 				backtracks: [
-					{ type: "failure_retry", tool_name: "Edit", file_path: "src/risky.ts", attempts: 2, start_t: 100, end_t: 200, tool_use_ids: ["t1", "t2"] },
+					{
+						type: "failure_retry",
+						tool_name: "Edit",
+						file_path: "src/risky.ts",
+						attempts: 2,
+						start_t: 100,
+						end_t: 200,
+						tool_use_ids: ["t1", "t2"],
+					},
 				],
 			}),
 		);
@@ -72,7 +94,14 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/abandoned.ts", reads: 1, edits: 3, writes: 0, errors: 0, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/abandoned.ts",
+							reads: 1,
+							edits: 3,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 				edit_chains: {
@@ -114,7 +143,14 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/bad.ts", reads: 5, edits: 8, writes: 0, errors: 3, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/bad.ts",
+							reads: 5,
+							edits: 8,
+							writes: 0,
+							errors: 3,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 				backtracks,
@@ -131,7 +167,14 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/messy.ts", reads: 1, edits: 6, writes: 0, errors: 0, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/messy.ts",
+							reads: 1,
+							edits: 6,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 				edit_chains: {
@@ -162,7 +205,14 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/failing.ts", reads: 1, edits: 5, writes: 0, errors: 2, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/failing.ts",
+							reads: 1,
+							edits: 5,
+							writes: 0,
+							errors: 2,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 				edit_chains: {
@@ -193,12 +243,34 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/clean.ts", reads: 1, edits: 1, writes: 0, errors: 0, tool_use_ids: ["t1"] },
-						{ file_path: "src/risky.ts", reads: 3, edits: 4, writes: 0, errors: 1, tool_use_ids: ["t2"] },
+						{
+							file_path: "src/clean.ts",
+							reads: 1,
+							edits: 1,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t1"],
+						},
+						{
+							file_path: "src/risky.ts",
+							reads: 3,
+							edits: 4,
+							writes: 0,
+							errors: 1,
+							tool_use_ids: ["t2"],
+						},
 					],
 				},
 				backtracks: [
-					{ type: "debugging_loop", tool_name: "Edit", file_path: "src/risky.ts", attempts: 3, start_t: 100, end_t: 200, tool_use_ids: ["t2"] },
+					{
+						type: "debugging_loop",
+						tool_name: "Edit",
+						file_path: "src/risky.ts",
+						attempts: 3,
+						start_t: 100,
+						end_t: 200,
+						tool_use_ids: ["t2"],
+					},
 				],
 			}),
 		);
@@ -217,12 +289,34 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/a.ts", reads: 1, edits: 1, writes: 0, errors: 0, tool_use_ids: ["t1"] },
-						{ file_path: "src/b.ts", reads: 1, edits: 1, writes: 0, errors: 0, tool_use_ids: ["t2"] },
+						{
+							file_path: "src/a.ts",
+							reads: 1,
+							edits: 1,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t1"],
+						},
+						{
+							file_path: "src/b.ts",
+							reads: 1,
+							edits: 1,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t2"],
+						},
 					],
 				},
 				backtracks: [
-					{ type: "failure_retry", tool_name: "Edit", file_path: "src/b.ts", attempts: 2, start_t: 100, end_t: 200, tool_use_ids: ["t2"] },
+					{
+						type: "failure_retry",
+						tool_name: "Edit",
+						file_path: "src/b.ts",
+						attempts: 2,
+						start_t: 100,
+						end_t: 200,
+						tool_use_ids: ["t2"],
+					},
 				],
 			}),
 		);
@@ -241,7 +335,14 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/readonly.ts", reads: 5, edits: 0, writes: 0, errors: 0, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/readonly.ts",
+							reads: 5,
+							edits: 0,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 			}),
@@ -259,13 +360,40 @@ describe("computeFileRiskScores", () => {
 			makeDistilled({
 				file_map: {
 					files: [
-						{ file_path: "src/multi.ts", reads: 1, edits: 4, writes: 0, errors: 0, tool_use_ids: ["t1"] },
+						{
+							file_path: "src/multi.ts",
+							reads: 1,
+							edits: 4,
+							writes: 0,
+							errors: 0,
+							tool_use_ids: ["t1"],
+						},
 					],
 				},
 				edit_chains: {
 					chains: [
-						{ file_path: "src/multi.ts", steps: [], total_edits: 2, total_failures: 0, total_reads: 1, effort_ms: 500, has_backtrack: false, surviving_edit_ids: ["e1", "e2"], abandoned_edit_ids: [] },
-						{ file_path: "src/multi.ts", steps: [], total_edits: 2, total_failures: 0, total_reads: 0, effort_ms: 300, has_backtrack: false, surviving_edit_ids: ["e3", "e4"], abandoned_edit_ids: [] },
+						{
+							file_path: "src/multi.ts",
+							steps: [],
+							total_edits: 2,
+							total_failures: 0,
+							total_reads: 1,
+							effort_ms: 500,
+							has_backtrack: false,
+							surviving_edit_ids: ["e1", "e2"],
+							abandoned_edit_ids: [],
+						},
+						{
+							file_path: "src/multi.ts",
+							steps: [],
+							total_edits: 2,
+							total_failures: 0,
+							total_reads: 0,
+							effort_ms: 300,
+							has_backtrack: false,
+							surviving_edit_ids: ["e3", "e4"],
+							abandoned_edit_ids: [],
+						},
 					],
 				},
 			}),

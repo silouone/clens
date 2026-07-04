@@ -11,10 +11,7 @@ export const findAgentInTree = (
 ): AgentNode | undefined =>
 	agents.reduce<AgentNode | undefined>(
 		(found, agent) =>
-			found ??
-			(agent.session_id === agentId
-				? agent
-				: findAgentInTree(agent.children, agentId)),
+			found ?? (agent.session_id === agentId ? agent : findAgentInTree(agent.children, agentId)),
 		undefined,
 	);
 

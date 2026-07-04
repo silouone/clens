@@ -1,6 +1,6 @@
-import { createMemo, For, Show, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
+import { type Component, createMemo, For, Show } from "solid-js";
 import { CATEGORY } from "../../../lib/categories";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── ReasoningWidget [agents] — Wave 1 ────────────────────────────────
@@ -48,8 +48,7 @@ const DECISION_LABELS: Readonly<Record<string, string>> = {
 	task_completion: "Task completions",
 };
 
-const decisionLabel = (type: string): string =>
-	DECISION_LABELS[type] ?? type.replace(/_/g, " ");
+const decisionLabel = (type: string): string => DECISION_LABELS[type] ?? type.replace(/_/g, " ");
 
 // Aggregate decisions by `type` into bar rows, widest = the most frequent kind.
 const buildDecisionRows = (decisions: readonly DecisionPoint[]): readonly DecisionRow[] => {

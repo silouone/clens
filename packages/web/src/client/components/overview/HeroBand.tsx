@@ -1,4 +1,4 @@
-import { Show, createMemo, createSignal, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, Show } from "solid-js";
 import type { DistilledSession } from "../../../shared/types";
 import { CATEGORY } from "../../lib/categories";
 import { formatCost, formatDuration, truncateMultiline } from "../../lib/format";
@@ -21,9 +21,7 @@ type HeroBandProps = {
 
 const stripHtml = (text: string): string => text.replace(/<[^>]+>/g, "");
 
-const findFirstPrompt = (
-	messages: DistilledSession["user_messages"],
-): string | undefined => {
+const findFirstPrompt = (messages: DistilledSession["user_messages"]): string | undefined => {
 	const msg = messages.find((m) => !m.message_type || m.message_type === "prompt");
 	if (!msg) return undefined;
 	const clean = stripHtml(msg.content).trim();
@@ -48,7 +46,7 @@ export const HeroBand: Component<HeroBandProps> = (props) => {
 		if (!text) return { text: "", truncated: false };
 		return truncateMultiline(text, 3);
 	});
-	const displayText = () => (expanded() ? rawPrompt() ?? "" : truncated().text);
+	const displayText = () => (expanded() ? (rawPrompt() ?? "") : truncated().text);
 
 	// -- Narrative ------------------------------------------------------
 	const narrative = () => session().summary?.narrative;
@@ -61,11 +59,9 @@ export const HeroBand: Component<HeroBandProps> = (props) => {
 	// Wall span is the headline (matches the session list, locked B2 semantic);
 	// active = idle-trimmed working time, surfaced as a sub-line so the tile
 	// reconciles with the "what happened" narrative instead of contradicting it.
-	const durationMs = () =>
-		session().stats.wall_duration_ms ?? session().stats.duration_ms;
+	const durationMs = () => session().stats.wall_duration_ms ?? session().stats.duration_ms;
 	const activeMs = () => session().summary?.key_metrics.active_duration_ms;
-	const cost = () =>
-		(session().cost_estimate ?? session().stats.cost_estimate)?.estimated_cost_usd;
+	const cost = () => (session().cost_estimate ?? session().stats.cost_estimate)?.estimated_cost_usd;
 	const costIsEstimated = () =>
 		(session().cost_estimate ?? session().stats.cost_estimate)?.is_estimated;
 	const toolCalls = () =>
@@ -115,6 +111,7 @@ export const HeroBand: Component<HeroBandProps> = (props) => {
 						/>
 						<Show when={truncated().truncated}>
 							<button
+								type="button"
 								onClick={() => setExpanded((prev) => !prev)}
 								class="instrument-microcaps text-[10px] text-brand-500 transition hover:text-brand-600 dark:text-brand-400"
 							>
@@ -127,9 +124,7 @@ export const HeroBand: Component<HeroBandProps> = (props) => {
 				{/* Promoted narrative — "what happened" (verbatim, never markdown) */}
 				<Show when={hasNarrative()}>
 					<div>
-						<h4 class="instrument-microcaps mb-1 text-[10px] text-muted">
-							What Happened
-						</h4>
+						<h4 class="instrument-microcaps mb-1 text-[10px] text-muted">What Happened</h4>
 						<div
 							class="prose-sm-dark text-sm leading-relaxed text-muted"
 							innerHTML={renderPlainText(narrative() ?? "")}

@@ -161,10 +161,7 @@ describe("buildTeamPhases", () => {
 	});
 
 	test("events with no task links but with other link types produce single Build phase", () => {
-		const events: readonly StoredEvent[] = [
-			mkToolEvent(1000, "Read"),
-			mkToolEvent(2000, "Edit"),
-		];
+		const events: readonly StoredEvent[] = [mkToolEvent(1000, "Read"), mkToolEvent(2000, "Edit")];
 		const links: readonly LinkEvent[] = [
 			mkSpawnLink({ t: 1000 }),
 			{
@@ -215,9 +212,7 @@ describe("buildTeamPhases", () => {
 			mkToolEvent(t, "Edit"),
 			mkToolEvent(t, "Bash"),
 		];
-		const links: readonly LinkEvent[] = [
-			mkTaskLink({ t, action: "assign", agent: "builder-1" }),
-		];
+		const links: readonly LinkEvent[] = [mkTaskLink({ t, action: "assign", agent: "builder-1" })];
 
 		const result = buildTeamPhases(events, links);
 

@@ -3,6 +3,7 @@ import {
 	CONTENT_SCROLL_TABS,
 	createInitialState,
 	DETAIL_TABS,
+	type DetailTab,
 	filterFilesByAgent,
 	getEditsFileList,
 	getVisibleTabs,
@@ -10,7 +11,6 @@ import {
 	nextTab,
 	nextTimelineFilter,
 	prevTab,
-	type DetailTab,
 	type TuiState,
 } from "../src/commands/tui-state";
 import type {
@@ -89,8 +89,16 @@ const makeState = (overrides?: Partial<TuiState>): TuiState => ({
 	selectedIndex: 0,
 	detailTab: "overview",
 	visibleTabs: [
-		"overview", "backtracks", "decisions", "reasoning",
-		"edits", "timeline", "drift", "agents", "messages", "graph",
+		"overview",
+		"backtracks",
+		"decisions",
+		"reasoning",
+		"edits",
+		"timeline",
+		"drift",
+		"agents",
+		"messages",
+		"graph",
 	],
 	agentIndex: 0,
 	projectDir: "/tmp/test",
@@ -183,9 +191,7 @@ describe("getVisibleTabs", () => {
 
 	test("includes decisions tab when decisions exist", () => {
 		const distilled = makeDistilled({
-			decisions: [
-				{ type: "timing_gap", t: 1000, gap_ms: 5000, classification: "user_idle" },
-			],
+			decisions: [{ type: "timing_gap", t: 1000, gap_ms: 5000, classification: "user_idle" }],
 		});
 		const tabs = getVisibleTabs(distilled);
 		expect(tabs).toContain("decisions");
@@ -288,9 +294,7 @@ describe("getVisibleTabs", () => {
 					file_path: "a.ts",
 				},
 			],
-			decisions: [
-				{ type: "timing_gap", t: 1000, gap_ms: 5000, classification: "user_idle" },
-			],
+			decisions: [{ type: "timing_gap", t: 1000, gap_ms: 5000, classification: "user_idle" }],
 			reasoning: [{ thinking: "reasoning", intent_hint: "planning", t: 1000 }],
 			file_map: { files: [makeFileMapEntry()] },
 			timeline: [makeTimelineEntry()],
@@ -407,7 +411,10 @@ describe("prevTab", () => {
 
 describe("filterFilesByAgent", () => {
 	test("returns all files when no agent filter is set", () => {
-		const files = [makeFileMapEntry({ file_path: "a.ts" }), makeFileMapEntry({ file_path: "b.ts" })];
+		const files = [
+			makeFileMapEntry({ file_path: "a.ts" }),
+			makeFileMapEntry({ file_path: "b.ts" }),
+		];
 		const state = makeState({
 			selectedSession: makeDistilled({ file_map: { files } }),
 		});
@@ -913,10 +920,7 @@ describe("handleKey - session_detail", () => {
 
 	test("down in agents tab caps at last agent", () => {
 		const distilled = makeDistilled({
-			agents: [
-				makeAgent({ session_id: "a1" }),
-				makeAgent({ session_id: "a2" }),
-			],
+			agents: [makeAgent({ session_id: "a1" }), makeAgent({ session_id: "a2" })],
 		});
 		const state = makeState({
 			view: "session_detail",
@@ -1032,9 +1036,7 @@ describe("handleKey - session_detail", () => {
 
 	test("a in edits cycles back to undefined after last agent", () => {
 		const distilled = makeDistilled({
-			agents: [
-				makeAgent({ session_id: "a1", agent_name: "builder-a", children: [] }),
-			],
+			agents: [makeAgent({ session_id: "a1", agent_name: "builder-a", children: [] })],
 		});
 		const state = makeState({
 			view: "session_detail",

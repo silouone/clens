@@ -419,7 +419,7 @@ const makeDistilledSession = (sessionId: string): DistilledSession => {
 								estimated_input_tokens: 25000,
 								estimated_output_tokens: 8000,
 								estimated_cost_usd: 0.15,
-							is_estimated: false,
+								is_estimated: false,
 							},
 						},
 					],
@@ -438,16 +438,18 @@ const makeDistilledSession = (sessionId: string): DistilledSession => {
 		: undefined;
 
 	const commGraph: readonly CommunicationEdge[] = isTeamSession
-		? [{
-			from_id: CHILD_SESSION_ID,
-			from_name: "builder-1",
-			to_id: SESSION_1_ID,
-			to_name: "team-lead",
-			from: "builder-1",
-			to: "team-lead",
-			count: 1,
-			msg_types: ["message"],
-		}]
+		? [
+				{
+					from_id: CHILD_SESSION_ID,
+					from_name: "builder-1",
+					to_id: SESSION_1_ID,
+					to_name: "team-lead",
+					from: "builder-1",
+					to: "team-lead",
+					count: 1,
+					msg_types: ["message"],
+				},
+			]
 		: [];
 
 	const teamMetrics: TeamMetrics | undefined = isTeamSession
@@ -578,8 +580,20 @@ const makeDistilledSession = (sessionId: string): DistilledSession => {
 					: [],
 			agent_workload: isTeamSession
 				? [
-						{ name: "team-lead", id: SESSION_1_ID, tool_calls: 22, files_modified: 4, duration_ms: 45000 },
-						{ name: "builder-1", id: CHILD_SESSION_ID, tool_calls: 15, files_modified: 3, duration_ms: 12000 },
+						{
+							name: "team-lead",
+							id: SESSION_1_ID,
+							tool_calls: 22,
+							files_modified: 4,
+							duration_ms: 45000,
+						},
+						{
+							name: "builder-1",
+							id: CHILD_SESSION_ID,
+							tool_calls: 15,
+							files_modified: 3,
+							duration_ms: 12000,
+						},
 					]
 				: undefined,
 		},

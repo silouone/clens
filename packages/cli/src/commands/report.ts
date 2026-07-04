@@ -88,7 +88,9 @@ const formatTopTools = (toolsByName: Readonly<Record<string, number>>): string =
 export const renderReportDefault = (distilled: DistilledSession): string => {
 	const { stats, backtracks, summary } = distilled;
 	const sessionPrefix = distilled.session_id.slice(0, 8);
-	const nameStr = distilled.session_name ? `${distilled.session_name} (${sessionPrefix})` : sessionPrefix;
+	const nameStr = distilled.session_name
+		? `${distilled.session_name} (${sessionPrefix})`
+		: sessionPrefix;
 
 	// Header line: session, date, duration, model, cost
 	const startTime = distilled.start_time ?? distilled.timeline?.[0]?.t;
@@ -124,7 +126,9 @@ export const renderReportDefault = (distilled: DistilledSession): string => {
 	const outcomeParts = [
 		`${filesModified} files changed`,
 		commitCount > 0 ? `${commitCount} commit${commitCount === 1 ? "" : "s"}` : undefined,
-	].filter(Boolean).join(", ");
+	]
+		.filter(Boolean)
+		.join(", ");
 	const outcomeLine = `  ${bold("Outcome:")} ${outcomeParts}`;
 
 	// Backtracks section
@@ -143,9 +147,8 @@ export const renderReportDefault = (distilled: DistilledSession): string => {
 				return `    ${file} -- ${typeLabel(bt.type)}, ${bt.attempts} attempts`;
 			});
 
-		const moreLine = backtracks.length > 3
-			? [`    ${dim(`... and ${backtracks.length - 3} more`)}`]
-			: [];
+		const moreLine =
+			backtracks.length > 3 ? [`    ${dim(`... and ${backtracks.length - 3} more`)}`] : [];
 
 		return ["", severityLine, ...top3, ...moreLine];
 	})();
@@ -261,7 +264,9 @@ export const reportCommand = async (args: {
 			console.log("No backtracks detected -- clean session");
 			return;
 		}
-		console.log(args.detail ? renderBacktracksDetail(distilled) : renderBacktracksSummary(distilled));
+		console.log(
+			args.detail ? renderBacktracksDetail(distilled) : renderBacktracksSummary(distilled),
+		);
 		return;
 	}
 
@@ -331,14 +336,16 @@ export const reportCommand = async (args: {
 			return;
 		}
 		if (distilled.reasoning.length === 0) {
-			console.log("No reasoning data found. Run 'clens distill' to extract reasoning from transcripts.");
+			console.log(
+				"No reasoning data found. Run 'clens distill' to extract reasoning from transcripts.",
+			);
 			return;
 		}
-		console.log(args.full ? renderReasoningFull(distilled, args.intent) : renderReasoningSummary(distilled));
+		console.log(
+			args.full ? renderReasoningFull(distilled, args.intent) : renderReasoningSummary(distilled),
+		);
 		return;
 	}
 
-	throw new Error(
-		`Unknown report subcommand: '${sub}'. Available: backtracks, drift, reasoning`,
-	);
+	throw new Error(`Unknown report subcommand: '${sub}'. Available: backtracks, drift, reasoning`);
 };

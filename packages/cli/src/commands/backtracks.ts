@@ -92,9 +92,7 @@ const findHotFiles = (
 /**
  * Find the costliest backtrack (highest attempt count).
  */
-const findCostliest = (
-	backtracks: readonly BacktrackResult[],
-): BacktrackResult | undefined =>
+const findCostliest = (backtracks: readonly BacktrackResult[]): BacktrackResult | undefined =>
 	backtracks.length === 0
 		? undefined
 		: backtracks.reduce((worst, bt) => (bt.attempts > worst.attempts ? bt : worst));
@@ -196,4 +194,3 @@ export const renderBacktracksDetail = (distilled: DistilledSession): string => {
 
 	return [header, "", ...joined].join("\n");
 };
-

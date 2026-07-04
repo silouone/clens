@@ -85,7 +85,14 @@ describe("buildCommGraph", () => {
 
 	test("includes task_complete alongside message edges", () => {
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "child", agent_type: "builder", agent_name: "worker" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "child",
+				agent_type: "builder",
+				agent_name: "worker",
+			},
 			makeMessageLink({ t: 2000, from: "lead", to: "worker", msg_type: "message" }),
 			{ t: 3000, type: "task_complete", task_id: "t1", agent: "worker", subject: "Done" },
 		];
@@ -178,7 +185,14 @@ describe("buildCommGraph with nameMap", () => {
 describe("buildCommGraph with task-based coordination", () => {
 	test("creates task_complete edges from task_complete links", () => {
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "child-1", agent_type: "builder", agent_name: "builder-a" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "child-1",
+				agent_type: "builder",
+				agent_name: "builder-a",
+			},
 			{ t: 2000, type: "task_complete", task_id: "t1", agent: "builder-a", subject: "Done" },
 			{ t: 3000, type: "task_complete", task_id: "t2", agent: "builder-a", subject: "Also done" },
 		];
@@ -192,7 +206,14 @@ describe("buildCommGraph with task-based coordination", () => {
 
 	test("creates idle_notify edges from teammate_idle links", () => {
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "child-1", agent_type: "builder", agent_name: "builder-a" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "child-1",
+				agent_type: "builder",
+				agent_name: "builder-a",
+			},
 			{ t: 2000, type: "teammate_idle", teammate: "builder-a" },
 			{ t: 3000, type: "teammate_idle", teammate: "builder-a" },
 		];
@@ -205,8 +226,23 @@ describe("buildCommGraph with task-based coordination", () => {
 
 	test("creates task_assign edges from task links with assign action", () => {
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "child-1", agent_type: "builder", agent_name: "builder-a" },
-			{ t: 2000, type: "task", action: "assign", task_id: "t1", session_id: "root", agent: "leader", owner: "builder-a" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "child-1",
+				agent_type: "builder",
+				agent_name: "builder-a",
+			},
+			{
+				t: 2000,
+				type: "task",
+				action: "assign",
+				task_id: "t1",
+				session_id: "root",
+				agent: "leader",
+				owner: "builder-a",
+			},
 		];
 		const result = buildCommGraph(links);
 		const assignEdges = result.filter((e) => e.edge_type === "task_assign");
@@ -218,7 +254,14 @@ describe("buildCommGraph with task-based coordination", () => {
 
 	test("ignores task links with create action (not assign)", () => {
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "task", action: "create", task_id: "t1", session_id: "root", subject: "Work" },
+			{
+				t: 1000,
+				type: "task",
+				action: "create",
+				task_id: "t1",
+				session_id: "root",
+				subject: "Work",
+			},
 		];
 		const result = buildCommGraph(links);
 		expect(result.length).toBe(0);
@@ -226,7 +269,14 @@ describe("buildCommGraph with task-based coordination", () => {
 
 	test("combines message and task-based edges together", () => {
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "child-1", agent_type: "builder", agent_name: "builder-a" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "child-1",
+				agent_type: "builder",
+				agent_name: "builder-a",
+			},
 			makeMessageLink({ t: 2000, from: "root", to: "builder-a", msg_type: "message" }),
 			{ t: 3000, type: "task_complete", task_id: "t1", agent: "builder-a", subject: "Done" },
 			{ t: 4000, type: "teammate_idle", teammate: "builder-a" },
@@ -241,7 +291,13 @@ describe("buildCommGraph with task-based coordination", () => {
 
 	test("handles null agent_name gracefully by using agent_id", () => {
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "uuid-abc", agent_type: "builder" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "uuid-abc",
+				agent_type: "builder",
+			},
 			{ t: 2000, type: "task_complete", task_id: "t1", agent: "uuid-abc" },
 		];
 		const result = buildCommGraph(links);
@@ -253,8 +309,21 @@ describe("buildCommGraph with task-based coordination", () => {
 	test("buildNameMap generates fallback names for agents without agent_name", () => {
 		const { buildNameMap } = require("../src/utils");
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "abcd1234-5678", agent_type: "builder" },
-			{ t: 2000, type: "spawn", parent_session: "root", agent_id: "efgh5678-9abc", agent_type: "reviewer", agent_name: "my-reviewer" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "abcd1234-5678",
+				agent_type: "builder",
+			},
+			{
+				t: 2000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "efgh5678-9abc",
+				agent_type: "reviewer",
+				agent_name: "my-reviewer",
+			},
 		];
 		const nameMap = buildNameMap(links);
 		// Agent without name gets fallback: agent_type
@@ -266,7 +335,13 @@ describe("buildCommGraph with task-based coordination", () => {
 	test("nameMap with generated fallback names resolves comm graph edges", () => {
 		const { buildNameMap } = require("../src/utils");
 		const links: readonly LinkEvent[] = [
-			{ t: 1000, type: "spawn", parent_session: "root", agent_id: "uuid-nona", agent_type: "builder" },
+			{
+				t: 1000,
+				type: "spawn",
+				parent_session: "root",
+				agent_id: "uuid-nona",
+				agent_type: "builder",
+			},
 			makeMessageLink({ t: 2000, from: "root", to: "builder-uuid", msg_type: "message" }),
 			{ t: 3000, type: "task_complete", task_id: "t1", agent: "builder-uuid" },
 		];
@@ -276,4 +351,3 @@ describe("buildCommGraph with task-based coordination", () => {
 		expect(result.length).toBeGreaterThan(0);
 	});
 });
-

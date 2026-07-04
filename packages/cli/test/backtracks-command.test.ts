@@ -1,17 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { renderBacktracksSummary, renderBacktracksDetail } from "../src/commands/backtracks";
+import { renderBacktracksDetail, renderBacktracksSummary } from "../src/commands/backtracks";
 import type { BacktrackResult, DistilledSession } from "../src/types";
 
 // -- ANSI stripping helper --
 
-const stripAnsi = (s: string): string =>
-	s.replace(/\x1b\[[0-9;]*m/g, "");
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require the ESC control char
+const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 // -- Fixture factories --
 
-const makeBacktrack = (
-	overrides: Partial<BacktrackResult> = {},
-): BacktrackResult => ({
+const makeBacktrack = (overrides: Partial<BacktrackResult> = {}): BacktrackResult => ({
 	type: "failure_retry",
 	tool_name: "Edit",
 	file_path: "src/foo.ts",
@@ -23,9 +21,7 @@ const makeBacktrack = (
 	...overrides,
 });
 
-const makeDistilled = (
-	overrides: Partial<DistilledSession> = {},
-): DistilledSession => ({
+const makeDistilled = (overrides: Partial<DistilledSession> = {}): DistilledSession => ({
 	session_id: "test1234-5678-uuid",
 	stats: {
 		duration_ms: 60000,
@@ -150,9 +146,7 @@ describe("renderBacktracksSummary", () => {
 	});
 
 	test("time summary shows backtracking duration and percentage", () => {
-		const backtracks = [
-			makeBacktrack({ start_t: 0, end_t: 15000 }),
-		];
+		const backtracks = [makeBacktrack({ start_t: 0, end_t: 15000 })];
 		const distilled = makeDistilled({
 			backtracks,
 			stats: {
@@ -178,10 +172,7 @@ describe("renderBacktracksSummary", () => {
 
 describe("renderBacktracksDetail", () => {
 	test("renders numbered headers for 2 backtracks", () => {
-		const backtracks = [
-			makeBacktrack({ tool_name: "Edit" }),
-			makeBacktrack({ tool_name: "Bash" }),
-		];
+		const backtracks = [makeBacktrack({ tool_name: "Edit" }), makeBacktrack({ tool_name: "Bash" })];
 		const distilled = makeDistilled({ backtracks });
 		const output = stripAnsi(renderBacktracksDetail(distilled));
 		expect(output).toContain("#1");
@@ -189,9 +180,7 @@ describe("renderBacktracksDetail", () => {
 	});
 
 	test("detail view shows tool name and attempts", () => {
-		const backtracks = [
-			makeBacktrack({ tool_name: "Edit", attempts: 5 }),
-		];
+		const backtracks = [makeBacktrack({ tool_name: "Edit", attempts: 5 })];
 		const distilled = makeDistilled({ backtracks });
 		const output = stripAnsi(renderBacktracksDetail(distilled));
 		expect(output).toContain("Tool:       Edit");
@@ -199,50 +188,37 @@ describe("renderBacktracksDetail", () => {
 	});
 
 	test("detail view shows file path when present", () => {
-		const backtracks = [
-			makeBacktrack({ file_path: "src/index.ts" }),
-		];
+		const backtracks = [makeBacktrack({ file_path: "src/index.ts" })];
 		const distilled = makeDistilled({ backtracks });
 		const output = stripAnsi(renderBacktracksDetail(distilled));
 		expect(output).toContain("File:       src/index.ts");
 	});
 
 	test("detail view omits file path when absent", () => {
-		const backtracks = [
-			makeBacktrack({ file_path: undefined }),
-		];
+		const backtracks = [makeBacktrack({ file_path: undefined })];
 		const distilled = makeDistilled({ backtracks });
 		const output = stripAnsi(renderBacktracksDetail(distilled));
 		expect(output).not.toContain("File:");
 	});
 
 	test("detail header shows correct backtrack count", () => {
-		const backtracks = [
-			makeBacktrack({}),
-			makeBacktrack({}),
-			makeBacktrack({}),
-		];
+		const backtracks = [makeBacktrack({}), makeBacktrack({}), makeBacktrack({})];
 		const distilled = makeDistilled({ backtracks });
 		const output = stripAnsi(renderBacktracksDetail(distilled));
 		expect(output).toContain("3 Backtracks (Detail)");
 	});
 
 	test("detail view shows error message when present", () => {
-		const backtracks = [
-			makeBacktrack({ error_message: "Permission denied" }),
-		];
+		const backtracks = [makeBacktrack({ error_message: "Permission denied" })];
 		const distilled = makeDistilled({ backtracks });
 		const output = stripAnsi(renderBacktracksDetail(distilled));
 		expect(output).toContain("Error:      Permission denied");
 	});
 
 	test("detail view shows command when present", () => {
-		const backtracks = [
-			makeBacktrack({ command: "bun test" }),
-		];
+		const backtracks = [makeBacktrack({ command: "bun test" })];
 		const distilled = makeDistilled({ backtracks });
 		const output = stripAnsi(renderBacktracksDetail(distilled));
 		expect(output).toContain("Command:    bun test");
 	});
 });
-

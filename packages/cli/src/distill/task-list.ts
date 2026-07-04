@@ -1,7 +1,8 @@
 import type { LinkEvent, TaskCompleteLink, TaskLink, TaskListResult, TaskRecord } from "../types";
 
 const isTaskLink = (link: LinkEvent): link is TaskLink => link.type === "task";
-const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink => link.type === "task_complete";
+const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink =>
+	link.type === "task_complete";
 
 const buildTaskFromCreate = (link: TaskLink, ordinal: number): TaskRecord => ({
 	task_id: link.task_id || `task-${ordinal}`,
@@ -17,9 +18,7 @@ const applyUpdate = (existing: TaskRecord, link: TaskLink): TaskRecord => ({
 	...existing,
 	...(link.owner ? { owner: link.owner } : {}),
 	...(link.status === "in_progress" ? { status: "in_progress" as const } : {}),
-	...(link.status === "completed"
-		? { status: "completed" as const, completed_at: link.t }
-		: {}),
+	...(link.status === "completed" ? { status: "completed" as const, completed_at: link.t } : {}),
 	...(link.blocked_by && link.blocked_by.length > 0 ? { blocked_by: link.blocked_by } : {}),
 });
 
@@ -84,7 +83,9 @@ export const extractTaskList = (links: readonly LinkEvent[]): TaskListResult => 
 	}, new Map());
 
 	// Apply updates (assign, status_change) — with ID reconciliation
-	const updateLinks = taskLinks.filter((l) => l.action === "assign" || l.action === "status_change");
+	const updateLinks = taskLinks.filter(
+		(l) => l.action === "assign" || l.action === "status_change",
+	);
 	const updatedMap = updateLinks.reduce<ReadonlyMap<string, TaskRecord>>((acc, link) => {
 		const { record: existing, map: reconciled } = resolveTask(acc, link.task_id);
 		if (!existing) return acc;

@@ -11,8 +11,10 @@ import type {
 import { resolveId, resolveName, resolveParentSession } from "../utils";
 
 const isMessageLink = (link: LinkEvent): link is MessageLink => link.type === "msg_send";
-const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink => link.type === "task_complete";
-const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink => link.type === "teammate_idle";
+const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink =>
+	link.type === "task_complete";
+const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink =>
+	link.type === "teammate_idle";
 const isTaskLink = (link: LinkEvent): link is TaskLink => link.type === "task";
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
 
@@ -35,14 +37,16 @@ const buildMessageEdges = (
 	links: readonly LinkEvent[],
 	nameMap?: ReadonlyMap<string, string>,
 ): readonly RawEdge[] =>
-	links.filter(isMessageLink).map((msg): RawEdge => ({
-		from_id: msg.from,
-		from_name: msg.from_name ?? (nameMap ? resolveName(msg.from, nameMap) : msg.from),
-		to_id: msg.to_id ?? (nameMap ? resolveId(msg.to, nameMap) : msg.to),
-		to_name: nameMap ? resolveName(msg.to, nameMap) : msg.to,
-		edge_type: "message",
-		msg_type: msg.msg_type,
-	}));
+	links.filter(isMessageLink).map(
+		(msg): RawEdge => ({
+			from_id: msg.from,
+			from_name: msg.from_name ?? (nameMap ? resolveName(msg.from, nameMap) : msg.from),
+			to_id: msg.to_id ?? (nameMap ? resolveId(msg.to, nameMap) : msg.to),
+			to_name: nameMap ? resolveName(msg.to, nameMap) : msg.to,
+			edge_type: "message",
+			msg_type: msg.msg_type,
+		}),
+	);
 
 /**
  * Build edges from task_complete links: completer -> parent session.

@@ -1,12 +1,5 @@
-import {
-	createSignal,
-	createEffect,
-	onCleanup,
-	Show,
-	type Component,
-	type JSX,
-} from "solid-js";
-import { ChevronDown, ChevronUp, ChevronRight, ChevronLeft } from "lucide-solid";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-solid";
+import { type Component, createEffect, createSignal, type JSX, onCleanup, Show } from "solid-js";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -91,7 +84,8 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 
 	const clampRatio = (r: number): number => {
 		if (!containerRef) return r;
-		const totalSize = (isVertical() ? containerRef.offsetHeight : containerRef.offsetWidth) - HANDLE_WIDTH_PX;
+		const totalSize =
+			(isVertical() ? containerRef.offsetHeight : containerRef.offsetWidth) - HANDLE_WIDTH_PX;
 		if (totalSize <= 0) return r;
 		const minRatio = MIN_WIDTH_PX / totalSize;
 		const maxRatio = 1 - minRatio;
@@ -205,24 +199,34 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 					"cursor-row-resize": isVertical(),
 					"cursor-col-resize": !isVertical(),
 				}}
-				style={isVertical()
-					? { height: `${HANDLE_WIDTH_PX}px` }
-					: { width: `${HANDLE_WIDTH_PX}px` }
+				style={
+					isVertical() ? { height: `${HANDLE_WIDTH_PX}px` } : { width: `${HANDLE_WIDTH_PX}px` }
 				}
-				onMouseDown={onMouseDown}
-				onKeyDown={onKeyDown}
-				tabIndex={0}
-				role="separator"
-				aria-orientation={isVertical() ? "horizontal" : "vertical"}
-				aria-valuenow={Math.round(ratio() * 100)}
-				aria-valuemin={0}
-				aria-valuemax={100}
-				aria-label="Resize panes"
 			>
+				{/* Focusable splitter surface (semantic <hr> implies role="separator") */}
+				<hr
+					class="absolute inset-0 m-0 border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+					classList={{
+						"cursor-row-resize": isVertical(),
+						"cursor-col-resize": !isVertical(),
+					}}
+					tabIndex={0}
+					aria-orientation={isVertical() ? "horizontal" : "vertical"}
+					aria-valuenow={Math.round(ratio() * 100)}
+					aria-valuemin={0}
+					aria-valuemax={100}
+					aria-label="Resize panes"
+					onMouseDown={onMouseDown}
+					onKeyDown={onKeyDown}
+				/>
 				{/* Collapse / expand affordance */}
 				<Show when={collapsed() === "left"}>
 					<button
-						onClick={(e) => { e.stopPropagation(); toggleCollapseLeft(); }}
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							toggleCollapseLeft();
+						}}
 						class="absolute z-10 flex items-center justify-center rounded-none border border-clens bg-surface-raised p-0.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"-left-3 top-1/2 -translate-y-1/2": !isVertical(),
@@ -236,7 +240,11 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 				</Show>
 				<Show when={collapsed() === "right"}>
 					<button
-						onClick={(e) => { e.stopPropagation(); toggleCollapseRight(); }}
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							toggleCollapseRight();
+						}}
 						class="absolute z-10 flex items-center justify-center rounded-none border border-clens bg-surface-raised p-0.5 text-muted transition hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"-right-3 top-1/2 -translate-y-1/2": !isVertical(),
@@ -250,7 +258,10 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 				</Show>
 				<Show when={collapsed() === "none"}>
 					{/* Drag indicator dots */}
-					<div class="flex items-center justify-center gap-0.5" classList={{ "flex-col": !isVertical() }}>
+					<div
+						class="pointer-events-none flex items-center justify-center gap-0.5"
+						classList={{ "flex-col": !isVertical() }}
+					>
 						<div class="h-1 w-1 rounded-none bg-muted" />
 						<div class="h-1 w-1 rounded-none bg-muted" />
 						<div class="h-1 w-1 rounded-none bg-muted" />
@@ -258,7 +269,11 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 					</div>
 					{/* Collapse buttons on hover */}
 					<button
-						onClick={(e) => { e.stopPropagation(); toggleCollapseLeft(); }}
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							toggleCollapseLeft();
+						}}
 						class="absolute z-10 rounded-none border border-clens bg-surface-raised p-0.5 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"left-0 top-1/2 -translate-y-1/2 -translate-x-full": !isVertical(),
@@ -270,7 +285,11 @@ export const SplitPane: Component<SplitPaneProps> = (props) => {
 						{isVertical() ? <ChevronUp class="h-3 w-3" /> : <ChevronLeft class="h-3 w-3" />}
 					</button>
 					<button
-						onClick={(e) => { e.stopPropagation(); toggleCollapseRight(); }}
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							toggleCollapseRight();
+						}}
 						class="absolute z-10 rounded-none border border-clens bg-surface-raised p-0.5 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-hover hover:text-secondary"
 						classList={{
 							"right-0 top-1/2 -translate-y-1/2 translate-x-full": !isVertical(),

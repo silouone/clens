@@ -1,6 +1,6 @@
-import { For, Show, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
+import { type Component, For, Show } from "solid-js";
 import { MetaRow } from "../../ui/MetaRow";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── ConfigWidget [context] — Wave 1 ──────────────────────────────────
@@ -109,10 +109,7 @@ export const ConfigWidget: Component<WidgetProps> = (props) => {
 
 	return (
 		<Widget category="context" title="Config / Environment" span={6}>
-			<Show
-				when={config()}
-				fallback={<p class="text-xs italic text-muted">No config captured</p>}
-			>
+			<Show when={config()} fallback={<p class="text-xs italic text-muted">No config captured</p>}>
 				{(cfg) => (
 					<Show
 						when={hasSignal(cfg(), model())}
@@ -132,16 +129,10 @@ export const ConfigWidget: Component<WidgetProps> = (props) => {
 
 							{/* Extensions — MCP servers (or an explicit "none used") */}
 							<div class="space-y-1 border-t border-clens pt-2">
-								<h4 class="instrument-microcaps text-[10px] text-muted">
-									MCP servers
-								</h4>
+								<h4 class="instrument-microcaps text-[10px] text-muted">MCP servers</h4>
 								<Show
 									when={cfg().mcp_servers.length > 0}
-									fallback={
-										<p class="instrument-microcaps text-[10px] text-muted">
-											None used
-										</p>
-									}
+									fallback={<p class="instrument-microcaps text-[10px] text-muted">None used</p>}
 								>
 									<div class="space-y-1">
 										<For each={cfg().mcp_servers}>

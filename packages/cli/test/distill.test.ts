@@ -754,7 +754,12 @@ describe("extractStats - real token usage", () => {
 				data: {
 					tool_name: "Read",
 					tool_use_id: "t1",
-					usage: { input_tokens: 1000, output_tokens: 500, cache_read_tokens: 200, cache_creation_tokens: 100 },
+					usage: {
+						input_tokens: 1000,
+						output_tokens: 500,
+						cache_read_tokens: 200,
+						cache_creation_tokens: 100,
+					},
 				},
 			}),
 			makeEvent({ t: 4000, event: "SessionEnd", data: {} }),
@@ -775,12 +780,20 @@ describe("extractStats - real token usage", () => {
 			makeEvent({
 				t: 2000,
 				event: "PostToolUse",
-				data: { tool_name: "Read", tool_use_id: "t1", usage: { input_tokens: 500, output_tokens: 200 } },
+				data: {
+					tool_name: "Read",
+					tool_use_id: "t1",
+					usage: { input_tokens: 500, output_tokens: 200 },
+				},
 			}),
 			makeEvent({
 				t: 3000,
 				event: "PostToolUse",
-				data: { tool_name: "Edit", tool_use_id: "t2", usage: { input_tokens: 800, output_tokens: 300 } },
+				data: {
+					tool_name: "Edit",
+					tool_use_id: "t2",
+					usage: { input_tokens: 800, output_tokens: 300 },
+				},
 			}),
 			makeEvent({ t: 4000, event: "SessionEnd", data: {} }),
 		];
@@ -812,7 +825,12 @@ describe("extractStats - real token usage", () => {
 				data: {
 					tool_name: "Read",
 					tool_use_id: "t1",
-					usage: { input_tokens: 1000, output_tokens: 500, cache_read_tokens: 200, cache_creation_tokens: 100 },
+					usage: {
+						input_tokens: 1000,
+						output_tokens: 500,
+						cache_read_tokens: 200,
+						cache_creation_tokens: 100,
+					},
 				},
 			}),
 			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
@@ -843,7 +861,11 @@ describe("extractStats - real token usage", () => {
 			makeEvent({
 				t: 2000,
 				event: "PostToolUse",
-				data: { tool_name: "Read", tool_use_id: "t1", token_usage: { input_tokens: 750, output_tokens: 250 } },
+				data: {
+					tool_name: "Read",
+					tool_use_id: "t1",
+					token_usage: { input_tokens: 750, output_tokens: 250 },
+				},
 			}),
 			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
 		];
@@ -918,7 +940,12 @@ describe("extractStats - 3-tier cost resolution", () => {
 				data: {
 					tool_name: "Read",
 					tool_use_id: "t1",
-					usage: { input_tokens: 800, output_tokens: 400, cache_read_tokens: 50, cache_creation_tokens: 25 },
+					usage: {
+						input_tokens: 800,
+						output_tokens: 400,
+						cache_read_tokens: 50,
+						cache_creation_tokens: 25,
+					},
 				},
 			}),
 			makeEvent({ t: 3000, event: "SessionEnd", data: {} }),
@@ -984,23 +1011,29 @@ describe("extractStats - 3-tier cost resolution", () => {
 // ---------------------------------------------------------------------------
 
 describe("extractStats - model prefix matching", () => {
-	const makeSessionContext = (model: string) => ({
-		project_dir: "/test",
-		cwd: "/test",
-		git_branch: null,
-		git_remote: null,
-		git_commit: null,
-		git_worktree: null,
-		team_name: null,
-		task_list_dir: null,
-		claude_entrypoint: null,
-		model,
-		agent_type: null,
-	}) as const;
+	const makeSessionContext = (model: string) =>
+		({
+			project_dir: "/test",
+			cwd: "/test",
+			git_branch: null,
+			git_remote: null,
+			git_commit: null,
+			git_worktree: null,
+			team_name: null,
+			task_list_dir: null,
+			claude_entrypoint: null,
+			model,
+			agent_type: null,
+		}) as const;
 
 	test("claude-opus-4-6 matches claude-opus-4 pricing", () => {
 		const events: StoredEvent[] = [
-			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: makeSessionContext("claude-opus-4-6") }),
+			makeEvent({
+				t: 1000,
+				event: "SessionStart",
+				data: {},
+				context: makeSessionContext("claude-opus-4-6"),
+			}),
 			makeEvent({ t: 2000, event: "SessionEnd", data: {} }),
 		];
 
@@ -1022,7 +1055,12 @@ describe("extractStats - model prefix matching", () => {
 
 	test("claude-sonnet-4-6 matches claude-sonnet-4 pricing", () => {
 		const events: StoredEvent[] = [
-			makeEvent({ t: 1000, event: "SessionStart", data: {}, context: makeSessionContext("claude-sonnet-4-6") }),
+			makeEvent({
+				t: 1000,
+				event: "SessionStart",
+				data: {},
+				context: makeSessionContext("claude-sonnet-4-6"),
+			}),
 			makeEvent({ t: 2000, event: "SessionEnd", data: {} }),
 		];
 
@@ -1453,11 +1491,46 @@ describe("distill - session-scoped link filtering", () => {
 		const linkEvents: readonly LinkEvent[] = [
 			// Session A: team + 3 agents
 			{ t: 1000, type: "team", team_name: "team-alpha", leader_session: SESSION_A },
-			{ t: 1100, type: "spawn", parent_session: SESSION_A, agent_id: "agent-a1", agent_type: "builder", agent_name: "builder-a1" },
-			{ t: 1200, type: "spawn", parent_session: SESSION_A, agent_id: "agent-a2", agent_type: "builder", agent_name: "builder-a2" },
-			{ t: 1300, type: "spawn", parent_session: SESSION_A, agent_id: "agent-a3", agent_type: "validator", agent_name: "validator-a" },
-			{ t: 2000, type: "msg_send", session_id: SESSION_A, from: "agent-a1", to: "builder-a2", msg_type: "message" },
-			{ t: 3000, type: "msg_send", session_id: SESSION_A, from: "agent-a2", to: "builder-a1", msg_type: "message" },
+			{
+				t: 1100,
+				type: "spawn",
+				parent_session: SESSION_A,
+				agent_id: "agent-a1",
+				agent_type: "builder",
+				agent_name: "builder-a1",
+			},
+			{
+				t: 1200,
+				type: "spawn",
+				parent_session: SESSION_A,
+				agent_id: "agent-a2",
+				agent_type: "builder",
+				agent_name: "builder-a2",
+			},
+			{
+				t: 1300,
+				type: "spawn",
+				parent_session: SESSION_A,
+				agent_id: "agent-a3",
+				agent_type: "validator",
+				agent_name: "validator-a",
+			},
+			{
+				t: 2000,
+				type: "msg_send",
+				session_id: SESSION_A,
+				from: "agent-a1",
+				to: "builder-a2",
+				msg_type: "message",
+			},
+			{
+				t: 3000,
+				type: "msg_send",
+				session_id: SESSION_A,
+				from: "agent-a2",
+				to: "builder-a1",
+				msg_type: "message",
+			},
 			{ t: 4000, type: "task_complete", task_id: "task-1", agent: "builder-a1" },
 			{ t: 5000, type: "teammate_idle", teammate: "builder-a1" },
 			{ t: 8000, type: "stop", parent_session: SESSION_A, agent_id: "agent-a1" },
@@ -1466,9 +1539,30 @@ describe("distill - session-scoped link filtering", () => {
 
 			// Session B: team + 2 agents (should be excluded from Session A distill)
 			{ t: 1000, type: "team", team_name: "team-beta", leader_session: SESSION_B },
-			{ t: 1100, type: "spawn", parent_session: SESSION_B, agent_id: "agent-b1", agent_type: "builder", agent_name: "builder-b1" },
-			{ t: 1200, type: "spawn", parent_session: SESSION_B, agent_id: "agent-b2", agent_type: "tester", agent_name: "tester-b" },
-			{ t: 2500, type: "msg_send", session_id: SESSION_B, from: "agent-b1", to: "tester-b", msg_type: "message" },
+			{
+				t: 1100,
+				type: "spawn",
+				parent_session: SESSION_B,
+				agent_id: "agent-b1",
+				agent_type: "builder",
+				agent_name: "builder-b1",
+			},
+			{
+				t: 1200,
+				type: "spawn",
+				parent_session: SESSION_B,
+				agent_id: "agent-b2",
+				agent_type: "tester",
+				agent_name: "tester-b",
+			},
+			{
+				t: 2500,
+				type: "msg_send",
+				session_id: SESSION_B,
+				from: "agent-b1",
+				to: "tester-b",
+				msg_type: "message",
+			},
 			{ t: 3500, type: "task_complete", task_id: "task-b1", agent: "builder-b1" },
 			{ t: 6000, type: "stop", parent_session: SESSION_B, agent_id: "agent-b1" },
 			{ t: 6500, type: "stop", parent_session: SESSION_B, agent_id: "agent-b2" },

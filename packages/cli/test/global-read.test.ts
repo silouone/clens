@@ -2,23 +2,24 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { listGlobalSessions, resolveProjectForSession } from "../src/session/global-read";
 import {
 	globalConfigPath,
 	registerProject,
 	unregisterProject,
 	writeGlobalConfig,
 } from "../src/session/registry";
-import {
-	listGlobalSessions,
-	resolveProjectForSession,
-} from "../src/session/global-read";
 
 const SESSION_A1 = "aaaaaaaa-1111-1111-1111-111111111111";
 const SESSION_A2 = "aaaaaaaa-2222-2222-2222-222222222222";
 const SESSION_B1 = "bbbbbbbb-1111-1111-1111-111111111111";
 
-const makeEvent = (event: string, t: number, data: Record<string, unknown> = {}, sid: string = SESSION_A1) =>
-	JSON.stringify({ event, t, sid, data, context: { git_branch: "main" } });
+const makeEvent = (
+	event: string,
+	t: number,
+	data: Record<string, unknown> = {},
+	sid: string = SESSION_A1,
+) => JSON.stringify({ event, t, sid, data, context: { git_branch: "main" } });
 
 describe("global-read", () => {
 	let tempDir: string;

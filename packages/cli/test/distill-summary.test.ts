@@ -629,7 +629,9 @@ describe("extractSummary", () => {
 		expect(result.narrative).toContain("2 builder");
 		expect(result.narrative).toContain("1 researcher");
 		expect(result.narrative).toContain("5 tasks");
-		expect(result.narrative).toContain("Top contributors: builder-a (a1), builder-b (a2), researcher-1 (a3)");
+		expect(result.narrative).toContain(
+			"Top contributors: builder-a (a1), builder-b (a2), researcher-1 (a3)",
+		);
 	});
 
 	test("enhanced team narrative includes failure breakdown when failures_by_tool exists", () => {

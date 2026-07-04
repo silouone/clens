@@ -327,7 +327,12 @@ describe("extractTeamMetrics - sessionId matching (BUG-7)", () => {
 		const links: readonly LinkEvent[] = [
 			mkSpawn({ t: 1000, agent_id: "a1", agent_name: "builder-1" }),
 			// task_complete with agent set to some unknown value but session_id matches parent
-			mkTaskComplete({ t: 3000, agent: "unknown-agent", task_id: "t1", session_id: parentSessionId }),
+			mkTaskComplete({
+				t: 3000,
+				agent: "unknown-agent",
+				task_id: "t1",
+				session_id: parentSessionId,
+			}),
 			mkStop({ t: 5000, agent_id: "a1" }),
 		];
 

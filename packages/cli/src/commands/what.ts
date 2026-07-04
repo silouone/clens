@@ -31,9 +31,10 @@ const getRequestSection = (distilled: DistilledSession): string => {
 const getOutcomeSection = (distilled: DistilledSession): string => {
 	const commitCount = distilled.git_diff.commits.length;
 	const wtc = distilled.git_diff.working_tree_changes;
-	const wtcSummary = wtc && wtc.length > 0
-		? `${wtc.length} working tree change${wtc.length === 1 ? "" : "s"}`
-		: "no working tree changes";
+	const wtcSummary =
+		wtc && wtc.length > 0
+			? `${wtc.length} working tree change${wtc.length === 1 ? "" : "s"}`
+			: "no working tree changes";
 	const statusStr = distilled.complete ? "completed" : "incomplete";
 	return commitCount > 0
 		? `${commitCount} commit${commitCount === 1 ? "" : "s"}, ${wtcSummary}, ${statusStr}`
@@ -60,24 +61,21 @@ const getCostSection = (distilled: DistilledSession): string => {
 
 const getIssuesSection = (distilled: DistilledSession): readonly string[] => {
 	const btCount = distilled.backtracks.length;
-	const btLine = btCount === 0
-		? `  Backtracks: ${green("0")} -- clean session`
-		: `  Backtracks: ${btCount} (${classifySeverity(btCount).color(classifySeverity(btCount).label)})`;
+	const btLine =
+		btCount === 0
+			? `  Backtracks: ${green("0")} -- clean session`
+			: `  Backtracks: ${btCount} (${classifySeverity(btCount).color(classifySeverity(btCount).label)})`;
 
-	const errorLines = (distilled.summary?.top_errors ?? [])
-		.slice(0, 2)
-		.map((err) => {
-			const msg = err.sample_message ? `: ${truncate(err.sample_message, 60)}` : "";
-			return `  ${err.tool_name} x${err.count}${msg}`;
-		});
+	const errorLines = (distilled.summary?.top_errors ?? []).slice(0, 2).map((err) => {
+		const msg = err.sample_message ? `: ${truncate(err.sample_message, 60)}` : "";
+		return `  ${err.tool_name} x${err.count}${msg}`;
+	});
 
 	return [btLine, ...errorLines];
 };
 
 const getFilesChangedSection = (distilled: DistilledSession): readonly string[] => {
-	const changed = distilled.file_map.files
-		.filter((f) => f.edits > 0 || f.writes > 0)
-		.slice(0, 15);
+	const changed = distilled.file_map.files.filter((f) => f.edits > 0 || f.writes > 0).slice(0, 15);
 
 	if (changed.length === 0) return [dim("  (no files changed)")];
 
@@ -85,7 +83,9 @@ const getFilesChangedSection = (distilled: DistilledSession): readonly string[] 
 		const parts = [
 			f.edits > 0 ? `${f.edits} edit${f.edits === 1 ? "" : "s"}` : undefined,
 			f.writes > 0 ? `${f.writes} write${f.writes === 1 ? "" : "s"}` : undefined,
-		].filter(Boolean).join(", ");
+		]
+			.filter(Boolean)
+			.join(", ");
 		return `  ${f.file_path} ${dim(`(${parts})`)}`;
 	});
 };

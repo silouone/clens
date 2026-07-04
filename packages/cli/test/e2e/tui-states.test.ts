@@ -47,7 +47,18 @@ describe("TUI State Machine with Fixture Data", () => {
 		journeys: [],
 		selectedIndex: 0,
 		detailTab: "overview",
-		visibleTabs: ["overview", "backtracks", "decisions", "reasoning", "edits", "timeline", "drift", "agents", "messages", "graph"],
+		visibleTabs: [
+			"overview",
+			"backtracks",
+			"decisions",
+			"reasoning",
+			"edits",
+			"timeline",
+			"drift",
+			"agents",
+			"messages",
+			"graph",
+		],
 		agentIndex: 0,
 		projectDir,
 		timelineOffset: 0,
@@ -154,7 +165,18 @@ describe("TUI State Machine with Fixture Data", () => {
 	});
 
 	test("tab cycles through detail tabs", () => {
-		const tabs = ["overview", "backtracks", "decisions", "reasoning", "edits", "timeline", "drift", "agents", "messages", "graph"] as const;
+		const tabs = [
+			"overview",
+			"backtracks",
+			"decisions",
+			"reasoning",
+			"edits",
+			"timeline",
+			"drift",
+			"agents",
+			"messages",
+			"graph",
+		] as const;
 		tabs.forEach((tab, i) => {
 			expect(nextTab(tab, [...tabs])).toBe(tabs[(i + 1) % tabs.length]);
 		});
@@ -327,7 +349,18 @@ describe("TUI State Machine with Fixture Data", () => {
 
 	test("tab cycle returns to overview after graph", () => {
 		// Validates the complete tab cycle wraps around
-		const tabs = ["overview", "backtracks", "decisions", "reasoning", "edits", "timeline", "drift", "agents", "messages", "graph"] as const;
+		const tabs = [
+			"overview",
+			"backtracks",
+			"decisions",
+			"reasoning",
+			"edits",
+			"timeline",
+			"drift",
+			"agents",
+			"messages",
+			"graph",
+		] as const;
 		const lastTab = tabs[tabs.length - 1];
 		expect(nextTab(lastTab, [...tabs])).toBe("overview");
 	});

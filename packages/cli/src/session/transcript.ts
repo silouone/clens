@@ -42,7 +42,9 @@ export const resolveTranscriptPath = (events: readonly StoredEvent[]): string | 
 };
 
 /** Type guard for custom-title transcript entries. */
-const isCustomTitleEntry = (value: unknown): value is { readonly type: "custom-title"; readonly customTitle: string } => {
+const isCustomTitleEntry = (
+	value: unknown,
+): value is { readonly type: "custom-title"; readonly customTitle: string } => {
 	if (typeof value !== "object" || value === null) return false;
 	const obj = value as Record<string, unknown>;
 	return obj.type === "custom-title" && typeof obj.customTitle === "string";
@@ -52,9 +54,8 @@ const isCustomTitleEntry = (value: unknown): value is { readonly type: "custom-t
  *  e.g. `"\"EDITS GIT DIFF\""` -> `EDITS GIT DIFF` */
 const stripEscapedQuotes = (raw: string): string => {
 	const trimmed = raw.trim();
-	const withoutOuter = trimmed.startsWith('"') && trimmed.endsWith('"')
-		? trimmed.slice(1, -1)
-		: trimmed;
+	const withoutOuter =
+		trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed.slice(1, -1) : trimmed;
 	return withoutOuter.replace(/&amp;/g, "&");
 };
 

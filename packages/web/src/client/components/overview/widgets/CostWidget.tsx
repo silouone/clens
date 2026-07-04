@@ -1,11 +1,11 @@
-import { createMemo, createSignal, For, Show, type Component } from "solid-js";
 import { ChevronRight } from "lucide-solid";
-import { Widget } from "../../ui/Widget";
-import { MetaRow } from "../../ui/MetaRow";
-import { CostDrilldown } from "../../CostDrilldown";
-import { formatCost, modelDisplayName } from "../../../lib/format";
-import { formatCompact, TOKEN_COLORS } from "../../charts";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import type { CostEstimate, TokenUsage } from "../../../../shared/types";
+import { formatCost, modelDisplayName } from "../../../lib/format";
+import { CostDrilldown } from "../../CostDrilldown";
+import { formatCompact, TOKEN_COLORS } from "../../charts";
+import { MetaRow } from "../../ui/MetaRow";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── CostWidget [cost] — Wave 1 ───────────────────────────────────────
@@ -46,8 +46,18 @@ const tokenSlices = (tu: TokenUsage): readonly TokenSlice[] =>
 	[
 		{ key: "input", label: "Input", value: tu.input_tokens, color: TOKEN_COLORS.input },
 		{ key: "output", label: "Output", value: tu.output_tokens, color: TOKEN_COLORS.output },
-		{ key: "cache_read", label: "Cache read", value: tu.cache_read_tokens, color: TOKEN_COLORS.cache_read },
-		{ key: "cache_create", label: "Cache create", value: tu.cache_creation_tokens, color: TOKEN_COLORS.cache_create },
+		{
+			key: "cache_read",
+			label: "Cache read",
+			value: tu.cache_read_tokens,
+			color: TOKEN_COLORS.cache_read,
+		},
+		{
+			key: "cache_create",
+			label: "Cache create",
+			value: tu.cache_creation_tokens,
+			color: TOKEN_COLORS.cache_create,
+		},
 	].filter((s) => s.value > 0);
 
 export const CostWidget: Component<WidgetProps> = (props) => {
@@ -71,10 +81,7 @@ export const CostWidget: Component<WidgetProps> = (props) => {
 
 	return (
 		<Widget category="cost" title="Cost" span={4}>
-			<Show
-				when={hasAny()}
-				fallback={<p class="text-xs italic text-muted">No cost data</p>}
-			>
+			<Show when={hasAny()} fallback={<p class="text-xs italic text-muted">No cost data</p>}>
 				<div class="space-y-3">
 					{/* Cost figure — dominant, estimated-marked, opens the drilldown */}
 					<Show when={cost() !== undefined}>
@@ -143,10 +150,7 @@ export const CostWidget: Component<WidgetProps> = (props) => {
 
 					{/* Model + pricing tier */}
 					<div class="space-y-1 border-t border-clens pt-2">
-						<MetaRow
-							label="Model"
-							value={model() ? modelDisplayName(model() ?? "") : "unknown"}
-						/>
+						<MetaRow label="Model" value={model() ? modelDisplayName(model() ?? "") : "unknown"} />
 						<Show when={tier()}>{(t) => <MetaRow label="Tier" value={t()} />}</Show>
 					</div>
 				</div>

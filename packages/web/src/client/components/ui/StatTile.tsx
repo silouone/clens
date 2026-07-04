@@ -1,4 +1,4 @@
-import { Show, type Component, type JSX } from "solid-js";
+import { type Component, type JSX, Show } from "solid-js";
 import { CATEGORY, type CategoryKey } from "../../lib/categories";
 
 // ── StatTile (overview-moat-refactor, Wave 0) ────────────────────────

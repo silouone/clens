@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, test, expect } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-	toSummaryRow,
 	localDayKey,
 	readAnalyticsSummary,
+	toSummaryRow,
 	writeAnalyticsSummary,
 	writeAnalyticsSummaryBatch,
 } from "../src/distill/analytics-summary";
@@ -153,11 +153,11 @@ describe("analytics-summary disk reconcile (NUM-7) + batch flush (DIST-2)", () =
 
 		const lines = readFileSync(summaryFile(), "utf-8").split("\n").filter(Boolean);
 		expect(lines.length).toBe(3);
-		expect(readAnalyticsSummary(projectDir).map((r) => r.session_id).sort()).toEqual([
-			"s1",
-			"s2",
-			"s3",
-		]);
+		expect(
+			readAnalyticsSummary(projectDir)
+				.map((r) => r.session_id)
+				.sort(),
+		).toEqual(["s1", "s2", "s3"]);
 	});
 
 	test("DIST-2: batch merges with existing rows (last write wins, no duplicates)", () => {
@@ -215,7 +215,10 @@ describe("analytics-summary disk reconcile (NUM-7) + batch flush (DIST-2)", () =
 		// Stale cached row: marks duration as a sentinel we can detect.
 		writeFileSync(
 			summaryFile(),
-			JSON.stringify({ ...toSummaryRow(makeDistilled({ session_id: "s1" })), duration_ms: 999999 }) + "\n",
+			JSON.stringify({
+				...toSummaryRow(makeDistilled({ session_id: "s1" })),
+				duration_ms: 999999,
+			}) + "\n",
 		);
 		// Summary is OLDER than the distilled file → cached row is stale and must be rebuilt.
 		utimesSync(summaryFile(), summaryTime, summaryTime);

@@ -1,6 +1,6 @@
-import { Show, type Component } from "solid-js";
 import { X } from "lucide-solid";
-import { customRange, clearCustomRange } from "../lib/analytics-store";
+import { type Component, Show } from "solid-js";
+import { clearCustomRange, customRange } from "../lib/analytics-store";
 import { formatShortDate } from "./charts/shared";
 
 // ── Custom range chip (AC8) ─────────────────────────────────────────
@@ -20,6 +20,7 @@ export const CustomRangeChip: Component = () => (
 					{formatShortDate(range().from)}–{formatShortDate(range().to)}
 				</span>
 				<button
+					type="button"
 					onClick={() => clearCustomRange()}
 					class="ml-0.5 -mr-0.5 text-muted transition-colors hover:text-danger"
 					title="Clear custom range"

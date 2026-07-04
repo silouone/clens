@@ -1,5 +1,5 @@
-import { Show, type Component, type JSX } from "solid-js";
 import { ChevronRight } from "lucide-solid";
+import { type Component, type JSX, Show } from "solid-js";
 import { CATEGORY, type CategoryKey } from "../../lib/categories";
 
 // ── Widget shell (overview-moat-refactor, Wave 0) ────────────────────
@@ -42,23 +42,14 @@ export const Widget: Component<WidgetProps> = (props) => {
 	const clickable = () => props.onClick !== undefined;
 
 	const activate = () => props.onClick?.();
-	const onKeyDown = (e: KeyboardEvent) => {
-		if (e.key === "Enter" || e.key === " ") {
-			e.preventDefault();
-			activate();
-		}
-	};
 
-	return (
-		<div
-			class={`animate-fade-in rounded-none border border-clens bg-surface-raised ${meta().ruleClass} ${spanClass()} ${
-				clickable() ? "cursor-pointer transition hover:bg-surface-hover focus-ring" : ""
-			} ${props.class ?? ""}`}
-			role={clickable() ? "button" : undefined}
-			tabindex={clickable() ? 0 : undefined}
-			onClick={clickable() ? activate : undefined}
-			onKeyDown={clickable() ? onKeyDown : undefined}
-		>
+	const baseClass = () =>
+		`animate-fade-in rounded-none border border-clens bg-surface-raised ${meta().ruleClass} ${spanClass()} ${
+			clickable() ? "cursor-pointer transition hover:bg-surface-hover focus-ring" : ""
+		} ${props.class ?? ""}`;
+
+	const Inner = () => (
+		<>
 			<div class="flex items-center justify-between gap-2 border-b border-clens px-3 py-2">
 				<div class="flex items-center gap-2" style={{ color: meta().cssVar }}>
 					{(() => {
@@ -75,6 +66,14 @@ export const Widget: Component<WidgetProps> = (props) => {
 				</div>
 			</div>
 			<div class="p-3">{props.children}</div>
-		</div>
+		</>
+	);
+
+	return (
+		<Show when={clickable()} fallback={<div class={baseClass()}>{Inner()}</div>}>
+			<button type="button" class={`${baseClass()} w-full text-left`} onClick={activate}>
+				{Inner()}
+			</button>
+		</Show>
 	);
 };

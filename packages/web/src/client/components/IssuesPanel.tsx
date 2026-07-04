@@ -1,5 +1,5 @@
-import { For, Show, createMemo, type Component } from "solid-js";
 import { AlertTriangle } from "lucide-solid";
+import { type Component, createMemo, For, Show } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { classifySeverity } from "../lib/format";
 import { getBacktrackBadgeClass } from "../lib/severity";
@@ -16,8 +16,7 @@ type IssuesPanelProps = {
 const truncate = (text: string, maxLen: number): string =>
 	text.length <= maxLen ? text : `${text.slice(0, maxLen - 1)}...`;
 
-const formatBacktrackType = (type: string): string =>
-	type.replace(/_/g, " ");
+const formatBacktrackType = (type: string): string => type.replace(/_/g, " ");
 
 // ── Backtrack grouping ──────────────────────────────────────────────
 
@@ -29,21 +28,25 @@ type GroupedBacktrack = {
 };
 
 const groupBacktracks = (
-	backtracks: readonly { readonly type: string; readonly tool_name: string; readonly error_message?: string }[],
+	backtracks: readonly {
+		readonly type: string;
+		readonly tool_name: string;
+		readonly error_message?: string;
+	}[],
 ): readonly GroupedBacktrack[] => {
-	const grouped = backtracks.reduce<ReadonlyMap<string, GroupedBacktrack>>(
-		(acc, bt) => {
-			const key = `${bt.type}::${bt.tool_name}`;
-			const existing = acc.get(key);
-			return new Map([
-				...acc,
-				[key, existing
+	const grouped = backtracks.reduce<ReadonlyMap<string, GroupedBacktrack>>((acc, bt) => {
+		const key = `${bt.type}::${bt.tool_name}`;
+		const existing = acc.get(key);
+		return new Map([
+			...acc,
+			[
+				key,
+				existing
 					? { ...existing, count: existing.count + 1 }
-					: { type: bt.type, tool_name: bt.tool_name, error_message: bt.error_message, count: 1 }],
-			]);
-		},
-		new Map(),
-	);
+					: { type: bt.type, tool_name: bt.tool_name, error_message: bt.error_message, count: 1 },
+			],
+		]);
+	}, new Map());
 	return [...grouped.values()].sort((a, b) => b.count - a.count);
 };
 
@@ -57,17 +60,13 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 
 	const severity = createMemo(() => classifySeverity(backtrackCount()));
 
-	const hasContent = createMemo(
-		() => backtrackCount() > 0 || topErrors().length > 0,
-	);
+	const hasContent = createMemo(() => backtrackCount() > 0 || topErrors().length > 0);
 
 	return (
 		<Card class="p-3">
 			<div class="flex items-center gap-2">
 				<AlertTriangle class="h-4 w-4 text-muted" />
-				<h3 class="instrument-microcaps text-[11px] text-muted">
-					Issues &amp; Errors
-				</h3>
+				<h3 class="instrument-microcaps text-[11px] text-muted">Issues &amp; Errors</h3>
 			</div>
 
 			<Show
@@ -87,9 +86,7 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 						<span class="instrument-microcaps text-[10px] text-muted">
 							Backtracks ({backtrackCount()})
 						</span>
-						<span class={`text-xs font-medium ${severity().color}`}>
-							{severity().label}
-						</span>
+						<span class={`text-xs font-medium ${severity().color}`}>{severity().label}</span>
 					</div>
 
 					<Show
@@ -114,15 +111,9 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 										>
 											{formatBacktrackType(group.type)}
 										</span>
-										<span class="font-mono text-muted">
-											{group.tool_name}
-										</span>
+										<span class="font-mono text-muted">{group.tool_name}</span>
 										<Show when={group.error_message}>
-											{(msg) => (
-												<span class="truncate text-muted">
-													{truncate(msg(), 80)}
-												</span>
-											)}
+											{(msg) => <span class="truncate text-muted">{truncate(msg(), 80)}</span>}
 										</Show>
 									</div>
 								)}
@@ -134,25 +125,17 @@ export const IssuesPanel: Component<IssuesPanelProps> = (props) => {
 				{/* Top Errors section */}
 				<Show when={topErrors().length > 0}>
 					<div class="mt-4">
-						<span class="instrument-microcaps text-[10px] text-muted">
-							Top Errors
-						</span>
+						<span class="instrument-microcaps text-[10px] text-muted">Top Errors</span>
 						<div class="mt-2 space-y-1.5">
 							<For each={topErrors()}>
 								{(err) => (
 									<div class="flex items-start gap-2 text-xs">
-										<span class="font-mono text-muted">
-											{err.tool_name}
-										</span>
+										<span class="font-mono text-muted">{err.tool_name}</span>
 										<span class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 text-xs font-mono tabular-nums text-muted">
 											{err.count}
 										</span>
 										<Show when={err.sample_message}>
-											{(msg) => (
-												<span class="truncate text-muted">
-													{truncate(msg(), 100)}
-												</span>
-											)}
+											{(msg) => <span class="truncate text-muted">{truncate(msg(), 100)}</span>}
 										</Show>
 									</div>
 								)}

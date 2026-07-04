@@ -1,4 +1,4 @@
-import type { StoredEvent } from "../../shared/types"
+import type { StoredEvent } from "../../shared/types";
 
 /**
  * SolidJS-free leaf module: the authoritative acceptance predicate for live
@@ -26,7 +26,7 @@ import type { StoredEvent } from "../../shared/types"
  * an `event` discriminator and a server timestamp `t`.
  */
 export const isStoredEvent = (raw: unknown): raw is StoredEvent =>
-	typeof raw === "object" && raw !== null && "event" in raw && "t" in raw
+	typeof raw === "object" && raw !== null && "event" in raw && "t" in raw;
 
 // ── Acceptance predicate ────────────────────────────────────────────
 
@@ -42,4 +42,4 @@ export const acceptsLiveEvent = (
 	event: StoredEvent,
 	sessionId: string,
 	childSessionIds: ReadonlySet<string>,
-): boolean => event.sid === sessionId || childSessionIds.has(event.sid)
+): boolean => event.sid === sessionId || childSessionIds.has(event.sid);

@@ -159,14 +159,14 @@ export interface SessionSummary {
 	// event no longer implies complete — it fires after every turn (bug B6).
 	readonly status: SessionStatus;
 	readonly file_size_bytes: number;
-	readonly agent_count?: number;    // 0 = single-agent, >0 = multi-agent
-	readonly is_distilled?: boolean;  // true if .clens/distilled/{sid}.json exists
+	readonly agent_count?: number; // 0 = single-agent, >0 = multi-agent
+	readonly is_distilled?: boolean; // true if .clens/distilled/{sid}.json exists
 	// Idle-trimmed active span (distilled stats.duration_ms; locked semantics). Source
 	// for the "ACTIVE" header chip — distinct from wall-clock duration_ms. Present only
 	// for analyzed sessions; absent (undefined) when not distilled.
 	readonly active_duration_ms?: number;
-	readonly has_spec?: boolean;      // true if distilled data has plan_drift
-	readonly is_subagent?: boolean;   // true if spawned by another session
+	readonly has_spec?: boolean; // true if distilled data has plan_drift
+	readonly is_subagent?: boolean; // true if spawned by another session
 	// Lone-SessionEnd / torn capture: the file's only event is a SessionEnd (the
 	// session start was never recorded), so it carries no real content. Such rows
 	// render as EMPTY rather than "DONE 0s" (NUM-4). Set by the web lightweight
@@ -174,10 +174,10 @@ export interface SessionSummary {
 	readonly is_empty?: boolean;
 	readonly features?: readonly FeatureFlag[]; // harness features used (loop/goal/workflow)
 	// --- Naming / color flag (resolved at list time, never recomputed by surfaces) ---
-	readonly display_name?: string;   // resolved name by precedence (label>custom_title>computed>id)
+	readonly display_name?: string; // resolved name by precedence (label>custom_title>computed>id)
 	readonly name_source?: NameSource; // provenance of display_name
-	readonly label?: string;          // user-entered custom label (sidecar), if any
-	readonly color?: ColorName;       // user color flag (sidecar); non-"none" = flagged
+	readonly label?: string; // user-entered custom label (sidecar), if any
+	readonly color?: ColorName; // user color flag (sidecar); non-"none" = flagged
 }
 
 // --- Global Config Types ---
@@ -192,10 +192,10 @@ export interface GlobalConfig {
 // --- Project Registry Types ---
 
 export interface ProjectEntry {
-	readonly id: string;        // kebab-case slug, e.g. "agent-observability-project"
-	readonly path: string;      // absolute path to project root
-	readonly name: string;      // display name (basename of path by default)
-	readonly added_at: number;  // timestamp
+	readonly id: string; // kebab-case slug, e.g. "agent-observability-project"
+	readonly path: string; // absolute path to project root
+	readonly name: string; // display name (basename of path by default)
+	readonly added_at: number; // timestamp
 }
 
 export interface ProjectRegistry {

@@ -1,5 +1,12 @@
 import { readLinks } from "../session/read";
-import type { LinkEvent, MessageLink, SpawnLink, TaskCompleteLink, TaskLink, TeammateIdleLink } from "../types";
+import type {
+	LinkEvent,
+	MessageLink,
+	SpawnLink,
+	TaskCompleteLink,
+	TaskLink,
+	TeammateIdleLink,
+} from "../types";
 import { filterLinksForSession, sanitizeAgentName } from "../utils";
 
 type CoordinationLink = MessageLink | TeammateIdleLink | TaskCompleteLink | SpawnLink | TaskLink;
@@ -11,7 +18,10 @@ const isCoordinationLink = (l: LinkEvent): l is CoordinationLink =>
 	l.type === "teammate_idle" ||
 	l.type === "task_complete" ||
 	l.type === "spawn" ||
-	(l.type === "task" && l.action === "assign" && typeof l.subject === "string" && l.subject.length > 0);
+	(l.type === "task" &&
+		l.action === "assign" &&
+		typeof l.subject === "string" &&
+		l.subject.length > 0);
 
 export const getMessagesData = (
 	sessionId: string,
@@ -22,9 +32,7 @@ export const getMessagesData = (
 	if (links.length === 0) return [];
 
 	const sessionLinks = filterLinksForSession(sessionId, links);
-	return sessionLinks
-		.filter(isCoordinationLink)
-		.sort((a, b) => a.t - b.t);
+	return sessionLinks.filter(isCoordinationLink).sort((a, b) => a.t - b.t);
 };
 
 const formatLink = (link: CoordinationLink): string => {

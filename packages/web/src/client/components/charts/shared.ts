@@ -1,4 +1,4 @@
-import { createSignal, type Accessor } from "solid-js";
+import { type Accessor, createSignal } from "solid-js";
 
 // ── Chart utilities ─────────────────────────────────────────────────
 
@@ -118,8 +118,7 @@ export const linearScale = (
 	const [d0, d1] = domain;
 	const [r0, r1] = range;
 	const span = d1 - d0;
-	return (value: number): number =>
-		span === 0 ? r0 : r0 + ((value - d0) / span) * (r1 - r0);
+	return (value: number): number => (span === 0 ? r0 : r0 + ((value - d0) / span) * (r1 - r0));
 };
 
 // ── Continuous time x-scale (AC11) ─────────────────────────────────
@@ -158,9 +157,7 @@ export const dayToDate = (dayEpoch: number): string => {
  * `YYYY-MM-DD` strings. Unparseable dates are ignored. Returns undefined when
  * no usable date exists so callers can fall back (e.g. single-point centering).
  */
-export const dateDomain = (
-	dates: readonly string[],
-): readonly [number, number] | undefined => {
+export const dateDomain = (dates: readonly string[]): readonly [number, number] | undefined => {
 	const days = dates.map(parseDay).filter((n) => Number.isFinite(n));
 	if (days.length === 0) return undefined;
 	return [Math.min(...days), Math.max(...days)];
@@ -174,10 +171,7 @@ export const dateDomain = (
  * it to the left axis. Out-of-domain dates are positioned proportionally (the
  * caller is responsible for clamping if needed).
  */
-export const timeScale = (
-	domain: readonly [number, number],
-	range: readonly [number, number],
-) => {
+export const timeScale = (domain: readonly [number, number], range: readonly [number, number]) => {
 	const [d0, d1] = domain;
 	const [r0, r1] = range;
 	const span = d1 - d0;
@@ -211,7 +205,7 @@ export const pixelToDate = (
 
 export const niceMax = (max: number): number => {
 	if (max <= 0) return 1;
-	const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
+	const magnitude = 10 ** Math.floor(Math.log10(max));
 	const normalized = max / magnitude;
 	const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
 	return nice * magnitude;

@@ -1,18 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { renderReasoningSummary, renderReasoningFull } from "../src/commands/reasoning";
+import { renderReasoningFull, renderReasoningSummary } from "../src/commands/reasoning";
 import type { DistilledSession } from "../src/types";
 import type { TranscriptReasoning } from "../src/types/transcript";
 
 // -- ANSI stripping helper --
 
-const stripAnsi = (s: string): string =>
-	s.replace(/\x1b\[[0-9;]*m/g, "");
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require the ESC control char
+const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 // -- Fixture factories --
 
-const makeReasoning = (
-	overrides: Partial<TranscriptReasoning> = {},
-): TranscriptReasoning => ({
+const makeReasoning = (overrides: Partial<TranscriptReasoning> = {}): TranscriptReasoning => ({
 	t: 1000000,
 	thinking: "I need to analyze the error and determine the root cause",
 	tool_use_id: "tool-123",
@@ -22,9 +20,7 @@ const makeReasoning = (
 	...overrides,
 });
 
-const makeDistilled = (
-	overrides: Partial<DistilledSession> = {},
-): DistilledSession => ({
+const makeDistilled = (overrides: Partial<DistilledSession> = {}): DistilledSession => ({
 	session_id: "test1234-5678-uuid",
 	stats: {
 		duration_ms: 60000,
@@ -103,9 +99,7 @@ describe("renderReasoningSummary", () => {
 	});
 
 	test("shows unknown intent for blocks without intent", () => {
-		const reasoning = [
-			makeReasoning({ intent_hint: undefined }),
-		];
+		const reasoning = [makeReasoning({ intent_hint: undefined })];
 		const distilled = makeDistilled({ reasoning });
 		const output = stripAnsi(renderReasoningSummary(distilled));
 		expect(output).toContain("unknown");
@@ -118,9 +112,7 @@ describe("renderReasoningSummary", () => {
 
 describe("renderReasoningFull", () => {
 	test("full output contains thinking text", () => {
-		const reasoning = [
-			makeReasoning({ thinking: "Analyzing the build failure carefully" }),
-		];
+		const reasoning = [makeReasoning({ thinking: "Analyzing the build failure carefully" })];
 		const distilled = makeDistilled({ reasoning });
 		const output = stripAnsi(renderReasoningFull(distilled));
 		expect(output).toContain("Analyzing the build failure carefully");
@@ -141,18 +133,14 @@ describe("renderReasoningFull", () => {
 	});
 
 	test("truncated block contains [truncated] marker", () => {
-		const reasoning = [
-			makeReasoning({ truncated: true, thinking: "Partial thought" }),
-		];
+		const reasoning = [makeReasoning({ truncated: true, thinking: "Partial thought" })];
 		const distilled = makeDistilled({ reasoning });
 		const output = stripAnsi(renderReasoningFull(distilled));
 		expect(output).toContain("[truncated]");
 	});
 
 	test("non-truncated block does not contain [truncated] marker", () => {
-		const reasoning = [
-			makeReasoning({ truncated: false, thinking: "Complete thought" }),
-		];
+		const reasoning = [makeReasoning({ truncated: false, thinking: "Complete thought" })];
 		const distilled = makeDistilled({ reasoning });
 		const output = stripAnsi(renderReasoningFull(distilled));
 		expect(output).not.toContain("[truncated]");
@@ -165,9 +153,7 @@ describe("renderReasoningFull", () => {
 	});
 
 	test("empty filtered result returns intent-specific message", () => {
-		const reasoning = [
-			makeReasoning({ intent_hint: "debugging" }),
-		];
+		const reasoning = [makeReasoning({ intent_hint: "debugging" })];
 		const distilled = makeDistilled({ reasoning });
 		const output = stripAnsi(renderReasoningFull(distilled, "planning"));
 		expect(output).toContain("No reasoning blocks found with intent");
@@ -175,11 +161,7 @@ describe("renderReasoningFull", () => {
 	});
 
 	test("header shows correct block count", () => {
-		const reasoning = [
-			makeReasoning({}),
-			makeReasoning({}),
-			makeReasoning({}),
-		];
+		const reasoning = [makeReasoning({}), makeReasoning({}), makeReasoning({})];
 		const distilled = makeDistilled({ reasoning });
 		const output = stripAnsi(renderReasoningFull(distilled));
 		expect(output).toContain("3 reasoning blocks");
@@ -204,4 +186,3 @@ describe("renderReasoningFull", () => {
 		expect(output).toContain("standalone");
 	});
 });
-

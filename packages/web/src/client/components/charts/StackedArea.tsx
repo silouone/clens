@@ -1,4 +1,6 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { ChartEmpty } from "./ChartEmpty";
+import { hideTooltip, showTooltip } from "./ChartTooltip";
 import type { BaseChartProps, BrushableChartProps } from "./shared";
 import {
 	BRUSH_FILL,
@@ -14,8 +16,6 @@ import {
 	niceMax,
 	timeScale,
 } from "./shared";
-import { hideTooltip, showTooltip } from "./ChartTooltip";
-import { ChartEmpty } from "./ChartEmpty";
 
 interface SeriesConfig {
 	readonly key: string;
@@ -82,30 +82,32 @@ export const StackedArea = <T,>(props: StackedAreaProps<T>): ReturnType<Componen
 		const stackedData = stacked();
 		if (data.length === 0) return [];
 
-		return props.series.map((series, si) =>
-			({
-				...series,
-				d: (() => {
-					// Top line: cumulative[si]
-					const topLine = data.map((d, i) => {
+		return props.series.map((series, si) => ({
+			...series,
+			d: (() => {
+				// Top line: cumulative[si]
+				const topLine = data
+					.map((d, i) => {
 						const px = pointX(d);
 						const py = yScale()(stackedData[i].cumulative[si]);
 						return `${i === 0 ? "M" : "L"}${px},${py}`;
-					}).join(" ");
+					})
+					.join(" ");
 
-					// Bottom line: cumulative[si-1] or 0, reversed
-					const bottomLine = [...data].map((_, idx) => {
+				// Bottom line: cumulative[si-1] or 0, reversed
+				const bottomLine = [...data]
+					.map((_, idx) => {
 						const i = data.length - 1 - idx;
 						const px = pointX(data[i]);
 						const base = si > 0 ? stackedData[i].cumulative[si - 1] : 0;
 						const py = yScale()(base);
 						return `L${px},${py}`;
-					}).join(" ");
+					})
+					.join(" ");
 
-					return `${topLine} ${bottomLine} Z`;
-				})(),
-			}),
-		);
+				return `${topLine} ${bottomLine} Z`;
+			})(),
+		}));
 	});
 
 	// Nearest-point hit-test by plot-local x. Hover/click and the brush share the
@@ -176,7 +178,14 @@ export const StackedArea = <T,>(props: StackedAreaProps<T>): ReturnType<Componen
 	return (
 		<Show
 			when={props.data.length > 0}
-			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+			fallback={
+				<ChartEmpty
+					height={props.height}
+					class={props.class}
+					ariaLabel={props.ariaLabel}
+					label="No data"
+				/>
+			}
 		>
 			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
 				<svg
@@ -186,114 +195,124 @@ export const StackedArea = <T,>(props: StackedAreaProps<T>): ReturnType<Componen
 					aria-label={props.ariaLabel}
 					class="overflow-visible"
 				>
-				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
-					<For each={ticks()}>
-						{(tick) => (
-							<>
-								<line
-									x1={0} y1={yScale()(tick)}
-									x2={cw()} y2={yScale()(tick)}
-									stroke={CHART_HAIRLINE}
-									stroke-opacity={tick === 0 ? 1 : 0.55}
-								/>
-								<text
-									x={-8} y={yScale()(tick)}
-									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{formatCompact(tick)}
-								</text>
-							</>
-						)}
-					</For>
-
-					{/* Stacked areas (render in reverse so first series is on top) */}
-					<For each={[...areaPaths()].reverse()}>
-						{(area) => (
-							<path d={area.d} fill={area.color} fill-opacity="0.6" />
-						)}
-					</For>
-
-					{/* A single data point degenerates the area path to zero width —
-					    render visible square markers per series instead (one per
-					    cumulative level), matching the line charts' point markers */}
-					<Show when={props.data.length === 1}>
-						<For each={props.series}>
-							{(series, si) => (
-								<rect
-									x={cw() / 2 - 3}
-									y={yScale()(stacked()[0].cumulative[si()]) - 3}
-									width={6}
-									height={6}
-									fill={series.color}
-								/>
+					<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
+						<For each={ticks()}>
+							{(tick) => (
+								<>
+									<line
+										x1={0}
+										y1={yScale()(tick)}
+										x2={cw()}
+										y2={yScale()(tick)}
+										stroke={CHART_HAIRLINE}
+										stroke-opacity={tick === 0 ? 1 : 0.55}
+									/>
+									<text
+										x={-8}
+										y={yScale()(tick)}
+										text-anchor="end"
+										dominant-baseline="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{formatCompact(tick)}
+									</text>
+								</>
 							)}
 						</For>
-					</Show>
 
-					{/* X-axis labels */}
-					<For each={props.data}>
-						{(d, i) => {
-							const n = props.data.length;
-							const step = Math.max(1, Math.floor(n / 8));
-							if (i() % step !== 0 && i() !== n - 1) return null;
-							return (
-								<text
-									x={pointX(d)}
-									y={ch() + 16}
-									text-anchor="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{formatShortDate(props.x(d))}
-								</text>
-							);
-						}}
-					</For>
+						{/* Stacked areas (render in reverse so first series is on top) */}
+						<For each={[...areaPaths()].reverse()}>
+							{(area) => <path d={area.d} fill={area.color} fill-opacity="0.6" />}
+						</For>
 
-					{/* Drag-brush + hover overlay: one full-plot transparent rect is the
+						{/* A single data point degenerates the area path to zero width —
+					    render visible square markers per series instead (one per
+					    cumulative level), matching the line charts' point markers */}
+						<Show when={props.data.length === 1}>
+							<For each={props.series}>
+								{(series, si) => (
+									<rect
+										x={cw() / 2 - 3}
+										y={yScale()(stacked()[0].cumulative[si()]) - 3}
+										width={6}
+										height={6}
+										fill={series.color}
+									/>
+								)}
+							</For>
+						</Show>
+
+						{/* X-axis labels */}
+						<For each={props.data}>
+							{(d, i) => {
+								const n = props.data.length;
+								const step = Math.max(1, Math.floor(n / 8));
+								if (i() % step !== 0 && i() !== n - 1) return null;
+								return (
+									<text
+										x={pointX(d)}
+										y={ch() + 16}
+										text-anchor="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{formatShortDate(props.x(d))}
+									</text>
+								);
+							}}
+						</For>
+
+						{/* Drag-brush + hover overlay: one full-plot transparent rect is the
 					    single interaction surface. The brush owns drag (mousedown→up);
 					    hover drives nearest-point tooltips; a non-drag mouseup is a click.
 					    Sitting inside the padded <g>, its client x is the plot origin so
 					    the brush's range is [0, cw()]. */}
-					<rect
-						x={0}
-						y={0}
-						width={cw()}
-						height={ch()}
-						fill="transparent"
-						class={brush.enabled() ? "cursor-crosshair" : "cursor-pointer"}
-						onMouseDown={onOverlayDown}
-						onMouseMove={onOverlayMove}
-						onMouseUp={onOverlayUp}
-						onMouseLeave={onOverlayLeave}
-					/>
-					<Show when={brush.band()}>
-						{(b) => (
-							<rect
-								x={b().x}
-								y={0}
-								width={b().width}
-								height={ch()}
-								fill={BRUSH_FILL}
-								fill-opacity="0.15"
-								pointer-events="none"
-							/>
-						)}
-					</Show>
-				</g>
-			</svg>
+						<rect
+							role="slider"
+							aria-label="Brush to select a range"
+							aria-valuemin={0}
+							aria-valuemax={100}
+							aria-valuenow={0}
+							x={0}
+							y={0}
+							width={cw()}
+							height={ch()}
+							fill="transparent"
+							class={brush.enabled() ? "cursor-crosshair" : "cursor-pointer"}
+							onMouseDown={onOverlayDown}
+							onMouseMove={onOverlayMove}
+							onMouseUp={onOverlayUp}
+							onMouseLeave={onOverlayLeave}
+						/>
+						<Show when={brush.band()}>
+							{(b) => (
+								<rect
+									x={b().x}
+									y={0}
+									width={b().width}
+									height={ch()}
+									fill={BRUSH_FILL}
+									fill-opacity="0.15"
+									pointer-events="none"
+								/>
+							)}
+						</Show>
+					</g>
+				</svg>
 
-			{/* Legend */}
-			<div class="mt-2 flex flex-wrap gap-3 px-2 text-xs text-muted">
-				<For each={props.series}>
-					{(s) => (
-						<div class="flex items-center gap-1">
-							<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": s.color }} />
-							<span class="instrument-microcaps text-[10px] text-muted">{s.label}</span>
-						</div>
-					)}
-				</For>
-			</div>
+				{/* Legend */}
+				<div class="mt-2 flex flex-wrap gap-3 px-2 text-xs text-muted">
+					<For each={props.series}>
+						{(s) => (
+							<div class="flex items-center gap-1">
+								<span
+									class="inline-block h-2.5 w-2.5 rounded-[2px]"
+									style={{ "background-color": s.color }}
+								/>
+								<span class="instrument-microcaps text-[10px] text-muted">{s.label}</span>
+							</div>
+						)}
+					</For>
+				</div>
 			</div>
 		</Show>
 	);

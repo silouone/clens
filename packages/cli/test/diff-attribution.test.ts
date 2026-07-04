@@ -683,10 +683,7 @@ describe("computeWriteDiffLines", () => {
 	test("write with content — all non-empty lines are additions", async () => {
 		const { computeWriteDiffLines } = await importModule();
 
-		const result = computeWriteDiffLines(
-			{ content: "line1\n\nline3\nline4" },
-			"writer",
-		);
+		const result = computeWriteDiffLines({ content: "line1\n\nline3\nline4" }, "writer");
 
 		// Empty lines are filtered out
 		expect(result).toHaveLength(3);
@@ -890,9 +887,7 @@ describe("computeToolSourcedDiff", () => {
 	test("empty edit chains — empty result", async () => {
 		const { computeToolSourcedDiff } = await importModule();
 
-		const events: readonly StoredEvent[] = [
-			makeSessionStartEvent("abc123"),
-		];
+		const events: readonly StoredEvent[] = [makeSessionStartEvent("abc123")];
 
 		const editChains = makeEditChainsResult({ chains: [] });
 

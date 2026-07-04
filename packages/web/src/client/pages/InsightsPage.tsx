@@ -1,43 +1,49 @@
-import { createMemo, For, Show, type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { RefreshCw, RotateCcw } from "lucide-solid";
+import { type Component, createMemo, For, Show } from "solid-js";
+import { CustomRangeChip } from "../components/CustomRangeChip";
 import {
+	BACKTRACK_COLORS,
+	CHART_COLORS,
+	ChartTooltip,
+	formatCompact,
+	REASONING_COLORS,
+} from "../components/charts";
+import { BarChart } from "../components/charts/BarChart";
+import { DonutChart } from "../components/charts/DonutChart";
+import { ScatterPlot } from "../components/charts/ScatterPlot";
+import { StackedArea } from "../components/charts/StackedArea";
+import { StackedBar } from "../components/charts/StackedBar";
+import { ProjectDropdown } from "../components/ProjectDropdown";
+import { TelescopeIllustration } from "../components/ui/EmptyState";
+import { Spinner } from "../components/ui/Spinner";
+import {
+	type AnalyticsRange,
 	analyticsRange,
-	setAnalyticsRange,
-	customRange,
-	setCustomRange,
 	clearCustomRange,
-	insightsData,
-	refetchInsights,
+	computeDelta,
+	computePpDelta,
+	customRange,
+	type DailyInsightsMetrics,
+	type DeltaResult,
 	dailyInsights,
-	insightsTotals,
+	insightsData,
+	insightsPopulation,
 	insightsPreviousTotals,
+	insightsTotals,
+	isRebuilding,
+	isValidDayKey,
+	planDriftPoints,
+	rebuildAnalytics,
+	refetchInsights,
+	setAnalyticsRange,
+	setCustomRange,
 	toolErrors,
 	topBacktrackFiles,
 	topErrorPatterns,
-	planDriftPoints,
 	worstSessions,
-	computeDelta,
-	computePpDelta,
-	rebuildAnalytics,
-	isRebuilding,
-	insightsPopulation,
-	isValidDayKey,
-	type AnalyticsRange,
-	type DeltaResult,
-	type DailyInsightsMetrics,
 } from "../lib/analytics-store";
-import { CustomRangeChip } from "../components/CustomRangeChip";
 import { formatDuration } from "../lib/format";
-import { BarChart } from "../components/charts/BarChart";
-import { StackedArea } from "../components/charts/StackedArea";
-import { StackedBar } from "../components/charts/StackedBar";
-import { DonutChart } from "../components/charts/DonutChart";
-import { ScatterPlot } from "../components/charts/ScatterPlot";
-import { ChartTooltip, BACKTRACK_COLORS, REASONING_COLORS, CHART_COLORS, formatCompact } from "../components/charts";
-import { TelescopeIllustration } from "../components/ui/EmptyState";
-import { Spinner } from "../components/ui/Spinner";
-import { ProjectDropdown } from "../components/ProjectDropdown";
 
 // ── Range selector ──────────────────────────────────────────────────
 
@@ -57,11 +63,14 @@ const RangeSelector: Component = () => {
 			<For each={RANGES}>
 				{(r) => (
 					<button
+						type="button"
 						onClick={() => selectPreset(r)}
 						class="instrument-microcaps rounded-none border px-2.5 py-1 text-[10px] transition"
 						classList={{
-							"text-primary bg-surface-muted border-brand-500": !isCustom() && analyticsRange() === r,
-							"text-muted border-clens hover:text-secondary hover:bg-surface-hover": isCustom() || analyticsRange() !== r,
+							"text-primary bg-surface-muted border-brand-500":
+								!isCustom() && analyticsRange() === r,
+							"text-muted border-clens hover:text-secondary hover:bg-surface-hover":
+								isCustom() || analyticsRange() !== r,
 						}}
 					>
 						{r === "all" ? "All" : r}
@@ -104,14 +113,16 @@ const KpiCard: Component<KpiCardProps> = (props) => (
 		</Show>
 		<Show when={props.delta && props.delta.direction !== "flat"}>
 			<div class="mt-1 flex items-center gap-1 text-xs">
-				<span classList={{
-					"text-success": (props.invertColor
-						? props.delta?.direction === "down"
-						: props.delta?.direction === "up"),
-					"text-danger": (props.invertColor
-						? props.delta?.direction === "up"
-						: props.delta?.direction === "down"),
-				}}>
+				<span
+					classList={{
+						"text-success": props.invertColor
+							? props.delta?.direction === "down"
+							: props.delta?.direction === "up",
+						"text-danger": props.invertColor
+							? props.delta?.direction === "up"
+							: props.delta?.direction === "down",
+					}}
+				>
 					{props.delta?.direction === "up" ? "+" : "-"}
 					{props.delta?.value.toFixed(1)}
 					{props.deltaLabel ?? "%"}
@@ -191,6 +202,7 @@ const EmptyState: Component = () => (
 			If you have distilled sessions, click rebuild to extract analytics data.
 		</p>
 		<button
+			type="button"
 			onClick={() => rebuildAnalytics()}
 			disabled={isRebuilding()}
 			class="instrument-microcaps mt-4 rounded-none border border-brand-500 bg-brand-500 px-4 py-2 text-[10px] text-surface hover:bg-brand-600 transition disabled:opacity-50"
@@ -198,7 +210,11 @@ const EmptyState: Component = () => (
 			{isRebuilding() ? "Rebuilding..." : "Rebuild Analytics"}
 		</button>
 		<p class="mt-3 text-xs text-muted">
-			Or run <code class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-xs">clens distill --all</code> to distill and generate analytics.
+			Or run{" "}
+			<code class="rounded-none border border-clens bg-surface-inset px-1.5 py-0.5 font-mono text-xs">
+				clens distill --all
+			</code>{" "}
+			to distill and generate analytics.
 		</p>
 	</div>
 );
@@ -237,7 +253,11 @@ const bucketDecisions = (
 		weekStart.setUTCDate(date.getUTCDate() - date.getUTCDay());
 		const key = weekStart.toISOString().slice(0, 10);
 		const existing = weeks.get(key) ?? {
-			label: key, timing_gap: 0, tool_pivot: 0, phase_boundary: 0, task_delegation: 0,
+			label: key,
+			timing_gap: 0,
+			tool_pivot: 0,
+			phase_boundary: 0,
+			task_delegation: 0,
 		};
 		weeks.set(key, {
 			label: key,
@@ -280,7 +300,9 @@ export const InsightsPage: Component = () => {
 	const backtrackDelta = createMemo(() => {
 		const t = totals();
 		const p = prevTotals();
-		return t && p && hasPrevBaseline() ? computeDelta(t.backtrack_rate, p.backtrack_rate) : undefined;
+		return t && p && hasPrevBaseline()
+			? computeDelta(t.backtrack_rate, p.backtrack_rate)
+			: undefined;
 	});
 	const editSurvival = createMemo(() => {
 		const t = totals();
@@ -296,13 +318,13 @@ export const InsightsPage: Component = () => {
 	const reasoningDelta = createMemo(() => {
 		const t = totals();
 		const p = prevTotals();
-		return t && p && hasPrevBaseline() ? computeDelta(t.reasoning_action_ratio, p.reasoning_action_ratio) : undefined;
+		return t && p && hasPrevBaseline()
+			? computeDelta(t.reasoning_action_ratio, p.reasoning_action_ratio)
+			: undefined;
 	});
 
 	// Has edit chain data?
-	const hasEditChains = createMemo(() =>
-		dailyInsights().some((d) => d.avg_edit_chain_length > 0),
-	);
+	const hasEditChains = createMemo(() => dailyInsights().some((d) => d.avg_edit_chain_length > 0));
 
 	// Reasoning donut segments
 	const reasoningSegments = createMemo(() => {
@@ -318,9 +340,7 @@ export const InsightsPage: Component = () => {
 	});
 
 	// Decision patterns
-	const decisionBuckets = createMemo(() =>
-		bucketDecisions(dailyInsights(), analyticsRange()),
-	);
+	const decisionBuckets = createMemo(() => bucketDecisions(dailyInsights(), analyticsRange()));
 
 	// Top reasoning category insight
 	const topReasoningInsight = createMemo(() => {
@@ -348,6 +368,7 @@ export const InsightsPage: Component = () => {
 					<CustomRangeChip />
 					<RangeSelector />
 					<button
+						type="button"
 						onClick={() => rebuildAnalytics()}
 						disabled={isRebuilding()}
 						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-strong transition disabled:opacity-50"
@@ -356,6 +377,7 @@ export const InsightsPage: Component = () => {
 						<RotateCcw class="h-4 w-4" classList={{ "animate-spin": isRebuilding() }} />
 					</button>
 					<button
+						type="button"
 						onClick={() => refetchInsights()}
 						class="rounded-none border border-clens p-1.5 text-muted hover:text-secondary hover:bg-surface-hover hover:border-strong transition"
 						title="Refresh"
@@ -408,7 +430,8 @@ export const InsightsPage: Component = () => {
 					<div class="mb-6 rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Edit Efficiency" />
 						<div class="mb-3 text-xs text-muted">
-							<span class="font-mono tabular-nums text-secondary">{editSurvival()}%</span> of edits survive to final state
+							<span class="font-mono tabular-nums text-secondary">{editSurvival()}%</span> of edits
+							survive to final state
 						</div>
 						<BarChart
 							data={dailyInsights()}
@@ -456,9 +479,21 @@ export const InsightsPage: Component = () => {
 						height={200}
 						ariaLabel="Backtrack trends by type stacked area chart"
 						series={[
-							{ key: "failure_retry", label: "Failure Retry", color: BACKTRACK_COLORS.failure_retry },
-							{ key: "iteration_struggle", label: "Iteration", color: BACKTRACK_COLORS.iteration_struggle },
-							{ key: "debugging_loop", label: "Debug Loop", color: BACKTRACK_COLORS.debugging_loop },
+							{
+								key: "failure_retry",
+								label: "Failure Retry",
+								color: BACKTRACK_COLORS.failure_retry,
+							},
+							{
+								key: "iteration_struggle",
+								label: "Iteration",
+								color: BACKTRACK_COLORS.iteration_struggle,
+							},
+							{
+								key: "debugging_loop",
+								label: "Debug Loop",
+								color: BACKTRACK_COLORS.debugging_loop,
+							},
 						]}
 						getValue={(d, key) => d.backtracks_by_type[key] ?? 0}
 						tooltipLabel={(d) => `${d.date}: ${d.backtrack_count} backtracks`}
@@ -475,25 +510,39 @@ export const InsightsPage: Component = () => {
 				<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div class="rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Reasoning Distribution" />
-						<Show when={reasoningSegments().length > 0} fallback={
-							<div class="instrument-microcaps py-10 text-center text-[10px] text-muted">No reasoning data</div>
-						}>
+						<Show
+							when={reasoningSegments().length > 0}
+							fallback={
+								<div class="instrument-microcaps py-10 text-center text-[10px] text-muted">
+									No reasoning data
+								</div>
+							}
+						>
 							<DonutChart
 								segments={reasoningSegments()}
 								ariaLabel="Reasoning distribution donut chart"
 								centerLabel="Turns"
-								centerValue={formatCompact(reasoningSegments().reduce((s, seg) => s + seg.value, 0))}
+								centerValue={formatCompact(
+									reasoningSegments().reduce((s, seg) => s + seg.value, 0),
+								)}
 							/>
 							<Show when={topReasoningInsight()}>
-								<div class="mt-3 border-t border-clens/60 pt-3 text-xs italic text-muted">{topReasoningInsight()}</div>
+								<div class="mt-3 border-t border-clens/60 pt-3 text-xs italic text-muted">
+									{topReasoningInsight()}
+								</div>
 							</Show>
 						</Show>
 					</div>
 					<div class="rounded-none border border-clens bg-surface p-4">
 						<SectionHeader title="Decision Patterns" />
-						<Show when={decisionBuckets().length > 0} fallback={
-							<div class="instrument-microcaps py-10 text-center text-[10px] text-muted">No decision data</div>
-						}>
+						<Show
+							when={decisionBuckets().length > 0}
+							fallback={
+								<div class="instrument-microcaps py-10 text-center text-[10px] text-muted">
+									No decision data
+								</div>
+							}
+						>
 							<StackedBar
 								data={decisionBuckets()}
 								x={(d) => d.label}
@@ -530,7 +579,9 @@ export const InsightsPage: Component = () => {
 										<thead>
 											<tr class="text-left text-muted border-b border-clens">
 												<th class="instrument-microcaps py-2 pr-4 text-[10px]">Tool</th>
-												<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Failures</th>
+												<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">
+													Failures
+												</th>
 												<th class="instrument-microcaps py-2 text-[10px] text-right">Rate</th>
 											</tr>
 										</thead>
@@ -539,9 +590,13 @@ export const InsightsPage: Component = () => {
 												{(te) => (
 													<tr class="border-b border-clens/50 transition-colors hover:bg-surface-hover">
 														<td class="py-2 pr-4 font-medium text-primary">{te.tool_name}</td>
-														<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{te.total_failures}</td>
+														<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">
+															{te.total_failures}
+														</td>
 														<td class="py-2 text-right text-secondary">
-															{te.failure_rate > 0 ? `${(te.failure_rate * 100).toFixed(1)}%` : "n/a"}
+															{te.failure_rate > 0
+																? `${(te.failure_rate * 100).toFixed(1)}%`
+																: "n/a"}
 														</td>
 													</tr>
 												)}
@@ -568,9 +623,12 @@ export const InsightsPage: Component = () => {
 												{(ep) => (
 													<tr class="border-b border-clens/50 transition-colors hover:bg-surface-hover">
 														<td class="py-2 pr-4 text-primary truncate max-w-48" title={ep.pattern}>
-															{ep.pattern.slice(0, 50)}{ep.pattern.length > 50 ? "..." : ""}
+															{ep.pattern.slice(0, 50)}
+															{ep.pattern.length > 50 ? "..." : ""}
 														</td>
-														<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">{ep.count}</td>
+														<td class="py-2 pr-4 text-right font-mono tabular-nums text-secondary">
+															{ep.count}
+														</td>
 														<td class="py-2 text-muted">{ep.tools.join(", ")}</td>
 													</tr>
 												)}
@@ -593,7 +651,9 @@ export const InsightsPage: Component = () => {
 									<thead>
 										<tr class="text-left text-muted border-b border-clens">
 											<th class="instrument-microcaps py-2 pr-4 text-[10px]">Session</th>
-											<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Backtracks</th>
+											<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">
+												Backtracks
+											</th>
 											<th class="instrument-microcaps py-2 pr-4 text-[10px] text-right">Cost</th>
 											{/* Active = working time, idle excluded (aggregate stats.duration_ms) */}
 											<th class="instrument-microcaps py-2 text-[10px] text-right">Active</th>
@@ -644,7 +704,9 @@ export const InsightsPage: Component = () => {
 													<td class="py-2 pr-4 text-primary truncate max-w-64" title={f.file}>
 														{f.file.split("/").slice(-2).join("/")}
 													</td>
-													<td class="py-2 text-right font-mono tabular-nums text-secondary">{f.count}</td>
+													<td class="py-2 text-right font-mono tabular-nums text-secondary">
+														{f.count}
+													</td>
 												</tr>
 											)}
 										</For>

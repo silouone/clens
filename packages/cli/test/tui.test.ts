@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	collapseConsecutive,
 	colorizeTimelineType,
+	DETAIL_TABS,
 	formatAgentDetail,
 	formatAgentRow,
 	formatDecisionsSection,
@@ -11,7 +12,6 @@ import {
 	formatTimelineTab,
 	handleKey,
 	nextTab,
-	DETAIL_TABS,
 	nextTimelineFilter,
 	parseKey,
 	render,
@@ -60,7 +60,18 @@ const makeState = (overrides?: Partial<TuiState>): TuiState => ({
 	journeys: [],
 	selectedIndex: 0,
 	detailTab: "overview",
-	visibleTabs: ["overview", "backtracks", "decisions", "reasoning", "edits", "timeline", "drift", "agents", "messages", "graph"],
+	visibleTabs: [
+		"overview",
+		"backtracks",
+		"decisions",
+		"reasoning",
+		"edits",
+		"timeline",
+		"drift",
+		"agents",
+		"messages",
+		"graph",
+	],
 	agentIndex: 0,
 	projectDir: "/tmp/test",
 	timelineOffset: 0,
@@ -207,7 +218,9 @@ describe("handleKey", () => {
 
 	test("up/down scrolls timeline", () => {
 		// Use alternating tool names to prevent collapsing
-		const timeline = Array.from({ length: 50 }, (_, i) => makeTimelineEntry({ t: 1000 + i, tool_name: `Tool${i}` }));
+		const timeline = Array.from({ length: 50 }, (_, i) =>
+			makeTimelineEntry({ t: 1000 + i, tool_name: `Tool${i}` }),
+		);
 		const distilled: DistilledSession = {
 			session_id: "aaaa1111",
 			stats: {
@@ -255,7 +268,9 @@ describe("handleKey", () => {
 
 	test("timeline down does not exceed max offset", () => {
 		// Use alternating tool names to prevent collapsing
-		const timeline = Array.from({ length: 35 }, (_, i) => makeTimelineEntry({ t: 1000 + i, tool_name: `Tool${i}` }));
+		const timeline = Array.from({ length: 35 }, (_, i) =>
+			makeTimelineEntry({ t: 1000 + i, tool_name: `Tool${i}` }),
+		);
 		const distilled: DistilledSession = {
 			session_id: "aaaa1111",
 			stats: {
@@ -652,9 +667,7 @@ describe("formatOverviewTab", () => {
 					files_modified: 5,
 					backtrack_count: 0,
 				},
-				task_summary: [
-					{ task_id: "t1", agent: "grandchild-id", subject: "Deep task", t: 1000 },
-				],
+				task_summary: [{ task_id: "t1", agent: "grandchild-id", subject: "Deep task", t: 1000 }],
 			},
 			agents: [
 				makeAgent({
@@ -712,8 +725,20 @@ describe("formatOverviewTab", () => {
 					backtrack_count: 0,
 				},
 				agent_workload: [
-					{ name: "builder-lintfix", id: "abc12345", tool_calls: 132, files_modified: 12, duration_ms: 300000 },
-					{ name: "builder-types", id: "def67890", tool_calls: 80, files_modified: 8, duration_ms: 480000 },
+					{
+						name: "builder-lintfix",
+						id: "abc12345",
+						tool_calls: 132,
+						files_modified: 12,
+						duration_ms: 300000,
+					},
+					{
+						name: "builder-types",
+						id: "def67890",
+						tool_calls: 80,
+						files_modified: 8,
+						duration_ms: 480000,
+					},
 				],
 			},
 		};
@@ -1187,8 +1212,10 @@ describe("formatAgentLifetimeBar", () => {
 		const stripped1 = stripAnsi(bar1);
 		const stripped2 = stripAnsi(bar2);
 		// The bar character position should be consistent
-		const barStart1 = stripped1.indexOf("\u2588") >= 0 ? stripped1.indexOf("\u2588") : stripped1.indexOf("\u2500");
-		const barStart2 = stripped2.indexOf("\u2588") >= 0 ? stripped2.indexOf("\u2588") : stripped2.indexOf("\u2500");
+		const barStart1 =
+			stripped1.indexOf("\u2588") >= 0 ? stripped1.indexOf("\u2588") : stripped1.indexOf("\u2500");
+		const barStart2 =
+			stripped2.indexOf("\u2588") >= 0 ? stripped2.indexOf("\u2588") : stripped2.indexOf("\u2500");
 		expect(barStart1).toBe(barStart2);
 	});
 
@@ -1231,8 +1258,19 @@ describe("formatDecisionsSection", () => {
 	test("groups decisions by type and shows counts", () => {
 		const decisions = [
 			{ type: "timing_gap" as const, t: 1000, gap_ms: 5000, classification: "user_idle" as const },
-			{ type: "timing_gap" as const, t: 2000, gap_ms: 3000, classification: "session_pause" as const },
-			{ type: "tool_pivot" as const, t: 3000, from_tool: "Read", to_tool: "Edit", after_failure: false },
+			{
+				type: "timing_gap" as const,
+				t: 2000,
+				gap_ms: 3000,
+				classification: "session_pause" as const,
+			},
+			{
+				type: "tool_pivot" as const,
+				t: 3000,
+				from_tool: "Read",
+				to_tool: "Edit",
+				after_failure: false,
+			},
 			{ type: "phase_boundary" as const, t: 4000, phase_name: "Implementation", phase_index: 1 },
 		];
 		const lines = formatDecisionsSection(decisions);
@@ -1244,10 +1282,27 @@ describe("formatDecisionsSection", () => {
 	test("shows 3 most recent decisions", () => {
 		const decisions = [
 			{ type: "timing_gap" as const, t: 1000, gap_ms: 5000, classification: "user_idle" as const },
-			{ type: "tool_pivot" as const, t: 5000, from_tool: "Read", to_tool: "Edit", after_failure: true },
-			{ type: "tool_pivot" as const, t: 4000, from_tool: "Bash", to_tool: "Read", after_failure: false },
+			{
+				type: "tool_pivot" as const,
+				t: 5000,
+				from_tool: "Read",
+				to_tool: "Edit",
+				after_failure: true,
+			},
+			{
+				type: "tool_pivot" as const,
+				t: 4000,
+				from_tool: "Bash",
+				to_tool: "Read",
+				after_failure: false,
+			},
 			{ type: "phase_boundary" as const, t: 3000, phase_name: "Review", phase_index: 2 },
-			{ type: "timing_gap" as const, t: 2000, gap_ms: 3000, classification: "session_pause" as const },
+			{
+				type: "timing_gap" as const,
+				t: 2000,
+				gap_ms: 3000,
+				classification: "session_pause" as const,
+			},
 		];
 		const lines = formatDecisionsSection(decisions);
 		// Most recent first: t=5000, t=4000, t=3000
@@ -1271,9 +1326,7 @@ describe("formatDecisionsSection", () => {
 				unique_files: [],
 			},
 			backtracks: [],
-			decisions: [
-				{ type: "timing_gap", t: 1000, gap_ms: 5000, classification: "user_idle" },
-			],
+			decisions: [{ type: "timing_gap", t: 1000, gap_ms: 5000, classification: "user_idle" }],
 			file_map: { files: [] },
 			git_diff: { commits: [], hunks: [] },
 			complete: true,
@@ -1388,12 +1441,8 @@ describe("formatGitDiffSection", () => {
 	test("omits working tree section in TUI (compact mode)", () => {
 		const gitDiff = {
 			commits: [],
-			hunks: [
-				{ commit_hash: "abc", file_path: "x.ts", additions: 1, deletions: 0 },
-			],
-			working_tree_changes: [
-				{ file_path: "src/new.ts", status: "added" as const, additions: 50 },
-			],
+			hunks: [{ commit_hash: "abc", file_path: "x.ts", additions: 1, deletions: 0 }],
+			working_tree_changes: [{ file_path: "src/new.ts", status: "added" as const, additions: 50 }],
 		};
 		const lines = formatGitDiffSection(gitDiff);
 		expect(lines.some((l) => l.includes("Working tree"))).toBe(false);
@@ -1458,9 +1507,7 @@ describe("agent filter on files tab", () => {
 			complete: true,
 			reasoning: [],
 			user_messages: [],
-			agents: [
-				makeAgent({ session_id: "a1", agent_name: "builder-a", children: [] }),
-			],
+			agents: [makeAgent({ session_id: "a1", agent_name: "builder-a", children: [] })],
 		};
 		const state = makeState({
 			view: "session_detail",
@@ -1491,7 +1538,14 @@ describe("agent filter on files tab", () => {
 			decisions: [],
 			file_map: {
 				files: [
-					{ file_path: "/tmp/test/a.ts", reads: 1, edits: 1, writes: 0, errors: 0, tool_use_ids: [] },
+					{
+						file_path: "/tmp/test/a.ts",
+						reads: 1,
+						edits: 1,
+						writes: 0,
+						errors: 0,
+						tool_use_ids: [],
+					},
 				],
 			},
 			git_diff: { commits: [], hunks: [] },
@@ -1536,8 +1590,14 @@ describe("formatCommGraphSummary", () => {
 	test("shows edge count in header", () => {
 		const edges = [
 			{
-				from_id: "a", from_name: "lead", to_id: "b", to_name: "builder",
-				from: "lead", to: "builder", count: 5, msg_types: ["message"],
+				from_id: "a",
+				from_name: "lead",
+				to_id: "b",
+				to_name: "builder",
+				from: "lead",
+				to: "builder",
+				count: 5,
+				msg_types: ["message"],
 			},
 		];
 		const lines = formatCommGraphSummary(edges);
@@ -1546,8 +1606,14 @@ describe("formatCommGraphSummary", () => {
 
 	test("sorts by count and shows top 5", () => {
 		const edges = Array.from({ length: 7 }, (_, i) => ({
-			from_id: `a${i}`, from_name: `agent-${i}`, to_id: `b${i}`, to_name: `partner-${i}`,
-			from: `agent-${i}`, to: `partner-${i}`, count: (i + 1) * 10, msg_types: ["message"],
+			from_id: `a${i}`,
+			from_name: `agent-${i}`,
+			to_id: `b${i}`,
+			to_name: `partner-${i}`,
+			from: `agent-${i}`,
+			to: `partner-${i}`,
+			count: (i + 1) * 10,
+			msg_types: ["message"],
 		}));
 		const lines = formatCommGraphSummary(edges);
 		// Top edge should be agent-6 (count=70)
@@ -1559,8 +1625,14 @@ describe("formatCommGraphSummary", () => {
 	test("shows msg types in brackets", () => {
 		const edges = [
 			{
-				from_id: "a", from_name: "lead", to_id: "b", to_name: "builder",
-				from: "lead", to: "builder", count: 3, msg_types: ["message", "broadcast"],
+				from_id: "a",
+				from_name: "lead",
+				to_id: "b",
+				to_name: "builder",
+				from: "lead",
+				to: "builder",
+				count: 3,
+				msg_types: ["message", "broadcast"],
 			},
 		];
 		const lines = formatCommGraphSummary(edges);

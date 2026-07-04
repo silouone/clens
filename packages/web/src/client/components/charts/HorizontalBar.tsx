@@ -1,8 +1,8 @@
-import { createMemo, For, Show, type Component } from "solid-js";
+import { type Component, createMemo, For, Show } from "solid-js";
+import { ChartEmpty } from "./ChartEmpty";
+import { hideTooltip, showTooltip } from "./ChartTooltip";
 import type { BaseChartProps } from "./shared";
 import { CHART_COLORS, formatCompact, niceMax } from "./shared";
-import { hideTooltip, showTooltip } from "./ChartTooltip";
-import { ChartEmpty } from "./ChartEmpty";
 
 interface HorizontalBarProps<T> extends BaseChartProps {
 	readonly data: readonly T[];
@@ -20,7 +20,9 @@ export const HorizontalBar = <T,>(props: HorizontalBarProps<T>): ReturnType<Comp
 	const valueWidth = 60;
 	const color = () => props.color ?? CHART_COLORS.blue;
 
-	const maxVal = createMemo(() => niceMax(props.data.reduce((m, d) => Math.max(m, props.value(d)), 0)));
+	const maxVal = createMemo(() =>
+		niceMax(props.data.reduce((m, d) => Math.max(m, props.value(d)), 0)),
+	);
 
 	const totalHeight = createMemo(() => {
 		const n = props.data.length;
@@ -30,20 +32,29 @@ export const HorizontalBar = <T,>(props: HorizontalBarProps<T>): ReturnType<Comp
 	return (
 		<Show
 			when={props.data.length > 0}
-			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+			fallback={
+				<ChartEmpty
+					height={props.height}
+					class={props.class}
+					ariaLabel={props.ariaLabel}
+					label="No data"
+				/>
+			}
 		>
 			<div class={`w-full ${props.class ?? ""}`} role="img" aria-label={props.ariaLabel}>
 				<div class="flex flex-col gap-1">
 					<For each={props.data}>
 						{(d, i) => {
-							const pct = () => maxVal() > 0 ? (props.value(d) / maxVal()) * 100 : 0;
+							const pct = () => (maxVal() > 0 ? (props.value(d) / maxVal()) * 100 : 0);
 							return (
-								<div
-									class="flex items-center gap-2 cursor-pointer group"
+								<button
+									type="button"
+									class="flex w-full items-center gap-2 text-left cursor-pointer group"
 									onClick={() => props.onClickPoint?.(d, i())}
 									onMouseEnter={(e) => {
 										const rect = e.currentTarget.getBoundingClientRect();
-										const label = props.tooltipLabel?.(d) ??
+										const label =
+											props.tooltipLabel?.(d) ??
 											`${props.label(d)}: ${formatCompact(props.value(d))}`;
 										showTooltip(rect.x + rect.width / 2, rect.y, label);
 									}}
@@ -64,7 +75,7 @@ export const HorizontalBar = <T,>(props: HorizontalBarProps<T>): ReturnType<Comp
 									<span class="w-14 text-right font-mono text-xs tabular-nums text-secondary flex-shrink-0">
 										{formatCompact(props.value(d))}
 									</span>
-								</div>
+								</button>
 							);
 						}}
 					</For>

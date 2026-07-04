@@ -42,7 +42,9 @@ const VALID_MEMORY_TYPES = new Set(["User", "Project", "Local", "Managed"]);
  * event — see CFG-5 BLOCKED-VERIFY), letting the caller fall back to an inferred
  * list. Deduped by `file_path`, preserving first-seen order. Pure (zero I/O).
  */
-const realizeClaudeMd = (events: readonly StoredEvent[]): readonly ClaudeMdInEffect[] | undefined => {
+const realizeClaudeMd = (
+	events: readonly StoredEvent[],
+): readonly ClaudeMdInEffect[] | undefined => {
 	const seen = new Set<string>();
 	const realized: ClaudeMdInEffect[] = [];
 	for (const e of events) {
@@ -50,15 +52,18 @@ const realizeClaudeMd = (events: readonly StoredEvent[]): readonly ClaudeMdInEff
 		const filePath = e.data.file_path;
 		if (typeof filePath !== "string" || filePath.length === 0 || seen.has(filePath)) continue;
 		const rawType = e.data.memory_type;
-		const memory_type = typeof rawType === "string" && VALID_MEMORY_TYPES.has(rawType)
-			? (rawType as ClaudeMdInEffect["memory_type"])
-			: "inferred";
+		const memory_type =
+			typeof rawType === "string" && VALID_MEMORY_TYPES.has(rawType)
+				? (rawType as ClaudeMdInEffect["memory_type"])
+				: "inferred";
 		const loadReason = e.data.load_reason;
 		seen.add(filePath);
 		realized.push({
 			file_path: filePath,
 			memory_type,
-			...(typeof loadReason === "string" && loadReason.length > 0 ? { load_reason: loadReason } : {}),
+			...(typeof loadReason === "string" && loadReason.length > 0
+				? { load_reason: loadReason }
+				: {}),
 		});
 	}
 	return realized.length > 0 ? realized : undefined;

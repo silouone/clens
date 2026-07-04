@@ -9,7 +9,7 @@ import type {
 	TaskCompleteLink,
 	TeammateIdleLink,
 } from "../types";
-import { resolveName, resolveId, resolveParentSession, sanitizeAgentName } from "../utils";
+import { resolveId, resolveName, resolveParentSession, sanitizeAgentName } from "../utils";
 
 const MAX_ENTRIES = 500;
 const PREVIEW_LENGTH = 120;
@@ -17,14 +17,14 @@ const PREVIEW_LENGTH = 120;
 const isMessageLink = (link: LinkEvent): link is MessageLink => link.type === "msg_send";
 const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn";
 const isStopLink = (link: LinkEvent): link is StopLink => link.type === "stop";
-const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink => link.type === "task_complete";
-const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink => link.type === "teammate_idle";
+const isTaskCompleteLink = (link: LinkEvent): link is TaskCompleteLink =>
+	link.type === "task_complete";
+const isTeammateIdleLink = (link: LinkEvent): link is TeammateIdleLink =>
+	link.type === "teammate_idle";
 
-const truncate = (s: string, max: number): string =>
-	s.length <= max ? s : `${s.slice(0, max)}…`;
+const truncate = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max)}…`);
 
-const conversationKey = (a: string, b: string): string =>
-	a < b ? `${a}::${b}` : `${b}::${a}`;
+const conversationKey = (a: string, b: string): string => (a < b ? `${a}::${b}` : `${b}::${a}`);
 
 /**
  * Build sequence entries from msg_send links.
@@ -160,9 +160,7 @@ export const groupByConversation = (
 			}
 
 			const participants: readonly [string, string] =
-				entry.from < entry.to
-					? [entry.from, entry.to]
-					: [entry.to, entry.from];
+				entry.from < entry.to ? [entry.from, entry.to] : [entry.to, entry.from];
 
 			const newCurrent = {
 				key,
@@ -211,7 +209,8 @@ const inferLifetimesFromComms = (
 	return agentNames
 		.map((agentName): AgentLifetime | undefined => {
 			const timestamps: readonly number[] = links.flatMap((link): readonly number[] => {
-				if (link.type === "msg_send" && (link.to === agentName || link.from_name === agentName)) return [link.t];
+				if (link.type === "msg_send" && (link.to === agentName || link.from_name === agentName))
+					return [link.t];
 				if (link.type === "task" && link.owner === agentName) return [link.t];
 				if (link.type === "task_complete" && link.agent === agentName) return [link.t];
 				if (link.type === "teammate_idle" && link.teammate === agentName) return [link.t];
@@ -247,9 +246,7 @@ export const extractAgentLifetimes = (
 	if (spawns.length === 0) return inferLifetimesFromComms(links, nameMap);
 
 	// Build a lookup of agent_id → stop timestamp
-	const stopMap: ReadonlyMap<string, number> = new Map(
-		stops.map((s) => [s.agent_id, s.t]),
-	);
+	const stopMap: ReadonlyMap<string, number> = new Map(stops.map((s) => [s.agent_id, s.t]));
 
 	// Fallback end_t: latest timestamp in all links
 	const maxT = links.reduce((max, link) => Math.max(max, link.t), 0);

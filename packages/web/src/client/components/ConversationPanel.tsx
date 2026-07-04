@@ -1,13 +1,4 @@
 import {
-	createSignal,
-	For,
-	Match,
-	onCleanup,
-	Show,
-	Switch,
-	type Component,
-} from "solid-js";
-import {
 	AlertTriangle,
 	Brain,
 	Check,
@@ -19,9 +10,10 @@ import {
 	User,
 	X,
 } from "lucide-solid";
-import { createConversationStore } from "../lib/stores";
+import { type Component, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import type { ConversationEntry } from "../../shared/types";
 import { renderMarkdown, renderPlainText } from "../lib/markdown";
+import { createConversationStore } from "../lib/stores";
 import { Badge } from "./ui/Badge";
 import { Spinner } from "./ui/Spinner";
 
@@ -49,8 +41,7 @@ const INTENT_VARIANT: Readonly<Record<string, "info" | "warning" | "success" | "
 	general: "default",
 };
 
-const intentVariant = (intent: string) =>
-	INTENT_VARIANT[intent] ?? "default";
+const intentVariant = (intent: string) => INTENT_VARIANT[intent] ?? "default";
 
 const truncate = (text: string, max: number): string =>
 	text.length > max ? `${text.slice(0, max)}...` : text;
@@ -78,17 +69,21 @@ type TextSegment =
 const ATTR_RE = /(\w+)="([^"]*)"/g;
 
 /** Tags to strip entirely (system metadata, not user-visible) */
-const SYSTEM_TAG_RE = /<(?:system-reminder|antml_thinking|available-deferred-tools|context-window-status)[^>]*>[\s\S]*?<\/(?:system-reminder|antml_thinking|available-deferred-tools|context-window-status)>/g;
+const SYSTEM_TAG_RE =
+	/<(?:system-reminder|antml_thinking|available-deferred-tools|context-window-status)[^>]*>[\s\S]*?<\/(?:system-reminder|antml_thinking|available-deferred-tools|context-window-status)>/g;
 
 /** Command invocation block: <command-name>...</command-name> with optional siblings */
-const COMMAND_BLOCK_RE = /<command-message>([\s\S]*?)<\/command-message>\s*<command-name>([\s\S]*?)<\/command-name>\s*<command-args>([\s\S]*?)<\/command-args>/g;
-const COMMAND_BLOCK_RE2 = /<command-name>([\s\S]*?)<\/command-name>\s*<command-message>([\s\S]*?)<\/command-message>\s*<command-args>([\s\S]*?)<\/command-args>/g;
+const COMMAND_BLOCK_RE =
+	/<command-message>([\s\S]*?)<\/command-message>\s*<command-name>([\s\S]*?)<\/command-name>\s*<command-args>([\s\S]*?)<\/command-args>/g;
+const COMMAND_BLOCK_RE2 =
+	/<command-name>([\s\S]*?)<\/command-name>\s*<command-message>([\s\S]*?)<\/command-message>\s*<command-args>([\s\S]*?)<\/command-args>/g;
 
 /** Teammate message */
 const TEAMMATE_RE = /<teammate-message\s+([^>]*)>([\s\S]*?)<\/teammate-message>/g;
 
 /** Catch-all for any remaining unrecognized XML-like tags */
-const STRAY_TAG_RE = /<\/?(?:command-name|command-message|command-args|system-reminder|antml_thinking)[^>]*>/g;
+const STRAY_TAG_RE =
+	/<\/?(?:command-name|command-message|command-args|system-reminder|antml_thinking)[^>]*>/g;
 
 const parseUserPromptSegments = (raw: string): readonly TextSegment[] => {
 	// Phase 1: strip system tags
@@ -135,11 +130,18 @@ const parseUserPromptSegments = (raw: string): readonly TextSegment[] => {
 	type Span = { readonly index: number; readonly length: number; readonly segment: TextSegment };
 	const spans: readonly Span[] = [...commands, ...teammates].sort((a, b) => a.index - b.index);
 
-	const { segments, cursor: finalCursor } = spans.reduce<{ readonly segments: readonly TextSegment[]; readonly cursor: number }>(
+	const { segments, cursor: finalCursor } = spans.reduce<{
+		readonly segments: readonly TextSegment[];
+		readonly cursor: number;
+	}>(
 		(acc, span) => {
 			const before = text.slice(acc.cursor, span.index).replace(STRAY_TAG_RE, "").trim();
 			return {
-				segments: [...acc.segments, ...(before ? [{ kind: "text" as const, value: before }] : []), span.segment],
+				segments: [
+					...acc.segments,
+					...(before ? [{ kind: "text" as const, value: before }] : []),
+					span.segment,
+				],
 				cursor: span.index + span.length,
 			};
 		},
@@ -161,11 +163,9 @@ const RAIL_COLOR_MAP: Readonly<Record<string, string>> = {
 	red: "var(--clens-danger)",
 };
 
-const railColor = (color: string): string =>
-	RAIL_COLOR_MAP[color] ?? "var(--clens-tick)";
+const railColor = (color: string): string => RAIL_COLOR_MAP[color] ?? "var(--clens-tick)";
 
-const isJsonContent = (s: string): boolean =>
-	s.startsWith("{") || s.startsWith("[");
+const isJsonContent = (s: string): boolean => s.startsWith("{") || s.startsWith("[");
 
 const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => (
 	<div
@@ -173,13 +173,9 @@ const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => (
 		style={{ "border-left-color": railColor(props.msg.color) }}
 	>
 		<div class="mb-1 flex items-center gap-2">
-			<span class="instrument-microcaps text-[10px] text-secondary">
-				{props.msg.teammate_id}
-			</span>
+			<span class="instrument-microcaps text-[10px] text-secondary">{props.msg.teammate_id}</span>
 			<Show when={props.msg.summary}>
-				{(s) => (
-					<span class="text-[11px] text-muted">{s()}</span>
-				)}
+				{(s) => <span class="text-[11px] text-muted">{s()}</span>}
 			</Show>
 		</div>
 		<Show
@@ -190,7 +186,10 @@ const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => (
 				</pre>
 			}
 		>
-			<div class="prose-sm-dark whitespace-pre-wrap text-xs leading-relaxed text-secondary" innerHTML={renderMd(props.msg.content)} />
+			<div
+				class="prose-sm-dark whitespace-pre-wrap text-xs leading-relaxed text-secondary"
+				innerHTML={renderMd(props.msg.content)}
+			/>
 		</Show>
 	</div>
 );
@@ -198,7 +197,11 @@ const TeammateCard: Component<{ readonly msg: TeammateMessage }> = (props) => (
 const CommandCard: Component<{ readonly cmd: CommandInvocation }> = (props) => (
 	<div class="flex items-center gap-2 rounded-none border border-clens bg-surface-inset px-3 py-1.5">
 		<Terminal class="h-3 w-3 shrink-0 text-muted" />
-		<span class="font-mono text-[11px] font-medium text-secondary">{props.cmd.command_name.startsWith("/") ? props.cmd.command_name : `/${props.cmd.command_name}`}</span>
+		<span class="font-mono text-[11px] font-medium text-secondary">
+			{props.cmd.command_name.startsWith("/")
+				? props.cmd.command_name
+				: `/${props.cmd.command_name}`}
+		</span>
 		<Show when={props.cmd.command_args}>
 			<span class="truncate font-mono text-[11px] text-muted">{props.cmd.command_args}</span>
 		</Show>
@@ -207,7 +210,9 @@ const CommandCard: Component<{ readonly cmd: CommandInvocation }> = (props) => (
 
 // ── Entry renderers ──────────────────────────────────────────────────
 
-const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "user_prompt" } }> = (props) => {
+const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "user_prompt" } }> = (
+	props,
+) => {
 	const segments = () => parseUserPromptSegments(props.entry.text);
 	const hasStructured = () => segments().some((s) => s.kind !== "text");
 
@@ -219,13 +224,18 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 			<div class="min-w-0 flex-1">
 				<div class="mb-1 flex items-center gap-2">
 					<span class="instrument-microcaps text-[11px] text-secondary">User</span>
-					<span class="font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
+					<span class="font-mono text-[10px] tabular-nums text-muted">
+						{formatTimestamp(props.entry.t)}
+					</span>
 				</div>
 				<Show
 					when={hasStructured()}
 					fallback={
 						/* Raw user input — verbatim, never markdown (bug B16) */
-						<div class="prose-sm-dark whitespace-pre-wrap rounded-none border border-clens bg-surface-inset px-3 py-2 text-xs leading-relaxed text-secondary" innerHTML={renderPlainText(props.entry.text)} />
+						<div
+							class="prose-sm-dark whitespace-pre-wrap rounded-none border border-clens bg-surface-inset px-3 py-2 text-xs leading-relaxed text-secondary"
+							innerHTML={renderPlainText(props.entry.text)}
+						/>
 					}
 				>
 					<div class="flex flex-col gap-2">
@@ -235,18 +245,17 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 									<Match when={seg.kind === "text" && seg}>
 										{(s) => (
 											/* Raw user input — verbatim, never markdown (bug B16) */
-											<div class="prose-sm-dark whitespace-pre-wrap rounded-none border border-clens bg-surface-inset px-3 py-2 text-xs leading-relaxed text-secondary" innerHTML={renderPlainText((s() as TextSegment & { kind: "text" }).value)} />
+											<div
+												class="prose-sm-dark whitespace-pre-wrap rounded-none border border-clens bg-surface-inset px-3 py-2 text-xs leading-relaxed text-secondary"
+												innerHTML={renderPlainText((s() as TextSegment & { kind: "text" }).value)}
+											/>
 										)}
 									</Match>
 									<Match when={seg.kind === "teammate" && seg}>
-										{(s) => (
-											<TeammateCard msg={(s() as TextSegment & { kind: "teammate" }).msg} />
-										)}
+										{(s) => <TeammateCard msg={(s() as TextSegment & { kind: "teammate" }).msg} />}
 									</Match>
 									<Match when={seg.kind === "command" && seg}>
-										{(s) => (
-											<CommandCard cmd={(s() as TextSegment & { kind: "command" }).cmd} />
-										)}
+										{(s) => <CommandCard cmd={(s() as TextSegment & { kind: "command" }).cmd} />}
 									</Match>
 								</Switch>
 							)}
@@ -258,7 +267,9 @@ const UserPromptRow: Component<{ readonly entry: ConversationEntry & { type: "us
 	);
 };
 
-const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thinking" } }> = (props) => {
+const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thinking" } }> = (
+	props,
+) => {
 	const [expanded, setExpanded] = createSignal(false);
 	const hasText = () => props.entry.text.trim().length > 0;
 
@@ -277,13 +288,12 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 					}
 				>
 					<button
+						type="button"
 						onClick={() => setExpanded((p) => !p)}
 						class="flex w-full items-center gap-2 text-left text-xs text-muted hover:text-secondary"
 					>
 						<Badge variant={intentVariant(props.entry.intent)}>{props.entry.intent}</Badge>
-						<span class="flex-1 truncate text-muted">
-							{truncate(props.entry.text, 120)}
-						</span>
+						<span class="flex-1 truncate text-muted">{truncate(props.entry.text, 120)}</span>
 						<Show when={expanded()} fallback={<ChevronRight class="h-3 w-3 shrink-0" />}>
 							<ChevronDown class="h-3 w-3 shrink-0" />
 						</Show>
@@ -299,7 +309,9 @@ const ThinkingRow: Component<{ readonly entry: ConversationEntry & { type: "thin
 	);
 };
 
-const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool_call" } }> = (props) => (
+const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool_call" } }> = (
+	props,
+) => (
 	<div class="flex items-center gap-3 py-1.5 ml-8 pl-4 border-l-2 border-l-clens">
 		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-clens bg-surface-muted">
 			<Terminal class="h-3 w-3 text-secondary" />
@@ -309,74 +321,72 @@ const ToolCallRow: Component<{ readonly entry: ConversationEntry & { type: "tool
 				{props.entry.tool_name}
 			</span>
 			<Show when={props.entry.file_path}>
-				{(fp) => (
-					<span class="truncate font-mono text-[11px] text-muted">
-						{fp()}
-					</span>
-				)}
+				{(fp) => <span class="truncate font-mono text-[11px] text-muted">{fp()}</span>}
 			</Show>
-			<span class="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
+			<span class="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-muted">
+				{formatTimestamp(props.entry.t)}
+			</span>
 		</div>
 	</div>
 );
 
-const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "tool_result" } }> = (props) => {
+const ToolResultRow: Component<{ readonly entry: ConversationEntry & { type: "tool_result" } }> = (
+	props,
+) => {
 	const isSuccess = () => props.entry.outcome === "success";
 
 	return (
 		<div class="flex items-center gap-3 py-1 ml-8 pl-4 border-l-2 border-l-clens">
 			<Show
 				when={isSuccess()}
-				fallback={
-					<X class="h-3.5 w-3.5 shrink-0 text-[var(--clens-danger)]" />
-				}
+				fallback={<X class="h-3.5 w-3.5 shrink-0 text-[var(--clens-danger)]" />}
 			>
 				<Check class="h-3.5 w-3.5 shrink-0 text-[var(--clens-success)]" />
 			</Show>
 			<span class="font-mono text-[11px] text-muted">{props.entry.tool_name}</span>
 			<Show when={props.entry.error}>
 				{(err) => (
-					<span class="truncate text-[11px] text-[var(--clens-danger)]">
-						{truncate(err(), 80)}
-					</span>
+					<span class="truncate text-[11px] text-[var(--clens-danger)]">{truncate(err(), 80)}</span>
 				)}
 			</Show>
 		</div>
 	);
 };
 
-const BacktrackRow: Component<{ readonly entry: ConversationEntry & { type: "backtrack" } }> = (props) => (
+const BacktrackRow: Component<{ readonly entry: ConversationEntry & { type: "backtrack" } }> = (
+	props,
+) => (
 	<div class="flex items-center gap-3 py-2 ml-4 pl-4 border-l-2 border-l-[var(--clens-warning)]">
 		<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-clens bg-surface-raised">
 			<AlertTriangle class="h-3 w-3 text-[var(--clens-warning)]" />
 		</div>
 		<Badge variant="warning">{props.entry.backtrack_type}</Badge>
-		<span class="text-xs text-muted">
-			Attempt {props.entry.attempt}
-		</span>
+		<span class="text-xs text-muted">Attempt {props.entry.attempt}</span>
 		<Show when={props.entry.reverted_tool_ids.length > 0}>
-			<span class="text-[10px] text-muted">
-				({props.entry.reverted_tool_ids.length} reverted)
-			</span>
+			<span class="text-[10px] text-muted">({props.entry.reverted_tool_ids.length} reverted)</span>
 		</Show>
-		<span class="ml-auto font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
+		<span class="ml-auto font-mono text-[10px] tabular-nums text-muted">
+			{formatTimestamp(props.entry.t)}
+		</span>
 	</div>
 );
 
-const PhaseBoundaryRow: Component<{ readonly entry: ConversationEntry & { type: "phase_boundary" } }> = (props) => (
+const PhaseBoundaryRow: Component<{
+	readonly entry: ConversationEntry & { type: "phase_boundary" };
+}> = (props) => (
 	<div class="flex items-center gap-3 py-3 ml-4 pl-4 border-l-2 border-l-clens">
 		<div class="h-px flex-1 bg-[var(--clens-border)]" />
 		<div class="flex items-center gap-1.5">
 			<Milestone class="h-3 w-3 text-muted" />
-			<span class="instrument-microcaps text-[10px] text-muted">
-				{props.entry.phase_name}
-			</span>
+			<span class="instrument-microcaps text-[10px] text-muted">{props.entry.phase_name}</span>
 		</div>
 		<div class="h-px flex-1 bg-[var(--clens-border)]" />
 	</div>
 );
 
-const AgentMessageRow: Component<{ readonly entry: ConversationEntry & { type: "agent_message" } }> = (props) => {
+const AgentMessageRow: Component<{
+	readonly entry: ConversationEntry & { type: "agent_message" };
+}> = (props) => {
 	const isSent = () => props.entry.direction === "sent";
 
 	return (
@@ -391,7 +401,9 @@ const AgentMessageRow: Component<{ readonly entry: ConversationEntry & { type: "
 			<Show when={props.entry.summary}>
 				{(s) => <span class="truncate text-[11px] text-muted">{s()}</span>}
 			</Show>
-			<span class="ml-auto font-mono text-[10px] tabular-nums text-muted">{formatTimestamp(props.entry.t)}</span>
+			<span class="ml-auto font-mono text-[10px] tabular-nums text-muted">
+				{formatTimestamp(props.entry.t)}
+			</span>
 		</div>
 	);
 };
@@ -406,21 +418,11 @@ const isType = <T extends ConversationEntry["type"]>(
 
 const ConversationEntryRow: Component<{ readonly entry: ConversationEntry }> = (props) => (
 	<Switch>
-		<Match when={isType(props.entry, "user_prompt")}>
-			{(e) => <UserPromptRow entry={e()} />}
-		</Match>
-		<Match when={isType(props.entry, "thinking")}>
-			{(e) => <ThinkingRow entry={e()} />}
-		</Match>
-		<Match when={isType(props.entry, "tool_call")}>
-			{(e) => <ToolCallRow entry={e()} />}
-		</Match>
-		<Match when={isType(props.entry, "tool_result")}>
-			{(e) => <ToolResultRow entry={e()} />}
-		</Match>
-		<Match when={isType(props.entry, "backtrack")}>
-			{(e) => <BacktrackRow entry={e()} />}
-		</Match>
+		<Match when={isType(props.entry, "user_prompt")}>{(e) => <UserPromptRow entry={e()} />}</Match>
+		<Match when={isType(props.entry, "thinking")}>{(e) => <ThinkingRow entry={e()} />}</Match>
+		<Match when={isType(props.entry, "tool_call")}>{(e) => <ToolCallRow entry={e()} />}</Match>
+		<Match when={isType(props.entry, "tool_result")}>{(e) => <ToolResultRow entry={e()} />}</Match>
+		<Match when={isType(props.entry, "backtrack")}>{(e) => <BacktrackRow entry={e()} />}</Match>
 		<Match when={isType(props.entry, "phase_boundary")}>
 			{(e) => <PhaseBoundaryRow entry={e()} />}
 		</Match>
@@ -467,10 +469,7 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 			</div>
 
 			{/* Scrollable entries */}
-			<div
-				ref={attachListener}
-				class="flex-1 overflow-y-auto px-4"
-			>
+			<div ref={attachListener} class="flex-1 overflow-y-auto px-4">
 				<Show
 					when={store.entries().length > 0}
 					fallback={
@@ -483,9 +482,7 @@ export const ConversationPanel: Component<ConversationPanelProps> = (props) => {
 					}
 				>
 					<div class="divide-y divide-clens">
-						<For each={store.entries()}>
-							{(entry) => <ConversationEntryRow entry={entry} />}
-						</For>
+						<For each={store.entries()}>{(entry) => <ConversationEntryRow entry={entry} />}</For>
 					</div>
 				</Show>
 

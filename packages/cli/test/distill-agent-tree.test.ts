@@ -1,7 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import type { DiffContext } from "../src/distill/agent-distill";
-import { attributeEventsToAgents, buildAgentTree, computeLinkBasedDuration, enrichNodeFromSessionEvents, enrichNodeWithTranscript, inferAgentsFromComms } from "../src/distill/agent-tree";
-import type { AgentNode, LinkEvent, SessionStartContext, SpawnLink, StopLink, StoredEvent, TranscriptEntry } from "../src/types";
+import {
+	attributeEventsToAgents,
+	buildAgentTree,
+	computeLinkBasedDuration,
+	enrichNodeFromSessionEvents,
+	enrichNodeWithTranscript,
+	inferAgentsFromComms,
+} from "../src/distill/agent-tree";
+import type {
+	AgentNode,
+	LinkEvent,
+	SessionStartContext,
+	SpawnLink,
+	StopLink,
+	StoredEvent,
+	TranscriptEntry,
+} from "../src/types";
 
 // -- Helpers --
 
@@ -23,7 +38,9 @@ const makeStop = (overrides: Partial<StopLink> = {}): StopLink => ({
 	...overrides,
 });
 
-const makeEvent = (overrides: Partial<{ t: number; event: string; data: Record<string, unknown> }> = {}): {
+const makeEvent = (
+	overrides: Partial<{ t: number; event: string; data: Record<string, unknown> }> = {},
+): {
 	t: number;
 	event: string;
 	data: Record<string, unknown>;
@@ -36,7 +53,9 @@ const makeEvent = (overrides: Partial<{ t: number; event: string; data: Record<s
 
 const noopReadTranscript = (_path: string): readonly TranscriptEntry[] => [];
 
-const makeStoredEvent = (overrides: Partial<StoredEvent> & { event: StoredEvent["event"] }): StoredEvent => ({
+const makeStoredEvent = (
+	overrides: Partial<StoredEvent> & { event: StoredEvent["event"] },
+): StoredEvent => ({
 	t: 2000,
 	sid: "test",
 	data: {},
@@ -122,10 +141,7 @@ describe("attributeEventsToAgents", () => {
 
 describe("computeLinkBasedDuration", () => {
 	test("returns 0 when no relevant links exist", () => {
-		const links: readonly LinkEvent[] = [
-			makeSpawn(),
-			makeStop(),
-		];
+		const links: readonly LinkEvent[] = [makeSpawn(), makeStop()];
 		const duration = computeLinkBasedDuration("agent-1", "builder-1", 1000, links);
 		expect(duration).toBe(0);
 	});
@@ -290,7 +306,11 @@ describe("enrichNodeWithTranscript", () => {
 			children: [],
 		};
 
-		const result = enrichNodeWithTranscript(baseNode, "/path/to/transcript.jsonl", noopReadTranscript);
+		const result = enrichNodeWithTranscript(
+			baseNode,
+			"/path/to/transcript.jsonl",
+			noopReadTranscript,
+		);
 		expect(result.transcript_path).toBe("/path/to/transcript.jsonl");
 		// distillAgent returns undefined for empty entries, so only transcript_path is added
 		expect(result.model).toBeUndefined();
@@ -317,7 +337,12 @@ describe("enrichNodeWithTranscript", () => {
 					role: "assistant",
 					content: [
 						{ type: "tool_use", id: "t1", name: "Read", input: { file_path: "/src/foo.ts" } },
-						{ type: "tool_use", id: "t2", name: "Edit", input: { file_path: "/src/foo.ts", old_string: "a", new_string: "b" } },
+						{
+							type: "tool_use",
+							id: "t2",
+							name: "Edit",
+							input: { file_path: "/src/foo.ts", old_string: "a", new_string: "b" },
+						},
 					],
 					model: "claude-sonnet-4-20250514",
 					usage: { input_tokens: 100, output_tokens: 50 },
@@ -325,7 +350,11 @@ describe("enrichNodeWithTranscript", () => {
 			},
 		];
 
-		const result = enrichNodeWithTranscript(baseNode, "/path/to/transcript.jsonl", mockTranscriptReader);
+		const result = enrichNodeWithTranscript(
+			baseNode,
+			"/path/to/transcript.jsonl",
+			mockTranscriptReader,
+		);
 		expect(result.transcript_path).toBe("/path/to/transcript.jsonl");
 		expect(result.model).toBe("claude-sonnet-4-20250514");
 		expect(result.stats).toBeDefined();
@@ -338,9 +367,7 @@ describe("enrichNodeWithTranscript", () => {
 
 describe("buildAgentTree", () => {
 	test("returns empty array when no spawns match session", () => {
-		const links: readonly LinkEvent[] = [
-			makeSpawn({ parent_session: "other-session" }),
-		];
+		const links: readonly LinkEvent[] = [makeSpawn({ parent_session: "other-session" })];
 		const result = buildAgentTree("root-session", links, [], noopReadTranscript);
 		expect(result).toEqual([]);
 	});
@@ -367,8 +394,19 @@ describe("buildAgentTree", () => {
 
 	test("builds nested agent tree with children", () => {
 		const links: readonly LinkEvent[] = [
-			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session", agent_name: "builder-1" }),
-			makeSpawn({ t: 2000, agent_id: "agent-2", parent_session: "agent-1", agent_type: "reviewer", agent_name: "reviewer-1" }),
+			makeSpawn({
+				t: 1000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				agent_name: "builder-1",
+			}),
+			makeSpawn({
+				t: 2000,
+				agent_id: "agent-2",
+				parent_session: "agent-1",
+				agent_type: "reviewer",
+				agent_name: "reviewer-1",
+			}),
 			makeStop({ t: 4000, agent_id: "agent-2", parent_session: "agent-1" }),
 			makeStop({ t: 6000, agent_id: "agent-1", parent_session: "root-session" }),
 		];
@@ -384,8 +422,19 @@ describe("buildAgentTree", () => {
 
 	test("builds multiple root agents", () => {
 		const links: readonly LinkEvent[] = [
-			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session", agent_name: "builder-1" }),
-			makeSpawn({ t: 1500, agent_id: "agent-2", parent_session: "root-session", agent_type: "reviewer", agent_name: "reviewer-1" }),
+			makeSpawn({
+				t: 1000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				agent_name: "builder-1",
+			}),
+			makeSpawn({
+				t: 1500,
+				agent_id: "agent-2",
+				parent_session: "root-session",
+				agent_type: "reviewer",
+				agent_name: "reviewer-1",
+			}),
 			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session" }),
 			makeStop({ t: 6000, agent_id: "agent-2", parent_session: "root-session" }),
 		];
@@ -430,7 +479,7 @@ describe("buildAgentTree", () => {
 			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session" }),
 		];
 		const events = [
-			makeEvent({ t: 500, event: "PreToolUse" }),  // before spawn
+			makeEvent({ t: 500, event: "PreToolUse" }), // before spawn
 			makeEvent({ t: 2000, event: "PreToolUse" }), // in range
 			makeEvent({ t: 4000, event: "PreToolUse" }), // in range
 			makeEvent({ t: 6000, event: "PreToolUse" }), // after stop
@@ -444,7 +493,12 @@ describe("buildAgentTree", () => {
 	test("enriches node when transcript path is available on stop link", () => {
 		const links: readonly LinkEvent[] = [
 			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
-			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
+			makeStop({
+				t: 5000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				transcript_path: "/tmp/t.jsonl",
+			}),
 		];
 
 		const mockReader = (path: string): readonly TranscriptEntry[] => {
@@ -489,9 +543,19 @@ describe("buildAgentTree", () => {
 
 	test("deduplicates spawns for resumed agents (same agent_id spawned twice)", () => {
 		const links: readonly LinkEvent[] = [
-			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session", agent_name: "builder-1" }),
+			makeSpawn({
+				t: 1000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				agent_name: "builder-1",
+			}),
 			// Duplicate spawn from resume
-			makeSpawn({ t: 2000, agent_id: "agent-1", parent_session: "root-session", agent_name: "builder-1" }),
+			makeSpawn({
+				t: 2000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				agent_name: "builder-1",
+			}),
 			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session" }),
 		];
 
@@ -521,11 +585,14 @@ describe("buildAgentTree", () => {
 	test("retains real tool_call_count when enrichment succeeds", () => {
 		const links: readonly LinkEvent[] = [
 			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
-			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
+			makeStop({
+				t: 5000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				transcript_path: "/tmp/t.jsonl",
+			}),
 		];
-		const events = [
-			makeEvent({ t: 2000, event: "PreToolUse" }),
-		];
+		const events = [makeEvent({ t: 2000, event: "PreToolUse" })];
 
 		const mockReader = (_path: string): readonly TranscriptEntry[] => [
 			{
@@ -538,7 +605,12 @@ describe("buildAgentTree", () => {
 					role: "assistant",
 					content: [
 						{ type: "tool_use", id: "t1", name: "Read", input: { file_path: "/src/foo.ts" } },
-						{ type: "tool_use", id: "t2", name: "Edit", input: { file_path: "/src/foo.ts", old_string: "a", new_string: "b" } },
+						{
+							type: "tool_use",
+							id: "t2",
+							name: "Edit",
+							input: { file_path: "/src/foo.ts", old_string: "a", new_string: "b" },
+						},
 						{ type: "tool_use", id: "t3", name: "Grep", input: { pattern: "x" } },
 					],
 					model: "claude-sonnet-4-20250514",
@@ -556,7 +628,12 @@ describe("buildAgentTree", () => {
 	test("prefers hook-based tool count when non-zero over transcript stats", () => {
 		const links: readonly LinkEvent[] = [
 			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
-			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
+			makeStop({
+				t: 5000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				transcript_path: "/tmp/t.jsonl",
+			}),
 		];
 		const events = [
 			makeEvent({ t: 2000, event: "PreToolUse" }),
@@ -626,8 +703,18 @@ describe("buildAgentTree", () => {
 
 	test("only counts the agent's own tagged events, not sibling agents' tagged events", () => {
 		const links: readonly LinkEvent[] = [
-			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session", agent_name: "builder-1" }),
-			makeSpawn({ t: 1000, agent_id: "agent-2", parent_session: "root-session", agent_name: "builder-2" }),
+			makeSpawn({
+				t: 1000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				agent_name: "builder-1",
+			}),
+			makeSpawn({
+				t: 1000,
+				agent_id: "agent-2",
+				parent_session: "root-session",
+				agent_name: "builder-2",
+			}),
 			makeStop({ t: 9000, agent_id: "agent-1", parent_session: "root-session" }),
 			makeStop({ t: 9000, agent_id: "agent-2", parent_session: "root-session" }),
 		];
@@ -667,10 +754,7 @@ describe("buildAgentTree", () => {
 
 describe("inferAgentsFromComms", () => {
 	test("returns empty array when no msg_send links exist", () => {
-		const links: readonly LinkEvent[] = [
-			makeSpawn(),
-			makeStop(),
-		];
+		const links: readonly LinkEvent[] = [makeSpawn(), makeStop()];
 		const result = inferAgentsFromComms("root-session", links);
 		expect(result).toEqual([]);
 	});
@@ -750,9 +834,7 @@ describe("inferAgentsFromComms", () => {
 				subject: "build web",
 			},
 		];
-		const teamMemberSessions = new Map([
-			["builder-web", "real-session-id-abc123"],
-		]);
+		const teamMemberSessions = new Map([["builder-web", "real-session-id-abc123"]]);
 		const result = inferAgentsFromComms("root-session", links, teamMemberSessions);
 		expect(result).toHaveLength(1);
 		// teamMemberSessions should take priority over task-link UUID
@@ -781,9 +863,7 @@ describe("inferAgentsFromComms", () => {
 				subject: "build web",
 			},
 		];
-		const teamMemberSessions = new Map([
-			["builder-api", "session-for-api"],
-		]);
+		const teamMemberSessions = new Map([["builder-api", "session-for-api"]]);
 		const result = inferAgentsFromComms("root-session", links, teamMemberSessions);
 		expect(result).toHaveLength(1);
 		// builder-web not in teamMemberSessions, falls back to task-link UUID
@@ -997,7 +1077,8 @@ const makeDiffContext = (): DiffContext => ({
 	parentEvents: [makeParentSessionStartEvent()],
 });
 
-const makeEditTranscriptReader = (): ((path: string) => readonly TranscriptEntry[]) =>
+const makeEditTranscriptReader =
+	(): ((path: string) => readonly TranscriptEntry[]) =>
 	(_path: string): readonly TranscriptEntry[] => [
 		{
 			uuid: "uuid-u1",
@@ -1020,7 +1101,11 @@ const makeEditTranscriptReader = (): ((path: string) => readonly TranscriptEntry
 						type: "tool_use",
 						id: "t1",
 						name: "Edit",
-						input: { file_path: "/src/foo.ts", old_string: "const a = 1", new_string: "const a = 2" },
+						input: {
+							file_path: "/src/foo.ts",
+							old_string: "const a = 1",
+							new_string: "const a = 2",
+						},
 					},
 				],
 				model: "claude-sonnet-4-20250514",
@@ -1078,7 +1163,12 @@ describe("buildAgentTree with diffContext", () => {
 	test("passes diffContext through to enriched nodes with edit_chains", () => {
 		const links: readonly LinkEvent[] = [
 			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
-			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
+			makeStop({
+				t: 5000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				transcript_path: "/tmp/t.jsonl",
+			}),
 		];
 
 		const result = buildAgentTree(
@@ -1097,15 +1187,15 @@ describe("buildAgentTree with diffContext", () => {
 	test("diff_attribution computed from tool events without diffContext", () => {
 		const links: readonly LinkEvent[] = [
 			makeSpawn({ t: 1000, agent_id: "agent-1", parent_session: "root-session" }),
-			makeStop({ t: 5000, agent_id: "agent-1", parent_session: "root-session", transcript_path: "/tmp/t.jsonl" }),
+			makeStop({
+				t: 5000,
+				agent_id: "agent-1",
+				parent_session: "root-session",
+				transcript_path: "/tmp/t.jsonl",
+			}),
 		];
 
-		const result = buildAgentTree(
-			"root-session",
-			links,
-			[],
-			makeEditTranscriptReader(),
-		);
+		const result = buildAgentTree("root-session", links, [], makeEditTranscriptReader());
 		expect(result).toHaveLength(1);
 		expect(result[0].edit_chains).toBeDefined();
 		// Tool-sourced diff attribution is git-independent

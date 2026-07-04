@@ -53,7 +53,9 @@ const makeTaskComplete = (
 	...overrides,
 });
 
-const makeIdle = (overrides: Partial<TeammateIdleLink> & { teammate: string }): TeammateIdleLink => ({
+const makeIdle = (
+	overrides: Partial<TeammateIdleLink> & { teammate: string },
+): TeammateIdleLink => ({
 	t: Date.now(),
 	type: "teammate_idle",
 	...overrides,
@@ -81,16 +83,20 @@ describe("extractAgentMessages", () => {
 	});
 
 	test("returns empty array when no messages match agent", () => {
-		const links: readonly LinkEvent[] = [
-			makeMessage({ t: 1000, from: "other-1", to: "other-2" }),
-		];
+		const links: readonly LinkEvent[] = [makeMessage({ t: 1000, from: "other-1", to: "other-2" })];
 		const result = extractAgentMessages("agent-1", links);
 		expect(result).toEqual([]);
 	});
 
 	test("extracts sent messages", () => {
 		const links: readonly LinkEvent[] = [
-			makeMessage({ t: 1000, from: "agent-1", to: "team-lead", msg_type: "message", summary: "Done" }),
+			makeMessage({
+				t: 1000,
+				from: "agent-1",
+				to: "team-lead",
+				msg_type: "message",
+				summary: "Done",
+			}),
 			makeMessage({ t: 2000, from: "agent-1", to: "team-lead", msg_type: "shutdown_response" }),
 		];
 		const result = extractAgentMessages("agent-1", links);
@@ -299,9 +305,7 @@ describe("extractAgentIdlePeriods", () => {
 	});
 
 	test("returns empty when agent name cannot be resolved (no spawn)", () => {
-		const links: readonly LinkEvent[] = [
-			makeIdle({ t: 2000, teammate: "builder-1" }),
-		];
+		const links: readonly LinkEvent[] = [makeIdle({ t: 2000, teammate: "builder-1" })];
 		const result = extractAgentIdlePeriods("agent-1", links);
 		expect(result).toEqual([]);
 	});

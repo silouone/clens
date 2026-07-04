@@ -38,27 +38,22 @@ export const computeClientRiskScores = (
 		files.map((file) => {
 			const filePath = file.file_path;
 
-			const backtrackCount = backtracks.filter(
-				(b) => b.file_path === filePath,
-			).length;
+			const backtrackCount = backtracks.filter((b) => b.file_path === filePath).length;
 
 			const fileChains = chains.filter((c) => c.file_path === filePath);
 			const abandonedEditCount = fileChains.reduce(
 				(sum, c) => sum + c.abandoned_edit_ids.length,
 				0,
 			);
-			const totalEditCount = fileChains.reduce(
-				(sum, c) => sum + c.total_edits,
-				0,
-			);
-			const totalFailures = fileChains.reduce(
-				(sum, c) => sum + c.total_failures,
-				0,
-			);
+			const totalEditCount = fileChains.reduce((sum, c) => sum + c.total_edits, 0);
+			const totalFailures = fileChains.reduce((sum, c) => sum + c.total_failures, 0);
 
 			const failureRate = totalEditCount > 0 ? totalFailures / totalEditCount : 0;
 
-			return [filePath, computeRiskLevel(backtrackCount, abandonedEditCount, totalEditCount, failureRate)] as const;
+			return [
+				filePath,
+				computeRiskLevel(backtrackCount, abandonedEditCount, totalEditCount, failureRate),
+			] as const;
 		}),
 	);
 };

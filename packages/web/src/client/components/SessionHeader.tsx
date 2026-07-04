@@ -1,10 +1,15 @@
-import { Show, createSignal, type Component } from "solid-js";
 import { Pencil } from "lucide-solid";
-import type { ColorName, DistilledSession, SessionStatus, SessionSummary } from "../../shared/types";
-import { StatusBadge } from "./ui/StatusBadge";
-import { ColorFlag } from "./ui/ColorFlag";
+import { type Component, createSignal, Show } from "solid-js";
+import type {
+	ColorName,
+	DistilledSession,
+	SessionStatus,
+	SessionSummary,
+} from "../../shared/types";
 import { setSessionMeta } from "../lib/stores";
 import { DetailHeader } from "./DetailHeader";
+import { ColorFlag } from "./ui/ColorFlag";
+import { StatusBadge } from "./ui/StatusBadge";
 
 // -- Types ----------------------------------------------------------------
 
@@ -25,9 +30,9 @@ type SessionHeaderProps = {
 // -- Display-name resolution ---------------------------------------------
 
 const resolveTitle = (props: SessionHeaderProps): string =>
-	props.summary?.display_name
-	?? props.session.session_name
-	?? props.session.session_id.slice(0, 12);
+	props.summary?.display_name ??
+	props.session.session_name ??
+	props.session.session_id.slice(0, 12);
 
 // -- Component ------------------------------------------------------------
 
@@ -69,10 +74,14 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 			action={
 				<Show when={props.onRedistill}>
 					<button
+						type="button"
 						onClick={async () => {
 							setDistilling(true);
-							try { await props.onRedistill?.(); }
-							finally { setDistilling(false); }
+							try {
+								await props.onRedistill?.();
+							} finally {
+								setDistilling(false);
+							}
 						}}
 						disabled={distilling()}
 						class="instrument-microcaps rounded-none border border-clens bg-surface-inset px-2 py-1 text-[10px] text-secondary transition hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed"
@@ -84,7 +93,10 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 		>
 			{/* Rename + color controls (R18) — only when the list row is available */}
 			<Show when={props.summary}>
-				<ColorFlag value={flag()} onChange={(color) => void setSessionMeta(sessionId(), { color })} />
+				<ColorFlag
+					value={flag()}
+					onChange={(color) => void setSessionMeta(sessionId(), { color })}
+				/>
 				<Show when={editing()}>
 					<input
 						ref={inputRef}
@@ -93,8 +105,13 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 						placeholder="Name this session…"
 						onInput={(e) => setDraft(e.currentTarget.value)}
 						onKeyDown={(e: KeyboardEvent) => {
-							if (e.key === "Enter") { e.preventDefault(); commit(); }
-							else if (e.key === "Escape") { e.preventDefault(); cancel(); }
+							if (e.key === "Enter") {
+								e.preventDefault();
+								commit();
+							} else if (e.key === "Escape") {
+								e.preventDefault();
+								cancel();
+							}
 						}}
 						onBlur={commit}
 						class="w-64 rounded-none border border-brand-500 bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-primary focus:outline-none"
@@ -113,10 +130,7 @@ export const SessionHeader: Component<SessionHeaderProps> = (props) => {
 				</Show>
 			</Show>
 
-			<Show
-				when={props.status}
-				fallback={<StatusBadge complete={props.session.complete} />}
-			>
+			<Show when={props.status} fallback={<StatusBadge complete={props.session.complete} />}>
 				{(status) => <StatusBadge status={status()} />}
 			</Show>
 		</DetailHeader>

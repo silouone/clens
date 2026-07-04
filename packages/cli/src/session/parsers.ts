@@ -1,5 +1,5 @@
-import { LINK_EVENT_TYPE_VALUES } from "../types";
 import type { DistilledSession, LinkEvent } from "../types";
+import { LINK_EVENT_TYPE_VALUES } from "../types";
 
 /**
  * Type guard: checks that a value is a non-null object.

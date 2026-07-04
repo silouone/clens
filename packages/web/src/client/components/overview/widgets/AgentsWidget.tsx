@@ -1,8 +1,8 @@
-import { For, Show, createMemo, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
-import { StatTile } from "../../ui/StatTile";
-import { HorizontalBar } from "../../charts";
+import { type Component, createMemo, For, Show } from "solid-js";
 import { CATEGORY } from "../../../lib/categories";
+import { HorizontalBar } from "../../charts";
+import { StatTile } from "../../ui/StatTile";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── AgentsWidget [agents] — Wave 1 (overview-moat-refactor) ──────────
@@ -61,7 +61,7 @@ export const AgentsWidget: Component<WidgetProps> = (props) => {
 
 	const agentCount = () => {
 		const fromTree = agentTypes().length;
-		return fromTree > 0 ? fromTree : props.session.team_metrics?.agent_count ?? 0;
+		return fromTree > 0 ? fromTree : (props.session.team_metrics?.agent_count ?? 0);
 	};
 	const commCount = () => props.session.comm_sequence?.length ?? 0;
 	const workflowRuns = () => props.session.feature_usage?.workflow?.invocation_count ?? 0;
@@ -130,9 +130,7 @@ export const AgentsWidget: Component<WidgetProps> = (props) => {
 
 					<Show when={typeBreakdown().length >= 2}>
 						<div>
-							<div class="instrument-microcaps mb-1 text-[10px] text-muted">
-								Agent types
-							</div>
+							<div class="instrument-microcaps mb-1 text-[10px] text-muted">Agent types</div>
 							<HorizontalBar
 								data={topTypes()}
 								label={(d) => d.type}

@@ -87,10 +87,9 @@ export const mergeStats = (
 	]);
 
 	// Sum token_usage from parent + agents (parent hook events usually lack usage)
-	const allTokenUsages = [
-		parentStats.token_usage,
-		...agentStats.map((s) => s.token_usage),
-	].filter((u): u is TokenUsage => u !== undefined);
+	const allTokenUsages = [parentStats.token_usage, ...agentStats.map((s) => s.token_usage)].filter(
+		(u): u is TokenUsage => u !== undefined,
+	);
 
 	const mergedTokenUsage: TokenUsage | undefined =
 		allTokenUsages.length > 0
@@ -215,7 +214,8 @@ export const mergeCostEstimates = (
 	const distinctModels = [...new Set(allCosts.map((c) => c.model))];
 	const model = distinctModels.length === 1 ? distinctModels[0] : "mixed";
 
-	const pricingTier = parentCost?.pricing_tier ?? allCosts.find((c) => c.pricing_tier !== undefined)?.pricing_tier;
+	const pricingTier =
+		parentCost?.pricing_tier ?? allCosts.find((c) => c.pricing_tier !== undefined)?.pricing_tier;
 
 	const totalInputTokens = allCosts.reduce((acc, c) => acc + c.estimated_input_tokens, 0);
 	const totalOutputTokens = allCosts.reduce((acc, c) => acc + c.estimated_output_tokens, 0);

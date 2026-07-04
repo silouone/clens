@@ -2,6 +2,6 @@
 // BottomPanel dispatcher imports every tab from here and Wave 2 builders only
 // ever touch their own tab file — never this barrel.
 export { BacktracksTab } from "./BacktracksTab";
-export { TimelineTab } from "./TimelineTab";
-export { EditsTab } from "./EditsTab";
 export { CommunicationTab } from "./CommunicationTab";
+export { EditsTab } from "./EditsTab";
+export { TimelineTab } from "./TimelineTab";

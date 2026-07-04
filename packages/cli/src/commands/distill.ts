@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import type { BacktrackResult, CostEstimate, DistilledSession, GlobalSessionSummary } from "../types/distill";
 import type { PricingTier } from "../types";
+import type {
+	BacktrackResult,
+	CostEstimate,
+	DistilledSession,
+	GlobalSessionSummary,
+} from "../types/distill";
 import { fmtDuration } from "./format-helpers";
 import { bold, cyan, dim, green, red, yellow } from "./shared";
 
@@ -24,7 +29,10 @@ const backtrackBreakdown = (backtracks: readonly BacktrackResult[]): string => {
 		{},
 	);
 	return Object.entries(counts)
-		.map(([type, count]) => `${count} ${BACKTRACK_LABELS[type as BacktrackResult["type"]] ?? type}${count !== 1 ? "s" : ""}`)
+		.map(
+			([type, count]) =>
+				`${count} ${BACKTRACK_LABELS[type as BacktrackResult["type"]] ?? type}${count !== 1 ? "s" : ""}`,
+		)
 		.join(", ");
 };
 
@@ -55,9 +63,10 @@ const buildNarrative = (result: DistilledSession): readonly string[] => {
 
 	// Line 2: phases
 	const phaseNames = summary?.phases?.map((p) => p.name) ?? [];
-	const line2 = phaseNames.length > 0
-		? `${phaseNames.length} phase${phaseNames.length === 1 ? "" : "s"}: ${phaseNames.join(", ")}.`
-		: undefined;
+	const line2 =
+		phaseNames.length > 0
+			? `${phaseNames.length} phase${phaseNames.length === 1 ? "" : "s"}: ${phaseNames.join(", ")}.`
+			: undefined;
 
 	// Line 3: primary tools + files modified
 	const topTools = Object.entries(stats.tools_by_name)
@@ -71,9 +80,10 @@ const buildNarrative = (result: DistilledSession): readonly string[] => {
 
 	// Line 4: backtracks + failure rate
 	const failRate = (stats.failure_rate * 100).toFixed(1);
-	const line4 = backtracks.length > 0
-		? `${backtracks.length} backtrack${backtracks.length === 1 ? "" : "s"} (${backtrackBreakdown(backtracks)}). Failure rate: ${failRate}%.`
-		: `No backtracks. Failure rate: ${failRate}%.`;
+	const line4 =
+		backtracks.length > 0
+			? `${backtracks.length} backtrack${backtracks.length === 1 ? "" : "s"} (${backtrackBreakdown(backtracks)}). Failure rate: ${failRate}%.`
+			: `No backtracks. Failure rate: ${failRate}%.`;
 
 	return [`  ${line1}`, ...(line2 ? [`  ${line2}`] : []), `  ${line3}`, `  ${line4}`];
 };
@@ -88,9 +98,12 @@ const buildMetrics = (result: DistilledSession): readonly string[] => {
 		metricLine("Files:", String(result.file_map.files.length)),
 		metricLine("User msgs:", String(result.user_messages.length)),
 		metricLine("Cost:", ce ? formatCost(ce) : "n/a"),
-		metricLine("Context:", result.context_consumption
-			? `${Math.round(result.context_consumption.peak_context_pct)}% peak, ${result.context_consumption.compaction_count} compaction${result.context_consumption.compaction_count === 1 ? "" : "s"}`
-			: "n/a"),
+		metricLine(
+			"Context:",
+			result.context_consumption
+				? `${Math.round(result.context_consumption.peak_context_pct)}% peak, ${result.context_consumption.compaction_count} compaction${result.context_consumption.compaction_count === 1 ? "" : "s"}`
+				: "n/a",
+		),
 	];
 
 	const rightCol = [
@@ -103,6 +116,7 @@ const buildMetrics = (result: DistilledSession): readonly string[] => {
 	const colWidth = 28;
 	return leftCol.map((left, i) => {
 		const right = rightCol[i];
+		// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences require the ESC control char
 		const stripped = left.replace(/\x1b\[[0-9;]*m/g, "");
 		const padding = Math.max(0, colWidth - stripped.length);
 		return right ? `${left}${" ".repeat(padding)}${right}` : left;
@@ -113,7 +127,9 @@ const buildMetrics = (result: DistilledSession): readonly string[] => {
 const buildTeamLine = (result: DistilledSession): readonly string[] => {
 	if (!result.team_metrics) return [];
 	const tm = result.team_metrics;
-	return [metricLine("Team:", `${tm.agent_count} agents, ${tm.task_completed_count} tasks completed`)];
+	return [
+		metricLine("Team:", `${tm.agent_count} agents, ${tm.task_completed_count} tasks completed`),
+	];
 };
 
 /** Build optional drift line. */
@@ -122,7 +138,14 @@ const buildDriftLine = (result: DistilledSession): readonly string[] => {
 	const pd = result.plan_drift;
 	const score = pd.drift_score;
 	const colorFn = score < 0.3 ? green : score < 0.7 ? yellow : red;
-	return [colorFn(metricLine("Drift:", `${score.toFixed(2)} (${pd.spec_path}: ${pd.expected_files.length} expected, ${pd.actual_files.length} actual)`))];
+	return [
+		colorFn(
+			metricLine(
+				"Drift:",
+				`${score.toFixed(2)} (${pd.spec_path}: ${pd.expected_files.length} expected, ${pd.actual_files.length} actual)`,
+			),
+		),
+	];
 };
 
 export const distillCommand = async (args: {
@@ -157,7 +180,9 @@ export const distillCommand = async (args: {
 		try {
 			const { writeAnalyticsSummary } = await import("../distill/analytics-summary");
 			writeAnalyticsSummary(result, args.projectDir);
-		} catch { /* best-effort — summary is a derived artifact */ }
+		} catch {
+			/* best-effort — summary is a derived artifact */
+		}
 	}
 
 	if (args.json) {
@@ -217,7 +242,8 @@ export const resolveExpectedTier = (
 	if (override === "api" || override === "max") return override;
 	try {
 		const raw: unknown = JSON.parse(readFileSync(`${captureDir}/.clens/config.json`, "utf-8"));
-		const pricing = raw && typeof raw === "object" ? (raw as { pricing?: unknown }).pricing : undefined;
+		const pricing =
+			raw && typeof raw === "object" ? (raw as { pricing?: unknown }).pricing : undefined;
 		return pricing === "api" || pricing === "max" ? pricing : undefined;
 	} catch {
 		return undefined;
@@ -246,7 +272,11 @@ export const isDistilledFresh = (
 			readonly pricing_tier?: string;
 		};
 		if (parsed.schema_version !== DISTILL_SCHEMA_VERSION) return false;
-		if (expectedTier !== undefined && parsed.pricing_tier !== undefined && parsed.pricing_tier !== expectedTier) {
+		if (
+			expectedTier !== undefined &&
+			parsed.pricing_tier !== undefined &&
+			parsed.pricing_tier !== expectedTier
+		) {
 			return false;
 		}
 		return true;
@@ -325,7 +355,9 @@ export const distillAllInDir = async (args: {
 	try {
 		const { writeAnalyticsSummaryBatch } = await import("../distill/analytics-summary");
 		writeAnalyticsSummaryBatch(distilledResults, args.projectDir);
-	} catch { /* best-effort — summary is a derived artifact */ }
+	} catch {
+		/* best-effort — summary is a derived artifact */
+	}
 
 	console.log(
 		`\nDistilled ${counts.distilled}, skipped ${counts.skipped}, failed ${counts.failed} of ${sessions.length} session(s).`,
@@ -346,8 +378,7 @@ export const distillAllGlobal = async (args: {
 	readonly force: boolean;
 	readonly sessions?: readonly GlobalSessionSummary[];
 }): Promise<GlobalDistillCounts> => {
-	const sessions =
-		args.sessions ?? (await import("../session/global-read")).listGlobalSessions();
+	const sessions = args.sessions ?? (await import("../session/global-read")).listGlobalSessions();
 	if (sessions.length === 0) {
 		throw new Error(
 			"No sessions found across registered projects. Run 'clens init --global' or 'clens list --global' first.",
@@ -366,7 +397,7 @@ export const distillAllGlobal = async (args: {
 			const progress = `[${idx + 1}/${sessions.length}]`;
 			const prefix = s.session_id.slice(0, 8);
 			const header = acc.lastProject !== s.project_name ? [`\n── ${s.project_name} ──`] : [];
-			header.forEach((h) => console.log(h));
+			for (const h of header) console.log(h);
 			const base: Acc = { ...acc, lastProject: s.project_name };
 
 			const fresh =
@@ -408,7 +439,9 @@ export const distillAllGlobal = async (args: {
 		for (const [captureDir, results] of resultsByDir) {
 			writeAnalyticsSummaryBatch(results, captureDir);
 		}
-	} catch { /* best-effort — summary is a derived artifact */ }
+	} catch {
+		/* best-effort — summary is a derived artifact */
+	}
 
 	const projectCount = new Set(sessions.map((s) => s.project_name)).size;
 	console.log(

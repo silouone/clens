@@ -20,7 +20,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "tsc" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "exit 1",
+					tool_input: { command: "tsc" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
@@ -30,13 +35,22 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 3000,
 				event: "PreToolUse",
-				data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "bun run typecheck" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b3",
+					tool_input: { command: "bun run typecheck" },
+				},
 			}),
 			// Trailing failure: the loop keeps failing, so this is a genuine debugging_loop.
 			makeEvent({
 				t: 3500,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b3f", error: "exit 1", tool_input: { command: "bun run typecheck" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b3f",
+					error: "exit 1",
+					tool_input: { command: "bun run typecheck" },
+				},
 			}),
 		];
 
@@ -58,7 +72,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Edit", tool_use_id: "e1", error: "not found", tool_input: { file_path: "/a.ts" } },
+				data: {
+					tool_name: "Edit",
+					tool_use_id: "e1",
+					error: "not found",
+					tool_input: { file_path: "/a.ts" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
@@ -69,7 +88,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 5000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "test" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "exit 1",
+					tool_input: { command: "test" },
+				},
 			}),
 			makeEvent({
 				t: 6000,
@@ -85,7 +109,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 7500,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b3f", error: "exit 1", tool_input: { command: "test3" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b3f",
+					error: "exit 1",
+					tool_input: { command: "test3" },
+				},
 			}),
 		];
 
@@ -147,7 +176,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Edit", tool_use_id: "e1", error: "not found", tool_input: { file_path: "/a.ts" } },
+				data: {
+					tool_name: "Edit",
+					tool_use_id: "e1",
+					error: "not found",
+					tool_input: { file_path: "/a.ts" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
@@ -193,17 +227,31 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "npm test" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "exit 1",
+					tool_input: { command: "npm test" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
 				event: "PreToolUse",
-				data: { tool_name: "Bash", tool_use_id: "b2", tool_input: { command: "npm test -- --fix" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b2",
+					tool_input: { command: "npm test -- --fix" },
+				},
 			}),
 			makeEvent({
 				t: 3000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b3", error: "exit 1", tool_input: { command: "npm test -- --fix" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b3",
+					error: "exit 1",
+					tool_input: { command: "npm test -- --fix" },
+				},
 			}),
 			makeEvent({
 				t: 4000,
@@ -233,7 +281,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "test" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "exit 1",
+					tool_input: { command: "test" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
@@ -249,7 +302,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 3500,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b3f", error: "exit 1", tool_input: { command: "test3" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b3f",
+					error: "exit 1",
+					tool_input: { command: "test3" },
+				},
 			}),
 			// 6-minute gap: agent went to lunch
 			makeEvent({
@@ -278,7 +336,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "tsc" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "exit 1",
+					tool_input: { command: "tsc" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
@@ -317,13 +380,23 @@ describe("extractBacktracks - deduplication", () => {
 		const initialFailure = makeEvent({
 			t: 1000,
 			event: "PostToolUseFailure",
-			data: { tool_name: "Bash", tool_use_id: "b0", error: "exit 1", tool_input: { command: "test" } },
+			data: {
+				tool_name: "Bash",
+				tool_use_id: "b0",
+				error: "exit 1",
+				tool_input: { command: "test" },
+			},
 		});
 		// A second failure early in the chain makes this a genuine debugging_loop.
 		const secondFailure = makeEvent({
 			t: 1500,
 			event: "PostToolUseFailure" as const,
-			data: { tool_name: "Bash", tool_use_id: "b0b", error: "exit 1", tool_input: { command: "test" } },
+			data: {
+				tool_name: "Bash",
+				tool_use_id: "b0b",
+				error: "exit 1",
+				tool_input: { command: "test" },
+			},
 		});
 		const bashRetries = Array.from({ length: 60 }, (_, i) =>
 			makeEvent({
@@ -350,12 +423,23 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Edit", tool_use_id: "a1", error: "not found", agent_id: "agentA", tool_input: { file_path: "/a.ts" } },
+				data: {
+					tool_name: "Edit",
+					tool_use_id: "a1",
+					error: "not found",
+					agent_id: "agentA",
+					tool_input: { file_path: "/a.ts" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
 				event: "PreToolUse",
-				data: { tool_name: "Edit", tool_use_id: "b1", agent_id: "agentB", tool_input: { file_path: "/b.ts" } },
+				data: {
+					tool_name: "Edit",
+					tool_use_id: "b1",
+					agent_id: "agentB",
+					tool_input: { file_path: "/b.ts" },
+				},
 			}),
 		];
 
@@ -368,12 +452,23 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Edit", tool_use_id: "a1", error: "not found", agent_id: "agentA", tool_input: { file_path: "/a.ts" } },
+				data: {
+					tool_name: "Edit",
+					tool_use_id: "a1",
+					error: "not found",
+					agent_id: "agentA",
+					tool_input: { file_path: "/a.ts" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
 				event: "PreToolUse",
-				data: { tool_name: "Edit", tool_use_id: "a2", agent_id: "agentA", tool_input: { file_path: "/a.ts" } },
+				data: {
+					tool_name: "Edit",
+					tool_use_id: "a2",
+					agent_id: "agentA",
+					tool_input: { file_path: "/a.ts" },
+				},
 			}),
 		];
 
@@ -386,13 +481,70 @@ describe("extractBacktracks - deduplication", () => {
 		// Two agents each fail Bash once, interleaved. Without partitioning the global
 		// walk would chain them into a false 3+ attempt loop.
 		const events: StoredEvent[] = [
-			makeEvent({ t: 1000, event: "PostToolUseFailure", data: { tool_name: "Bash", tool_use_id: "a1", error: "e", agent_id: "A", tool_input: { command: "x" } } }),
-			makeEvent({ t: 1500, event: "PostToolUseFailure", data: { tool_name: "Bash", tool_use_id: "b1", error: "e", agent_id: "B", tool_input: { command: "y" } } }),
-			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "a2", agent_id: "A", tool_input: { command: "x2" } } }),
-			makeEvent({ t: 2500, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "b2", agent_id: "B", tool_input: { command: "y2" } } }),
-			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "a3", agent_id: "A", tool_input: { command: "x3" } } }),
+			makeEvent({
+				t: 1000,
+				event: "PostToolUseFailure",
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "a1",
+					error: "e",
+					agent_id: "A",
+					tool_input: { command: "x" },
+				},
+			}),
+			makeEvent({
+				t: 1500,
+				event: "PostToolUseFailure",
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "e",
+					agent_id: "B",
+					tool_input: { command: "y" },
+				},
+			}),
+			makeEvent({
+				t: 2000,
+				event: "PreToolUse",
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "a2",
+					agent_id: "A",
+					tool_input: { command: "x2" },
+				},
+			}),
+			makeEvent({
+				t: 2500,
+				event: "PreToolUse",
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b2",
+					agent_id: "B",
+					tool_input: { command: "y2" },
+				},
+			}),
+			makeEvent({
+				t: 3000,
+				event: "PreToolUse",
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "a3",
+					agent_id: "A",
+					tool_input: { command: "x3" },
+				},
+			}),
 			// Agent A's loop keeps failing — trailing failure makes it a genuine debugging_loop.
-			makeEvent({ t: 3200, event: "PostToolUseFailure", data: { tool_name: "Bash", tool_use_id: "a3f", error: "e", agent_id: "A", tool_input: { command: "x3" } } }),
+			makeEvent({
+				t: 3200,
+				event: "PostToolUseFailure",
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "a3f",
+					error: "e",
+					agent_id: "A",
+					tool_input: { command: "x3" },
+				},
+			}),
 		];
 
 		const loops = extractBacktracks(events).filter((b) => b.type === "debugging_loop");
@@ -405,10 +557,26 @@ describe("extractBacktracks - deduplication", () => {
 		// Real loops keep failing: fail, retry-pre, retry-pre, then a final failure of the
 		// last retry. The loop's end must include that terminal failure.
 		const events: StoredEvent[] = [
-			makeEvent({ t: 1000, event: "PostToolUseFailure", data: { tool_name: "Bash", tool_use_id: "b1", error: "e", tool_input: { command: "a" } } }),
-			makeEvent({ t: 2000, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "b2", tool_input: { command: "b" } } }),
-			makeEvent({ t: 3000, event: "PreToolUse", data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "c" } } }),
-			makeEvent({ t: 3500, event: "PostToolUseFailure", data: { tool_name: "Bash", tool_use_id: "b3f", error: "e", tool_input: { command: "c" } } }),
+			makeEvent({
+				t: 1000,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b1", error: "e", tool_input: { command: "a" } },
+			}),
+			makeEvent({
+				t: 2000,
+				event: "PreToolUse",
+				data: { tool_name: "Bash", tool_use_id: "b2", tool_input: { command: "b" } },
+			}),
+			makeEvent({
+				t: 3000,
+				event: "PreToolUse",
+				data: { tool_name: "Bash", tool_use_id: "b3", tool_input: { command: "c" } },
+			}),
+			makeEvent({
+				t: 3500,
+				event: "PostToolUseFailure",
+				data: { tool_name: "Bash", tool_use_id: "b3f", error: "e", tool_input: { command: "c" } },
+			}),
 		];
 
 		const loops = extractBacktracks(events).filter((b) => b.type === "debugging_loop");
@@ -461,7 +629,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "bun test" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "exit 1",
+					tool_input: { command: "bun test" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
@@ -486,7 +659,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 1000,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b1", error: "exit 1", tool_input: { command: "bun test" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b1",
+					error: "exit 1",
+					tool_input: { command: "bun test" },
+				},
 			}),
 			makeEvent({
 				t: 2000,
@@ -496,7 +674,12 @@ describe("extractBacktracks - deduplication", () => {
 			makeEvent({
 				t: 2500,
 				event: "PostToolUseFailure",
-				data: { tool_name: "Bash", tool_use_id: "b2f", error: "exit 1", tool_input: { command: "bun test --rerun" } },
+				data: {
+					tool_name: "Bash",
+					tool_use_id: "b2f",
+					error: "exit 1",
+					tool_input: { command: "bun test --rerun" },
+				},
 			}),
 			makeEvent({
 				t: 3000,

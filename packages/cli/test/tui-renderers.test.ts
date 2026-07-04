@@ -1,17 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { stripAnsi } from "../src/commands/tui-formatters";
 import {
 	formatAgentDetail,
 	formatAgentRow,
 	formatSessionRow,
 	render,
 } from "../src/commands/tui-renderers";
-import { stripAnsi } from "../src/commands/tui-formatters";
 import type { TuiState } from "../src/commands/tui-state";
-import type {
-	AgentNode,
-	DistilledSession,
-	SessionSummary,
-} from "../src/types";
+import type { AgentNode, DistilledSession, SessionSummary } from "../src/types";
 
 // --- Test helpers ---
 

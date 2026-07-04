@@ -5,8 +5,8 @@
 // Pure module: I/O (file scanning) is injected via the `scanFn` parameter.
 // The default scanSessionFiles implementation lives in session/synthetic-scan.ts.
 
-import type { LinkEvent, SpawnLink, StopLink, StoredEvent } from "../types";
 import type { SessionFileInfo } from "../session/synthetic-scan";
+import type { LinkEvent, SpawnLink, StopLink, StoredEvent } from "../types";
 
 /** An Agent tool call extracted from parent session events. */
 interface AgentCall {
@@ -51,7 +51,10 @@ export const extractUnlinkedAgentCalls = (
 
 	return agentPreToolUses.flatMap((e): readonly AgentCall[] => {
 		const rawInput: unknown = e.data?.tool_input ?? {};
-		const toolInput = typeof rawInput === "object" && rawInput !== null ? rawInput as Readonly<Record<string, unknown>> : {};
+		const toolInput =
+			typeof rawInput === "object" && rawInput !== null
+				? (rawInput as Readonly<Record<string, unknown>>)
+				: {};
 		const name = typeof toolInput.name === "string" ? toolInput.name : "";
 		const agentType = typeof toolInput.subagent_type === "string" ? toolInput.subagent_type : "";
 		const description = typeof toolInput.description === "string" ? toolInput.description : "";
@@ -89,7 +92,7 @@ export const matchAgentCallsToSessions = (
 			const eligible = candidates
 				.filter((c) => !acc.claimed.has(c.sessionId))
 				.filter((c) => c.startT >= call.t && c.startT - call.t <= MATCH_WINDOW_MS)
-				.sort((a, b) => (a.startT - call.t) - (b.startT - call.t));
+				.sort((a, b) => a.startT - call.t - (b.startT - call.t));
 
 			const best = eligible[0];
 			if (!best) return acc;
@@ -124,13 +127,15 @@ export const buildSyntheticLinks = (
 
 	const stops: readonly StopLink[] = matches.flatMap((m): readonly StopLink[] => {
 		if (m.session.endT === undefined) return [];
-		return [{
-			t: m.session.endT,
-			type: "stop" as const,
-			parent_session: parentSessionId,
-			agent_id: m.session.sessionId,
-			synthetic: true,
-		}];
+		return [
+			{
+				t: m.session.endT,
+				type: "stop" as const,
+				parent_session: parentSessionId,
+				agent_id: m.session.sessionId,
+				synthetic: true,
+			},
+		];
 	});
 
 	return { spawns, stops };
@@ -151,9 +156,7 @@ export const synthesizeSpawnLinks = (
 	if (unlinkedCalls.length === 0) return { spawns: [], stops: [] };
 
 	// Build set of already-linked session IDs
-	const linkedIds = new Set(
-		existingLinks.filter(isSpawnLink).map((s) => s.agent_id),
-	);
+	const linkedIds = new Set(existingLinks.filter(isSpawnLink).map((s) => s.agent_id));
 
 	// Determine parent session time range from events
 	const timestamps = events.map((e) => e.t);

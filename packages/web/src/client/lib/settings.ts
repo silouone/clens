@@ -38,8 +38,7 @@ const VALID_TIMESTAMP_FORMATS: readonly TimestampFormat[] = ["relative", "absolu
 const VALID_LIST_LIMITS: readonly number[] = [20, 50, 100] as const;
 const VALID_PAGE_SIZES: readonly number[] = [25, 50, 100] as const;
 
-const isValidFontSize = (v: unknown): v is FontSize =>
-	VALID_FONT_SIZES.includes(v as FontSize);
+const isValidFontSize = (v: unknown): v is FontSize => VALID_FONT_SIZES.includes(v as FontSize);
 
 const isValidTimestampFormat = (v: unknown): v is TimestampFormat =>
 	VALID_TIMESTAMP_FORMATS.includes(v as TimestampFormat);
@@ -47,20 +46,26 @@ const isValidTimestampFormat = (v: unknown): v is TimestampFormat =>
 const isValidSidebarWidth = (v: unknown): v is number =>
 	typeof v === "number" && v >= 15 && v <= 40;
 
-const isValidListLimit = (v: unknown): v is number =>
-	VALID_LIST_LIMITS.includes(v as number);
+const isValidListLimit = (v: unknown): v is number => VALID_LIST_LIMITS.includes(v as number);
 
-const isValidPageSize = (v: unknown): v is number =>
-	VALID_PAGE_SIZES.includes(v as number);
+const isValidPageSize = (v: unknown): v is number => VALID_PAGE_SIZES.includes(v as number);
 
 /** Validate and sanitize stored preferences, falling back to defaults for invalid fields. */
 const validatePreferences = (raw: Record<string, unknown>): ClientPreferences => ({
 	fontSize: isValidFontSize(raw.fontSize) ? raw.fontSize : DEFAULT_PREFS.fontSize,
-	sidebarWidth: isValidSidebarWidth(raw.sidebarWidth) ? raw.sidebarWidth : DEFAULT_PREFS.sidebarWidth,
-	sessionListLimit: isValidListLimit(raw.sessionListLimit) ? raw.sessionListLimit : DEFAULT_PREFS.sessionListLimit,
+	sidebarWidth: isValidSidebarWidth(raw.sidebarWidth)
+		? raw.sidebarWidth
+		: DEFAULT_PREFS.sidebarWidth,
+	sessionListLimit: isValidListLimit(raw.sessionListLimit)
+		? raw.sessionListLimit
+		: DEFAULT_PREFS.sessionListLimit,
 	autoDistill: typeof raw.autoDistill === "boolean" ? raw.autoDistill : DEFAULT_PREFS.autoDistill,
-	showTimestamps: isValidTimestampFormat(raw.showTimestamps) ? raw.showTimestamps : DEFAULT_PREFS.showTimestamps,
-	conversationPageSize: isValidPageSize(raw.conversationPageSize) ? raw.conversationPageSize : DEFAULT_PREFS.conversationPageSize,
+	showTimestamps: isValidTimestampFormat(raw.showTimestamps)
+		? raw.showTimestamps
+		: DEFAULT_PREFS.showTimestamps,
+	conversationPageSize: isValidPageSize(raw.conversationPageSize)
+		? raw.conversationPageSize
+		: DEFAULT_PREFS.conversationPageSize,
 });
 
 // ── Storage ─────────────────────────────────────────────────────────
@@ -159,8 +164,7 @@ const fetchProjectConfig = async (): Promise<WebClensConfig | undefined> => {
 	}
 };
 
-const [projectConfig, { refetch: refetchProjectConfig }] =
-	createResource(fetchProjectConfig);
+const [projectConfig, { refetch: refetchProjectConfig }] = createResource(fetchProjectConfig);
 
 /** Save updated project config via PUT /api/config. */
 const saveProjectConfig = async (config: WebClensConfig): Promise<WebClensConfig | undefined> => {

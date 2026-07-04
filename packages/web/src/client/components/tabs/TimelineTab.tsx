@@ -1,6 +1,6 @@
-import { For, Show, createMemo, createSignal, type Component } from "solid-js";
-import { DensityRibbon } from "../charts/DensityRibbon";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import { formatDuration, formatRelTime } from "../../lib/format";
+import { DensityRibbon } from "../charts/DensityRibbon";
 import type { TabProps } from "./types";
 
 // ── TimelineTab — Wave 2 rework (DensityRibbon headline) ─────────────
@@ -84,10 +84,10 @@ export const TimelineTab: Component<TabProps> = (props) => {
 	// The timeline is not guaranteed sorted, so derive [min,max] in one pass
 	// rather than trusting events[0]/[last].
 	const bounds = createMemo(() =>
-		timeline().reduce(
-			(acc, e) => ({ min: Math.min(acc.min, e.t), max: Math.max(acc.max, e.t) }),
-			{ min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY },
-		),
+		timeline().reduce((acc, e) => ({ min: Math.min(acc.min, e.t), max: Math.max(acc.max, e.t) }), {
+			min: Number.POSITIVE_INFINITY,
+			max: Number.NEGATIVE_INFINITY,
+		}),
 	);
 
 	// Span derivation MUST match what is handed to DensityRibbon (and mirrors
@@ -109,7 +109,9 @@ export const TimelineTab: Component<TabProps> = (props) => {
 	const presentTypes = createMemo(() => {
 		const tl = timeline();
 		const countOf = (t: string): number => tl.filter((e) => e.type === t).length;
-		const known = CANON_TYPES.map((t) => ({ type: t, count: countOf(t) })).filter((c) => c.count > 0);
+		const known = CANON_TYPES.map((t) => ({ type: t, count: countOf(t) })).filter(
+			(c) => c.count > 0,
+		);
 		const extras = [...new Set(tl.map((e) => e.type))]
 			.filter((t) => !CANON_TYPES.includes(t))
 			.map((t) => ({ type: t, count: countOf(t) }));
@@ -143,7 +145,9 @@ export const TimelineTab: Component<TabProps> = (props) => {
 	// Window selection in fractions [0..1] of the span. Committed on mouseup so
 	// the 493-row list only re-filters once per drag; the band <div> follows the
 	// live drag signals.
-	const [windowSel, setWindowSel] = createSignal<{ readonly lo: number; readonly hi: number } | undefined>();
+	const [windowSel, setWindowSel] = createSignal<
+		{ readonly lo: number; readonly hi: number } | undefined
+	>();
 	const [dragOrigin, setDragOrigin] = createSignal<number | undefined>();
 	const [dragCur, setDragCur] = createSignal<number | undefined>();
 
@@ -225,6 +229,7 @@ export const TimelineTab: Component<TabProps> = (props) => {
 						<Show when={windowMs()}>
 							{(w) => (
 								<button
+									type="button"
 									onClick={() => setWindowSel(undefined)}
 									class="instrument-microcaps ml-auto inline-flex items-center gap-1 rounded-none border border-clens px-1.5 py-0.5 text-[10px] text-secondary transition hover:text-primary"
 								>
@@ -271,6 +276,7 @@ export const TimelineTab: Component<TabProps> = (props) => {
 						</Show>
 						<div
 							class="absolute inset-0 cursor-crosshair"
+							role="none"
 							onMouseDown={onDown}
 							onMouseMove={onMove}
 							onMouseUp={onUp}
@@ -289,6 +295,7 @@ export const TimelineTab: Component<TabProps> = (props) => {
 							const active = () => !excluded().has(pt.type);
 							return (
 								<button
+									type="button"
 									onClick={() => toggleType(pt.type)}
 									class="instrument-microcaps inline-flex items-center gap-1 rounded-none border px-1.5 py-0.5 text-[10px] transition"
 									classList={{
@@ -298,7 +305,9 @@ export const TimelineTab: Component<TabProps> = (props) => {
 								>
 									<span
 										class="inline-block h-2 w-2 rounded-none"
-										style={{ background: active() ? typeColor(pt.type) : "var(--clens-text-muted)" }}
+										style={{
+											background: active() ? typeColor(pt.type) : "var(--clens-text-muted)",
+										}}
 									/>
 									{typeLabel(pt.type)}
 									<span class="font-mono tabular-nums text-muted">{pt.count}</span>
@@ -330,7 +339,9 @@ export const TimelineTab: Component<TabProps> = (props) => {
 										{typeLabel(entry.type)}
 									</span>
 									<Show when={entry.tool_name}>
-										{(tn) => <span class="shrink-0 font-mono text-[11px] text-secondary">{tn()}</span>}
+										{(tn) => (
+											<span class="shrink-0 font-mono text-[11px] text-secondary">{tn()}</span>
+										)}
 									</Show>
 									<Show when={entry.content_preview}>
 										{(cp) => <span class="flex-1 truncate text-muted">{cp()}</span>}

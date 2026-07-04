@@ -1,4 +1,4 @@
-import { createSignal, Show, type Component } from "solid-js";
+import { type Component, createSignal, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 
 export type TooltipData = {

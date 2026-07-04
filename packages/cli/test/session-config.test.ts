@@ -2,11 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { extractSessionConfig } from "../src/distill/session-config";
 import type { ClaudeMdInEffect, HookEventType, StoredEvent } from "../src/types";
 
-const ev = (
-	event: HookEventType,
-	data: Record<string, unknown>,
-	t = 1000,
-): StoredEvent => ({ t, event, sid: "s1", data });
+const ev = (event: HookEventType, data: Record<string, unknown>, t = 1000): StoredEvent => ({
+	t,
+	event,
+	sid: "s1",
+	data,
+});
 
 describe("extractSessionConfig — permission_mode + effort (CFG-2)", () => {
 	test("lifts recognized permission_mode + effort as typed values (latest wins)", () => {
@@ -75,11 +76,15 @@ describe("extractSessionConfig — MCP server aggregation (CFG-4)", () => {
 describe("extractSessionConfig — CLAUDE.md realization (CFG-5)", () => {
 	test("realizes claude_md_in_effect from InstructionsLoaded events (deduped)", () => {
 		const cfg = extractSessionConfig([
-			ev("InstructionsLoaded", {
-				file_path: "/p/CLAUDE.md",
-				memory_type: "Project",
-				load_reason: "session_start",
-			}, 1),
+			ev(
+				"InstructionsLoaded",
+				{
+					file_path: "/p/CLAUDE.md",
+					memory_type: "Project",
+					load_reason: "session_start",
+				},
+				1,
+			),
 			ev("InstructionsLoaded", { file_path: "/p/CLAUDE.md", memory_type: "Project" }, 2),
 			ev("InstructionsLoaded", { file_path: "/u/CLAUDE.md", memory_type: "User" }, 3),
 		]);

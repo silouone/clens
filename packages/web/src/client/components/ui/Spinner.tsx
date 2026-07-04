@@ -16,9 +16,8 @@ export const Spinner: Component<SpinnerProps> = (props) => {
 	const size = () => props.size ?? "md";
 
 	return (
-		<div
-			class={`animate-spin rounded-none border-clens border-t-brand-500 ${SIZE_CLASSES[size()]}`}
-			role="status"
+		<output
+			class={`inline-block animate-spin rounded-none border-clens border-t-brand-500 ${SIZE_CLASSES[size()]}`}
 			aria-label="Loading"
 		/>
 	);

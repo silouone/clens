@@ -1,7 +1,7 @@
 export { Badge } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
-export { ColorFlag, ColorDot } from "./ColorFlag";
+export { ColorDot, ColorFlag } from "./ColorFlag";
 export { EmptyState } from "./EmptyState";
 export { KbdShortcut } from "./KbdShortcut";
 export { MetaRow } from "./MetaRow";

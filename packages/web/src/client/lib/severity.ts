@@ -2,9 +2,12 @@
 
 /** Backtrack severity badge styles (used in BottomPanel timeline). */
 const SEVERITY_STYLES: Readonly<Record<string, string>> = {
-	failure_retry: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50",
-	iteration_struggle: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/50 dark:text-orange-400 dark:border-orange-700/50",
-	debugging_loop: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-400 dark:border-red-700/50",
+	failure_retry:
+		"bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-400 dark:border-amber-700/50",
+	iteration_struggle:
+		"bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/50 dark:text-orange-400 dark:border-orange-700/50",
+	debugging_loop:
+		"bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-400 dark:border-red-700/50",
 };
 
 /** Get severity border+bg style for a backtrack type (BottomPanel). */

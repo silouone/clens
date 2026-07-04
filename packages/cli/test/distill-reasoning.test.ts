@@ -51,9 +51,7 @@ describe("extractReasoning", () => {
 				timestamp: "2024-01-01T00:00:02.000Z",
 				message: {
 					role: "assistant",
-					content: [
-						{ type: "tool_use", id: "toolu_02", name: "Grep", input: { pattern: "bug" } },
-					],
+					content: [{ type: "tool_use", id: "toolu_02", name: "Grep", input: { pattern: "bug" } }],
 				},
 			}),
 		];
@@ -88,9 +86,7 @@ describe("extractReasoning", () => {
 				timestamp: "2024-01-01T00:00:03.000Z",
 				message: {
 					role: "assistant",
-					content: [
-						{ type: "tool_use", id: "toolu_03", name: "Bash", input: { command: "ls" } },
-					],
+					content: [{ type: "tool_use", id: "toolu_03", name: "Bash", input: { command: "ls" } }],
 				},
 			}),
 		];

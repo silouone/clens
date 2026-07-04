@@ -26,8 +26,9 @@ const findAgent = (agents: readonly AgentNode[], agentId: string): AgentNode | u
 
 	// Try tree display format: agent_type-session_id_prefix (e.g., "builder-a82d7f2f" or legacy "builder-a849")
 	const treeFormatMatch = all.find(
-		(a) => `${a.agent_type}-${a.session_id.slice(0, 8)}` === agentId
-			|| `${a.agent_type}-${a.session_id.slice(0, 4)}` === agentId,
+		(a) =>
+			`${a.agent_type}-${a.session_id.slice(0, 8)}` === agentId ||
+			`${a.agent_type}-${a.session_id.slice(0, 4)}` === agentId,
 	);
 	if (treeFormatMatch) return treeFormatMatch;
 
@@ -99,7 +100,9 @@ export const getAgentData = (
 
 		// Check for team-lead across all sessions
 		if (agentId === "team-lead") {
-			return { error: "team-lead lookup requires a session ID. Use: clens agent team-lead <session-id>" };
+			return {
+				error: "team-lead lookup requires a session ID. Use: clens agent team-lead <session-id>",
+			};
 		}
 
 		return { error: `Agent "${agentId}" not found in any distilled session.` };
@@ -130,9 +133,10 @@ export const getAgentData = (
 
 	if (!agent) {
 		const allAgents = flattenAgents(distilled.agents);
-		const names = ["team-lead", ...allAgents.map((a) =>
-			`${a.agent_name ?? a.agent_type} (${a.session_id.slice(0, 8)})`,
-		)].join(", ");
+		const names = [
+			"team-lead",
+			...allAgents.map((a) => `${a.agent_name ?? a.agent_type} (${a.session_id.slice(0, 8)})`),
+		].join(", ");
 		return {
 			error: `Agent "${agentId}" not found in session ${sessionId.slice(0, 8)}.\nAvailable agents: ${names}`,
 		};
@@ -158,7 +162,9 @@ export const renderAgentReport = (
 		`Session ID: ${agent.session_id}`,
 		...(agent.model ? [`Model: ${agent.model}`] : []),
 		`Duration: ${formatDuration(agent.duration_ms)}`,
-		...(agent.task_prompt ? ["", "Task Prompt:", ...agent.task_prompt.split("\n").map((line) => `  ${line}`)] : []),
+		...(agent.task_prompt
+			? ["", "Task Prompt:", ...agent.task_prompt.split("\n").map((line) => `  ${line}`)]
+			: []),
 		"",
 		...renderToolUsage(agent),
 		...renderCommunication(agent),
@@ -275,9 +281,7 @@ const renderIdlePeriods = (agent: AgentNode): readonly string[] => {
 			const time = new Date(ip.t).toLocaleTimeString();
 			return `  ${time} idle`;
 		}),
-		...(agent.idle_periods.length > 10
-			? [`  ... and ${agent.idle_periods.length - 10} more`]
-			: []),
+		...(agent.idle_periods.length > 10 ? [`  ... and ${agent.idle_periods.length - 10} more`] : []),
 		"",
 	];
 };
@@ -313,4 +317,3 @@ const renderTokenUsage = (agent: AgentNode): readonly string[] => {
 			: []),
 	];
 };
-

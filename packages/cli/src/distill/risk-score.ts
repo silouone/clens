@@ -24,9 +24,7 @@ const computeRiskLevel = (
  * Compute per-file risk scores from a distilled session.
  * Pure function — no I/O.
  */
-export const computeFileRiskScores = (
-	distilled: DistilledSession,
-): readonly FileRiskScore[] => {
+export const computeFileRiskScores = (distilled: DistilledSession): readonly FileRiskScore[] => {
 	const files = distilled.file_map.files;
 	if (files.length === 0) return [];
 
@@ -37,29 +35,17 @@ export const computeFileRiskScores = (
 		const filePath = file.file_path;
 
 		// Count backtracks targeting this file
-		const backtrackCount = backtracks.filter(
-			(b) => b.file_path === filePath,
-		).length;
+		const backtrackCount = backtracks.filter((b) => b.file_path === filePath).length;
 
 		// Find edit chains for this file
 		const fileChains = chains.filter((c) => c.file_path === filePath);
-		const abandonedEditCount = fileChains.reduce(
-			(sum, c) => sum + c.abandoned_edit_ids.length,
-			0,
-		);
-		const totalEditCount = fileChains.reduce(
-			(sum, c) => sum + c.total_edits,
-			0,
-		);
-		const totalFailures = fileChains.reduce(
-			(sum, c) => sum + c.total_failures,
-			0,
-		);
+		const abandonedEditCount = fileChains.reduce((sum, c) => sum + c.abandoned_edit_ids.length, 0);
+		const totalEditCount = fileChains.reduce((sum, c) => sum + c.total_edits, 0);
+		const totalFailures = fileChains.reduce((sum, c) => sum + c.total_failures, 0);
 		const editChainLength = fileChains.length;
 
 		// Failure rate scoped to this file's edit chains
-		const failureRate =
-			totalEditCount > 0 ? totalFailures / totalEditCount : 0;
+		const failureRate = totalEditCount > 0 ? totalFailures / totalEditCount : 0;
 
 		const riskLevel = computeRiskLevel(
 			backtrackCount,

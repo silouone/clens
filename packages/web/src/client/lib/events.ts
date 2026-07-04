@@ -1,7 +1,7 @@
 import { createSignal, onCleanup } from "solid-js";
 import { getToken } from "./api";
-import { refetchSessions } from "./stores";
 import { debounce } from "./debounce";
+import { refetchSessions } from "./stores";
 
 const LOG_PREFIX = "[cLens:sse]";
 
@@ -210,8 +210,7 @@ const [liveEvents, setLiveEvents] = createSignal<readonly unknown[]>([]);
 const clearLiveEvents = () => setLiveEvents([]);
 
 const [liveLinks, setLiveLinks] = createSignal<readonly unknown[]>([]);
-const appendLiveLink = (link: unknown) =>
-	setLiveLinks((prev) => [...prev, link]);
+const appendLiveLink = (link: unknown) => setLiveLinks((prev) => [...prev, link]);
 const clearLiveLinks = () => setLiveLinks([]);
 
 /**

@@ -1,10 +1,10 @@
-import { createMemo, For, Show, type Component, type JSX } from "solid-js";
-import { CommunicationTimeline } from "../CommunicationTimeline";
-import { AgentGraph, HorizontalBar, categoricalColor } from "../charts";
-import type { AgentGraphNode, AgentGraphEdge } from "../charts";
-import { StatTile } from "../ui/StatTile";
+import { type Component, createMemo, For, type JSX, Show } from "solid-js";
 import { CATEGORY, type CategoryKey } from "../../lib/categories";
 import { formatDuration } from "../../lib/format";
+import { CommunicationTimeline } from "../CommunicationTimeline";
+import type { AgentGraphEdge, AgentGraphNode } from "../charts";
+import { AgentGraph, categoricalColor, HorizontalBar } from "../charts";
+import { StatTile } from "../ui/StatTile";
 import type { TabProps } from "./types";
 
 // ── CommunicationTab — Wave 2 rework (overview-moat-refactor) ─────────
@@ -76,9 +76,7 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 	const session = () => props.session;
 
 	const lifetimes = () => session().agent_lifetimes ?? [];
-	const flatAgents = createMemo<readonly FlatAgent[]>(() =>
-		flattenAgents(session().agents ?? []),
-	);
+	const flatAgents = createMemo<readonly FlatAgent[]>(() => flattenAgents(session().agents ?? []));
 	const byId = createMemo(() => new Map(flatAgents().map((a) => [a.session_id, a])));
 
 	// B15 count precedence: flattened agents tree → lifetimes → team_metrics, so
@@ -96,8 +94,7 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 
 	// Treat as a team view when there is genuine multi-agent signal (prop OR data),
 	// so the graph never renders for a lone session.
-	const isTeam = () =>
-		props.isMultiAgent || agentCount() > 1 || messageCount() > 0;
+	const isTeam = () => props.isMultiAgent || agentCount() > 1 || messageCount() > 0;
 
 	// Roster: prefer lifetimes (names + spans), enriched with tree activity; fall
 	// back to the flattened tree when lifetimes are absent.
@@ -157,8 +154,7 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 	const graphEdges = createMemo<readonly AgentGraphEdge[]>(() => {
 		const seq = session().comm_sequence ?? [];
 		const sid = session().session_id;
-		const isHub = (id: string, name: string) =>
-			id === sid || id === "leader" || name === "leader";
+		const isHub = (id: string, name: string) => id === sid || id === "leader" || name === "leader";
 		const resolve = (id: string, name: string) => (isHub(id, name) ? sid : id);
 		const counts = seq.reduce<ReadonlyMap<string, AgentGraphEdge>>((acc, e) => {
 			const from = resolve(e.from_id, e.from_name);
@@ -170,9 +166,7 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 		return [...counts.values()];
 	});
 
-	const topAgents = createMemo(() =>
-		[...roster()].sort((a, b) => b.weight - a.weight).slice(0, 8),
-	);
+	const topAgents = createMemo(() => [...roster()].sort((a, b) => b.weight - a.weight).slice(0, 8));
 
 	// Headline tiles — Agents always; the rest only when non-zero (no "0" noise).
 	const headlineTiles = createMemo<
@@ -195,9 +189,7 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 						const Icon = CATEGORY.comms.icon;
 						return <Icon class="h-5 w-5 text-muted" />;
 					})()}
-					<span class="instrument-microcaps text-[11px] text-muted">
-						Single-agent session
-					</span>
+					<span class="instrument-microcaps text-[11px] text-muted">Single-agent session</span>
 					<span class="text-sm text-muted">No inter-agent communication captured</span>
 				</div>
 			}
@@ -214,7 +206,8 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 						{agentCount()} agents · {messageCount()} captured message
 						{messageCount() === 1 ? "" : "s"}
 						<Show when={agentCount() >= 8 && messageCount() < agentCount() / 2}>
-							{" "}— broad fan-out, sparse cross-talk
+							{" "}
+							— broad fan-out, sparse cross-talk
 						</Show>
 					</p>
 				</div>

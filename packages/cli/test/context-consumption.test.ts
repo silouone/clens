@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { TranscriptEntry } from "../src/types/transcript";
 import { extractContextConsumption } from "../src/distill/context-consumption";
 import { getModelContextWindow, MODEL_CONTEXT_WINDOWS } from "../src/distill/stats";
+import type { TranscriptEntry } from "../src/types/transcript";
 
 const mockEntry = (overrides: Partial<TranscriptEntry> = {}): TranscriptEntry => ({
 	type: "assistant",
@@ -43,9 +43,7 @@ describe("extractContextConsumption", () => {
 	});
 
 	test("returns undefined when no entries have usage data", () => {
-		const entries = [
-			mockEntry({ message: { role: "assistant", content: [] } }),
-		];
+		const entries = [mockEntry({ message: { role: "assistant", content: [] } })];
 		const result = extractContextConsumption(entries, "claude-sonnet-4-20250514");
 		expect(result).toBeUndefined();
 	});
@@ -83,7 +81,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 2000, output_tokens: 400, cache_read_input_tokens: 1000, cache_creation_input_tokens: 500 },
+					usage: {
+						input_tokens: 2000,
+						output_tokens: 400,
+						cache_read_input_tokens: 1000,
+						cache_creation_input_tokens: 500,
+					},
 				},
 			}),
 			mockEntry({
@@ -91,7 +94,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 5000, output_tokens: 600, cache_read_input_tokens: 3000, cache_creation_input_tokens: 1000 },
+					usage: {
+						input_tokens: 5000,
+						output_tokens: 600,
+						cache_read_input_tokens: 3000,
+						cache_creation_input_tokens: 1000,
+					},
 				},
 			}),
 			mockEntry({
@@ -99,7 +107,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 10000, output_tokens: 800, cache_read_input_tokens: 5000, cache_creation_input_tokens: 2000 },
+					usage: {
+						input_tokens: 10000,
+						output_tokens: 800,
+						cache_read_input_tokens: 5000,
+						cache_creation_input_tokens: 2000,
+					},
 				},
 			}),
 		];
@@ -127,7 +140,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 100000, output_tokens: 1000, cache_read_input_tokens: 50000, cache_creation_input_tokens: 10000 },
+					usage: {
+						input_tokens: 100000,
+						output_tokens: 1000,
+						cache_read_input_tokens: 50000,
+						cache_creation_input_tokens: 10000,
+					},
 				},
 			}),
 			// Compaction: total drops from 160000 to 30000 (< 160000 * 0.7 = 112000)
@@ -136,7 +154,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 20000, output_tokens: 500, cache_read_input_tokens: 8000, cache_creation_input_tokens: 2000 },
+					usage: {
+						input_tokens: 20000,
+						output_tokens: 500,
+						cache_read_input_tokens: 8000,
+						cache_creation_input_tokens: 2000,
+					},
 				},
 			}),
 			// Growth after compaction
@@ -145,7 +168,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 40000, output_tokens: 700, cache_read_input_tokens: 15000, cache_creation_input_tokens: 5000 },
+					usage: {
+						input_tokens: 40000,
+						output_tokens: 700,
+						cache_read_input_tokens: 15000,
+						cache_creation_input_tokens: 5000,
+					},
 				},
 			}),
 		];
@@ -168,7 +196,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 500, cache_creation_input_tokens: 200 },
+					usage: {
+						input_tokens: 1000,
+						output_tokens: 100,
+						cache_read_input_tokens: 500,
+						cache_creation_input_tokens: 200,
+					},
 				},
 			}),
 			// Second streaming chunk with same requestId — should overwrite first
@@ -177,7 +210,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 500, cache_creation_input_tokens: 200 },
+					usage: {
+						input_tokens: 1000,
+						output_tokens: 200,
+						cache_read_input_tokens: 500,
+						cache_creation_input_tokens: 200,
+					},
 				},
 			}),
 			// Different requestId — separate turn
@@ -186,7 +224,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 3000, output_tokens: 400, cache_read_input_tokens: 1500, cache_creation_input_tokens: 500 },
+					usage: {
+						input_tokens: 3000,
+						output_tokens: 400,
+						cache_read_input_tokens: 1500,
+						cache_creation_input_tokens: 500,
+					},
 				},
 			}),
 		];
@@ -207,7 +250,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 10000, output_tokens: 500, cache_read_input_tokens: 5000, cache_creation_input_tokens: 1000 },
+					usage: {
+						input_tokens: 10000,
+						output_tokens: 500,
+						cache_read_input_tokens: 5000,
+						cache_creation_input_tokens: 1000,
+					},
 				},
 			}),
 			// Compaction at 2 min
@@ -216,7 +264,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 2000, output_tokens: 200, cache_read_input_tokens: 1000, cache_creation_input_tokens: 200 },
+					usage: {
+						input_tokens: 2000,
+						output_tokens: 200,
+						cache_read_input_tokens: 1000,
+						cache_creation_input_tokens: 200,
+					},
 				},
 			}),
 			// Growth at 4 min
@@ -225,7 +278,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 20000, output_tokens: 800, cache_read_input_tokens: 10000, cache_creation_input_tokens: 3000 },
+					usage: {
+						input_tokens: 20000,
+						output_tokens: 800,
+						cache_read_input_tokens: 10000,
+						cache_creation_input_tokens: 3000,
+					},
 				},
 			}),
 		];
@@ -258,7 +316,12 @@ describe("extractContextConsumption", () => {
 				message: {
 					role: "assistant",
 					content: [],
-					usage: { input_tokens: 100000, output_tokens: 5000, cache_read_input_tokens: 50000, cache_creation_input_tokens: 20000 },
+					usage: {
+						input_tokens: 100000,
+						output_tokens: 5000,
+						cache_read_input_tokens: 50000,
+						cache_creation_input_tokens: 20000,
+					},
 				},
 			}),
 		];

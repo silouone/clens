@@ -15,7 +15,6 @@ import {
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-
 // --- Types ---
 
 export type PluginInstallResult = {
@@ -123,9 +122,7 @@ const readJsonFile = (path: string): Record<string, unknown> => {
 };
 
 const asHooksMap = (value: unknown): HooksMap =>
-	typeof value === "object" && value !== null && !Array.isArray(value)
-		? (value as HooksMap)
-		: {};
+	typeof value === "object" && value !== null && !Array.isArray(value) ? (value as HooksMap) : {};
 
 const asSettingsJson = (value: Record<string, unknown>): SettingsJson => ({
 	...value,
@@ -146,18 +143,13 @@ const isClensMatcherGroup = (group: unknown): boolean =>
 	Array.isArray((group as Record<string, unknown>).hooks) &&
 	((group as Record<string, unknown>).hooks as readonly unknown[]).some(isClensHookHandler);
 
-const mergePluginHooks = (
-	existingSettings: SettingsJson,
-	pluginHooks: HooksMap,
-): SettingsJson => {
+const mergePluginHooks = (existingSettings: SettingsJson, pluginHooks: HooksMap): SettingsJson => {
 	const existingHooks: HooksMap = existingSettings.hooks ?? {};
 
 	// For each event, filter out existing clens hooks, then append new plugin hooks
 	const mergedHooks: Record<string, readonly MatcherGroup[]> = Object.fromEntries(
 		Object.keys({ ...existingHooks, ...pluginHooks }).map((event) => {
-			const existing = (existingHooks[event] ?? []).filter(
-				(group) => !isClensMatcherGroup(group),
-			);
+			const existing = (existingHooks[event] ?? []).filter((group) => !isClensMatcherGroup(group));
 			const incoming = pluginHooks[event] ?? [];
 			return [event, [...existing, ...incoming] as readonly MatcherGroup[]];
 		}),
@@ -371,4 +363,3 @@ export const validatePluginStructure = (): {
 		errors,
 	};
 };
-

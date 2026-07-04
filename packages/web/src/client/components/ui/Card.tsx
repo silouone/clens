@@ -1,4 +1,4 @@
-import { Show, type Component, type JSX } from "solid-js";
+import { type Component, type JSX, Show } from "solid-js";
 
 type CardProps = {
 	readonly title?: string;
@@ -23,13 +23,9 @@ export const Card: Component<CardProps> = (props) => (
 							return <IconComp class="h-3.5 w-3.5 text-muted" />;
 						}}
 					</Show>
-					<h3 class="instrument-microcaps text-[11px] text-muted">
-						{props.title}
-					</h3>
+					<h3 class="instrument-microcaps text-[11px] text-muted">{props.title}</h3>
 				</div>
-				<Show when={props.headerRight}>
-					{props.headerRight}
-				</Show>
+				<Show when={props.headerRight}>{props.headerRight}</Show>
 			</div>
 		</Show>
 		{props.children}

@@ -157,10 +157,7 @@ describe("listSessions", () => {
 	});
 
 	test("skips files with invalid JSON content gracefully", () => {
-		writeFileSync(
-			`${TEST_DIR}/.clens/sessions/sess-corrupt.jsonl`,
-			"not valid json at all\n",
-		);
+		writeFileSync(`${TEST_DIR}/.clens/sessions/sess-corrupt.jsonl`, "not valid json at all\n");
 
 		const sessions = listSessions(TEST_DIR);
 		expect(sessions.length).toBe(0);
@@ -278,8 +275,20 @@ describe("enrichSessionSummaries", () => {
 		writeFileSync(`${TEST_DIR}/.clens/sessions/${sid}.jsonl`, `${events}\n`);
 
 		// Write spawn links with this session as parent
-		const spawnLink1 = JSON.stringify({ t: 2000, type: "spawn", parent_session: sid, agent_id: "child-1", agent_type: "builder" });
-		const spawnLink2 = JSON.stringify({ t: 3000, type: "spawn", parent_session: sid, agent_id: "child-2", agent_type: "builder" });
+		const spawnLink1 = JSON.stringify({
+			t: 2000,
+			type: "spawn",
+			parent_session: sid,
+			agent_id: "child-1",
+			agent_type: "builder",
+		});
+		const spawnLink2 = JSON.stringify({
+			t: 3000,
+			type: "spawn",
+			parent_session: sid,
+			agent_id: "child-2",
+			agent_type: "builder",
+		});
 		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, `${spawnLink1}\n${spawnLink2}\n`);
 
 		const sessions = listSessions(TEST_DIR);
@@ -299,9 +308,27 @@ describe("enrichSessionSummaries", () => {
 
 		// child-1 was spawned twice (resumed) — must count as ONE agent.
 		const links = [
-			JSON.stringify({ t: 2000, type: "spawn", parent_session: sid, agent_id: "child-1", agent_type: "builder" }),
-			JSON.stringify({ t: 2500, type: "spawn", parent_session: sid, agent_id: "child-1", agent_type: "builder" }),
-			JSON.stringify({ t: 3000, type: "spawn", parent_session: sid, agent_id: "child-2", agent_type: "builder" }),
+			JSON.stringify({
+				t: 2000,
+				type: "spawn",
+				parent_session: sid,
+				agent_id: "child-1",
+				agent_type: "builder",
+			}),
+			JSON.stringify({
+				t: 2500,
+				type: "spawn",
+				parent_session: sid,
+				agent_id: "child-1",
+				agent_type: "builder",
+			}),
+			JSON.stringify({
+				t: 3000,
+				type: "spawn",
+				parent_session: sid,
+				agent_id: "child-2",
+				agent_type: "builder",
+			}),
 		].join("\n");
 		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, `${links}\n`);
 
@@ -320,15 +347,24 @@ describe("enrichSessionSummaries", () => {
 		writeFileSync(`${TEST_DIR}/.clens/sessions/${sid}.jsonl`, `${events}\n`);
 
 		// One spawn link, but the distilled tree records 3 agents (incl. nesting).
-		const links = JSON.stringify({ t: 2000, type: "spawn", parent_session: sid, agent_id: "child-1", agent_type: "builder" });
+		const links = JSON.stringify({
+			t: 2000,
+			type: "spawn",
+			parent_session: sid,
+			agent_id: "child-1",
+			agent_type: "builder",
+		});
 		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, `${links}\n`);
-		writeFileSync(`${TEST_DIR}/.clens/distilled/${sid}.json`, JSON.stringify({
-			session_id: sid,
-			agents: [
-				{ session_id: "a1", children: [{ session_id: "a2", children: [] }] },
-				{ session_id: "a3", children: [] },
-			],
-		}));
+		writeFileSync(
+			`${TEST_DIR}/.clens/distilled/${sid}.json`,
+			JSON.stringify({
+				session_id: sid,
+				agents: [
+					{ session_id: "a1", children: [{ session_id: "a2", children: [] }] },
+					{ session_id: "a3", children: [] },
+				],
+			}),
+		);
 
 		const sessions = listSessions(TEST_DIR);
 		const enriched = enrichSessionSummaries(sessions, TEST_DIR);
@@ -386,10 +422,20 @@ describe("enrichSessionSummaries", () => {
 			JSON.stringify(makeStoredEvent({ t: 5000, event: "SessionEnd", sid })),
 		].join("\n");
 		writeFileSync(`${TEST_DIR}/.clens/sessions/${sid}.jsonl`, `${events}\n`);
-		writeFileSync(`${TEST_DIR}/.clens/distilled/${sid}.json`, JSON.stringify({
-			session_id: sid,
-			plan_drift: { spec_path: "specs/test.md", drift_score: 0.5, expected_files: [], actual_files: [], unexpected_files: [], missing_files: [] },
-		}));
+		writeFileSync(
+			`${TEST_DIR}/.clens/distilled/${sid}.json`,
+			JSON.stringify({
+				session_id: sid,
+				plan_drift: {
+					spec_path: "specs/test.md",
+					drift_score: 0.5,
+					expected_files: [],
+					actual_files: [],
+					unexpected_files: [],
+					missing_files: [],
+				},
+			}),
+		);
 
 		const sessions = listSessions(TEST_DIR);
 		const enriched = enrichSessionSummaries(sessions, TEST_DIR);

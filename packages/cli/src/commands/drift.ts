@@ -38,4 +38,3 @@ export const renderDriftReport = (drift: PlanDriftReport): string => {
 
 	return [...lines, ...matchedLines, ...unexpectedLines, ...missingLines].join("\n");
 };
-

@@ -1,7 +1,7 @@
-import { Show, createMemo, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
-import { HorizontalBar } from "../../charts";
+import { type Component, createMemo, Show } from "solid-js";
 import { CATEGORY } from "../../../lib/categories";
+import { HorizontalBar } from "../../charts";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── EditsWidget [edits] — churn + abandoned waste (R-C3, AC8) ─────────
@@ -64,12 +64,7 @@ export const EditsWidget: Component<WidgetProps> = (props) => {
 	});
 
 	return (
-		<Widget
-			category="edits"
-			title="Edits"
-			span={6}
-			onClick={() => props.onNavigate?.("edits")}
-		>
+		<Widget category="edits" title="Edits" span={6} onClick={() => props.onNavigate?.("edits")}>
 			<Show
 				when={chains().length > 0}
 				fallback={<p class="text-xs italic text-muted">No edits captured</p>}

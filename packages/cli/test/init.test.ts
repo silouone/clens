@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import {
 	detectLegacyInstall,
+	type HooksMap,
 	init,
 	initCommand,
 	isAlreadyInitialized,
@@ -10,7 +11,6 @@ import {
 	resolveInitPaths,
 	uninit,
 	uninitAll,
-	type HooksMap,
 } from "../src/commands/init";
 import type { Flags } from "../src/commands/shared";
 
@@ -118,9 +118,7 @@ describe("init", () => {
 		writeFileSync(`${TEST_DIR}/.claude/settings.local.json`, JSON.stringify(existing));
 		const result = init(TEST_DIR);
 		expect(result.delegated_hooks_count).toBe(1);
-		const delegated = JSON.parse(
-			readFileSync(`${TEST_DIR}/.clens/delegated-hooks.json`, "utf-8"),
-		);
+		const delegated = JSON.parse(readFileSync(`${TEST_DIR}/.clens/delegated-hooks.json`, "utf-8"));
 		expect(delegated.PreToolUse).toContain("my-custom-hook PreToolUse");
 	});
 
@@ -214,7 +212,9 @@ describe("legacy detection", () => {
 	test("detectLegacyInstall detects hook.ts references as legacy", () => {
 		const settings = {
 			hooks: {
-				PreToolUse: [{ hooks: [{ type: "command", command: "bun run /path/to/hook.ts PreToolUse" }] }],
+				PreToolUse: [
+					{ hooks: [{ type: "command", command: "bun run /path/to/hook.ts PreToolUse" }] },
+				],
 			},
 		};
 		writeFileSync(`${TEST_DIR}/.claude/settings.json`, JSON.stringify(settings));

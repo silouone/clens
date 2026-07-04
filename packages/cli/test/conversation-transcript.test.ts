@@ -309,9 +309,7 @@ describe("buildConversationFromTranscript", () => {
 				timestamp: "2024-01-01T00:00:03.000Z",
 				message: {
 					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "Let me analyze the code first." },
-					],
+					content: [{ type: "thinking", thinking: "Let me analyze the code first." }],
 				},
 			}),
 		];
@@ -353,9 +351,7 @@ describe("buildConversationFromTranscript", () => {
 				timestamp: "2024-01-01T00:00:04.000Z",
 				message: {
 					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "Raw transcript thinking (less rich)." },
-					],
+					content: [{ type: "thinking", thinking: "Raw transcript thinking (less rich)." }],
 				},
 			}),
 		];
@@ -386,9 +382,7 @@ describe("buildConversationFromTranscript", () => {
 				timestamp: "2024-01-01T00:00:04.000Z",
 				message: {
 					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "Transcript thinking used." },
-					],
+					content: [{ type: "thinking", thinking: "Transcript thinking used." }],
 				},
 			}),
 		];
@@ -480,9 +474,7 @@ describe("buildConversationFromTranscript", () => {
 
 	test("agent_message without summary omits summary field", () => {
 		const agent = makeAgentNode({
-			messages: [
-				makeAgentMessage({ t: 9000, summary: undefined }),
-			],
+			messages: [makeAgentMessage({ t: 9000, summary: undefined })],
 		});
 		const result = buildConversationFromTranscript([], agent);
 		expect(result).toHaveLength(1);
@@ -508,9 +500,7 @@ describe("buildConversationFromTranscript", () => {
 	test("inserts task_prompt before other entries using agent start time", () => {
 		const agent = makeAgentNode({
 			task_prompt: "Build the authentication module",
-			messages: [
-				makeAgentMessage({ t: 5000, direction: "received", partner: "orchestrator" }),
-			],
+			messages: [makeAgentMessage({ t: 5000, direction: "received", partner: "orchestrator" })],
 		});
 		const result = buildConversationFromTranscript([], agent);
 		const taskPromptEntries = result.filter((e) => e.type === "user_prompt");
@@ -527,7 +517,11 @@ describe("buildConversationFromTranscript", () => {
 		const agent = makeAgentNode({ task_prompt: "A task with no timing data" });
 		const result = buildConversationFromTranscript([], agent);
 		expect(result).toHaveLength(1);
-		expect(result[0]).toMatchObject({ type: "user_prompt", text: "A task with no timing data", t: -1 });
+		expect(result[0]).toMatchObject({
+			type: "user_prompt",
+			text: "A task with no timing data",
+			t: -1,
+		});
 	});
 
 	test("does not insert task_prompt when agent has none", () => {
@@ -546,7 +540,9 @@ describe("buildConversationFromTranscript", () => {
 		];
 		const agent = makeAgentNode({
 			task_prompt: "Initial task prompt",
-			task_events: [{ t: new Date("2024-01-01T00:00:05.000Z").getTime(), action: "create", task_id: "t-1" }],
+			task_events: [
+				{ t: new Date("2024-01-01T00:00:05.000Z").getTime(), action: "create", task_id: "t-1" },
+			],
 		});
 		const result = buildConversationFromTranscript(entries, agent);
 		const prompts = result.filter((e) => e.type === "user_prompt");
@@ -571,9 +567,7 @@ describe("buildConversationFromTranscript", () => {
 				timestamp: "2024-01-01T00:00:03.000Z",
 				message: {
 					role: "assistant",
-					content: [
-						{ type: "tool_use", id: "tu-a", name: "Read", input: { file_path: "/x.ts" } },
-					],
+					content: [{ type: "tool_use", id: "tu-a", name: "Read", input: { file_path: "/x.ts" } }],
 				},
 			}),
 			makeTranscriptEntry({
@@ -582,9 +576,7 @@ describe("buildConversationFromTranscript", () => {
 				timestamp: "2024-01-01T00:00:01.000Z",
 				message: {
 					role: "user",
-					content: [
-						{ type: "tool_result", tool_use_id: "tu-a", content: "ok" },
-					],
+					content: [{ type: "tool_result", tool_use_id: "tu-a", content: "ok" }],
 				},
 			}),
 		];
@@ -648,9 +640,7 @@ describe("buildConversationFromTranscript", () => {
 				timestamp: "2024-01-01T00:00:05.000Z",
 				message: {
 					role: "user",
-					content: [
-						{ type: "tool_result", tool_use_id: "tu-x", content: "result text" },
-					],
+					content: [{ type: "tool_result", tool_use_id: "tu-x", content: "result text" }],
 				},
 			}),
 		];

@@ -80,7 +80,10 @@ const normalizePath = (filePath: string, root: string | undefined): string => {
 	return filePath.startsWith(prefix) ? filePath.slice(prefix.length) : filePath;
 };
 
-const mergeToolUseId = (existing: readonly string[], toolUseId: string | undefined): readonly string[] =>
+const mergeToolUseId = (
+	existing: readonly string[],
+	toolUseId: string | undefined,
+): readonly string[] =>
 	toolUseId && !existing.includes(toolUseId) ? [...existing, toolUseId] : existing;
 
 /**
@@ -117,7 +120,8 @@ const processToolEvent =
 			source: "tool" as const,
 		};
 
-		const toolUseId = typeof event.data.tool_use_id === "string" ? event.data.tool_use_id : undefined;
+		const toolUseId =
+			typeof event.data.tool_use_id === "string" ? event.data.tool_use_id : undefined;
 		const updatedIds = mergeToolUseId(existing.tool_use_ids, toolUseId);
 
 		const updated: FileMapEntry = {

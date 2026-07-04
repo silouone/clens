@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
 import { createServer } from "node:net";
+import { resolve } from "node:path";
 
 /**
  * DEFERRED-PENDING-REBOOT live end-to-end tests for the dev launcher.
@@ -56,63 +56,66 @@ const parsePort = (output: string, label: "web" | "API"): number | undefined => 
 	return m ? Number(m[1]) : undefined;
 };
 
-describe.skipIf(!LIVE)("DEFERRED live e2e: dev launcher (needs reboot — spawns real vite/esbuild)", () => {
-	test("both ports LISTEN and the web port proxies /api/health to the API", async () => {
-		const { child, output } = launch([]);
-		try {
-			// Give the supervised stack time to boot vite + API.
+describe.skipIf(!LIVE)(
+	"DEFERRED live e2e: dev launcher (needs reboot — spawns real vite/esbuild)",
+	() => {
+		test("both ports LISTEN and the web port proxies /api/health to the API", async () => {
+			const { child, output } = launch([]);
+			try {
+				// Give the supervised stack time to boot vite + API.
+				await wait(20_000);
+				const webPort = parsePort(output(), "web");
+				const apiPort = parsePort(output(), "API");
+				expect(webPort).toBeDefined();
+				expect(apiPort).toBeDefined();
+
+				expect(await isListening(apiPort ?? 0)).toBe(true);
+				expect(await isListening(webPort ?? 0)).toBe(true);
+
+				// Proxy: hitting /api/health on the WEB port should reach the API.
+				const proxied = await fetch(`http://localhost:${webPort}/api/health`);
+				expect(proxied.status).toBe(200);
+				const body = await proxied.json();
+				expect(body.status).toBe("ok");
+			} finally {
+				if (child.pid) process.kill(-child.pid, "SIGINT");
+				await wait(5000);
+			}
+		}, 60_000);
+
+		test("SIGINT leaves zero orphaned vite/esbuild/server processes", async () => {
+			const { child, output } = launch([]);
 			await wait(20_000);
 			const webPort = parsePort(output(), "web");
 			const apiPort = parsePort(output(), "API");
-			expect(webPort).toBeDefined();
-			expect(apiPort).toBeDefined();
 
-			expect(await isListening(apiPort ?? 0)).toBe(true);
-			expect(await isListening(webPort ?? 0)).toBe(true);
-
-			// Proxy: hitting /api/health on the WEB port should reach the API.
-			const proxied = await fetch(`http://localhost:${webPort}/api/health`);
-			expect(proxied.status).toBe(200);
-			const body = await proxied.json();
-			expect(body.status).toBe("ok");
-		} finally {
 			if (child.pid) process.kill(-child.pid, "SIGINT");
-			await wait(5000);
-		}
-	}, 60_000);
+			await wait(6000); // grace + escalation window
 
-	test("SIGINT leaves zero orphaned vite/esbuild/server processes", async () => {
-		const { child, output } = launch([]);
-		await wait(20_000);
-		const webPort = parsePort(output(), "web");
-		const apiPort = parsePort(output(), "API");
+			// The launcher tears down the whole group: both ports must be free again.
+			expect(await isListening(apiPort ?? 0)).toBe(false);
+			expect(await isListening(webPort ?? 0)).toBe(false);
+		}, 60_000);
 
-		if (child.pid) process.kill(-child.pid, "SIGINT");
-		await wait(6000); // grace + escalation window
-
-		// The launcher tears down the whole group: both ports must be free again.
-		expect(await isListening(apiPort ?? 0)).toBe(false);
-		expect(await isListening(webPort ?? 0)).toBe(false);
-	}, 60_000);
-
-	test("a second concurrent instance selects different free ports", async () => {
-		const a = launch([]);
-		await wait(18_000);
-		const b = launch([]);
-		await wait(18_000);
-		try {
-			const aWeb = parsePort(a.output(), "web");
-			const bWeb = parsePort(b.output(), "web");
-			const aApi = parsePort(a.output(), "API");
-			const bApi = parsePort(b.output(), "API");
-			expect(aWeb).toBeDefined();
-			expect(bWeb).toBeDefined();
-			expect(aWeb).not.toBe(bWeb);
-			expect(aApi).not.toBe(bApi);
-		} finally {
-			if (a.child.pid) process.kill(-a.child.pid, "SIGINT");
-			if (b.child.pid) process.kill(-b.child.pid, "SIGINT");
-			await wait(6000);
-		}
-	}, 90_000);
-});
+		test("a second concurrent instance selects different free ports", async () => {
+			const a = launch([]);
+			await wait(18_000);
+			const b = launch([]);
+			await wait(18_000);
+			try {
+				const aWeb = parsePort(a.output(), "web");
+				const bWeb = parsePort(b.output(), "web");
+				const aApi = parsePort(a.output(), "API");
+				const bApi = parsePort(b.output(), "API");
+				expect(aWeb).toBeDefined();
+				expect(bWeb).toBeDefined();
+				expect(aWeb).not.toBe(bWeb);
+				expect(aApi).not.toBe(bApi);
+			} finally {
+				if (a.child.pid) process.kill(-a.child.pid, "SIGINT");
+				if (b.child.pid) process.kill(-b.child.pid, "SIGINT");
+				await wait(6000);
+			}
+		}, 90_000);
+	},
+);

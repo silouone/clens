@@ -24,7 +24,13 @@ const parseSessionFile = (
 		const firstLine = firstNewline === -1 ? content : content.slice(0, firstNewline);
 
 		const firstEvent: unknown = JSON.parse(firstLine);
-		if (!firstEvent || typeof firstEvent !== "object" || !("event" in firstEvent) || !("t" in firstEvent)) return undefined;
+		if (
+			!firstEvent ||
+			typeof firstEvent !== "object" ||
+			!("event" in firstEvent) ||
+			!("t" in firstEvent)
+		)
+			return undefined;
 		const { event, t: rawT } = firstEvent as { event: unknown; t: unknown };
 		if (event !== "SessionStart" || typeof rawT !== "number") return undefined;
 
@@ -38,9 +44,13 @@ const parseSessionFile = (
 		const lastNewline = trimmed.lastIndexOf("\n");
 		const lastLine = lastNewline === -1 ? trimmed : trimmed.slice(lastNewline + 1);
 		const lastEvent: unknown = JSON.parse(lastLine);
-		const endT = lastEvent && typeof lastEvent === "object" && "t" in lastEvent && typeof (lastEvent as { t: unknown }).t === "number"
-			? (lastEvent as { t: number }).t
-			: undefined;
+		const endT =
+			lastEvent &&
+			typeof lastEvent === "object" &&
+			"t" in lastEvent &&
+			typeof (lastEvent as { t: unknown }).t === "number"
+				? (lastEvent as { t: number }).t
+				: undefined;
 
 		return { startT, endT };
 	} catch {
@@ -63,9 +73,7 @@ export const scanSessionFiles = (
 
 	const files = (() => {
 		try {
-			return readdirSync(sessionsDir).filter(
-				(f) => f.endsWith(".jsonl") && f !== "_links.jsonl",
-			);
+			return readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl") && f !== "_links.jsonl");
 		} catch {
 			return [];
 		}

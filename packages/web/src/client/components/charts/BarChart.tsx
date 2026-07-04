@@ -1,22 +1,22 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
+import { type Component, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { ChartEmpty } from "./ChartEmpty";
+import { hideTooltip, showTooltip } from "./ChartTooltip";
 import type { BaseChartProps, BrushableChartProps } from "./shared";
 import {
 	BRUSH_FILL,
 	CHART_COLORS,
 	CHART_HAIRLINE,
 	CHART_PADDING,
-	MAX_BAND,
 	createBrush,
 	dateDomain,
 	formatCompact,
 	formatShortDate,
 	generateTicks,
 	linearScale,
+	MAX_BAND,
 	niceMax,
 	timeScale,
 } from "./shared";
-import { hideTooltip, showTooltip } from "./ChartTooltip";
-import { ChartEmpty } from "./ChartEmpty";
 
 interface BarChartProps<T> extends BaseChartProps, BrushableChartProps {
 	readonly data: readonly T[];
@@ -69,7 +69,10 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 		const centers = dates()
 			.map((dateStr) => scale(dateStr))
 			.sort((a, b) => a - b);
-		const minGap = centers.reduce<number>((m, c, i) => (i === 0 ? m : Math.min(m, c - centers[i - 1])), Number.POSITIVE_INFINITY);
+		const minGap = centers.reduce<number>(
+			(m, c, i) => (i === 0 ? m : Math.min(m, c - centers[i - 1])),
+			Number.POSITIVE_INFINITY,
+		);
 		const spacing = Number.isFinite(minGap) && minGap > 0 ? minGap : chartWidth();
 		return Math.max(2, Math.min(MAX_BAND, spacing * 0.8));
 	});
@@ -83,7 +86,14 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 	return (
 		<Show
 			when={props.data.length > 0}
-			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+			fallback={
+				<ChartEmpty
+					height={props.height}
+					class={props.class}
+					ariaLabel={props.ariaLabel}
+					label="No data"
+				/>
+			}
 		>
 			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
 				<svg
@@ -93,102 +103,118 @@ export const BarChart = <T,>(props: BarChartProps<T>): ReturnType<Component> => 
 					aria-label={props.ariaLabel}
 					class="overflow-visible"
 				>
-				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
-					{/* Y-axis grid lines + labels */}
-					<For each={ticks()}>
-						{(tick) => (
-							<>
-								<line
-									x1={0} y1={yScale()(tick)}
-									x2={chartWidth()} y2={yScale()(tick)}
-									stroke={CHART_HAIRLINE}
-									stroke-opacity={tick === 0 ? 1 : 0.55}
-								/>
-								<text
-									x={-8} y={yScale()(tick)}
-									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{formatCompact(tick)}
-								</text>
-							</>
-						)}
-					</For>
+					<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
+						{/* Y-axis grid lines + labels */}
+						<For each={ticks()}>
+							{(tick) => (
+								<>
+									<line
+										x1={0}
+										y1={yScale()(tick)}
+										x2={chartWidth()}
+										y2={yScale()(tick)}
+										stroke={CHART_HAIRLINE}
+										stroke-opacity={tick === 0 ? 1 : 0.55}
+									/>
+									<text
+										x={-8}
+										y={yScale()(tick)}
+										text-anchor="end"
+										dominant-baseline="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{formatCompact(tick)}
+									</text>
+								</>
+							)}
+						</For>
 
-					{/* Drag-brush capture surface (behind bars so bars stay clickable). */}
-					<rect
-						x={0} y={0}
-						width={chartWidth()} height={chartHeight()}
-						fill="transparent"
-						class={brush.enabled() ? "cursor-crosshair" : undefined}
-						onMouseDown={brush.onMouseDown}
-						onMouseMove={brush.onMouseMove}
-						onMouseUp={brush.onMouseUp}
-						onMouseLeave={brush.onMouseLeave}
-					/>
+						{/* Drag-brush capture surface (behind bars so bars stay clickable). */}
+						<rect
+							role="slider"
+							aria-label="Brush to select a range"
+							aria-valuemin={0}
+							aria-valuemax={100}
+							aria-valuenow={0}
+							x={0}
+							y={0}
+							width={chartWidth()}
+							height={chartHeight()}
+							fill="transparent"
+							class={brush.enabled() ? "cursor-crosshair" : undefined}
+							onMouseDown={brush.onMouseDown}
+							onMouseMove={brush.onMouseMove}
+							onMouseUp={brush.onMouseUp}
+							onMouseLeave={brush.onMouseLeave}
+						/>
 
-					{/* Bars */}
-					<For each={props.data}>
-						{(d, i) => {
-							const val = props.y(d);
-							const h = chartHeight() - yScale()(val);
-							const w = barWidth();
-							return (
+						{/* Bars */}
+						<For each={props.data}>
+							{(d, i) => {
+								const val = props.y(d);
+								const h = chartHeight() - yScale()(val);
+								const w = barWidth();
+								return (
+									<rect
+										role="menuitem"
+										aria-label={props.tooltipLabel?.(d) ?? `${props.x(d)}: ${formatCompact(val)}`}
+										x={xScale()(props.x(d)) - w / 2}
+										y={yScale()(val)}
+										width={w}
+										height={Math.max(0, h)}
+										fill={color()}
+										rx={0}
+										class="cursor-pointer transition-opacity hover:opacity-80"
+										onClick={(e) => {
+											e.stopPropagation();
+											props.onClickPoint?.(d, i());
+										}}
+										onMouseEnter={(e) => {
+											const rect = (e.target as SVGRectElement).getBoundingClientRect();
+											const label =
+												props.tooltipLabel?.(d) ?? `${props.x(d)}: ${formatCompact(val)}`;
+											showTooltip(rect.x + rect.width / 2, rect.y, label);
+										}}
+										onMouseLeave={hideTooltip}
+									/>
+								);
+							}}
+						</For>
+
+						{/* Live brush band (never blocks pointer events). */}
+						<Show when={brush.band()}>
+							{(b) => (
 								<rect
-									x={xScale()(props.x(d)) - w / 2}
-									y={yScale()(val)}
-									width={w}
-									height={Math.max(0, h)}
-									fill={color()}
-									rx={0}
-									class="cursor-pointer transition-opacity hover:opacity-80"
-									onClick={(e) => {
-										e.stopPropagation();
-										props.onClickPoint?.(d, i());
-									}}
-									onMouseEnter={(e) => {
-										const rect = (e.target as SVGRectElement).getBoundingClientRect();
-										const label = props.tooltipLabel?.(d) ?? `${props.x(d)}: ${formatCompact(val)}`;
-										showTooltip(rect.x + rect.width / 2, rect.y, label);
-									}}
-									onMouseLeave={hideTooltip}
+									x={b().x}
+									width={b().width}
+									y={0}
+									height={chartHeight()}
+									fill={BRUSH_FILL}
+									fill-opacity={0.15}
+									pointer-events="none"
 								/>
-							);
-						}}
-					</For>
+							)}
+						</Show>
 
-					{/* Live brush band (never blocks pointer events). */}
-					<Show when={brush.band()}>
-						{(b) => (
-							<rect
-								x={b().x} width={b().width}
-								y={0} height={chartHeight()}
-								fill={BRUSH_FILL}
-								fill-opacity={0.15}
-								pointer-events="none"
-							/>
-						)}
-					</Show>
-
-					{/* X-axis labels (show subset to avoid crowding) */}
-					<For each={props.data}>
-						{(d, i) => {
-							const n = props.data.length;
-							const step = Math.max(1, Math.floor(n / 8));
-							if (i() % step !== 0 && i() !== n - 1) return null;
-							return (
-								<text
-									x={xScale()(props.x(d))}
-									y={chartHeight() + 16}
-									text-anchor="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{formatShortDate(props.x(d))}
-								</text>
-							);
-						}}
-					</For>
-				</g>
+						{/* X-axis labels (show subset to avoid crowding) */}
+						<For each={props.data}>
+							{(d, i) => {
+								const n = props.data.length;
+								const step = Math.max(1, Math.floor(n / 8));
+								if (i() % step !== 0 && i() !== n - 1) return null;
+								return (
+									<text
+										x={xScale()(props.x(d))}
+										y={chartHeight() + 16}
+										text-anchor="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{formatShortDate(props.x(d))}
+									</text>
+								);
+							}}
+						</For>
+					</g>
 				</svg>
 			</div>
 		</Show>

@@ -1,35 +1,43 @@
-import { Wrench, MessageSquare, FileCode, ArrowUp, ArrowDown } from "lucide-solid";
-import { createMemo, For, Show, type Component } from "solid-js";
+import { ArrowDown, ArrowUp, FileCode, MessageSquare, Wrench } from "lucide-solid";
+import { type Component, createMemo, For, Show } from "solid-js";
 import type { AgentNode, DistilledSession } from "../../../shared/types";
 import { getTypeBadgeClass } from "../../lib/agent-colors";
-import { formatDuration, formatCost } from "../../lib/format";
-import { Card } from "../ui/Card";
-import { StatItem } from "../ui/StatItem";
-import { FileList, buildAgentFileRows } from "../FileList";
+import { formatCost, formatDuration } from "../../lib/format";
+import { buildAgentFileRows, FileList } from "../FileList";
 import { SplitPane } from "../SplitPane";
 import { SystemPromptPanel } from "../SystemPromptPanel";
+import { Card } from "../ui/Card";
+import { StatItem } from "../ui/StatItem";
 
 // ── Tool color palette ────────────────────────────────────────────────
 
 // Tool-category bar tints — token-derived graphite/green ramp, hairline-faint washes.
 const getToolColor = (toolName: string): string => {
 	const name = toolName.toLowerCase();
-	if (name.includes('read') || name.includes('file') || name.includes('glob')) return 'bg-[color-mix(in_srgb,var(--clens-brand)_10%,transparent)]';
-	if (name.includes('write') || name.includes('edit') || name.includes('notebook')) return 'bg-[color-mix(in_srgb,var(--clens-success)_12%,transparent)]';
-	if (name.includes('bash') || name.includes('terminal')) return 'bg-[color-mix(in_srgb,var(--clens-warning)_12%,transparent)]';
-	if (name.includes('search') || name.includes('grep')) return 'bg-[color-mix(in_srgb,var(--clens-muted)_14%,transparent)]';
-	if (name.includes('agent') || name.includes('task') || name.includes('send')) return 'bg-[color-mix(in_srgb,var(--clens-brand)_16%,transparent)]';
-	return 'bg-[color-mix(in_srgb,var(--clens-muted)_8%,transparent)]';
+	if (name.includes("read") || name.includes("file") || name.includes("glob"))
+		return "bg-[color-mix(in_srgb,var(--clens-brand)_10%,transparent)]";
+	if (name.includes("write") || name.includes("edit") || name.includes("notebook"))
+		return "bg-[color-mix(in_srgb,var(--clens-success)_12%,transparent)]";
+	if (name.includes("bash") || name.includes("terminal"))
+		return "bg-[color-mix(in_srgb,var(--clens-warning)_12%,transparent)]";
+	if (name.includes("search") || name.includes("grep"))
+		return "bg-[color-mix(in_srgb,var(--clens-muted)_14%,transparent)]";
+	if (name.includes("agent") || name.includes("task") || name.includes("send"))
+		return "bg-[color-mix(in_srgb,var(--clens-brand)_16%,transparent)]";
+	return "bg-[color-mix(in_srgb,var(--clens-muted)_8%,transparent)]";
 };
 
 const getToolBarColor = (toolName: string): string => {
 	const name = toolName.toLowerCase();
-	if (name.includes('read') || name.includes('file') || name.includes('glob')) return 'bg-brand-500';
-	if (name.includes('write') || name.includes('edit') || name.includes('notebook')) return 'bg-[var(--clens-success)]';
-	if (name.includes('bash') || name.includes('terminal')) return 'bg-[var(--clens-warning)]';
-	if (name.includes('search') || name.includes('grep')) return 'bg-muted';
-	if (name.includes('agent') || name.includes('task') || name.includes('send')) return 'bg-brand-500';
-	return 'bg-muted';
+	if (name.includes("read") || name.includes("file") || name.includes("glob"))
+		return "bg-brand-500";
+	if (name.includes("write") || name.includes("edit") || name.includes("notebook"))
+		return "bg-[var(--clens-success)]";
+	if (name.includes("bash") || name.includes("terminal")) return "bg-[var(--clens-warning)]";
+	if (name.includes("search") || name.includes("grep")) return "bg-muted";
+	if (name.includes("agent") || name.includes("task") || name.includes("send"))
+		return "bg-brand-500";
+	return "bg-muted";
 };
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -54,15 +62,15 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 			{/* Agent header card */}
 			<Card class="p-4">
 				<div class="flex items-center gap-3 mb-3">
-					<span class={`instrument-microcaps rounded-none px-1.5 py-0.5 text-[10px] leading-none ${getTypeBadgeClass(props.agent.agent_type)}`}>
+					<span
+						class={`instrument-microcaps rounded-none px-1.5 py-0.5 text-[10px] leading-none ${getTypeBadgeClass(props.agent.agent_type)}`}
+					>
 						{props.agent.agent_type}
 					</span>
 					<h2 class="text-sm font-semibold text-primary">
 						{props.agent.agent_name ?? props.agent.agent_type}
 					</h2>
-					<span class="text-xs font-mono text-muted">
-						{props.agent.session_id.slice(0, 12)}
-					</span>
+					<span class="text-xs font-mono text-muted">{props.agent.session_id.slice(0, 12)}</span>
 					<Show when={ghost()}>
 						<span class="instrument-microcaps inline-flex items-center gap-1 rounded-none border border-clens bg-surface-raised px-1.5 py-0.5 text-[10px] text-[var(--clens-warning)]">
 							<span class="instrument-led bg-[var(--clens-warning)]" />
@@ -74,16 +82,16 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 					{/* Agent duration_ms is idle-trimmed effective working time → "Active" */}
 					<StatItem label="Active" value={formatDuration(props.agent.duration_ms)} />
 					<StatItem label="Tool calls" value={String(props.agent.tool_call_count)} />
-					<Show when={props.agent.model}>
-						{(m) => <StatItem label="Model" value={m()} />}
-					</Show>
+					<Show when={props.agent.model}>{(m) => <StatItem label="Model" value={m()} />}</Show>
 					<Show when={props.agent.cost_estimate}>
 						{(c) => (
 							<StatItem
 								label="Cost"
 								value={formatCost(c().estimated_cost_usd, c().is_estimated)}
 								muted={c().is_estimated}
-								title={c().is_estimated ? "Estimated cost (real token data unavailable)" : undefined}
+								title={
+									c().is_estimated ? "Estimated cost (real token data unavailable)" : undefined
+								}
 							/>
 						)}
 					</Show>
@@ -105,11 +113,15 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 						<For each={props.agent.task_events ?? []}>
 							{(te) => (
 								<div class="flex items-center gap-2 py-0.5 text-xs">
-									<span class={`instrument-microcaps shrink-0 rounded-none border border-clens px-1.5 py-0.5 text-[10px] ${
-										te.action === "create" ? "bg-surface-raised text-[var(--clens-success)]"
-										: te.action === "complete" ? "bg-surface-raised text-brand-500"
-										: "bg-surface-muted text-muted"
-									}`}>
+									<span
+										class={`instrument-microcaps shrink-0 rounded-none border border-clens px-1.5 py-0.5 text-[10px] ${
+											te.action === "create"
+												? "bg-surface-raised text-[var(--clens-success)]"
+												: te.action === "complete"
+													? "bg-surface-raised text-brand-500"
+													: "bg-surface-muted text-muted"
+										}`}
+									>
 										{te.action}
 									</span>
 									<Show when={te.owner}>
@@ -191,7 +203,9 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 								<div class="flex items-center justify-between py-0.5">
 									<span class="text-xs font-mono truncate text-muted">{cp.name}</span>
 									<span class="text-xs tabular-nums text-muted">
-										{cp.sent_count}<ArrowUp class="inline h-2.5 w-2.5" /> {cp.received_count}<ArrowDown class="inline h-2.5 w-2.5" />
+										{cp.sent_count}
+										<ArrowUp class="inline h-2.5 w-2.5" /> {cp.received_count}
+										<ArrowDown class="inline h-2.5 w-2.5" />
 									</span>
 								</div>
 							)}
@@ -217,10 +231,7 @@ const AgentCenterContent: Component<{ readonly agent: AgentNode }> = (props) => 
 // ── Main component ──────────────────────────────────────────────────
 
 export const AgentPanel: Component<AgentPanelProps> = (props) => (
-	<Show
-		when={props.agent.task_prompt}
-		fallback={<AgentCenterContent agent={props.agent} />}
-	>
+	<Show when={props.agent.task_prompt} fallback={<AgentCenterContent agent={props.agent} />}>
 		<SplitPane
 			id="agent-sysprompt"
 			direction="horizontal"

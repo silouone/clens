@@ -1,10 +1,5 @@
 import type { AgentNode, EditChain, SessionSummary } from "../types";
-import {
-	flattenAgents,
-	formatDuration,
-	formatSessionDate,
-	sanitizeAgentName,
-} from "../utils";
+import { flattenAgents, formatDuration, formatSessionDate, sanitizeAgentName } from "../utils";
 import {
 	ansi,
 	formatAttributedDiff,
@@ -215,7 +210,10 @@ export const formatAgentDetail = (agent: AgentNode): readonly string[] => {
 		? (() => {
 				const prefix = agent.cost_estimate.is_estimated ? "~" : "";
 				const label = agent.cost_estimate.is_estimated ? " (rough estimate)" : "";
-				return [ansi.bold(`Cost:${label}`), `  Total: ${prefix}$${agent.cost_estimate.estimated_cost_usd.toFixed(2)}`];
+				return [
+					ansi.bold(`Cost:${label}`),
+					`  Total: ${prefix}$${agent.cost_estimate.estimated_cost_usd.toFixed(2)}`,
+				];
 			})()
 		: [];
 

@@ -44,7 +44,14 @@ describe("nameCommand", () => {
 	test("setting a label makes it the display name (AC7)", () => {
 		const sid = "bbbb1111-2222-3333";
 		const dir = setupProject(sid, "Fix the analyze session button");
-		nameCommand({ sessionArg: "bbbb", projectDir: dir, label: "Auth refactor", color: "amber", clear: false, json: false });
+		nameCommand({
+			sessionArg: "bbbb",
+			projectDir: dir,
+			label: "Auth refactor",
+			color: "amber",
+			clear: false,
+			json: false,
+		});
 		const meta = readSessionMeta(dir)[sid];
 		expect(meta?.label).toBe("Auth refactor");
 		expect(meta?.color).toBe("amber");
@@ -57,8 +64,22 @@ describe("nameCommand", () => {
 	test("--clear reverts to computed name and unflags (AC7)", () => {
 		const sid = "cccc1111-2222-3333";
 		const dir = setupProject(sid, "Implement plan drift view");
-		nameCommand({ sessionArg: "cccc", projectDir: dir, label: "Temp", color: "blue", clear: false, json: false });
-		nameCommand({ sessionArg: "cccc", projectDir: dir, label: undefined, color: undefined, clear: true, json: false });
+		nameCommand({
+			sessionArg: "cccc",
+			projectDir: dir,
+			label: "Temp",
+			color: "blue",
+			clear: false,
+			json: false,
+		});
+		nameCommand({
+			sessionArg: "cccc",
+			projectDir: dir,
+			label: undefined,
+			color: undefined,
+			clear: true,
+			json: false,
+		});
 		expect(readSessionMeta(dir)[sid]).toBeUndefined();
 		const row = resolveRow(dir, sid);
 		expect(row?.display_name).toBe("Implement plan drift view");
@@ -70,7 +91,14 @@ describe("nameCommand", () => {
 		const sid = "dddd1111-2222-3333";
 		const dir = setupProject(sid, "Hello");
 		expect(() =>
-			nameCommand({ sessionArg: "dddd", projectDir: dir, label: undefined, color: "rainbow", clear: false, json: false }),
+			nameCommand({
+				sessionArg: "dddd",
+				projectDir: dir,
+				label: undefined,
+				color: "rainbow",
+				clear: false,
+				json: false,
+			}),
 		).toThrow();
 		expect(readSessionMeta(dir)[sid]).toBeUndefined();
 	});
@@ -78,7 +106,14 @@ describe("nameCommand", () => {
 	test("label survives when raw session data is removed (AC5)", () => {
 		const sid = "eeee1111-2222-3333";
 		const dir = setupProject(sid, "Hello");
-		nameCommand({ sessionArg: "eeee", projectDir: dir, label: "Keeper", color: "green", clear: false, json: false });
+		nameCommand({
+			sessionArg: "eeee",
+			projectDir: dir,
+			label: "Keeper",
+			color: "green",
+			clear: false,
+			json: false,
+		});
 		// Simulate `clens clean`: remove the raw session JSONL only.
 		rmSync(join(dir, ".clens", "sessions", `${sid}.jsonl`));
 		const meta = readSessionMeta(dir)[sid];

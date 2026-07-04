@@ -52,8 +52,7 @@ type VerdictInput = {
 /** Pull the structural verdict inputs out of a distilled session. */
 export const verdictInput = (session: DistilledSession): VerdictInput => ({
 	complete: session.complete,
-	filesModified: session.file_map.files.filter((f) => f.edits > 0 || f.writes > 0)
-		.length,
+	filesModified: session.file_map.files.filter((f) => f.edits > 0 || f.writes > 0).length,
 	commits: session.git_diff.commits.length,
 	workingTreeChanges: session.git_diff.working_tree_changes?.length ?? 0,
 	failureRate: session.stats.failure_rate,
@@ -61,8 +60,7 @@ export const verdictInput = (session: DistilledSession): VerdictInput => ({
 
 /** PURE: derive the outcome verdict from structural inputs. */
 export const deriveVerdict = (input: VerdictInput): Verdict => {
-	const producedWork =
-		input.filesModified > 0 || input.commits > 0 || input.workingTreeChanges > 0;
+	const producedWork = input.filesModified > 0 || input.commits > 0 || input.workingTreeChanges > 0;
 
 	const make = (level: VerdictLevel, label: string, detail: string): Verdict => ({
 		level,
@@ -82,11 +80,7 @@ export const deriveVerdict = (input: VerdictInput): Verdict => {
 		);
 	}
 	if (!producedWork) {
-		return make(
-			"partial",
-			"No changes landed",
-			"Completed without modifying files or committing.",
-		);
+		return make("partial", "No changes landed", "Completed without modifying files or committing.");
 	}
 	return make("success", "Completed", "Finished and produced changes.");
 };

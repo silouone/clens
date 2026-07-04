@@ -1,6 +1,6 @@
-import { Show, createMemo, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
+import { type Component, createMemo, Show } from "solid-js";
 import { MetaRow } from "../../ui/MetaRow";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── OutcomeWidget [outcome] — what landed on disk ────────────────────
@@ -73,10 +73,7 @@ export const OutcomeWidget: Component<WidgetProps> = (props) => {
 										"background-color": "var(--clens-success)",
 									}}
 								/>
-								<div
-									class="h-full flex-1"
-									style={{ "background-color": "var(--clens-danger)" }}
-								/>
+								<div class="h-full flex-1" style={{ "background-color": "var(--clens-danger)" }} />
 							</div>
 							<div class="instrument-microcaps mt-1 flex justify-between text-[9px] text-muted">
 								<span>Additions</span>

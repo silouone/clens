@@ -1,9 +1,8 @@
+import { enrichSessionSummaries, listSessions } from "../session/read";
+import { readSessionMeta, setSessionMeta } from "../session/session-meta";
 import type { ColorName } from "../types";
 import { isColorName } from "../types";
-import { readSessionMeta, setSessionMeta } from "../session/session-meta";
-import { enrichSessionSummaries, listSessions } from "../session/read";
-import { resolveSessionId } from "./shared";
-import { bold, cyan, dim, green } from "./shared";
+import { bold, cyan, dim, green, resolveSessionId } from "./shared";
 
 export interface NameCommandArgs {
 	readonly sessionArg: string | undefined;
@@ -43,7 +42,9 @@ const printCurrent = (sessionId: string, projectDir: string, json: boolean): voi
 	}
 
 	console.log(`${bold("Session")} ${cyan(sessionId.slice(0, 8))}`);
-	console.log(`  ${dim("name")}    ${summary?.display_name ?? sessionId.slice(0, 8)} ${dim(`(${summary?.name_source ?? "id"})`)}`);
+	console.log(
+		`  ${dim("name")}    ${summary?.display_name ?? sessionId.slice(0, 8)} ${dim(`(${summary?.name_source ?? "id"})`)}`,
+	);
 	console.log(`  ${dim("label")}   ${meta?.label ?? dim("—")}`);
 	console.log(`  ${dim("color")}   ${meta?.color ?? dim("none")}`);
 };

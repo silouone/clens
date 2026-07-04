@@ -1,4 +1,3 @@
-import type { Component } from "solid-js";
 import {
 	Activity,
 	AlertTriangle,
@@ -9,6 +8,7 @@ import {
 	Pencil,
 	Users,
 } from "lucide-solid";
+import type { Component } from "solid-js";
 
 // ── Detail-view tab ids ──────────────────────────────────────────────
 //

@@ -171,9 +171,13 @@ const collapsedTimelineLength = (entries: readonly TimelineEntry[]): number =>
 		if (i === 0) return 1;
 		const prev = entries[i - 1];
 		if (
-			prev && prev.type === "tool_call" && entry.type === "tool_call" &&
-			prev.tool_name === entry.tool_name && prev.agent_name === entry.agent_name
-		) return count;
+			prev &&
+			prev.type === "tool_call" &&
+			entry.type === "tool_call" &&
+			prev.tool_name === entry.tool_name &&
+			prev.agent_name === entry.agent_name
+		)
+			return count;
 		return count + 1;
 	}, 0);
 

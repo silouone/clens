@@ -21,8 +21,10 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 		if (failEvent.event !== "PostToolUseFailure") return [];
 		if (failEvent.data.is_interrupt) return [];
 
-		const failToolName = typeof failEvent.data.tool_name === "string" ? failEvent.data.tool_name : "";
-		const failToolId = typeof failEvent.data.tool_use_id === "string" ? failEvent.data.tool_use_id : "";
+		const failToolName =
+			typeof failEvent.data.tool_name === "string" ? failEvent.data.tool_name : "";
+		const failToolId =
+			typeof failEvent.data.tool_use_id === "string" ? failEvent.data.tool_use_id : "";
 
 		const retryEvent = events
 			.slice(i + 1, Math.min(i + 10, events.length))
@@ -30,7 +32,8 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 
 		if (!retryEvent) return [];
 
-		const retryToolId = typeof retryEvent.data.tool_use_id === "string" ? retryEvent.data.tool_use_id : "";
+		const retryToolId =
+			typeof retryEvent.data.tool_use_id === "string" ? retryEvent.data.tool_use_id : "";
 		return [
 			{
 				type: "failure_retry",
@@ -50,8 +53,7 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 	const editsByFile = events
 		.filter(
 			(e) =>
-				e.event === "PreToolUse" &&
-				(e.data.tool_name === "Edit" || e.data.tool_name === "Write"),
+				e.event === "PreToolUse" && (e.data.tool_name === "Edit" || e.data.tool_name === "Write"),
 		)
 		.reduce((acc, event) => {
 			const filePath = extractFilePath(event);
@@ -60,7 +62,10 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 			const existing = acc.get(filePath) ?? [];
 			return new Map(acc).set(filePath, [
 				...existing,
-				{ t: event.t, tool_use_id: typeof event.data.tool_use_id === "string" ? event.data.tool_use_id : "" },
+				{
+					t: event.t,
+					tool_use_id: typeof event.data.tool_use_id === "string" ? event.data.tool_use_id : "",
+				},
 			]);
 		}, new Map<string, Array<{ t: number; tool_use_id: string }>>());
 
@@ -140,16 +145,37 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 				// PostToolUseFailure events still belong to the loop (they advance endT and
 				// tracking) but are not double-counted as separate attempts.
 				return entry.event.event === "PreToolUse"
-					? { ...acc, items: [...acc.items, entry], lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t }
-					: { ...acc, lastT: entry.event.t, lastIndex: entry.index, endT: entry.event.t, sawSubsequentFailure: true };
+					? {
+							...acc,
+							items: [...acc.items, entry],
+							lastT: entry.event.t,
+							lastIndex: entry.index,
+							endT: entry.event.t,
+						}
+					: {
+							...acc,
+							lastT: entry.event.t,
+							lastIndex: entry.index,
+							endT: entry.event.t,
+							sawSubsequentFailure: true,
+						};
 			},
-			{ items: [], stopped: false, lastT: bashEntry.event.t, lastIndex: bashEntry.index, endT: bashEntry.event.t, sawSubsequentFailure: false },
+			{
+				items: [],
+				stopped: false,
+				lastT: bashEntry.event.t,
+				lastIndex: bashEntry.index,
+				endT: bashEntry.event.t,
+				sawSubsequentFailure: false,
+			},
 		);
 		const consecutiveBash = walk.items;
 
 		const debugAttempts = [
 			typeof bashEntry.event.data.tool_use_id === "string" ? bashEntry.event.data.tool_use_id : "",
-			...consecutiveBash.map((entry) => typeof entry.event.data.tool_use_id === "string" ? entry.event.data.tool_use_id : ""),
+			...consecutiveBash.map((entry) =>
+				typeof entry.event.data.tool_use_id === "string" ? entry.event.data.tool_use_id : "",
+			),
 		];
 
 		// A debugging loop must be a *loop*: the initial failure plus at least one
@@ -176,19 +202,19 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 	});
 
 	// Dedup overlapping debugging_loops: keep only the earliest (largest) loop when PreToolUse IDs overlap
-	const loopSets: readonly ReadonlySet<string>[] = debuggingLoops.map((l) => new Set(l.tool_use_ids));
-	const dedupedDebugLoops = debuggingLoops.filter((loop, idx) =>
-		!debuggingLoops.some(
-			(_, otherIdx) =>
-				otherIdx < idx &&
-				loop.tool_use_ids.slice(1).every((id) => loopSets[otherIdx].has(id)),
-		),
+	const loopSets: readonly ReadonlySet<string>[] = debuggingLoops.map(
+		(l) => new Set(l.tool_use_ids),
+	);
+	const dedupedDebugLoops = debuggingLoops.filter(
+		(loop, idx) =>
+			!debuggingLoops.some(
+				(_, otherIdx) =>
+					otherIdx < idx && loop.tool_use_ids.slice(1).every((id) => loopSets[otherIdx].has(id)),
+			),
 	);
 
 	// Dedup: remove failure_retry entries whose tool_use_ids are a subset of a debugging_loop
-	const debuggingLoopIds = new Set(
-		dedupedDebugLoops.flatMap((dl) => dl.tool_use_ids),
-	);
+	const debuggingLoopIds = new Set(dedupedDebugLoops.flatMap((dl) => dl.tool_use_ids));
 
 	const dedupedRetries = failureRetries.filter(
 		(fr) => !fr.tool_use_ids.every((id) => debuggingLoopIds.has(id)),

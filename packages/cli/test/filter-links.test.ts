@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { buildTeamMemberSessionMap, filterLinksForSession } from "../src/utils";
 import type {
 	ConfigChangeLink,
 	LinkEvent,
@@ -12,6 +11,7 @@ import type {
 	TeamLink,
 	TeammateIdleLink,
 } from "../src/types";
+import { buildTeamMemberSessionMap, filterLinksForSession } from "../src/utils";
 
 // -- Fixture factories --
 
@@ -24,9 +24,7 @@ const makeSpawn = (
 	...overrides,
 });
 
-const makeStop = (
-	overrides: Partial<StopLink> & { agent_id: string },
-): StopLink => ({
+const makeStop = (overrides: Partial<StopLink> & { agent_id: string }): StopLink => ({
 	t: Date.now(),
 	type: "stop",
 	parent_session: "root",
@@ -42,9 +40,7 @@ const makeMessage = (
 	...overrides,
 });
 
-const makeTask = (
-	overrides: Partial<TaskLink> & { session_id: string },
-): TaskLink => ({
+const makeTask = (overrides: Partial<TaskLink> & { session_id: string }): TaskLink => ({
 	t: Date.now(),
 	type: "task",
 	action: "create",
@@ -69,9 +65,7 @@ const makeTeammateIdle = (
 	...overrides,
 });
 
-const makeTeam = (
-	overrides: Partial<TeamLink> & { leader_session: string },
-): TeamLink => ({
+const makeTeam = (overrides: Partial<TeamLink> & { leader_session: string }): TeamLink => ({
 	t: Date.now(),
 	type: "team",
 	team_name: "test-team",
@@ -169,8 +163,15 @@ describe("filterLinksForSession", () => {
 		const otherStop = makeStop({ t: 5000, parent_session: otherRootId, agent_id: otherChildId });
 
 		const links: readonly LinkEvent[] = [
-			spawnChild, stopChild, teamLink, taskLink, msgFromChild, endLink,
-			otherSpawn, otherTask, otherStop,
+			spawnChild,
+			stopChild,
+			teamLink,
+			taskLink,
+			msgFromChild,
+			endLink,
+			otherSpawn,
+			otherTask,
+			otherStop,
 		];
 
 		const result = filterLinksForSession(rootId, links);
@@ -207,7 +208,11 @@ describe("filterLinksForSession", () => {
 		const endRoot = makeSessionEnd({ t: 6000, session: rootId });
 
 		const links: readonly LinkEvent[] = [
-			spawnChild, spawnGrandchild, stopGrandchild, stopChild, endRoot,
+			spawnChild,
+			spawnGrandchild,
+			stopGrandchild,
+			stopChild,
+			endRoot,
 		];
 
 		const result = filterLinksForSession(rootId, links);
@@ -247,7 +252,11 @@ describe("filterLinksForSession", () => {
 		const foreignIdle = makeTeammateIdle({ t: 4000, teammate: "foreign-builder" });
 
 		const links: readonly LinkEvent[] = [
-			spawnChild, taskComplete, idle, foreignTaskComplete, foreignIdle,
+			spawnChild,
+			taskComplete,
+			idle,
+			foreignTaskComplete,
+			foreignIdle,
 		];
 
 		const result = filterLinksForSession(rootId, links);
@@ -337,7 +346,11 @@ describe("filterLinksForSession", () => {
 		});
 
 		const links: readonly LinkEvent[] = [
-			spawnChild, msgFromChild, msgFromRoot, msgToChild, foreignMsg,
+			spawnChild,
+			msgFromChild,
+			msgFromRoot,
+			msgToChild,
+			foreignMsg,
 		];
 
 		const result = filterLinksForSession(rootId, links);
@@ -455,7 +468,12 @@ describe("filterLinksForSession", () => {
 		const foreignEnd = makeSessionEnd({ t: 6000, session: "foreign-sess" });
 
 		const links: readonly LinkEvent[] = [
-			spawnChild, idleLink, tmSessionEnd, tmTask, tmMsg, foreignEnd,
+			spawnChild,
+			idleLink,
+			tmSessionEnd,
+			tmTask,
+			tmMsg,
+			foreignEnd,
 		];
 
 		const result = filterLinksForSession(rootId, links);
@@ -496,9 +514,7 @@ describe("filterLinksForSession", () => {
 			session_id: teammateSessionId,
 		});
 
-		const links: readonly LinkEvent[] = [
-			msgToTeammate, idleLink, tmEnd, tmTaskComplete,
-		];
+		const links: readonly LinkEvent[] = [msgToTeammate, idleLink, tmEnd, tmTaskComplete];
 
 		const result = filterLinksForSession(rootId, links);
 		expect(result).toContain(msgToTeammate);
@@ -532,9 +548,7 @@ describe("filterLinksForSession", () => {
 		// Links from the other team member's session
 		const otherTmEnd = makeSessionEnd({ t: 5000, session: otherTeammateSessionId });
 
-		const links: readonly LinkEvent[] = [
-			spawnOtherChild, otherIdleLink, otherTmEnd,
-		];
+		const links: readonly LinkEvent[] = [spawnOtherChild, otherIdleLink, otherTmEnd];
 
 		const result = filterLinksForSession(rootId, links);
 		expect(result).not.toContain(spawnOtherChild);
@@ -577,7 +591,12 @@ describe("filterLinksForSession", () => {
 		const rootEnd = makeSessionEnd({ t: 6000, session: rootId });
 
 		const links: readonly LinkEvent[] = [
-			spawnChild, spawnGrandchild, idleLink, gcEnd, tmEnd, rootEnd,
+			spawnChild,
+			spawnGrandchild,
+			idleLink,
+			gcEnd,
+			tmEnd,
+			rootEnd,
 		];
 
 		const result = filterLinksForSession(rootId, links);

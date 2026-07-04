@@ -1,5 +1,5 @@
-import { createSignal, Show, type Component } from "solid-js";
-import { Clipboard, Check } from "lucide-solid";
+import { Check, Clipboard } from "lucide-solid";
+import { type Component, createSignal, Show } from "solid-js";
 import { renderMarkdown } from "../lib/markdown";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -27,11 +27,10 @@ export const SystemPromptPanel: Component<SystemPromptPanelProps> = (props) => {
 	return (
 		<div class="flex flex-col h-full">
 			<div class="flex items-center justify-between px-4 py-2 border-b border-clens">
-				<h3 class="instrument-microcaps text-[11px] text-muted">
-					System Prompt
-				</h3>
+				<h3 class="instrument-microcaps text-[11px] text-muted">System Prompt</h3>
 				<Show when={props.prompt}>
 					<button
+						type="button"
 						onClick={handleCopy}
 						class="flex items-center gap-1 rounded-none border border-clens px-1.5 py-0.5 text-[11px] text-muted transition hover:bg-surface-hover hover:text-secondary"
 						title="Copy to clipboard"

@@ -1,20 +1,23 @@
-import { createMemo, For, onCleanup, Show, type Component } from "solid-js";
 import { Keyboard } from "lucide-solid";
+import { type Component, createMemo, For, onCleanup, Show } from "solid-js";
+import { activeShortcuts, GLOBAL_SHORTCUTS, setShowHelp, showHelp } from "../lib/keyboard";
 import { KbdShortcut } from "./ui/KbdShortcut";
-import { showHelp, setShowHelp, activeShortcuts, GLOBAL_SHORTCUTS } from "../lib/keyboard";
 
 // ── Group shortcuts by context ──────────────────────────────────────
 
-type GroupedShortcuts = readonly { readonly context: string; readonly entries: readonly typeof GLOBAL_SHORTCUTS[number][] }[];
+type GroupedShortcuts = readonly {
+	readonly context: string;
+	readonly entries: readonly (typeof GLOBAL_SHORTCUTS)[number][];
+}[];
 
 const groupByContext = (
-	shortcuts: readonly typeof GLOBAL_SHORTCUTS[number][],
+	shortcuts: readonly (typeof GLOBAL_SHORTCUTS)[number][],
 ): GroupedShortcuts =>
 	Array.from(
 		shortcuts.reduce((map, s) => {
 			const existing = map.get(s.context) ?? [];
 			return new Map(map).set(s.context, [...existing, s]);
-		}, new Map<string, readonly typeof GLOBAL_SHORTCUTS[number][]>()),
+		}, new Map<string, readonly (typeof GLOBAL_SHORTCUTS)[number][]>()),
 	).map(([context, entries]) => ({ context, entries }));
 
 // ── Component ───────────────────────────────────────────────────────
@@ -75,12 +78,14 @@ export const KeyboardHelp: Component = () => {
 						aria-modal="true"
 						aria-labelledby="keyboard-help-title"
 						class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-						onClick={() => setShowHelp(false)}
+						onClick={(e) => {
+							if (e.target === e.currentTarget) setShowHelp(false);
+						}}
+						onKeyDown={(e) => {
+							if (e.key === "Escape") setShowHelp(false);
+						}}
 					>
-						<div
-							class="w-full max-w-md rounded-none border border-clens bg-surface-raised p-6"
-							onClick={(e) => e.stopPropagation()}
-						>
+						<div class="w-full max-w-md rounded-none border border-clens bg-surface-raised p-6">
 							<div class="flex items-center justify-between border-b border-clens pb-3">
 								<h2
 									id="keyboard-help-title"
@@ -89,6 +94,7 @@ export const KeyboardHelp: Component = () => {
 									<Keyboard class="h-4 w-4" /> Keyboard Shortcuts
 								</h2>
 								<button
+									type="button"
 									ref={closeButtonRef}
 									onClick={() => setShowHelp(false)}
 									class="rounded-none border border-clens px-1.5 py-0.5 font-mono text-[10px] text-muted transition hover:bg-surface-hover hover:text-secondary"

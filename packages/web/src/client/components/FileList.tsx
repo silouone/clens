@@ -1,8 +1,14 @@
 import { html } from "diff2html";
 import { ChevronRight } from "lucide-solid";
-import { createMemo, createSignal, For, Show, type Component } from "solid-js";
-import type { AgentNode, DiffLine, DistilledSession, FileMapEntry, RiskLevel } from "../../shared/types";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import { isFilePath } from "../../shared/paths";
+import type {
+	AgentNode,
+	DiffLine,
+	DistilledSession,
+	FileMapEntry,
+	RiskLevel,
+} from "../../shared/types";
 import { diffLinesToUnified } from "../lib/diff-utils";
 import { riskBadgeClass } from "../lib/risk";
 
@@ -138,6 +144,7 @@ export const FileList: Component<FileListProps> = (props) => {
 				</div>
 				<Show when={props.rows.length > 0}>
 					<button
+						type="button"
 						onClick={toggleAll}
 						class="instrument-microcaps rounded-none border border-clens px-2 py-0.5 text-[10px] text-muted transition hover:bg-surface-hover hover:text-secondary"
 					>
@@ -152,7 +159,9 @@ export const FileList: Component<FileListProps> = (props) => {
 				fallback={
 					<div class="flex flex-col items-center gap-1 py-8 text-center">
 						<span class="instrument-microcaps text-[10px] text-muted">No data</span>
-						<span class="text-xs text-muted">{props.emptyMessage ?? "No file changes detected"}</span>
+						<span class="text-xs text-muted">
+							{props.emptyMessage ?? "No file changes detected"}
+						</span>
 					</div>
 				}
 			>
@@ -170,6 +179,7 @@ export const FileList: Component<FileListProps> = (props) => {
 							return (
 								<div class="border-b border-clens last:border-0 overflow-hidden">
 									<button
+										type="button"
 										onClick={() => toggleFile(row.filePath)}
 										class="flex w-full items-center gap-2 px-4 py-1.5 text-xs text-left transition hover:bg-surface-hover"
 									>
@@ -182,10 +192,7 @@ export const FileList: Component<FileListProps> = (props) => {
 												title={`${row.riskLevel} risk`}
 											/>
 										</Show>
-										<span
-											class="flex-1 truncate font-mono text-secondary"
-											title={row.filePath}
-										>
+										<span class="flex-1 truncate font-mono text-secondary" title={row.filePath}>
 											{truncatePath(row.filePath)}
 										</span>
 										<Show when={row.reads > 0}>
@@ -199,12 +206,18 @@ export const FileList: Component<FileListProps> = (props) => {
 											</span>
 										</Show>
 										<Show when={row.additions > 0}>
-											<span class="font-mono text-[var(--clens-success)] tabular-nums" title="lines added">
+											<span
+												class="font-mono text-[var(--clens-success)] tabular-nums"
+												title="lines added"
+											>
 												+{row.additions}
 											</span>
 										</Show>
 										<Show when={row.deletions > 0}>
-											<span class="font-mono text-[var(--clens-danger)] tabular-nums" title="lines removed">
+											<span
+												class="font-mono text-[var(--clens-danger)] tabular-nums"
+												title="lines removed"
+											>
 												-{row.deletions}
 											</span>
 										</Show>
@@ -218,9 +231,7 @@ export const FileList: Component<FileListProps> = (props) => {
 												when={row.diffLines.length > 0}
 												fallback={
 													<div class="px-4 py-4 text-center text-xs text-muted">
-														{row.edits > 0
-															? "Diff not captured"
-															: "Read only \u2014 no changes"}
+														{row.edits > 0 ? "Diff not captured" : "Read only \u2014 no changes"}
 													</div>
 												}
 											>

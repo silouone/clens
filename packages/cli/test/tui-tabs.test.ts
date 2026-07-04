@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { stripAnsi } from "../src/commands/tui-formatters";
 import {
+	type CollapsedEntry,
 	collapseConsecutive,
 	formatBacktracksTab,
 	formatCollapsedEntry,
@@ -14,9 +16,7 @@ import {
 	formatSwimLaneEntry,
 	formatTimelineEntry,
 	formatTimelineTab,
-	type CollapsedEntry,
 } from "../src/commands/tui-tabs";
-import { stripAnsi } from "../src/commands/tui-formatters";
 import type {
 	AgentNode,
 	BacktrackResult,
@@ -264,7 +264,13 @@ describe("formatOverviewTab", () => {
 					backtrack_count: 0,
 				},
 				agent_workload: [
-					{ name: "builder-a", id: "abc12345", tool_calls: 100, files_modified: 10, duration_ms: 300000 },
+					{
+						name: "builder-a",
+						id: "abc12345",
+						tool_calls: 100,
+						files_modified: 10,
+						duration_ms: 300000,
+					},
 				],
 			},
 		});
@@ -279,7 +285,12 @@ describe("formatOverviewTab", () => {
 		const session = makeSummary();
 		const distilled = makeDistilled({
 			decisions: [
-				{ type: "timing_gap" as const, t: 1000, gap_ms: 5000, classification: "user_idle" as const },
+				{
+					type: "timing_gap" as const,
+					t: 1000,
+					gap_ms: 5000,
+					classification: "user_idle" as const,
+				},
 			],
 			summary: {
 				narrative: "Test",
@@ -420,8 +431,21 @@ describe("formatBacktracksTab", () => {
 	test("shows backtrack count and details", () => {
 		const distilled = makeDistilled({
 			backtracks: [
-				makeBacktrack({ type: "failure_retry", file_path: "src/a.ts", attempts: 3, start_t: 1000, end_t: 5000 }),
-				makeBacktrack({ type: "debugging_loop", file_path: "src/b.ts", attempts: 5, start_t: 6000, end_t: 12000, error_message: "Type error" }),
+				makeBacktrack({
+					type: "failure_retry",
+					file_path: "src/a.ts",
+					attempts: 3,
+					start_t: 1000,
+					end_t: 5000,
+				}),
+				makeBacktrack({
+					type: "debugging_loop",
+					file_path: "src/b.ts",
+					attempts: 5,
+					start_t: 6000,
+					end_t: 12000,
+					error_message: "Type error",
+				}),
 			],
 		});
 		const lines = formatBacktracksTab(distilled);
@@ -446,9 +470,7 @@ describe("formatBacktracksTab", () => {
 				failure_rate: 0.06,
 				unique_files: [],
 			},
-			backtracks: [
-				makeBacktrack({ start_t: 0, end_t: 5000 }),
-			],
+			backtracks: [makeBacktrack({ start_t: 0, end_t: 5000 })],
 		});
 		const lines = formatBacktracksTab(distilled);
 		expect(lines.some((l) => l.includes("50.0%"))).toBe(true);
@@ -479,7 +501,9 @@ describe("formatReasoningTab", () => {
 		expect(lines.some((l) => l.includes("planning") && l.includes("2"))).toBe(true);
 		expect(lines.some((l) => l.includes("debugging") && l.includes("1"))).toBe(true);
 		expect(lines.some((l) => l.includes("All entries:"))).toBe(true);
-		expect(lines.some((l) => l.includes("[planning]") && l.includes("Planning the architecture"))).toBe(true);
+		expect(
+			lines.some((l) => l.includes("[planning]") && l.includes("Planning the architecture")),
+		).toBe(true);
 	});
 
 	test("uses 'general' for entries without intent_hint", () => {
@@ -631,56 +655,102 @@ describe("formatGraphTab", () => {
 
 describe("formatDecisionDetail", () => {
 	test("formats timing_gap", () => {
-		const d: DecisionPoint = { type: "timing_gap", t: 1000, gap_ms: 5000, classification: "user_idle" };
+		const d: DecisionPoint = {
+			type: "timing_gap",
+			t: 1000,
+			gap_ms: 5000,
+			classification: "user_idle",
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("gap");
 		expect(result).toContain("user_idle");
 	});
 
 	test("formats tool_pivot", () => {
-		const d: DecisionPoint = { type: "tool_pivot", t: 1000, from_tool: "Read", to_tool: "Edit", after_failure: true };
+		const d: DecisionPoint = {
+			type: "tool_pivot",
+			t: 1000,
+			from_tool: "Read",
+			to_tool: "Edit",
+			after_failure: true,
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("Read -> Edit");
 		expect(result).toContain("after failure");
 	});
 
 	test("formats tool_pivot without failure", () => {
-		const d: DecisionPoint = { type: "tool_pivot", t: 1000, from_tool: "Bash", to_tool: "Read", after_failure: false };
+		const d: DecisionPoint = {
+			type: "tool_pivot",
+			t: 1000,
+			from_tool: "Bash",
+			to_tool: "Read",
+			after_failure: false,
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("Bash -> Read");
 		expect(result).not.toContain("after failure");
 	});
 
 	test("formats phase_boundary", () => {
-		const d: DecisionPoint = { type: "phase_boundary", t: 1000, phase_name: "Implementation", phase_index: 1 };
+		const d: DecisionPoint = {
+			type: "phase_boundary",
+			t: 1000,
+			phase_name: "Implementation",
+			phase_index: 1,
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("phase 2");
 		expect(result).toContain("Implementation");
 	});
 
 	test("formats agent_spawn", () => {
-		const d: DecisionPoint = { type: "agent_spawn", t: 1000, agent_id: "a1", agent_name: "builder-a", agent_type: "builder", parent_session: "root" };
+		const d: DecisionPoint = {
+			type: "agent_spawn",
+			t: 1000,
+			agent_id: "a1",
+			agent_name: "builder-a",
+			agent_type: "builder",
+			parent_session: "root",
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("spawned builder-a");
 		expect(result).toContain("builder");
 	});
 
 	test("formats task_delegation", () => {
-		const d: DecisionPoint = { type: "task_delegation", t: 1000, task_id: "t1", agent_name: "builder-a", subject: "Build types" };
+		const d: DecisionPoint = {
+			type: "task_delegation",
+			t: 1000,
+			task_id: "t1",
+			agent_name: "builder-a",
+			subject: "Build types",
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("delegated to builder-a");
 		expect(result).toContain("Build types");
 	});
 
 	test("formats task_delegation without subject", () => {
-		const d: DecisionPoint = { type: "task_delegation", t: 1000, task_id: "t1", agent_name: "builder-a" };
+		const d: DecisionPoint = {
+			type: "task_delegation",
+			t: 1000,
+			task_id: "t1",
+			agent_name: "builder-a",
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("delegated to builder-a");
 		expect(result).not.toContain(":");
 	});
 
 	test("formats task_completion", () => {
-		const d: DecisionPoint = { type: "task_completion", t: 1000, task_id: "t1", agent_name: "builder-a", subject: "Done" };
+		const d: DecisionPoint = {
+			type: "task_completion",
+			t: 1000,
+			task_id: "t1",
+			agent_name: "builder-a",
+			subject: "Done",
+		};
 		const result = formatDecisionDetail(d);
 		expect(result).toContain("completed by builder-a");
 		expect(result).toContain("Done");
@@ -731,7 +801,13 @@ describe("formatDecisionsTabFull", () => {
 			{ type: "timing_gap", t: 1000, gap_ms: 60000, classification: "session_pause" },
 			{ type: "tool_pivot", t: 2000, from_tool: "Bash", to_tool: "Edit", after_failure: true },
 			{ type: "phase_boundary", t: 3000, phase_name: "Review", phase_index: 2 },
-			{ type: "task_delegation", t: 4000, task_id: "t1", agent_name: "validator", subject: "Run tests" },
+			{
+				type: "task_delegation",
+				t: 4000,
+				task_id: "t1",
+				agent_name: "validator",
+				subject: "Run tests",
+			},
 		];
 		const lines = formatDecisionsTabFull(decisions);
 		const joined = lines.join("\n");
@@ -810,14 +886,24 @@ describe("formatTimelineEntry", () => {
 	});
 
 	test("includes content_preview when present", () => {
-		const entry = makeTimelineEntry({ t: 1000, type: "tool_call", tool_name: "Read", content_preview: "Reading file.ts" });
+		const entry = makeTimelineEntry({
+			t: 1000,
+			type: "tool_call",
+			tool_name: "Read",
+			content_preview: "Reading file.ts",
+		});
 		const result = formatTimelineEntry(entry);
 		expect(result).toContain("Reading file.ts");
 	});
 
 	test("truncates long content_preview", () => {
 		const longPreview = "A".repeat(80);
-		const entry = makeTimelineEntry({ t: 1000, type: "tool_call", tool_name: "Read", content_preview: longPreview });
+		const entry = makeTimelineEntry({
+			t: 1000,
+			type: "tool_call",
+			tool_name: "Read",
+			content_preview: longPreview,
+		});
 		const result = formatTimelineEntry(entry);
 		expect(stripAnsi(result)).not.toContain("A".repeat(80));
 	});
@@ -849,14 +935,24 @@ describe("formatCollapsedEntry", () => {
 
 describe("formatSwimLaneEntry", () => {
 	test("formats entry with agent label", () => {
-		const entry = makeTimelineEntry({ t: 1000, type: "tool_call", tool_name: "Read", agent_name: "builder-a" });
+		const entry = makeTimelineEntry({
+			t: 1000,
+			type: "tool_call",
+			tool_name: "Read",
+			agent_name: "builder-a",
+		});
 		const result = formatSwimLaneEntry(entry, 16);
 		expect(result).toContain("builder-a");
 		expect(result).toContain("\x1b[36m"); // cyan agent label
 	});
 
 	test("pads agent label to lane width", () => {
-		const entry = makeTimelineEntry({ t: 1000, type: "tool_call", tool_name: "Read", agent_name: "abc" });
+		const entry = makeTimelineEntry({
+			t: 1000,
+			type: "tool_call",
+			tool_name: "Read",
+			agent_name: "abc",
+		});
 		const result = formatSwimLaneEntry(entry, 10);
 		const stripped = stripAnsi(result);
 		// Agent label "abc" should be padded to 10 chars
@@ -864,7 +960,12 @@ describe("formatSwimLaneEntry", () => {
 	});
 
 	test("falls back to agent_id when no agent_name", () => {
-		const entry = makeTimelineEntry({ t: 1000, type: "tool_call", tool_name: "Read", agent_id: "abcd1234-long-id" });
+		const entry = makeTimelineEntry({
+			t: 1000,
+			type: "tool_call",
+			tool_name: "Read",
+			agent_id: "abcd1234-long-id",
+		});
 		const result = formatSwimLaneEntry(entry, 10);
 		expect(result).toContain("abcd1234");
 	});
@@ -875,7 +976,12 @@ describe("formatSwimLaneEntry", () => {
 describe("formatCollapsedSwimLaneEntry", () => {
 	test("shows count suffix for collapsed swim lane entries", () => {
 		const collapsed: CollapsedEntry = {
-			entry: makeTimelineEntry({ t: 1000, type: "tool_call", tool_name: "Read", agent_name: "builder-a" }),
+			entry: makeTimelineEntry({
+				t: 1000,
+				type: "tool_call",
+				tool_name: "Read",
+				agent_name: "builder-a",
+			}),
 			count: 3,
 		};
 		const result = formatCollapsedSwimLaneEntry(collapsed, 16);
@@ -885,7 +991,12 @@ describe("formatCollapsedSwimLaneEntry", () => {
 
 	test("shows no suffix for count 1", () => {
 		const collapsed: CollapsedEntry = {
-			entry: makeTimelineEntry({ t: 1000, type: "tool_call", tool_name: "Read", agent_name: "builder-a" }),
+			entry: makeTimelineEntry({
+				t: 1000,
+				type: "tool_call",
+				tool_name: "Read",
+				agent_name: "builder-a",
+			}),
 			count: 1,
 		};
 		const result = formatCollapsedSwimLaneEntry(collapsed, 16);
@@ -906,7 +1017,13 @@ describe("formatCommsTab", () => {
 		const distilled = makeDistilled({
 			agent_lifetimes: [
 				{ agent_id: "a1", agent_name: "lead", start_t: 0, end_t: 10000, agent_type: "leader" },
-				{ agent_id: "b1", agent_name: "builder", start_t: 1000, end_t: 8000, agent_type: "builder" },
+				{
+					agent_id: "b1",
+					agent_name: "builder",
+					start_t: 1000,
+					end_t: 8000,
+					agent_type: "builder",
+				},
 			],
 		});
 		const lines = formatCommsTab(distilled, 0);

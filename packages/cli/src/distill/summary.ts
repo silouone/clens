@@ -86,7 +86,17 @@ export interface SummaryOptions {
 // --- Narrative generation ---
 
 const buildNarrative = (opts: SummaryOptions): string => {
-	const { stats, backtracks, phases, file_map, reasoning, team_metrics, activeDuration, agents, editChains } = opts;
+	const {
+		stats,
+		backtracks,
+		phases,
+		file_map,
+		reasoning,
+		team_metrics,
+		activeDuration,
+		agents,
+		editChains,
+	} = opts;
 	const modelName = stats.model ?? "unknown model";
 	// Lead with the WALL span (B2 semantic) so the narrative matches the web
 	// DURATION tile / session list. duration_ms is idle-trimmed and would
@@ -143,7 +153,18 @@ const buildNarrative = (opts: SummaryOptions): string => {
 // --- Main extractor ---
 
 export const extractSummary = (opts: SummaryOptions): DistilledSummary => {
-	const { stats, backtracks, phases, file_map, reasoning, team_metrics, activeDuration, agents, events, editChains } = opts;
+	const {
+		stats,
+		backtracks,
+		phases,
+		file_map,
+		reasoning,
+		team_metrics,
+		activeDuration,
+		agents,
+		events,
+		editChains,
+	} = opts;
 	const filesModified = file_map.filter((f) => f.edits > 0 || f.writes > 0).length;
 
 	const topErrors = extractTopErrors(stats, events);

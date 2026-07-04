@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	readRegistry,
-	writeRegistry,
 	registerProject,
-	unregisterProject,
 	resolveProjectEntries,
+	unregisterProject,
+	writeRegistry,
 } from "../src/session/registry";
 
 const makeTempDir = (): string => {

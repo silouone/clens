@@ -1,6 +1,6 @@
-import { createSignal, Show, type Component, type JSX } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { ArrowLeft, Menu, X } from "lucide-solid";
+import { type Component, createSignal, type JSX, Show } from "solid-js";
 import { preferences } from "../../lib/settings";
 
 type DetailPageLayoutProps = {
@@ -30,6 +30,7 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 			<div class="flex items-center gap-2 border-b border-clens px-3 py-1">
 				{/* Mobile sidebar toggle */}
 				<button
+					type="button"
 					onClick={() => setSidebarOpen((prev) => !prev)}
 					class="rounded-none p-1 text-muted transition hover:bg-surface-hover hover:text-secondary md:hidden"
 					aria-label="Toggle sidebar"
@@ -39,6 +40,7 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 					</Show>
 				</button>
 				<button
+					type="button"
 					onClick={() => navigate(props.backHref)}
 					class="instrument-microcaps flex items-center gap-1 rounded-none px-2 py-1 text-[10px] text-muted transition hover:bg-surface-hover hover:text-secondary focus:outline-none focus:ring-2 focus:ring-brand-500"
 					aria-label={`Back to ${props.backLabel}`}
@@ -57,7 +59,10 @@ export const DetailPageLayout: Component<DetailPageLayoutProps> = (props) => {
 			<div class="relative flex flex-1 overflow-hidden">
 				{/* Mobile backdrop */}
 				<Show when={sidebarOpen()}>
-					<div
+					<button
+						type="button"
+						aria-label="Close sidebar"
+						tabIndex={-1}
 						class="fixed inset-0 z-20 bg-black/30 md:hidden"
 						onClick={() => setSidebarOpen(false)}
 					/>

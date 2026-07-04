@@ -1,8 +1,8 @@
-import { Show, createMemo, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
-import { DensityRibbon } from "../../charts/DensityRibbon";
-import { ChartEmpty } from "../../charts/ChartEmpty";
+import { type Component, createMemo, Show } from "solid-js";
 import { formatDuration } from "../../../lib/format";
+import { ChartEmpty } from "../../charts/ChartEmpty";
+import { DensityRibbon } from "../../charts/DensityRibbon";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── ActivityWidget [timing] ──────────────────────────────────────────
@@ -25,10 +25,10 @@ export const ActivityWidget: Component<WidgetProps> = (props) => {
 	// One pass over the timeline for the [min, max] timestamp bounds (the
 	// timeline is not guaranteed sorted, so we don't trust events[0] / [last]).
 	const bounds = createMemo(() =>
-		events().reduce(
-			(acc, e) => ({ min: Math.min(acc.min, e.t), max: Math.max(acc.max, e.t) }),
-			{ min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY },
-		),
+		events().reduce((acc, e) => ({ min: Math.min(acc.min, e.t), max: Math.max(acc.max, e.t) }), {
+			min: Number.POSITIVE_INFINITY,
+			max: Number.NEGATIVE_INFINITY,
+		}),
 	);
 
 	const startTime = createMemo(() => props.session.start_time ?? bounds().min);

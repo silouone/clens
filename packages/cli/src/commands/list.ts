@@ -6,20 +6,23 @@ import { bold, dim, green, yellow } from "./shared";
 const truncate = (str: string, maxLen: number): string =>
 	str.length > maxLen ? `${str.slice(0, maxLen - 1)}\u2026` : str;
 
-const isGlobalSession = (s: SessionSummary): s is GlobalSessionSummary =>
-	"project_name" in s;
+const isGlobalSession = (s: SessionSummary): s is GlobalSessionSummary => "project_name" in s;
 
-export const listCommand = async (args: { projectDir: string; json: boolean; global: boolean }): Promise<void> => {
+export const listCommand = async (args: {
+	projectDir: string;
+	json: boolean;
+	global: boolean;
+}): Promise<void> => {
 	const sessions: readonly SessionSummary[] = args.global
 		? await (async () => {
-			const { listGlobalSessions } = await import("../session/global-read");
-			return listGlobalSessions();
-		})()
+				const { listGlobalSessions } = await import("../session/global-read");
+				return listGlobalSessions();
+			})()
 		: await (async () => {
-			const { listSessions, enrichSessionSummaries } = await import("../session/read");
-			const raw = listSessions(args.projectDir);
-			return enrichSessionSummaries(raw, args.projectDir);
-		})();
+				const { listSessions, enrichSessionSummaries } = await import("../session/read");
+				const raw = listSessions(args.projectDir);
+				return enrichSessionSummaries(raw, args.projectDir);
+			})();
 
 	if (args.json) {
 		console.log(JSON.stringify(sessions, null, 2));

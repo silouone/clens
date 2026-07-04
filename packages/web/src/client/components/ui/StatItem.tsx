@@ -1,4 +1,4 @@
-import { Show, type Component } from "solid-js";
+import { type Component, Show } from "solid-js";
 
 type StatItemVariant = "row" | "pill";
 
@@ -21,7 +21,10 @@ const valueClasses = (props: StatItemProps): string =>
 			: "font-mono font-medium tabular-nums text-secondary";
 
 const RowLayout: Component<StatItemProps> = (props) => (
-	<div class="flex items-center justify-between gap-2 py-0.5 text-xs min-w-0" title={props.title ?? props.value}>
+	<div
+		class="flex items-center justify-between gap-2 py-0.5 text-xs min-w-0"
+		title={props.title ?? props.value}
+	>
 		<span class="instrument-microcaps shrink-0 text-[10px] text-muted">{props.label}</span>
 		<span class={`truncate text-right ${valueClasses(props)}`}>{props.value}</span>
 	</div>

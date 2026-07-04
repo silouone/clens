@@ -1,5 +1,5 @@
-import { For, Show, type Component } from "solid-js";
-import { Check, X, PlusCircle, GitBranch } from "lucide-solid";
+import { Check, GitBranch, PlusCircle, X } from "lucide-solid";
+import { type Component, For, Show } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { Card } from "./ui/Card";
 
@@ -11,10 +11,7 @@ type PlanDriftSectionProps = {
 
 // ── Pure helpers ─────────────────────────────────────────────────────
 
-const alignmentScore = (
-	expectedCount: number,
-	missingCount: number,
-): number => {
+const alignmentScore = (expectedCount: number, missingCount: number): number => {
 	if (expectedCount === 0) return 100;
 	return Math.round(((expectedCount - missingCount) / expectedCount) * 100);
 };
@@ -50,11 +47,11 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 						<div class="min-w-0">
 							<div class="flex items-center gap-2">
 								<GitBranch class="h-3.5 w-3.5 text-muted" />
-								<h3 class="instrument-microcaps text-[11px] text-muted">
-									Plan Fidelity
-								</h3>
+								<h3 class="instrument-microcaps text-[11px] text-muted">Plan Fidelity</h3>
 							</div>
-							<span class="block truncate font-mono text-xs text-muted" title={d().spec_path}>{d().spec_path}</span>
+							<span class="block truncate font-mono text-xs text-muted" title={d().spec_path}>
+								{d().spec_path}
+							</span>
 						</div>
 						{/* Scores */}
 						<div class="flex shrink-0 items-end gap-4">
@@ -65,9 +62,7 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 								<div class="text-xs text-muted">aligned</div>
 							</div>
 							<div class="text-right">
-								<div class="text-2xl font-bold tabular-nums text-muted">
-									{driftPct()}%
-								</div>
+								<div class="text-2xl font-bold tabular-nums text-muted">{driftPct()}%</div>
 								<div class="text-xs text-muted">drift</div>
 							</div>
 						</div>
@@ -86,17 +81,13 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 										<div class="flex items-center gap-1.5 min-w-0">
 											<Show
 												when={isMissing()}
-												fallback={
-													<Check class="h-3 w-3 shrink-0 text-[var(--clens-success)]" />
-												}
+												fallback={<Check class="h-3 w-3 shrink-0 text-[var(--clens-success)]" />}
 											>
 												<X class="h-3 w-3 shrink-0 text-[var(--clens-danger)]" />
 											</Show>
 											<span
 												class={`truncate font-mono text-xs ${
-													isMissing()
-														? "text-[var(--clens-danger)] line-through"
-														: "text-secondary"
+													isMissing() ? "text-[var(--clens-danger)] line-through" : "text-secondary"
 												}`}
 												title={file}
 											>
@@ -120,7 +111,10 @@ export const PlanDriftSection: Component<PlanDriftSectionProps> = (props) => {
 									{(file) => (
 										<div class="flex items-center gap-1.5 min-w-0">
 											<PlusCircle class="h-3 w-3 shrink-0 text-[var(--clens-warning)]" />
-											<span class="truncate font-mono text-xs text-[var(--clens-warning)]" title={file}>
+											<span
+												class="truncate font-mono text-xs text-[var(--clens-warning)]"
+												title={file}
+											>
 												{file}
 											</span>
 										</div>

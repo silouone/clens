@@ -1,6 +1,6 @@
-import { Show, type Component, type JSX } from "solid-js";
+import { type Component, type JSX, Show } from "solid-js";
+import { clearError, globalError } from "../lib/stores";
 import { Spinner } from "./ui/Spinner";
-import { globalError, clearError } from "../lib/stores";
 
 // ── Error banner ────────────────────────────────────────────────────
 
@@ -13,7 +13,11 @@ export const ErrorBanner: Component<{
 			<span class="instrument-led bg-[var(--clens-danger)]" aria-hidden="true" />
 			{props.message}
 		</span>
-		<button onClick={props.onDismiss} class="instrument-microcaps ml-4 text-[10px] text-muted transition hover:text-secondary">
+		<button
+			type="button"
+			onClick={props.onDismiss}
+			class="instrument-microcaps ml-4 text-[10px] text-muted transition hover:text-secondary"
+		>
 			Dismiss
 		</button>
 	</div>
@@ -47,9 +51,7 @@ export const PageShell: Component<{
 }> = (props) => (
 	<div class="flex h-[calc(100vh-var(--app-header-height))] flex-col">
 		<Show when={globalError()}>
-			{(err) => (
-				<ErrorBanner message={err().message} onDismiss={clearError} />
-			)}
+			{(err) => <ErrorBanner message={err().message} onDismiss={clearError} />}
 		</Show>
 		{props.children}
 	</div>

@@ -1,11 +1,11 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
-	enumerateOrphans,
-	clean,
 	classifyStat,
-	parsePsLine,
-	parseLsofPorts,
+	clean,
+	enumerateOrphans,
 	matchType,
+	parseLsofPorts,
+	parsePsLine,
 } from "../../../scripts/lib/orphans";
 
 // Doctor detection/clean tests. SAFETY: we NEVER use the real production
@@ -15,7 +15,8 @@ import {
 
 const wait = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
 
-const sentinel = (): string => `CLENS_DOCTOR_TEST_SENTINEL_${crypto.randomUUID().replace(/-/g, "")}`;
+const sentinel = (): string =>
+	`CLENS_DOCTOR_TEST_SENTINEL_${crypto.randomUUID().replace(/-/g, "")}`;
 
 /** Plant a long-lived dummy process carrying `tag` in its argv (no blocking sleep). */
 const plantDummy = (tag: string) =>
@@ -27,7 +28,10 @@ const plantDummy = (tag: string) =>
 	});
 
 /** Poll a predicate until true or timeout (recursion + timer, no loops/sleep). */
-const waitUntil = async (predicate: () => Promise<boolean>, timeoutMs: number): Promise<boolean> => {
+const waitUntil = async (
+	predicate: () => Promise<boolean>,
+	timeoutMs: number,
+): Promise<boolean> => {
 	const deadline = Date.now() + timeoutMs;
 	const poll = async (): Promise<boolean> => {
 		if (await predicate()) return true;
@@ -98,10 +102,7 @@ describe("orphans: detection & clean (sentinel)", () => {
 		const tag = sentinel();
 		planted.proc = plantDummy(tag);
 
-		const detected = await waitUntil(
-			async () => (await enumerateOrphans([tag])).length > 0,
-			5000,
-		);
+		const detected = await waitUntil(async () => (await enumerateOrphans([tag])).length > 0, 5000);
 		expect(detected).toBe(true);
 
 		const found = await enumerateOrphans([tag]);

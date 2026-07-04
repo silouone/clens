@@ -4,7 +4,15 @@ import {
 	extractCommSequence,
 	groupByConversation,
 } from "../src/distill/comm-sequence";
-import type { CommunicationSequenceEntry, LinkEvent, MessageLink, SpawnLink, StopLink, TaskCompleteLink, TeammateIdleLink } from "../src/types";
+import type {
+	CommunicationSequenceEntry,
+	LinkEvent,
+	MessageLink,
+	SpawnLink,
+	StopLink,
+	TaskCompleteLink,
+	TeammateIdleLink,
+} from "../src/types";
 
 // --- Factories ---
 
@@ -29,9 +37,7 @@ const makeSeqEntry = (
 	...overrides,
 });
 
-const makeSpawn = (
-	overrides: Partial<SpawnLink> & { agent_id: string },
-): SpawnLink => ({
+const makeSpawn = (overrides: Partial<SpawnLink> & { agent_id: string }): SpawnLink => ({
 	t: 1000,
 	type: "spawn",
 	parent_session: "root",
@@ -39,9 +45,7 @@ const makeSpawn = (
 	...overrides,
 });
 
-const makeStop = (
-	overrides: Partial<StopLink> & { agent_id: string },
-): StopLink => ({
+const makeStop = (overrides: Partial<StopLink> & { agent_id: string }): StopLink => ({
 	t: 5000,
 	type: "stop",
 	parent_session: "root",
@@ -132,9 +136,7 @@ describe("extractCommSequence", () => {
 			["uuid-2", "builder-a"],
 		]);
 		// from is sender session UUID; to is recipient agent name
-		const links: readonly LinkEvent[] = [
-			makeMessage({ t: 1000, from: "uuid-1", to: "builder-a" }),
-		];
+		const links: readonly LinkEvent[] = [makeMessage({ t: 1000, from: "uuid-1", to: "builder-a" })];
 		const result = extractCommSequence(links, nameMap);
 		// from_id retains UUID while from_name gets resolved name
 		expect(result[0].from_id).toBe("uuid-1");
@@ -185,9 +187,7 @@ describe("extractCommSequence", () => {
 	});
 
 	test("omits summary when not present", () => {
-		const links: readonly LinkEvent[] = [
-			makeMessage({ t: 1000, from: "a", to: "b" }),
-		];
+		const links: readonly LinkEvent[] = [makeMessage({ t: 1000, from: "a", to: "b" })];
 		const result = extractCommSequence(links);
 		expect(result[0]).not.toHaveProperty("summary");
 	});
@@ -294,18 +294,14 @@ describe("groupByConversation", () => {
 	});
 
 	test("single message forms one group", () => {
-		const sequence = [
-			makeSeqEntry({ t: 1000, from: "lead", to: "builder", msg_type: "message" }),
-		];
+		const sequence = [makeSeqEntry({ t: 1000, from: "lead", to: "builder", msg_type: "message" })];
 		const result = groupByConversation(sequence);
 		expect(result).toHaveLength(1);
 		expect(result[0].messages).toHaveLength(1);
 	});
 
 	test("preserves participant order (alphabetical)", () => {
-		const sequence = [
-			makeSeqEntry({ t: 1000, from: "zebra", to: "alpha", msg_type: "message" }),
-		];
+		const sequence = [makeSeqEntry({ t: 1000, from: "zebra", to: "alpha", msg_type: "message" })];
 		const result = groupByConversation(sequence);
 		expect(result[0].participants[0]).toBe("alpha");
 		expect(result[0].participants[1]).toBe("zebra");

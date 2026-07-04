@@ -1,7 +1,7 @@
 import { createResource, createRoot, createSignal } from "solid-js";
-import { selectedProjectId } from "./project-store";
-import { localDayKey, matchesLocalDay, isValidDayKey } from "./analytics-day";
+import { isValidDayKey, localDayKey, matchesLocalDay } from "./analytics-day";
 import { authHeaders } from "./api";
+import { selectedProjectId } from "./project-store";
 
 // ── Types (matching server response) ──────────────────────────────
 
@@ -140,7 +140,11 @@ export interface InsightsResponse {
 	readonly previous_totals: InsightsTotals;
 	readonly tool_errors: readonly ToolErrorEntry[];
 	readonly top_backtrack_files: readonly { readonly file: string; readonly count: number }[];
-	readonly top_error_patterns: readonly { readonly pattern: string; readonly count: number; readonly tools: readonly string[] }[];
+	readonly top_error_patterns: readonly {
+		readonly pattern: string;
+		readonly count: number;
+		readonly tools: readonly string[];
+	}[];
 	readonly plan_drift_points: readonly PlanDriftPoint[];
 	readonly worst_sessions: readonly WorstSession[];
 }
@@ -266,7 +270,7 @@ const computeDelta = (current: number, previous: number): DeltaResult => {
 	const pct = ((current - previous) / previous) * 100;
 	return {
 		value: Math.abs(pct),
-		direction: pct > 1 ? "up" as const : pct < -1 ? "down" as const : "flat" as const,
+		direction: pct > 1 ? ("up" as const) : pct < -1 ? ("down" as const) : ("flat" as const),
 	};
 };
 
@@ -274,7 +278,7 @@ const computePpDelta = (current: number, previous: number): DeltaResult => {
 	const diff = (current - previous) * 100; // percentage points
 	return {
 		value: Math.abs(diff),
-		direction: diff > 0.5 ? "up" as const : diff < -0.5 ? "down" as const : "flat" as const,
+		direction: diff > 0.5 ? ("up" as const) : diff < -0.5 ? ("down" as const) : ("flat" as const),
 	};
 };
 
@@ -304,10 +308,26 @@ const fetchHeaderStats = async (): Promise<HeaderStats> => {
 	if (project) qs.set("project", project);
 	try {
 		const res = await fetch(`/api/analytics/usage?${qs.toString()}`, { headers: authHeaders() });
-		if (!res.ok) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
+		if (!res.ok)
+			return {
+				totalSessions: 0,
+				todaySessions: 0,
+				totalEvents: 0,
+				avgDurationMs: 0,
+				totalCostUsd: 0,
+				sessionsWithCost: 0,
+			};
 		const body = await res.json();
 		const t = body.data?.totals as UsageTotals | undefined;
-		if (!t) return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
+		if (!t)
+			return {
+				totalSessions: 0,
+				todaySessions: 0,
+				totalEvents: 0,
+				avgDurationMs: 0,
+				totalCostUsd: 0,
+				sessionsWithCost: 0,
+			};
 		// "today" count from daily array — daily rows are keyed by LOCAL calendar day
 		// (analytics-summary.localDayKey), so match on the local current day, not UTC.
 		const daily = (body.data?.daily ?? []) as readonly DailyUsageMetrics[];
@@ -322,7 +342,14 @@ const fetchHeaderStats = async (): Promise<HeaderStats> => {
 			sessionsWithCost: t.sessions_with_cost,
 		};
 	} catch {
-		return { totalSessions: 0, todaySessions: 0, totalEvents: 0, avgDurationMs: 0, totalCostUsd: 0, sessionsWithCost: 0 };
+		return {
+			totalSessions: 0,
+			todaySessions: 0,
+			totalEvents: 0,
+			avgDurationMs: 0,
+			totalCostUsd: 0,
+			sessionsWithCost: 0,
+		};
 	}
 };
 

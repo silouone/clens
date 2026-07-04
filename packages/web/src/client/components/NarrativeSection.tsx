@@ -1,5 +1,5 @@
-import { For, Show, createMemo, type Component } from "solid-js";
 import { BookOpen } from "lucide-solid";
+import { type Component, createMemo, For, Show } from "solid-js";
 import type { DistilledSession } from "../../shared/types";
 import { formatDuration, formatRelTime } from "../lib/format";
 import { renderPlainText } from "../lib/markdown";
@@ -28,9 +28,7 @@ export const NarrativeSection: Component<NarrativeSectionProps> = (props) => {
 			<Card class="p-3">
 				<div class="flex items-center gap-2">
 					<BookOpen class="h-4 w-4 text-muted" />
-					<h3 class="instrument-microcaps text-[11px] text-muted">
-						What Happened
-					</h3>
+					<h3 class="instrument-microcaps text-[11px] text-muted">What Happened</h3>
 				</div>
 
 				{/* Narrative text — generated prose interpolating raw model ids and
@@ -47,9 +45,7 @@ export const NarrativeSection: Component<NarrativeSectionProps> = (props) => {
 							{(phase) => (
 								<div class="py-1.5 first:pt-0 last:pb-0">
 									<div class="flex items-center gap-2">
-										<span class="text-sm font-medium text-secondary">
-											{phase.name}
-										</span>
+										<span class="text-sm font-medium text-secondary">{phase.name}</span>
 										<span class="text-xs text-muted">
 											{formatDuration(phase.end_t - phase.start_t)}
 										</span>
@@ -62,9 +58,7 @@ export const NarrativeSection: Component<NarrativeSectionProps> = (props) => {
 										</Show>
 									</div>
 									<Show when={phase.description.length > 0}>
-										<p class="mt-0.5 text-xs text-muted">
-											{phase.description}
-										</p>
+										<p class="mt-0.5 text-xs text-muted">{phase.description}</p>
 									</Show>
 								</div>
 							)}

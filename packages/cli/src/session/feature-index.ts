@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { detectFeatureFlags } from "../distill/feature-usage";
 import type { FeatureFlag } from "../types";
 
@@ -31,7 +31,8 @@ const sanitizeEntry = (value: unknown): FeatureIndexEntry | undefined => {
 	if (!value || typeof value !== "object") return undefined;
 	const obj = value as Record<string, unknown>;
 	if (typeof obj.mtime_ms !== "number" || typeof obj.size !== "number") return undefined;
-	if (!Array.isArray(obj.flags) || !obj.flags.every((f) => VALID_FLAGS.includes(f as string))) return undefined;
+	if (!Array.isArray(obj.flags) || !obj.flags.every((f) => VALID_FLAGS.includes(f as string)))
+		return undefined;
 	return { flags: obj.flags as readonly FeatureFlag[], mtime_ms: obj.mtime_ms, size: obj.size };
 };
 
@@ -41,7 +42,8 @@ const readIndexFile = (projectDir: string): Readonly<Record<string, FeatureIndex
 	try {
 		const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
 		const file = parsed as FeatureIndexFile;
-		if (file.version !== INDEX_VERSION || !file.entries || typeof file.entries !== "object") return {};
+		if (file.version !== INDEX_VERSION || !file.entries || typeof file.entries !== "object")
+			return {};
 		return Object.fromEntries(
 			Object.entries(file.entries).flatMap(([sid, entry]) => {
 				const clean = sanitizeEntry(entry);
@@ -53,7 +55,10 @@ const readIndexFile = (projectDir: string): Readonly<Record<string, FeatureIndex
 	}
 };
 
-const writeIndexFile = (projectDir: string, entries: Readonly<Record<string, FeatureIndexEntry>>): void => {
+const writeIndexFile = (
+	projectDir: string,
+	entries: Readonly<Record<string, FeatureIndexEntry>>,
+): void => {
 	try {
 		const file: FeatureIndexFile = { version: INDEX_VERSION, entries };
 		writeFileSync(indexPath(projectDir), JSON.stringify(file));
@@ -66,7 +71,9 @@ const writeIndexFile = (projectDir: string, entries: Readonly<Record<string, Fea
  * Feature flags for every session in a project, keyed by session ID.
  * Cache hits cost one stat per file; misses scan the raw JSONL once.
  */
-export const readFeatureIndex = (projectDir: string): ReadonlyMap<string, readonly FeatureFlag[]> => {
+export const readFeatureIndex = (
+	projectDir: string,
+): ReadonlyMap<string, readonly FeatureFlag[]> => {
 	const sessionsDir = `${projectDir}/.clens/sessions`;
 
 	const files = (() => {

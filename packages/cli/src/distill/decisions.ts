@@ -1,4 +1,11 @@
-import type { DecisionPoint, LinkEvent, PhaseInfo, StoredEvent, TaskLink, TimingGapDecision } from "../types";
+import type {
+	DecisionPoint,
+	LinkEvent,
+	PhaseInfo,
+	StoredEvent,
+	TaskLink,
+	TimingGapDecision,
+} from "../types";
 import { buildTeamPhases, hasTaskLinks } from "./decisions-team";
 
 const TIMING_GAP_THRESHOLD_MS = 30_000; // 30 seconds
@@ -85,7 +92,9 @@ const phaseNameFromTool = (tool: string | undefined, hasFailures: boolean): stri
 // --- Gap Classification ---
 
 /** Extract ALL timing gaps >= 30s with classification. Used by active duration calculator. */
-export const extractRawTimingGaps = (events: readonly StoredEvent[]): readonly TimingGapDecision[] => {
+export const extractRawTimingGaps = (
+	events: readonly StoredEvent[],
+): readonly TimingGapDecision[] => {
 	if (events.length < 2) return [];
 
 	const promptTimestamps = extractPromptTimestamps(events);
@@ -247,7 +256,10 @@ const isTaskLink = (link: LinkEvent): link is TaskLink => link.type === "task";
 export const extractAgentDecisions = (links: readonly LinkEvent[]): readonly DecisionPoint[] =>
 	links
 		.filter(isTaskLink)
-		.filter((task) => task.action === "assign" && typeof task.subject === "string" && task.subject.length > 0)
+		.filter(
+			(task) =>
+				task.action === "assign" && typeof task.subject === "string" && task.subject.length > 0,
+		)
 		.map((task) => ({
 			type: "task_delegation" as const,
 			t: task.t,
@@ -270,5 +282,7 @@ export const extractDecisions = (
 	const phaseBoundaries = phaseBoundaryDecisions(phases);
 	const agentDecisions = links && links.length > 0 ? extractAgentDecisions(links) : [];
 
-	return [...timingGaps, ...toolPivots, ...phaseBoundaries, ...agentDecisions].sort((a, b) => a.t - b.t);
+	return [...timingGaps, ...toolPivots, ...phaseBoundaries, ...agentDecisions].sort(
+		(a, b) => a.t - b.t,
+	);
 };

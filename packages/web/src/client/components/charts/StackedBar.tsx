@@ -1,8 +1,17 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show, type Component } from "solid-js";
-import type { BaseChartProps } from "./shared";
-import { CHART_HAIRLINE, CHART_PADDING, MAX_BAND, formatCompact, formatShortDate, generateTicks, linearScale, niceMax } from "./shared";
-import { hideTooltip, showTooltip } from "./ChartTooltip";
+import { type Component, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { ChartEmpty } from "./ChartEmpty";
+import { hideTooltip, showTooltip } from "./ChartTooltip";
+import type { BaseChartProps } from "./shared";
+import {
+	CHART_HAIRLINE,
+	CHART_PADDING,
+	formatCompact,
+	formatShortDate,
+	generateTicks,
+	linearScale,
+	MAX_BAND,
+	niceMax,
+} from "./shared";
 
 interface SeriesConfig {
 	readonly key: string;
@@ -53,7 +62,7 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 	const slot = createMemo(() => {
 		const n = props.data.length;
 		if (n === 0) return 0;
-		const gap = Math.max(2, cw() / n * 0.2);
+		const gap = Math.max(2, (cw() / n) * 0.2);
 		return (cw() - gap * (n - 1)) / n + gap;
 	});
 
@@ -61,7 +70,7 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 	const barWidth = createMemo(() => {
 		const n = props.data.length;
 		if (n === 0) return 0;
-		const gap = Math.max(2, cw() / n * 0.2);
+		const gap = Math.max(2, (cw() / n) * 0.2);
 		return Math.max(2, Math.min(MAX_BAND, (cw() - gap * (n - 1)) / n));
 	});
 
@@ -74,7 +83,14 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 	return (
 		<Show
 			when={props.data.length > 0}
-			fallback={<ChartEmpty height={props.height} class={props.class} ariaLabel={props.ariaLabel} label="No data" />}
+			fallback={
+				<ChartEmpty
+					height={props.height}
+					class={props.class}
+					ariaLabel={props.ariaLabel}
+					label="No data"
+				/>
+			}
 		>
 			<div ref={containerRef} class={`w-full ${props.class ?? ""}`}>
 				<svg
@@ -84,96 +100,107 @@ export const StackedBar = <T,>(props: StackedBarProps<T>): ReturnType<Component>
 					aria-label={props.ariaLabel}
 					class="overflow-visible"
 				>
-				<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
-					<For each={ticks()}>
-						{(tick) => (
-							<>
-								<line
-									x1={0} y1={yScale()(tick)}
-									x2={cw()} y2={yScale()(tick)}
-									stroke={CHART_HAIRLINE}
+					<g transform={`translate(${CHART_PADDING.left},${CHART_PADDING.top})`}>
+						<For each={ticks()}>
+							{(tick) => (
+								<>
+									<line
+										x1={0}
+										y1={yScale()(tick)}
+										x2={cw()}
+										y2={yScale()(tick)}
+										stroke={CHART_HAIRLINE}
+									/>
+									<text
+										x={-8}
+										y={yScale()(tick)}
+										text-anchor="end"
+										dominant-baseline="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{formatCompact(tick)}
+									</text>
+								</>
+							)}
+						</For>
+
+						<For each={props.data}>
+							{(d, i) => {
+								const st = () => stacked()[i()];
+								return (
+									<g
+										role="menuitem"
+										aria-label={
+											props.tooltipLabel?.(d) ?? `${props.x(d)}: ${formatCompact(st().total)}`
+										}
+										class="cursor-pointer"
+										onClick={(e) => {
+											e.stopPropagation();
+											props.onClickPoint?.(d, i());
+										}}
+										onMouseEnter={(e) => {
+											const rect = (e.currentTarget as SVGGElement).getBoundingClientRect();
+											const label =
+												props.tooltipLabel?.(d) ?? `${props.x(d)}: ${formatCompact(st().total)}`;
+											showTooltip(rect.x + rect.width / 2, rect.y, label);
+										}}
+										onMouseLeave={hideTooltip}
+									>
+										<For each={props.series}>
+											{(series, si) => {
+												const top = () => st().cumulative[si()];
+												const base = () => (si() > 0 ? st().cumulative[si() - 1] : 0);
+												const h = () => yScale()(base()) - yScale()(top());
+												return (
+													<rect
+														x={barX(i())}
+														y={yScale()(top())}
+														width={barWidth()}
+														height={Math.max(0, h())}
+														fill={series.color}
+														rx={0}
+													/>
+												);
+											}}
+										</For>
+									</g>
+								);
+							}}
+						</For>
+
+						<For each={props.data}>
+							{(d, i) => {
+								const n = props.data.length;
+								const step = Math.max(1, Math.floor(n / 8));
+								if (i() % step !== 0 && i() !== n - 1) return null;
+								return (
+									<text
+										x={barX(i()) + barWidth() / 2}
+										y={ch() + 16}
+										text-anchor="middle"
+										class="fill-muted font-mono text-[10px] tabular-nums"
+									>
+										{formatShortDate(props.x(d))}
+									</text>
+								);
+							}}
+						</For>
+					</g>
+				</svg>
+
+				<div class="mt-2 flex flex-wrap gap-3 px-2 text-xs text-muted">
+					<For each={props.series}>
+						{(s) => (
+							<div class="flex items-center gap-1">
+								<span
+									class="inline-block h-2.5 w-2.5 rounded-[2px]"
+									style={{ "background-color": s.color }}
 								/>
-								<text
-									x={-8} y={yScale()(tick)}
-									text-anchor="end" dominant-baseline="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{formatCompact(tick)}
-								</text>
-							</>
+								<span class="instrument-microcaps text-[10px] text-muted">{s.label}</span>
+							</div>
 						)}
 					</For>
-
-					<For each={props.data}>
-						{(d, i) => {
-							const st = () => stacked()[i()];
-							return (
-								<g
-									class="cursor-pointer"
-									onClick={(e) => {
-										e.stopPropagation();
-										props.onClickPoint?.(d, i());
-									}}
-									onMouseEnter={(e) => {
-										const rect = (e.currentTarget as SVGGElement).getBoundingClientRect();
-										const label = props.tooltipLabel?.(d) ??
-											`${props.x(d)}: ${formatCompact(st().total)}`;
-										showTooltip(rect.x + rect.width / 2, rect.y, label);
-									}}
-									onMouseLeave={hideTooltip}
-								>
-									<For each={props.series}>
-										{(series, si) => {
-											const top = () => st().cumulative[si()];
-											const base = () => si() > 0 ? st().cumulative[si() - 1] : 0;
-											const h = () => yScale()(base()) - yScale()(top());
-											return (
-												<rect
-													x={barX(i())}
-													y={yScale()(top())}
-													width={barWidth()}
-													height={Math.max(0, h())}
-													fill={series.color}
-													rx={0}
-												/>
-											);
-										}}
-									</For>
-								</g>
-							);
-						}}
-					</For>
-
-					<For each={props.data}>
-						{(d, i) => {
-							const n = props.data.length;
-							const step = Math.max(1, Math.floor(n / 8));
-							if (i() % step !== 0 && i() !== n - 1) return null;
-							return (
-								<text
-									x={barX(i()) + barWidth() / 2}
-									y={ch() + 16}
-									text-anchor="middle"
-									class="fill-muted font-mono text-[10px] tabular-nums"
-								>
-									{formatShortDate(props.x(d))}
-								</text>
-							);
-						}}
-					</For>
-				</g>
-			</svg>
-
-			<div class="mt-2 flex flex-wrap gap-3 px-2 text-xs text-muted">
-				<For each={props.series}>
-					{(s) => (
-						<div class="flex items-center gap-1">
-							<span class="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ "background-color": s.color }} />
-							<span class="instrument-microcaps text-[10px] text-muted">{s.label}</span>
-						</div>
-					)}
-				</For>
-			</div>
+				</div>
 			</div>
 		</Show>
 	);

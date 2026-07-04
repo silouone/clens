@@ -17,9 +17,7 @@ type DashboardGridProps = {
 };
 
 export const DashboardGrid: Component<DashboardGridProps> = (props) => (
-	<div
-		class={`grid grid-cols-1 gap-3 sm:grid-cols-6 lg:grid-cols-12 ${props.class ?? ""}`}
-	>
+	<div class={`grid grid-cols-1 gap-3 sm:grid-cols-6 lg:grid-cols-12 ${props.class ?? ""}`}>
 		{props.children}
 	</div>
 );

@@ -1,26 +1,26 @@
-import { Show, createSignal, onCleanup, type Component } from "solid-js";
-import { PageShell } from "../components/PageShell";
-import { SettingsSection } from "../components/settings/SettingsSection";
-import { SettingRow } from "../components/settings/SettingRow";
-import { SegmentedControl } from "../components/ui/SegmentedControl";
-import { Toggle } from "../components/ui/Toggle";
-import { Button } from "../components/ui/Button";
-import { Spinner } from "../components/ui/Spinner";
+import { type Component, createSignal, onCleanup, Show } from "solid-js";
 import {
-	preferences,
-	setPreference,
-	resetPreferences,
-	projectConfig,
-	saveProjectConfig,
-} from "../lib/settings";
-import type { FontSize, TimestampFormat } from "../lib/settings";
-import { theme, setTheme } from "../lib/theme";
-import {
+	DEFAULT_SUBSCRIPTION_PLAN,
 	PLAN_MONTHLY_USD,
 	planFromLegacyPricing,
-	DEFAULT_SUBSCRIPTION_PLAN,
 	type SubscriptionPlan,
 } from "../../shared/types";
+import { PageShell } from "../components/PageShell";
+import { SettingRow } from "../components/settings/SettingRow";
+import { SettingsSection } from "../components/settings/SettingsSection";
+import { Button } from "../components/ui/Button";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { Spinner } from "../components/ui/Spinner";
+import { Toggle } from "../components/ui/Toggle";
+import type { FontSize, TimestampFormat } from "../lib/settings";
+import {
+	preferences,
+	projectConfig,
+	resetPreferences,
+	saveProjectConfig,
+	setPreference,
+} from "../lib/settings";
+import { setTheme, theme } from "../lib/theme";
 
 // ── Theme mode (3-way: light / dark / system) ───────────────────────
 
@@ -78,9 +78,7 @@ const getThemeMode = (): ThemeMode => {
 
 const getStorageSize = (): string => {
 	const size = new Blob([JSON.stringify(localStorage)]).size;
-	return size < 1024
-		? `~${size} B`
-		: `~${Math.round(size / 1024)} KB`;
+	return size < 1024 ? `~${size} B` : `~${Math.round(size / 1024)} KB`;
 };
 
 // ── Page component ───────────────────────────────────────────────────
@@ -88,7 +86,9 @@ const getStorageSize = (): string => {
 export const SettingsPage: Component = () => {
 	const [themeMode, setThemeMode] = createSignal<ThemeMode>(getThemeMode());
 	const [configSaved, setConfigSaved] = createSignal(false);
-	const [savedTimer, setSavedTimer] = createSignal<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const [savedTimer, setSavedTimer] = createSignal<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
 
 	onCleanup(() => {
 		const timer = savedTimer();
@@ -99,7 +99,9 @@ export const SettingsPage: Component = () => {
 		setThemeMode(mode);
 		if (mode === "system") {
 			localStorage.removeItem("clens-theme");
-			const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+			const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+				? "dark"
+				: "light";
 			setTheme(systemTheme);
 		} else {
 			setTheme(mode);
@@ -126,7 +128,10 @@ export const SettingsPage: Component = () => {
 					<div class="space-y-8">
 						{/* ── Section 1: Appearance ─────────────────────────── */}
 						<SettingsSection title="Appearance">
-							<SettingRow label="Theme" description="Choose light, dark, or follow system preference">
+							<SettingRow
+								label="Theme"
+								description="Choose light, dark, or follow system preference"
+							>
 								<SegmentedControl
 									options={THEME_OPTIONS}
 									value={themeMode()}
@@ -158,7 +163,10 @@ export const SettingsPage: Component = () => {
 									onChange={(v) => setPreference("sessionListLimit", Number(v))}
 								/>
 							</SettingRow>
-							<SettingRow label="Conversation page size" description="Messages per page in conversation view">
+							<SettingRow
+								label="Conversation page size"
+								description="Messages per page in conversation view"
+							>
 								<SegmentedControl
 									options={PAGE_SIZE_OPTIONS}
 									value={String(preferences().conversationPageSize)}
@@ -196,7 +204,9 @@ export const SettingsPage: Component = () => {
 								fallback={
 									<div class="flex items-center gap-2 py-6">
 										<Spinner size="sm" />
-										<span class="instrument-microcaps text-[10px] text-muted">Loading project config…</span>
+										<span class="instrument-microcaps text-[10px] text-muted">
+											Loading project config…
+										</span>
 									</div>
 								}
 							>
@@ -211,7 +221,10 @@ export const SettingsPage: Component = () => {
 								>
 									{(config) => (
 										<>
-											<SettingRow label="Capture enabled" description="Enable or disable hook event capture">
+											<SettingRow
+												label="Capture enabled"
+												description="Enable or disable hook event capture"
+											>
 												<div class="flex items-center gap-3">
 													<Show when={configSaved()}>
 														<span class="instrument-microcaps flex items-center gap-1.5 text-[10px] text-[var(--clens-success)] animate-fade-in">
@@ -227,7 +240,10 @@ export const SettingsPage: Component = () => {
 											</SettingRow>
 											{(() => {
 												const currentPlan = (): SubscriptionPlan =>
-													config().plan ?? (config().pricing ? planFromLegacyPricing(config().pricing) : DEFAULT_SUBSCRIPTION_PLAN);
+													config().plan ??
+													(config().pricing
+														? planFromLegacyPricing(config().pricing)
+														: DEFAULT_SUBSCRIPTION_PLAN);
 												return (
 													<SettingRow
 														label="Subscription plan"
@@ -255,7 +271,10 @@ export const SettingsPage: Component = () => {
 								</span>
 							</SettingRow>
 							<SettingRow label="Origin">
-								<span class="inline-flex max-w-[300px] items-center truncate rounded-none border border-clens bg-surface-inset px-2 py-0.5 font-mono text-sm text-secondary" title={window.location.origin}>
+								<span
+									class="inline-flex max-w-[300px] items-center truncate rounded-none border border-clens bg-surface-inset px-2 py-0.5 font-mono text-sm text-secondary"
+									title={window.location.origin}
+								>
 									{window.location.origin}
 								</span>
 							</SettingRow>
@@ -263,12 +282,18 @@ export const SettingsPage: Component = () => {
 
 						{/* ── Section 5: Data Management ────────────────────── */}
 						<SettingsSection title="Data Management">
-							<SettingRow label="Local storage usage" description="Approximate size of stored preferences">
+							<SettingRow
+								label="Local storage usage"
+								description="Approximate size of stored preferences"
+							>
 								<span class="inline-flex items-center rounded-none border border-clens bg-surface-inset px-2 py-0.5 font-mono text-sm text-secondary tabular-nums">
 									{getStorageSize()}
 								</span>
 							</SettingRow>
-							<SettingRow label="Reset preferences" description="Restore all settings to their defaults">
+							<SettingRow
+								label="Reset preferences"
+								description="Restore all settings to their defaults"
+							>
 								<Button
 									variant="secondary"
 									size="sm"

@@ -27,8 +27,18 @@ export interface TranscriptEntry {
 export type TranscriptContentBlock =
 	| { readonly type: "thinking"; readonly thinking: string; readonly signature?: string }
 	| { readonly type: "text"; readonly text: string }
-	| { readonly type: "tool_use"; readonly id: string; readonly name: string; readonly input: Readonly<Record<string, unknown>> }
-	| { readonly type: "tool_result"; readonly tool_use_id: string; readonly content: string | readonly Record<string, unknown>[]; readonly is_error?: boolean };
+	| {
+			readonly type: "tool_use";
+			readonly id: string;
+			readonly name: string;
+			readonly input: Readonly<Record<string, unknown>>;
+	  }
+	| {
+			readonly type: "tool_result";
+			readonly tool_use_id: string;
+			readonly content: string | readonly Record<string, unknown>[];
+			readonly is_error?: boolean;
+	  };
 
 export interface TranscriptReasoning {
 	readonly t: number;

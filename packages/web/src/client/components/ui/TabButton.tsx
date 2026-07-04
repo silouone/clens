@@ -1,4 +1,4 @@
-import { Show, type Component } from "solid-js";
+import { type Component, Show } from "solid-js";
 
 type TabButtonProps = {
 	readonly label: string;
@@ -27,6 +27,7 @@ const TabBadge: Component<{
 
 export const TabButton: Component<TabButtonProps> = (props) => (
 	<button
+		type="button"
 		role="tab"
 		aria-selected={props.active}
 		onClick={props.onClick}

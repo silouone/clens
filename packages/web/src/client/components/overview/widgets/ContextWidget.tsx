@@ -1,6 +1,6 @@
-import { Show, type Component } from "solid-js";
-import { Widget } from "../../ui/Widget";
+import { type Component, Show } from "solid-js";
 import { ContextChart } from "../../ContextChart";
+import { Widget } from "../../ui/Widget";
 import type { WidgetProps } from "../types";
 
 // ── ContextWidget [context] — Wave 1 ─────────────────────────────────
@@ -24,10 +24,7 @@ export const ContextWidget: Component<WidgetProps> = (props) => {
 	const ctx = () => props.session.context_consumption;
 	return (
 		<Widget category="context" title="Context" span={8}>
-			<Show
-				when={ctx()}
-				fallback={<p class="text-xs italic text-muted">No context data</p>}
-			>
+			<Show when={ctx()} fallback={<p class="text-xs italic text-muted">No context data</p>}>
 				{(c) => <ContextChart consumption={c()} />}
 			</Show>
 		</Widget>
