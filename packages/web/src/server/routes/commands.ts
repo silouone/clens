@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { ProjectEntry } from "clens";
-import { distill } from "clens/src/distill";
-import { writeAnalyticsSummary } from "clens/src/distill/analytics-summary";
+import type { ProjectEntry } from "@silou/clens";
+import { distill } from "@silou/clens/src/distill";
+import { writeAnalyticsSummary } from "@silou/clens/src/distill/analytics-summary";
 import { Hono } from "hono";
 import { createLogger } from "../logger";
 import { invalidateAnalyticsCache } from "./analytics";

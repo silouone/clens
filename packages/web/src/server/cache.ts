@@ -1,4 +1,4 @@
-import type { StoredEvent } from "clens/src/types";
+import type { StoredEvent } from "@silou/clens/src/types";
 
 // ── LRU Cache for session events ───────────────────────────────────
 // Mutable Map at I/O boundary — caching is inherently stateful

@@ -1,0 +1,4 @@
+# Copied in at pack time by the `prepack` script (root README/LICENSE are the
+# originals). Gitignored to avoid drift with the source-of-truth copies.
+/README.md
+/LICENSE

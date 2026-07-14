@@ -18,7 +18,7 @@ import type {
 	SessionSummary,
 	SpawnLink,
 	StoredEvent,
-} from "clens";
+} from "@silou/clens";
 import {
 	enrichSessionSummaries,
 	readDistilled,
@@ -27,15 +27,15 @@ import {
 	readSessionEvents,
 	readTranscript,
 	setSessionMeta,
-} from "clens/src/session";
-import { buildConversation, buildConversationFromTranscript } from "clens/src/session/conversation";
+} from "@silou/clens/src/session";
+import { buildConversation, buildConversationFromTranscript } from "@silou/clens/src/session/conversation";
 import {
 	BROADCAST_EVENTS,
 	deriveSessionStatus,
 	isColorName,
 	SESSION_STATUSES,
-} from "clens/src/types";
-import { deduplicateSpawns, diffLinesToUnified } from "clens/src/utils";
+} from "@silou/clens/src/types";
+import { deduplicateSpawns, diffLinesToUnified } from "@silou/clens/src/utils";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { pathsMatch } from "../../shared/paths";

@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { ProjectEntry } from "clens";
+import type { ProjectEntry } from "@silou/clens";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { createMiddleware } from "hono/factory";

@@ -2,10 +2,13 @@
 /**
  * Drift-proof publish guard.
  *
- * Asserts that `npm pack` for the target package ships BOTH:
+ * Asserts that `npm pack` for the target package ships ALL of:
  *   1. the web dashboard bundle (so `clens web` serves the dashboard in
- *      production mode), and
- *   2. the type definitions referenced by the package's "types" field.
+ *      production mode),
+ *   2. the type definitions referenced by the package's "types" field, and
+ *   3. README.md + LICENSE (so the npm page renders and the MIT grant travels
+ *      with the code). These are copied in by the `prepack` script; npm runs
+ *      prepack for `npm pack` (incl. --dry-run) and `npm publish`.
  *
  * Either dropping out of the tarball is a silent regression that only surfaces
  * for end users post-publish. Running this in CI (every PR) and as a publish
@@ -41,6 +44,15 @@ if (!typesPath) {
 	errors.push('package.json has no "types" field');
 } else if (!files.includes(typesPath)) {
 	errors.push(`missing types entry "${typesPath}" (referenced by package.json "types")`);
+}
+
+// 3. README + LICENSE — copied in by prepack; the npm page and MIT grant depend
+//    on them shipping inside the tarball.
+if (!files.includes("README.md")) {
+	errors.push("missing README.md (npm package page would render empty)");
+}
+if (!files.includes("LICENSE")) {
+	errors.push("missing LICENSE (MIT grant would not travel with the package)");
 }
 
 if (errors.length > 0) {

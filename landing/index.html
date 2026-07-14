@@ -305,11 +305,11 @@
         </div>
 
         <div class="code-block" id="install-hero">
-          <code class="mono"><span class="prompt">$ </span><span id="install-cmd">npm i -g clens &amp;&amp; clens init</span></code>
-          <button class="icon-btn btn-sm" data-copy="npm i -g clens &amp;&amp; clens init" aria-label="Copy install command">Copy</button>
+          <code class="mono"><span class="prompt">$ </span><span id="install-cmd">npm i -g @silou/clens &amp;&amp; clens init</span></code>
+          <button class="icon-btn btn-sm" data-copy="npm i -g @silou/clens &amp;&amp; clens init" aria-label="Copy install command">Copy</button>
         </div>
-        <!-- BUILD NOTE (LAND-2 / D1): canonical npm name resolved to `clens` (the public name). Publish under `clens` is still pending — no creds in the autonomous run — so confirm `npm i -g clens` installs end-to-end BEFORE DNS cutover. -->
-        <p class="copy-note"><span class="mono">clens</span> is the public package name — npm publish is pending; verify it installs before relying on it.</p>
+        <!-- Canonical npm name: `@silou/clens` (unscoped `clens` rejected by npm as too similar to `clean`). The bin it installs is still `clens`. -->
+        <p class="copy-note">The package is <span class="mono">@silou/clens</span>; the command it installs is <span class="mono">clens</span>.</p>
 
         <div class="bezel">
           <div class="bezel-bar">
@@ -459,7 +459,7 @@
         <div class="steps">
           <div class="step">
             <p class="num mono">01</p>
-            <code class="mono">npm i -g clens</code>
+            <code class="mono">npm i -g @silou/clens</code>
             <p>Install the CLI.</p>
           </div>
           <div class="step">
@@ -469,18 +469,18 @@
           </div>
           <div class="step">
             <p class="num mono">03</p>
-            <code class="mono">clens</code>
-            <p>Open the local dashboard, or run <code class="mono">clens distill</code> / <code class="mono">clens what --last</code> in the terminal.</p>
+            <code class="mono">clens web</code>
+            <p>Open the local dashboard, or run <code class="mono">clens distill --last</code> / <code class="mono">clens what --last</code> in the terminal.</p>
           </div>
         </div>
         <div class="codeblock-multi mono" style="margin-top:1.5rem;max-width:560px">
-          <pre><span class="prompt">$ </span>npm i -g clens
+          <pre><span class="prompt">$ </span>npm i -g @silou/clens
 <span class="prompt">$ </span>clens init
 <span class="comment"># use Claude Code normally, then…</span>
 <span class="prompt">$ </span>clens distill --last &amp;&amp; clens what --last</pre>
         </div>
-        <!-- BUILD NOTE (LAND-2 / D1): canonical npm name resolved to `clens` (the public name). Publish under `clens` is still pending — no creds in the autonomous run — so confirm `npm i -g clens` installs end-to-end BEFORE DNS cutover. -->
-        <p class="copy-note"><span class="mono">clens</span> is the public package name — npm publish is pending; verify it installs before relying on it.</p>
+        <!-- Canonical npm name: `@silou/clens` (unscoped `clens` rejected by npm as too similar to `clean`). The bin it installs is still `clens`. -->
+        <p class="copy-note">The package is <span class="mono">@silou/clens</span>; the command it installs is <span class="mono">clens</span>.</p>
       </div>
     </section>
 
@@ -586,12 +586,12 @@
         <h2>See how your agent actually reasoned.</h2>
         <p style="color:var(--clens-text-secondary);max-width:48ch;margin-inline:auto">Local-first, open source, two commands to start.</p>
         <div class="code-block">
-          <code class="mono"><span class="prompt">$ </span>npm i -g clens &amp;&amp; clens init</code>
-          <button class="icon-btn btn-sm" data-copy="npm i -g clens &amp;&amp; clens init" aria-label="Copy install command">Copy</button>
+          <code class="mono"><span class="prompt">$ </span>npm i -g @silou/clens &amp;&amp; clens init</code>
+          <button class="icon-btn btn-sm" data-copy="npm i -g @silou/clens &amp;&amp; clens init" aria-label="Copy install command">Copy</button>
         </div>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://github.com/silouone/clens">View on GitHub</a>
-          <a class="btn" href="https://www.npmjs.com/package/clens">npm</a>
+          <a class="btn" href="https://www.npmjs.com/package/@silou/clens">npm</a>
         </div>
       </div>
     </section>
@@ -604,7 +604,7 @@
       <div class="footer-inner">
         <div class="footer-links">
           <a href="https://github.com/silouone/clens">GitHub</a>
-          <a href="https://www.npmjs.com/package/clens">npm</a>
+          <a href="https://www.npmjs.com/package/@silou/clens">npm</a>
           <a href="https://github.com/silouone/clens#readme">Docs</a>
           <a href="https://github.com/silouone/clens/blob/main/CHANGELOG.md">Changelog</a>
           <a href="https://github.com/silouone/clens/blob/main/LICENSE">License (MIT)</a>

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Renamed the npm package to `@silou/clens` (unscoped `clens` is refused by npm as
+  too similar to `clean`); GitHub org stays `silouone`.
+
+### Fixed
+- **`clens web` now serves the dashboard in production mode from the npm artifact.**
+  Server mode is an explicit `startServer({ mode })` parameter instead of an ambient
+  `NODE_ENV` read: `bun build` constant-folded `process.env.NODE_ENV`, pinning the
+  shipped bundle to development mode — which 404'd the dashboard UI and silently
+  disabled the per-launch API token gate. The token gate is now enforced for the
+  installed package.
+- **`clens --version` and the `--help` banner report the real version.** The CLI
+  now reads the version from the package manifest (inlined at bundle time) instead
+  of a stale hardcoded `0.2.1` constant.
+- **The published tarball ships `README.md` and `LICENSE`** (copied in by a `prepack`
+  step), so the npm package page renders and the MIT grant travels with the code.
+- **Running the CLI under plain `node` prints an actionable message** ("clens
+  requires Bun — install it from https://bun.sh") instead of a cryptic `Bun.argv`
+  stack trace.
+
 ## [0.4.0] - 2026-07-04
 
 First public npm release. Builds on the 0.3.0 monorepo + web dashboard foundation

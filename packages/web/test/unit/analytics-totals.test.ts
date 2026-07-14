@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { AnalyticsSummaryRow } from "clens";
+import type { AnalyticsSummaryRow } from "@silou/clens";
 import {
 	cacheHitRate,
 	computeDerivedTotals,

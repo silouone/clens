@@ -1,6 +1,6 @@
-import type { ProjectEntry } from "clens";
-import { resolveProjectRoot } from "clens/src/utils";
-import { serveOnFreePort } from "clens/src/utils/net";
+import type { ProjectEntry } from "@silou/clens";
+import { resolveProjectRoot } from "@silou/clens/src/utils";
+import { serveOnFreePort } from "@silou/clens/src/utils/net";
 import { createApp } from "./app";
 import { startLiveWatcher } from "./live";
 import { currentLevel, log } from "./logger";
@@ -21,6 +21,13 @@ type StartServerOptions = {
 	 * busy port falls through to the next free one.
 	 */
 	readonly strict?: boolean;
+	/**
+	 * Runtime mode. Callers pass this explicitly: the `web` CLI command passes
+	 * `production`, the dev launcher/`dev:api` run in development. When omitted it
+	 * falls back to NODE_ENV — see the fallback comment in startServer for why
+	 * bundled code must NOT rely on that path.
+	 */
+	readonly mode?: "development" | "production";
 };
 
 type ServerHandle = {
@@ -48,8 +55,18 @@ const startServer = (options: StartServerOptions): ServerHandle => {
 	const port = options.port ?? 3117;
 	const token = options.token ?? generateToken();
 	const strict = options.strict ?? process.env.CLENS_PORT_STRICT === "1";
-	const mode =
-		process.env.NODE_ENV === "production" ? ("production" as const) : ("development" as const);
+	// Mode is an explicit caller-supplied option (production for `clens web`,
+	// development for the dev launcher). The NODE_ENV read below is ONLY a
+	// fallback for direct server invocation.
+	//
+	// ROOT CAUSE (2026-07-11 publish audit): `bun build` constant-folds
+	// `process.env.NODE_ENV` at bundle time, so bundled code that branches on it
+	// gets pinned to whatever value was set during the build. The shipped CLI
+	// carried the literal `mode = "development"`, which 404'd the dashboard and
+	// silently disabled the auth gate. Bundled code (anything reached via the CLI
+	// `web` command) MUST pass `mode` explicitly and never depend on this branch.
+	const mode: "development" | "production" =
+		options.mode ?? (process.env.NODE_ENV === "production" ? "production" : "development");
 
 	log.info(`Starting server mode=${mode} logLevel=${currentLevel}`);
 	const app = createApp({
@@ -128,7 +145,7 @@ if (import.meta.main) {
 
 	const projects = isGlobal
 		? await (async () => {
-				const { discoverAndRegisterProjects } = await import("clens/src/session/registry");
+				const { discoverAndRegisterProjects } = await import("@silou/clens/src/session/registry");
 				return discoverAndRegisterProjects();
 			})()
 		: undefined;

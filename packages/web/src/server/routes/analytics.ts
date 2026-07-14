@@ -1,7 +1,7 @@
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from "node:fs";
 import { resolve } from "node:path";
-import type { AnalyticsSummaryRow, ProjectEntry } from "clens";
-import { readAnalyticsSummary, rebuildAnalyticsSummary } from "clens/src/distill/analytics-summary";
+import type { AnalyticsSummaryRow, ProjectEntry } from "@silou/clens";
+import { readAnalyticsSummary, rebuildAnalyticsSummary } from "@silou/clens/src/distill/analytics-summary";
 import { Hono } from "hono";
 import { PLAN_MONTHLY_USD, resolvePlan, type SubscriptionPlan } from "../../shared/types";
 import { createLogger } from "../logger";

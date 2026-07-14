@@ -4,7 +4,7 @@ Thanks for your interest in contributing to cLens!
 
 cLens is a Bun monorepo with two packages:
 
-- **`packages/cli`** — the published `clens` package (CLI, hooks, distillers). This is what `npm install -g clens` installs.
+- **`packages/cli`** — the published `@silou/clens` package (CLI, hooks, distillers). This is what `npm install -g @silou/clens` installs.
 - **`packages/web`** — `@clens/web`, the private web dashboard (SolidJS + Hono) served by `clens web`. Not published to npm; it ships bundled inside the CLI package.
 
 ## Prerequisites
@@ -23,7 +23,7 @@ cLens is a Bun monorepo with two packages:
 
 ```
 packages/
-  cli/                — the published `clens` package
+  cli/                — the published `@silou/clens` package
     src/
       cli.ts          — CLI entry point (thin dispatch)
       hook.ts         — universal hook handler (JSONL append, ~2ms budget)
@@ -60,17 +60,19 @@ Run these from the repo root. Each delegates to the relevant workspace(s).
 | `bun run lint:cli` / `bun run lint:web` | Lint only the CLI / web package |
 | `bun run build:cli` / `bun run build:web` | Build only the CLI / web package |
 
-You can also work inside a package directly, e.g. `bun run --filter clens lint:fix` to auto-fix CLI lint violations, or `bun run --filter @clens/web typecheck`.
+You can also work inside a package directly, e.g. `bun run --filter @silou/clens lint:fix` to auto-fix CLI lint violations, or `bun run --filter @clens/web typecheck`.
 
 ### Building the CLI binary
 
 The CLI compiles to standalone binaries:
 
 ```sh
-bun run --filter clens build:bin
+bun run --filter @silou/clens build:bin
 ```
 
 Note: `bun run build` (the JS bundle) is **not** the same as the live compiled binary. To exercise the binary locally you must run `build:bin` and use the produced `packages/cli/bin/clens`.
+
+> **Convention — never branch on `process.env.NODE_ENV` in code that ships through `bun build`.** The bundler **constant-folds** `process.env.NODE_ENV` at build time, pinning the bundled code to whatever value was set during the build. A shipped CLI once carried a folded `mode = "development"`, which 404'd the dashboard and silently disabled the auth token gate. Runtime behaviour that differs between dev and prod (server mode, logging, etc.) must be passed as an **explicit parameter** by the caller — e.g. `startServer({ mode: "production" })` — not read from the ambient environment inside bundled code.
 
 ## Web dashboard development
 
@@ -127,7 +129,7 @@ There is no client-side component-test harness. Client UI changes are validated 
 - All tests must pass: `bun test`.
 - TypeScript must compile cleanly: `bun run typecheck`.
 - Code must pass lint: `bun run lint`.
-- Run `bun run --filter clens lint:fix` (and/or the web equivalent) before committing.
+- Run `bun run --filter @silou/clens lint:fix` (and/or the web equivalent) before committing.
 - For web client changes, run the web-review UI gate.
 
 ## Code Style

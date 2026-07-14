@@ -1,6 +1,6 @@
 # cLens — Session Observability for Claude Code
 
-[![npm](https://img.shields.io/npm/v/clens)](https://www.npmjs.com/package/clens)
+[![npm](https://img.shields.io/npm/v/%40silou%2Fclens)](https://www.npmjs.com/package/@silou/clens)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/silouone/clens/actions/workflows/ci.yml/badge.svg)](https://github.com/silouone/clens/actions/workflows/ci.yml)
 
@@ -9,7 +9,7 @@
 ## 30-second quickstart
 
 ```sh
-npm install -g clens       # or: bun install -g clens
+npm install -g @silou/clens   # or: bun install -g @silou/clens
 ```
 
 ![cLens web dashboard](.github/assets/dashboard-sessions.png)
@@ -62,7 +62,7 @@ cLens hooks into Claude Code to capture complete session traces as local JSONL f
 ## Quick Start
 
 ```sh
-npm install -g clens       # or: bun install -g clens
+npm install -g @silou/clens   # or: bun install -g @silou/clens
 ```
 
 Then in any project:

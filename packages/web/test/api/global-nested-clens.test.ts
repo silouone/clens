@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ProjectEntry } from "clens";
+import type { ProjectEntry } from "@silou/clens";
 import { createApp } from "../../src/server/app";
 
 // Regression for repo-mode-nested-clens-projects-dropped (web serving half).

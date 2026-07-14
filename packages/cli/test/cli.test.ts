@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { StoredEvent } from "../src/types";
 
 const TEST_DIR = "/tmp/clens-test-cli";
 const CLI_PATH = `${import.meta.dir}/../src/cli.ts`;
+// The CLI reads its version from the package manifest (single source of truth);
+// the test asserts against that same source rather than a hardcoded string.
+const MANIFEST_VERSION = JSON.parse(
+	readFileSync(`${import.meta.dir}/../package.json`, "utf8"),
+).version as string;
 
 const makeStoredEvent = (
 	overrides: Partial<StoredEvent> & { event: StoredEvent["event"] },
@@ -47,7 +52,7 @@ describe("cli --version", () => {
 	test("prints VERSION string", async () => {
 		const { exitCode, stdout } = await runCli("--version");
 		expect(exitCode).toBe(0);
-		expect(stdout.trim()).toBe("0.2.1");
+		expect(stdout.trim()).toBe(MANIFEST_VERSION);
 	});
 });
 

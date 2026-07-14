@@ -1,5 +1,5 @@
 {
-  "name": "clens",
+  "name": "@silou/clens",
   "version": "0.4.0",
   "type": "module",
   "description": "cLens — Claude Lens. Capture and analyze AI agent sessions. Local-first, zero-dependency observability for Claude Code.",
@@ -65,8 +65,9 @@
     "lint": "bunx biome check src/ test/",
     "lint:fix": "bunx biome check --write src/ test/",
     "format": "bunx biome format --write src/ test/",
+    "prepack": "cp ../../README.md ./README.md && cp ../../LICENSE ./LICENSE",
     "pack:check": "npm pack --dry-run 2>&1 | grep -q 'src/types/index.ts' && echo 'OK: type declarations present in tarball' || (echo 'FAIL: type declarations missing from tarball' && exit 1)",
-    "smoke:publish": "bun run build:bin && CLENS_PUBLISH_SMOKE=1 bun test test/e2e/publish-smoke.test.ts",
+    "smoke:publish": "bun run build && bun run build:bin && CLENS_PUBLISH_SMOKE=1 bun test test/e2e/publish-smoke.test.ts",
     "prepublishOnly": "bun run typecheck && bun test && bun run build && bun run pack:check && bun run smoke:publish"
   },
   "devDependencies": {

@@ -24,12 +24,6 @@ const openBrowser = (url: string): void => {
 };
 
 export const webCommand = async (options: WebCommandOptions): Promise<void> => {
-	// Force production mode by default: the dashboard is served from the bundled
-	// static client (set NODE_ENV=development only when driving the vite dev server).
-	if (!process.env.NODE_ENV) {
-		process.env.NODE_ENV = "production";
-	}
-
 	// The web server is bundled into this CLI at build time (see build.ts); it is
 	// NOT a runtime dependency, so npm consumers need nothing from @clens/web.
 	const { startServer, findProjectDir } = await import("@clens/web/server");
@@ -49,6 +43,9 @@ export const webCommand = async (options: WebCommandOptions): Promise<void> => {
 		: undefined;
 
 	const handle = startServer({
+		// Explicit production mode — never rely on NODE_ENV here: `bun build`
+		// constant-folds it, which shipped a dev-mode (404 + no-auth) dashboard.
+		mode: "production",
 		projectDir,
 		port: options.port,
 		distDir,

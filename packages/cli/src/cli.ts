@@ -1,7 +1,19 @@
 #!/usr/bin/env bun
+import pkg from "../package.json";
 import type { Flags } from "./commands/shared";
 
-const VERSION = "0.2.1";
+// Bun-required guard. Written in syntax plain Node can parse and run, and placed
+// before any Bun API is touched (Bun.argv below), so a user without Bun gets an
+// actionable one-liner instead of a cryptic `Bun.argv` ReferenceError. ESM
+// imports above are type-only (erased) or JSON (no Bun), so this runs first.
+if (typeof Bun === "undefined") {
+	console.error("clens requires Bun — install it from https://bun.sh");
+	process.exit(1);
+}
+
+// Single source of truth for the version: the package manifest. Bun inlines JSON
+// imports at bundle time, so dist/cli.js and the compiled binary both carry it.
+const VERSION = pkg.version;
 
 type CommandContext = {
 	readonly positional: readonly string[];

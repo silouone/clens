@@ -3,7 +3,7 @@
  *
  * Usage: import type { SessionSummary, DistilledSession } from "../shared/types";
  */
-import type { ClensConfig } from "clens";
+import type { ClensConfig } from "@silou/clens";
 
 export type {
 	AgentLifetime,
@@ -81,14 +81,14 @@ export type {
 	WorkflowRun,
 	WorkflowUsage,
 	WorkingTreeChange,
-} from "clens";
+} from "@silou/clens";
 
 /**
  * Runtime color-flag palette + guard (session-naming-flags). Re-exported as
  * VALUES (not just types) so the client palette and the server PATCH validator
  * share a single source of truth with the CLI.
  */
-export { COLOR_NAMES, isColorName } from "clens/src/types";
+export { COLOR_NAMES, isColorName } from "@silou/clens/src/types";
 
 // ── Subscription plan (analytics-truth-and-brush) ───────────────────
 //
