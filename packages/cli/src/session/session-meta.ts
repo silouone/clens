@@ -39,7 +39,8 @@ export const readSessionMeta = (dir: string): SessionMetaMap => {
 		return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, SessionMeta>>(
 			(acc, [id, rawEntry]) => {
 				const entry = parseEntry(rawEntry);
-				return entry ? { ...acc, [id]: entry } : acc;
+				if (entry) acc[id] = entry;
+				return acc;
 			},
 			{},
 		);

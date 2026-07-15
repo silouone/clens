@@ -59,10 +59,11 @@ const buildPoints = (
 	dedupedEntries: readonly TranscriptEntry[],
 	modelContextWindow: number,
 ): readonly ContextConsumptionPoint[] =>
-	dedupedEntries.reduce<readonly ContextConsumptionPoint[]>((acc, entry, idx) => {
+	dedupedEntries.reduce<ContextConsumptionPoint[]>((acc, entry, idx) => {
 		const prevTotal = acc.length > 0 ? acc[acc.length - 1].total_context_tokens : undefined;
 		const point = buildPoint(entry, idx, modelContextWindow, prevTotal);
-		return [...acc, point];
+		acc.push(point);
+		return acc;
 	}, []);
 
 const computeVelocity = (points: readonly ContextConsumptionPoint[]): number => {

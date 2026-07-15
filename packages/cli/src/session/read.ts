@@ -307,22 +307,26 @@ export const enrichSessionSummaries = (
 	const spawns = deduplicateSpawns(links.filter(isSpawnLink));
 
 	// Count deduplicated spawn links per parent_session
-	const spawnCountByParent: ReadonlyMap<string, number> = spawns.reduce<
-		ReadonlyMap<string, number>
-	>((acc, spawn) => {
-		const current = acc.get(spawn.parent_session) ?? 0;
-		return new Map([...acc, [spawn.parent_session, current + 1]]);
-	}, new Map());
+	const spawnCountByParent: ReadonlyMap<string, number> = spawns.reduce<Map<string, number>>(
+		(acc, spawn) => {
+			const current = acc.get(spawn.parent_session) ?? 0;
+			acc.set(spawn.parent_session, current + 1);
+			return acc;
+		},
+		new Map(),
+	);
 
 	// Fallback: count unique msg_send recipients per session when no spawns exist
 	const msgRecipientsBySession: ReadonlyMap<string, number> = (() => {
 		const msgSends = links.filter(
 			(l): l is Extract<LinkEvent, { type: "msg_send" }> => l.type === "msg_send",
 		);
-		const bySession = msgSends.reduce<ReadonlyMap<string, ReadonlySet<string>>>((acc, msg) => {
+		const bySession = msgSends.reduce<Map<string, Set<string>>>((acc, msg) => {
 			const sid = msg.session_id ?? msg.from;
-			const existing = acc.get(sid) ?? new Set<string>();
-			return new Map([...acc, [sid, new Set([...existing, msg.to])]]);
+			const existing = acc.get(sid);
+			if (existing) existing.add(msg.to);
+			else acc.set(sid, new Set([msg.to]));
+			return acc;
 		}, new Map());
 		return new Map([...bySession].map(([sid, recipients]) => [sid, recipients.size]));
 	})();

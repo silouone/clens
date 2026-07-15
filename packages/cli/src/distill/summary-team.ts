@@ -12,7 +12,8 @@ export const buildTeamSentence = (
 		const typeBreakdown = agents.reduce(
 			(acc, a) => {
 				const type = a.agent_type ?? "unknown";
-				return { ...acc, [type]: (acc[type] ?? 0) + 1 };
+				acc[type] = (acc[type] ?? 0) + 1;
+				return acc;
 			},
 			{} as Record<string, number>,
 		);

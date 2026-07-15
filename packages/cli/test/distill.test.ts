@@ -1842,10 +1842,11 @@ describe("model inference in distill orchestrator", () => {
 
 		const inferredModel = stats.model ?? agents.find((a) => a.model)?.model;
 		expect(inferredModel).toBe("claude-sonnet-4-20250514");
+		if (!inferredModel) throw new Error("expected inferredModel to be defined");
 
 		// Verify cost can be estimated from inferred model
 		const cost = estimateCostFromTokens(
-			inferredModel!,
+			inferredModel,
 			stats.total_events * 500,
 			stats.tool_call_count * 200,
 		);

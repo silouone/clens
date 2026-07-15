@@ -1,6 +1,5 @@
 import type {
 	LinkEvent,
-	MessageLink,
 	SpawnLink,
 	StopLink,
 	TaskCompleteLink,
@@ -16,8 +15,6 @@ const isStop = (link: LinkEvent): link is StopLink => link.type === "stop";
 const isTaskComplete = (link: LinkEvent): link is TaskCompleteLink => link.type === "task_complete";
 
 const isTeammateIdle = (link: LinkEvent): link is TeammateIdleLink => link.type === "teammate_idle";
-
-const isMessageLink = (link: LinkEvent): link is MessageLink => link.type === "msg_send";
 
 const isTaskLink = (link: LinkEvent): link is TaskLink => link.type === "task";
 

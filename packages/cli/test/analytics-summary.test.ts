@@ -197,10 +197,10 @@ describe("analytics-summary disk reconcile (NUM-7) + batch flush (DIST-2)", () =
 		// Cache holds a row whose distilled file no longer exists.
 		writeFileSync(
 			summaryFile(),
-			[
+			`${[
 				JSON.stringify(toSummaryRow(makeDistilled({ session_id: "s1" }))),
 				JSON.stringify(toSummaryRow(makeDistilled({ session_id: "ghost" }))),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 
 		const rows = readAnalyticsSummary(projectDir);
@@ -215,10 +215,10 @@ describe("analytics-summary disk reconcile (NUM-7) + batch flush (DIST-2)", () =
 		// Stale cached row: marks duration as a sentinel we can detect.
 		writeFileSync(
 			summaryFile(),
-			JSON.stringify({
+			`${JSON.stringify({
 				...toSummaryRow(makeDistilled({ session_id: "s1" })),
 				duration_ms: 999999,
-			}) + "\n",
+			})}\n`,
 		);
 		// Summary is OLDER than the distilled file → cached row is stale and must be rebuilt.
 		utimesSync(summaryFile(), summaryTime, summaryTime);

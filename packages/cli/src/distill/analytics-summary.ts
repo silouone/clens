@@ -91,19 +91,17 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 	}));
 
 	// Reasoning by intent
-	const reasoningByIntent = d.reasoning.reduce<Record<string, number>>(
-		(acc, r) => ({
-			...acc,
-			[r.intent_hint ?? "unclassified"]: (acc[r.intent_hint ?? "unclassified"] ?? 0) + 1,
-		}),
-		{},
-	);
+	const reasoningByIntent = d.reasoning.reduce<Record<string, number>>((acc, r) => {
+		const key = r.intent_hint ?? "unclassified";
+		acc[key] = (acc[key] ?? 0) + 1;
+		return acc;
+	}, {});
 
 	// Decision types
-	const decisionTypes = d.decisions.reduce<Record<string, number>>(
-		(acc, dec) => ({ ...acc, [dec.type]: (acc[dec.type] ?? 0) + 1 }),
-		{},
-	);
+	const decisionTypes = d.decisions.reduce<Record<string, number>>((acc, dec) => {
+		acc[dec.type] = (acc[dec.type] ?? 0) + 1;
+		return acc;
+	}, {});
 
 	// Edit chain stats. edit_chain_links is the total number of edits across all
 	// chains; dividing by edit_chain_count yields the real mean chain length (B19).
@@ -125,10 +123,10 @@ const toSummaryRow = (d: DistilledSession): AnalyticsSummaryRow => {
 	];
 
 	// Backtracks by type
-	const backtracksByType = d.backtracks.reduce<Record<string, number>>(
-		(acc, b) => ({ ...acc, [b.type]: (acc[b.type] ?? 0) + 1 }),
-		{},
-	);
+	const backtracksByType = d.backtracks.reduce<Record<string, number>>((acc, b) => {
+		acc[b.type] = (acc[b.type] ?? 0) + 1;
+		return acc;
+	}, {});
 
 	// Per-tool call counts (denominator for tool failure rates; see B11) and failures
 	const toolsByName = stats.tools_by_name ?? {};

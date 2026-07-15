@@ -348,7 +348,7 @@ const renderUninit = (projectDir: string, removeLegacy: boolean): void => {
 	console.log(dim("  Session data preserved in .clens/sessions/"));
 };
 
-const handlePluginSubcommand = (projectDir: string, flags: Flags): void => {
+const handlePluginSubcommand = (_projectDir: string, flags: Flags): void => {
 	if (flags.remove) {
 		const { uninstallPlugin } = require("./plugin") as typeof import("./plugin");
 		const removed = uninstallPlugin();

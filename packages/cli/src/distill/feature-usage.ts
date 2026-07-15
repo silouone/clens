@@ -38,16 +38,6 @@ const LOOP_PROMPT = /^\s*\/loop(\s|$)/;
 
 const GOAL_EXCERPT_LEN = 200;
 
-// Source precedence — higher wins when a feature is detected by several tiers.
-const SOURCE_RANK: Readonly<Record<DetectionSource, number>> = {
-	command: 3,
-	tool: 3,
-	command_tag: 2,
-	inferred: 1,
-};
-const strongerSource = (a: DetectionSource, b: DetectionSource): DetectionSource =>
-	SOURCE_RANK[a] >= SOURCE_RANK[b] ? a : b;
-
 type ToolEventData = {
 	readonly tool_name?: unknown;
 	readonly tool_input?: unknown;

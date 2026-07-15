@@ -58,10 +58,10 @@ const computeHighRiskFiles = (
 ): readonly HighRiskFile[] => {
 	const btCounts = backtracks
 		.filter((bt): bt is BacktrackResult & { file_path: string } => bt.file_path !== undefined)
-		.reduce<Readonly<Record<string, number>>>(
-			(acc, bt) => ({ ...acc, [bt.file_path]: (acc[bt.file_path] ?? 0) + 1 }),
-			{},
-		);
+		.reduce<Record<string, number>>((acc, bt) => {
+			acc[bt.file_path] = (acc[bt.file_path] ?? 0) + 1;
+			return acc;
+		}, {});
 
 	return files
 		.filter((f) => (btCounts[f.file_path] ?? 0) >= 2 || f.edits >= 10)

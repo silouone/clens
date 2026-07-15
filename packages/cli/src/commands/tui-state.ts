@@ -3,7 +3,6 @@ import { enrichSessionSummaries, listSessions, readDistilled } from "../session/
 import type {
 	AgentNode,
 	DistilledSession,
-	EditChain,
 	FileMapEntry,
 	Journey,
 	SessionSummary,
@@ -105,7 +104,7 @@ const TIMELINE_FILTER_CYCLE = [
 export const nextTimelineFilter = (
 	current: TimelineEntry["type"] | undefined,
 ): TimelineEntry["type"] | undefined => {
-	const idx = TIMELINE_FILTER_CYCLE.findIndex((v) => v === current);
+	const idx = TIMELINE_FILTER_CYCLE.indexOf(current as (typeof TIMELINE_FILTER_CYCLE)[number]);
 	const nextIdx = (idx + 1) % TIMELINE_FILTER_CYCLE.length;
 	return TIMELINE_FILTER_CYCLE[nextIdx];
 };

@@ -18,7 +18,6 @@ import {
 	formatTimelineTab,
 } from "../src/commands/tui-tabs";
 import type {
-	AgentNode,
 	BacktrackResult,
 	DecisionPoint,
 	DistilledSession,
@@ -36,16 +35,6 @@ const makeSummary = (overrides?: Partial<SessionSummary>): SessionSummary => ({
 	git_branch: "main",
 	status: "complete",
 	file_size_bytes: 1024,
-	...overrides,
-});
-
-const makeAgent = (overrides?: Partial<AgentNode>): AgentNode => ({
-	session_id: "agent-001",
-	agent_type: "builder",
-	agent_name: "builder-types",
-	duration_ms: 120000,
-	tool_call_count: 40,
-	children: [],
 	...overrides,
 });
 

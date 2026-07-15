@@ -48,19 +48,20 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 	const lines = rawDiff.split("\n");
 
 	const { result } = lines.reduce<{
-		readonly result: readonly DiffLine[];
-		readonly oldLine: number;
-		readonly newLine: number;
+		result: DiffLine[];
+		oldLine: number;
+		newLine: number;
 		// True once we're inside a hunk (after the first @@). File-header lines
 		// (--- / +++ / index) only appear OUTSIDE a hunk; inside one, a line
 		// beginning with --- / +++ is real content (e.g. `--option`, `-- sql`,
 		// `++count`) and must NOT be skipped as a header.
-		readonly inHunk: boolean;
+		inHunk: boolean;
 	}>(
 		(acc, line) => {
 			// A new file's header block — reset hunk state.
 			if (line.startsWith("diff --git")) {
-				return { ...acc, inHunk: false };
+				acc.inHunk = false;
+				return acc;
 			}
 
 			// File headers / metadata: only valid before the first @@ of the file.
@@ -77,62 +78,43 @@ export const parseUnifiedDiff = (rawDiff: string): readonly DiffLine[] => {
 			// Parse hunk headers for line numbers
 			const hunkMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
 			if (hunkMatch) {
-				return {
-					...acc,
-					oldLine: parseInt(hunkMatch[1], 10),
-					newLine: parseInt(hunkMatch[2], 10),
-					inHunk: true,
-				};
+				acc.oldLine = parseInt(hunkMatch[1], 10);
+				acc.newLine = parseInt(hunkMatch[2], 10);
+				acc.inHunk = true;
+				return acc;
 			}
 
 			// Addition line (inside a hunk; +++ headers are handled above)
 			if (line.startsWith("+")) {
-				return {
-					result: [
-						...acc.result,
-						{
-							type: "add" as const,
-							content: line.slice(1),
-							line_number: acc.newLine,
-						},
-					],
-					oldLine: acc.oldLine,
-					newLine: acc.newLine + 1,
-					inHunk: acc.inHunk,
-				};
+				acc.result.push({
+					type: "add" as const,
+					content: line.slice(1),
+					line_number: acc.newLine,
+				});
+				acc.newLine += 1;
+				return acc;
 			}
 
 			// Removal line (inside a hunk; --- headers are handled above)
 			if (line.startsWith("-")) {
-				return {
-					result: [
-						...acc.result,
-						{
-							type: "remove" as const,
-							content: line.slice(1),
-							line_number: acc.oldLine,
-						},
-					],
-					oldLine: acc.oldLine + 1,
-					newLine: acc.newLine,
-					inHunk: acc.inHunk,
-				};
+				acc.result.push({
+					type: "remove" as const,
+					content: line.slice(1),
+					line_number: acc.oldLine,
+				});
+				acc.oldLine += 1;
+				return acc;
 			}
 
 			// Context line (starts with space)
 			if (line.startsWith(" ")) {
-				return {
-					result: [
-						...acc.result,
-						{
-							type: "context" as const,
-							content: line.slice(1),
-						},
-					],
-					oldLine: acc.oldLine + 1,
-					newLine: acc.newLine + 1,
-					inHunk: acc.inHunk,
-				};
+				acc.result.push({
+					type: "context" as const,
+					content: line.slice(1),
+				});
+				acc.oldLine += 1;
+				acc.newLine += 1;
+				return acc;
 			}
 
 			// Skip any other line (e.g., "\ No newline at end of file")

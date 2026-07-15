@@ -41,10 +41,10 @@ const topNTools = (toolsByName: Record<string, number>, n: number): string[] =>
 
 const summarizeBacktrackTypes = (backtracks: readonly BacktrackResult[]): string => {
 	const typeCounts = backtracks.reduce(
-		(acc, bt) => ({
-			...acc,
-			[bt.type]: (acc[bt.type] ?? 0) + 1,
-		}),
+		(acc, bt) => {
+			acc[bt.type] = (acc[bt.type] ?? 0) + 1;
+			return acc;
+		},
 		{} as Record<string, number>,
 	);
 	return Object.entries(typeCounts)
@@ -58,7 +58,8 @@ const dominantIntent = (reasoning: readonly TranscriptReasoning[]): string => {
 	const intentCounts = reasoning.reduce(
 		(acc, r) => {
 			const intent = r.intent_hint ?? "general";
-			return { ...acc, [intent]: (acc[intent] ?? 0) + 1 };
+			acc[intent] = (acc[intent] ?? 0) + 1;
+			return acc;
 		},
 		{} as Record<string, number>,
 	);
@@ -158,7 +159,6 @@ export const extractSummary = (opts: SummaryOptions): DistilledSummary => {
 		backtracks,
 		phases,
 		file_map,
-		reasoning,
 		team_metrics,
 		activeDuration,
 		agents,

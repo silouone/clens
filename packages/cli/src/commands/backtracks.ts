@@ -75,13 +75,10 @@ const findHotFiles = (
 	const initial: Record<string, number> = {};
 	const fileCounts = backtracks
 		.filter((bt): bt is BacktrackResult & { file_path: string } => bt.file_path !== undefined)
-		.reduce(
-			(acc, bt) => ({
-				...acc,
-				[bt.file_path]: (acc[bt.file_path] ?? 0) + 1,
-			}),
-			initial,
-		);
+		.reduce((acc, bt) => {
+			acc[bt.file_path] = (acc[bt.file_path] ?? 0) + 1;
+			return acc;
+		}, initial);
 
 	return Object.entries(fileCounts)
 		.filter(([, count]) => count >= 2)
@@ -187,10 +184,11 @@ export const renderBacktracksDetail = (distilled: DistilledSession): string => {
 	const separator = dim("---");
 
 	const blocks = backtracks.map((bt, i) => renderSingleBacktrack(bt, i));
-	const joined = blocks.reduce<readonly string[]>(
-		(acc, block, i) => (i === 0 ? [block] : [...acc, separator, block]),
-		[],
-	);
+	const joined = blocks.reduce<string[]>((acc, block, i) => {
+		if (i === 0) acc.push(block);
+		else acc.push(separator, block);
+		return acc;
+	}, []);
 
 	return [header, "", ...joined].join("\n");
 };

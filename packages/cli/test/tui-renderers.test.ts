@@ -7,7 +7,7 @@ import {
 	render,
 } from "../src/commands/tui-renderers";
 import type { TuiState } from "../src/commands/tui-state";
-import type { AgentNode, DistilledSession, SessionSummary } from "../src/types";
+import type { AgentNode, SessionSummary } from "../src/types";
 
 // --- Test helpers ---
 

@@ -11,7 +11,6 @@ import {
 import type { TuiState } from "./tui-state";
 import { CONTENT_SCROLL_TABS, getEditsFileList } from "./tui-state";
 import {
-	collapseConsecutive,
 	formatBacktracksTab,
 	formatCommsTab,
 	formatDecisionsTabFull,

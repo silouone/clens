@@ -165,19 +165,21 @@ export const parseSpecExpectedFiles = (specContent: string): readonly string[] =
 	const lines = specContent.split("\n");
 
 	const { paths } = lines.reduce<{
-		readonly inFilesSection: boolean;
-		readonly inCodeBlock: boolean;
-		readonly paths: readonly string[];
+		inFilesSection: boolean;
+		inCodeBlock: boolean;
+		paths: string[];
 	}>(
 		(acc, line) => {
 			// Track fenced code blocks
 			if (line.trim().startsWith("```")) {
-				return { ...acc, inCodeBlock: !acc.inCodeBlock };
+				acc.inCodeBlock = !acc.inCodeBlock;
+				return acc;
 			}
 
 			// Inside code block: extract lines that look like file paths
 			if (acc.inCodeBlock) {
-				return { ...acc, paths: [...acc.paths, ...extractCodeBlockPaths(line)] };
+				acc.paths.push(...extractCodeBlockPaths(line));
+				return acc;
 			}
 
 			// Explicit declarations (Create:/Modify:/File:) are unambiguous deliverables
@@ -194,29 +196,25 @@ export const parseSpecExpectedFiles = (specContent: string): readonly string[] =
 
 			// Track section context
 			if (isFilesSectionHeading(line)) {
-				return {
-					inFilesSection: true,
-					inCodeBlock: false,
-					paths: [...acc.paths, ...prefixPaths],
-				};
+				acc.inFilesSection = true;
+				acc.inCodeBlock = false;
+				acc.paths.push(...prefixPaths);
+				return acc;
 			}
 
 			if (isAnyHeading(line)) {
-				return {
-					inFilesSection: false,
-					inCodeBlock: false,
-					paths: [...acc.paths, ...prefixPaths],
-				};
+				acc.inFilesSection = false;
+				acc.inCodeBlock = false;
+				acc.paths.push(...prefixPaths);
+				return acc;
 			}
 
 			// In a files section, extract bullet paths
 			const bulletPath = acc.inFilesSection ? extractPathFromBullet(line) : undefined;
 			const bulletPaths = bulletPath ? [normalizePath(bulletPath)] : [];
 
-			return {
-				...acc,
-				paths: [...acc.paths, ...prefixPaths, ...bulletPaths, ...inlinePaths, ...tablePaths],
-			};
+			acc.paths.push(...prefixPaths, ...bulletPaths, ...inlinePaths, ...tablePaths);
+			return acc;
 		},
 		{ inFilesSection: false, inCodeBlock: false, paths: [] },
 	);

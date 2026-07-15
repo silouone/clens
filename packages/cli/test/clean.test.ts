@@ -60,10 +60,10 @@ const distilledPath = (dir: string, id: string) => join(dir, ".clens", "distille
 const writeSession = (dir: string, id: string, distilled: boolean): void => {
 	writeFileSync(
 		sessionPath(dir, id),
-		[
+		`${[
 			JSON.stringify({ event: "SessionStart", t: 1000, sid: id, data: {} }),
 			JSON.stringify({ event: "SessionEnd", t: 2000, sid: id, data: {} }),
-		].join("\n") + "\n",
+		].join("\n")}\n`,
 	);
 	if (distilled) {
 		writeFileSync(distilledPath(dir, id), JSON.stringify({ session_id: id }));

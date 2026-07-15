@@ -6,7 +6,7 @@ import {
 	type ScanSessionFilesFn,
 	synthesizeSpawnLinks,
 } from "../src/distill/synthetic-links";
-import type { LinkEvent, SpawnLink, StopLink, StoredEvent } from "../src/types";
+import type { LinkEvent, SpawnLink, StoredEvent } from "../src/types";
 
 /** No-op scan function for tests that never reach the scan phase. */
 const noopScan: ScanSessionFilesFn = () => [];
@@ -45,14 +45,6 @@ const makeSpawnLink = (overrides: Partial<SpawnLink> = {}): SpawnLink => ({
 	parent_session: "root-session",
 	agent_id: "agent-1",
 	agent_type: "builder",
-	...overrides,
-});
-
-const makeStopLink = (overrides: Partial<StopLink> = {}): StopLink => ({
-	t: 2000,
-	type: "stop",
-	parent_session: "root-session",
-	agent_id: "agent-1",
 	...overrides,
 });
 
@@ -367,7 +359,7 @@ describe("buildSyntheticLinks", () => {
 	test("produces SpawnLink with correct fields and synthetic=true", () => {
 		const matches = [makeMatch()];
 
-		const { spawns, stops } = buildSyntheticLinks(matches, "parent-sess");
+		const { spawns } = buildSyntheticLinks(matches, "parent-sess");
 		expect(spawns).toHaveLength(1);
 		expect(spawns[0].type).toBe("spawn");
 		expect(spawns[0].t).toBe(1000);

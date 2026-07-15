@@ -30,24 +30,22 @@ export interface AggregateTeamInput {
 export const mergeFileMaps = (maps: readonly FileMapResult[]): FileMapResult => {
 	const allFiles = maps.flatMap((m) => m.files);
 
-	const merged = allFiles.reduce<Readonly<Record<string, FileMapEntry>>>((acc, entry) => {
+	const merged = allFiles.reduce<Record<string, FileMapEntry>>((acc, entry) => {
 		const existing = acc[entry.file_path];
-		return {
-			...acc,
-			[entry.file_path]: existing
-				? {
-						file_path: entry.file_path,
-						reads: existing.reads + entry.reads,
-						edits: existing.edits + entry.edits,
-						writes: existing.writes + entry.writes,
-						errors: existing.errors + entry.errors,
-						tool_use_ids: [...existing.tool_use_ids, ...entry.tool_use_ids],
-						...(existing.source !== undefined || entry.source !== undefined
-							? { source: existing.source ?? entry.source }
-							: {}),
-					}
-				: entry,
-		};
+		acc[entry.file_path] = existing
+			? {
+					file_path: entry.file_path,
+					reads: existing.reads + entry.reads,
+					edits: existing.edits + entry.edits,
+					writes: existing.writes + entry.writes,
+					errors: existing.errors + entry.errors,
+					tool_use_ids: [...existing.tool_use_ids, ...entry.tool_use_ids],
+					...(existing.source !== undefined || entry.source !== undefined
+						? { source: existing.source ?? entry.source }
+						: {}),
+				}
+			: entry;
+		return acc;
 	}, {});
 
 	const files = Object.values(merged);
@@ -133,12 +131,15 @@ export const mergeEditChains = (
 		...agentChains.flatMap(({ chains: result }) => result.diff_attribution ?? []),
 	];
 
-	const mergedDiffAttrs = allDiffAttrs.reduce<readonly FileDiffAttribution[]>((acc, attr) => {
+	const mergedDiffAttrs = allDiffAttrs.reduce<FileDiffAttribution[]>((acc, attr) => {
 		const existingIdx = acc.findIndex((a) => a.file_path === attr.file_path);
-		if (existingIdx === -1) return [...acc, attr];
+		if (existingIdx === -1) {
+			acc.push(attr);
+			return acc;
+		}
 		const existing = acc[existingIdx];
 		if (attr.lines.length > existing.lines.length) {
-			return [...acc.slice(0, existingIdx), attr, ...acc.slice(existingIdx + 1)];
+			acc[existingIdx] = attr;
 		}
 		return acc;
 	}, []);
@@ -162,7 +163,7 @@ const toolUseIdOverlap = (idsA: readonly string[], idsB: readonly string[]): num
 
 /** Deduplicate backtracks where type+file_path match and tool_use_ids overlap ≥ 50%. Keep entry with more tool_use_ids. */
 const deduplicateBacktracks = (sorted: readonly BacktrackResult[]): readonly BacktrackResult[] =>
-	sorted.reduce<readonly BacktrackResult[]>((acc, entry) => {
+	sorted.reduce<BacktrackResult[]>((acc, entry) => {
 		const duplicateIndex = acc.findIndex(
 			(existing) =>
 				existing.type === entry.type &&
@@ -170,12 +171,15 @@ const deduplicateBacktracks = (sorted: readonly BacktrackResult[]): readonly Bac
 				toolUseIdOverlap(existing.tool_use_ids, entry.tool_use_ids) >= 0.5,
 		);
 
-		if (duplicateIndex === -1) return [...acc, entry];
+		if (duplicateIndex === -1) {
+			acc.push(entry);
+			return acc;
+		}
 
 		// Keep the one with more tool_use_ids, or the existing one if equal
 		const existing = acc[duplicateIndex];
 		if (entry.tool_use_ids.length > existing.tool_use_ids.length) {
-			return [...acc.slice(0, duplicateIndex), entry, ...acc.slice(duplicateIndex + 1)];
+			acc[duplicateIndex] = entry;
 		}
 		return acc;
 	}, []);
@@ -185,7 +189,7 @@ export const mergeBacktracks = (
 	parentBacktracks: readonly BacktrackResult[],
 	agentBacktracks: readonly (readonly BacktrackResult[])[],
 ): readonly BacktrackResult[] => {
-	const sorted = [...parentBacktracks, ...agentBacktracks.flatMap((b) => b)].sort(
+	const sorted = [...parentBacktracks, ...agentBacktracks.flat()].sort(
 		(a, b) => a.start_t - b.start_t,
 	);
 	return deduplicateBacktracks(sorted);

@@ -1,6 +1,6 @@
 import type { DistilledSession, SessionConfig } from "../types";
 import { classifySeverity, truncate } from "./format-helpers";
-import { bold, cyan, dim, green } from "./shared";
+import { bold, dim, green } from "./shared";
 
 // --- Config line (pure) ---
 

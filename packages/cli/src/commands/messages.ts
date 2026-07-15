@@ -59,11 +59,16 @@ const formatLink = (link: CoordinationLink): string => {
 const groupByTimeWindows = (links: readonly CoordinationLink[]): string => {
 	if (links.length === 0) return "";
 
-	const result = links.reduce<readonly string[]>((acc, link, idx) => {
+	const result = links.reduce<string[]>((acc, link, idx) => {
 		const line = formatLink(link);
-		if (idx === 0) return [line];
+		if (idx === 0) {
+			acc.push(line);
+			return acc;
+		}
 		const gap = link.t - links[idx - 1].t;
-		return gap > TIME_GROUP_GAP_MS ? [...acc, "", line] : [...acc, line];
+		if (gap > TIME_GROUP_GAP_MS) acc.push("", line);
+		else acc.push(line);
+		return acc;
 	}, []);
 
 	return result.join("\n");
