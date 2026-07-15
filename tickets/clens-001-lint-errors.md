@@ -1,10 +1,10 @@
 ---
 id: clens-001-lint-errors
 type: chore
-status: in-progress
+status: blocked
 priority: 1
 created: 2026-07-15
-attempts: []
+attempts: [{"runId":"clens-001-lint-errors-1784130060111","branch":"adw/clens-001-lint-errors","workspace":"/Users/silouane/adw-factory/runs/clens-001-lint-errors-1784130060111/workspace","outcome":"blocked"}]
 ---
 # Make `bun run lint` exit 0 (fix the 19 biome errors)
 
