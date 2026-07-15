@@ -1,10 +1,10 @@
 ---
 id: clens-002-cli-lint-warnings
 type: chore
-status: in-progress
+status: blocked
 priority: 2
 created: 2026-07-15
-attempts: []
+attempts: [{"runId":"clens-002-cli-lint-warnings-1784140659034","branch":"adw/clens-002-cli-lint-warnings","workspace":"/Users/silouane/adw-factory/runs/clens-002-cli-lint-warnings-1784140659034/workspace","outcome":"blocked"}]
 ---
 # Biome-clean packages/cli (zero warnings and infos)
 
