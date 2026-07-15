@@ -1,10 +1,10 @@
 ---
 id: clens-005-hermetic-global-tests
 type: chore
-status: in-progress
+status: blocked
 priority: 1
 created: 2026-07-15
-attempts: []
+attempts: [{"runId":"clens-005-hermetic-global-tests-1784136713704","branch":"adw/clens-005-hermetic-global-tests","workspace":"/Users/silouane/adw-factory/runs/clens-005-hermetic-global-tests-1784136713704/workspace","outcome":"blocked"}]
 ---
 # Make the global-registry tests hermetic (stop scanning the real ~/.clens)
 
