@@ -197,13 +197,13 @@ const saveProjectConfig = async (config: WebClensConfig): Promise<WebClensConfig
 
 // ── Exports ─────────────────────────────────────────────────────────
 
-export {
-	preferences,
-	setPreference,
-	resetPreferences,
-	projectConfig,
-	saveProjectConfig,
-	refetchProjectConfig,
-	DEFAULT_PREFS,
-};
 export type { ClientPreferences, FontSize, TimestampFormat };
+export {
+	DEFAULT_PREFS,
+	preferences,
+	projectConfig,
+	refetchProjectConfig,
+	resetPreferences,
+	saveProjectConfig,
+	setPreference,
+};

@@ -58,5 +58,5 @@ const initThemeListener = (): (() => void) => {
 	return () => mql.removeEventListener("change", handler);
 };
 
-export { theme, setTheme, toggleTheme, initThemeListener };
 export type { Theme };
+export { initThemeListener, setTheme, theme, toggleTheme };

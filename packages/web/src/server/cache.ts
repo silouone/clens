@@ -87,4 +87,4 @@ const getCacheStats = () => ({
 	maxBytes: MAX_BYTES,
 });
 
-export { getCachedEvents, setCachedEvents, invalidateCache, getCacheStats };
+export { getCachedEvents, getCacheStats, invalidateCache, setCachedEvents };

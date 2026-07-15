@@ -58,10 +58,10 @@ const projectColor = (projectId: string): string => {
 };
 
 export {
+	isGlobalMode,
+	projectColor,
 	projectList,
 	refetchProjects,
 	selectedProjectId,
 	setSelectedProjectId,
-	isGlobalMode,
-	projectColor,
 };

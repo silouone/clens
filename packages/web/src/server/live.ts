@@ -279,5 +279,5 @@ const startLiveWatcher = (projectDir: string): LiveWatcherHandle => {
 	};
 };
 
-export { startLiveWatcher, readNewLines };
 export type { LiveWatcherHandle };
+export { readNewLines, startLiveWatcher };

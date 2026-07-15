@@ -116,9 +116,9 @@ const startServer = (options: StartServerOptions): ServerHandle => {
 	};
 };
 
-export { startServer, generateToken, findProjectDir };
-export type { StartServerOptions, ServerHandle };
 export type { AppType } from "./app";
+export type { ServerHandle, StartServerOptions };
+export { findProjectDir, generateToken, startServer };
 
 // ── Project dir resolution ─────────────────────────────────────────
 

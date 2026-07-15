@@ -145,5 +145,5 @@ const serveOnFreePort = (
 	return attempt(preferred, maxTries);
 };
 
-export { findFreePort, serveOnFreePort, PortExhaustionError, StrictPortUnavailableError };
-export type { FindFreePortOpts, ServeOnFreePortOpts, ServeResult, ServeConfig };
+export type { FindFreePortOpts, ServeConfig, ServeOnFreePortOpts, ServeResult };
+export { findFreePort, PortExhaustionError, StrictPortUnavailableError, serveOnFreePort };

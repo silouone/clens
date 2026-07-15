@@ -64,5 +64,5 @@ const createLogger = (tag: string): Logger => {
 
 const log = createLogger("clens");
 
-export { createLogger, log, currentLevel };
 export type { Logger, LogLevel };
+export { createLogger, currentLevel, log };

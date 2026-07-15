@@ -277,23 +277,23 @@ const initSSE = (): (() => void) => {
 	return client.disconnect;
 };
 
-export {
-	createSSEClient,
-	initSSE,
-	activeSessionId,
-	setActiveSessionId,
-	liveEvents,
-	clearLiveEvents,
-	liveLinks,
-	appendLiveLink,
-	clearLiveLinks,
-	lastDistilledSessionId,
-};
 export type {
 	ConnectionStatus,
+	DistillCompleteData,
+	LiveEventData,
+	SessionUpdateData,
 	SSEClient,
 	SSEEventHandler,
-	SessionUpdateData,
-	LiveEventData,
-	DistillCompleteData,
+};
+export {
+	activeSessionId,
+	appendLiveLink,
+	clearLiveEvents,
+	clearLiveLinks,
+	createSSEClient,
+	initSSE,
+	lastDistilledSessionId,
+	liveEvents,
+	liveLinks,
+	setActiveSessionId,
 };

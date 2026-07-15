@@ -21,14 +21,22 @@ const makeTempDir = (): string => {
 
 describe("session-registry", () => {
 	let tempDir: string;
+	let globalDir: string;
+	let previousGlobalDir: string | undefined;
 
 	beforeEach(() => {
 		tempDir = makeTempDir();
+		globalDir = makeTempDir();
+		previousGlobalDir = process.env.CLENS_GLOBAL_DIR;
+		process.env.CLENS_GLOBAL_DIR = globalDir;
 	});
 
 	afterEach(() => {
+		if (previousGlobalDir === undefined) delete process.env.CLENS_GLOBAL_DIR;
+		else process.env.CLENS_GLOBAL_DIR = previousGlobalDir;
 		// Clean up any test projects we registered
 		rmSync(tempDir, { recursive: true, force: true });
+		rmSync(globalDir, { recursive: true, force: true });
 	});
 
 	describe("readRegistry", () => {
