@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { readNewLines } from "../../src/server/live";
 import { broadcastSSE, getEventsAfter, getRingBufferSize } from "../../src/server/routes/events";
@@ -99,6 +99,6 @@ describe("Ring buffer", () => {
 		const result = getEventsAfter(999_999_999);
 		// Should return empty array (not undefined) — ID is in the future, not evicted
 		expect(result).toBeDefined();
-		expect(result!.length).toBe(0);
+		expect(result).toHaveLength(0);
 	});
 });

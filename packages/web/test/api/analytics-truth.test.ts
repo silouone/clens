@@ -40,7 +40,7 @@ type DistillOpts = {
 const writeSession = (id: string, opts: DistillOpts): void => {
 	writeFileSync(
 		`${SESSIONS_DIR}/${id}.jsonl`,
-		[
+		`${[
 			JSON.stringify({
 				event: "SessionStart",
 				t: opts.startMs,
@@ -55,7 +55,7 @@ const writeSession = (id: string, opts: DistillOpts): void => {
 				data: { reason: "done" },
 				context: {},
 			}),
-		].join("\n") + "\n",
+		].join("\n")}\n`,
 	);
 	writeFileSync(
 		`${DISTILLED_DIR}/${id}.json`,

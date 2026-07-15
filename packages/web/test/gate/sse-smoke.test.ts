@@ -5,7 +5,8 @@ const collectSSEEvents = async (
 	response: Response,
 	signal: AbortSignal,
 ): Promise<readonly string[]> => {
-	const reader = response.body!.getReader();
+	if (!response.body) throw new Error("collectSSEEvents: response has no body");
+	const reader = response.body.getReader();
 	const decoder = new TextDecoder();
 	const events: string[] = [];
 

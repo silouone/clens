@@ -36,7 +36,7 @@ describe("Session API endpoints", () => {
 			makeEvent("ToolResult", 2000, { tool: "Read" }),
 			makeEvent("Stop", 3000, { reason: "user" }),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, events.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, `${events.join("\n")}\n`);
 
 		// Write a second session with distilled data + tool events for conversation
 		const distilledEvents = [
@@ -69,7 +69,7 @@ describe("Session API endpoints", () => {
 		];
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${DISTILLED_SESSION_ID}.jsonl`,
-			distilledEvents.join("\n") + "\n",
+			`${distilledEvents.join("\n")}\n`,
 		);
 		writeFileSync(
 			`${TEST_DIR}/.clens/distilled/${DISTILLED_SESSION_ID}.json`,
@@ -129,7 +129,7 @@ describe("Session API endpoints", () => {
 		];
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${DISTILL_CMD_SESSION_ID}.jsonl`,
-			distillCmdEvents.join("\n") + "\n",
+			`${distillCmdEvents.join("\n")}\n`,
 		);
 
 		// Write agent session events
@@ -144,14 +144,14 @@ describe("Session API endpoints", () => {
 			makeEvent("PostToolUse", 5300, { tool_name: "Write", tool_use_id: "tu_a01" }, AGENT_ID),
 			makeEvent("Stop", 5500, { reason: "done" }, AGENT_ID),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${AGENT_ID}.jsonl`, agentEvents.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${AGENT_ID}.jsonl`, `${agentEvents.join("\n")}\n`);
 
 		// Ghost session: only broadcast events (Notification). Claude Code broadcasts
 		// these to every open session file, so a file containing nothing else is a
 		// ghost that must not appear in the list (bug sessions-list-ghost-sessions-shown).
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${GHOST_SESSION_ID}.jsonl`,
-			makeEvent("Notification", 9000, { message: "broadcast noise" }, GHOST_SESSION_ID) + "\n",
+			`${makeEvent("Notification", 9000, { message: "broadcast noise" }, GHOST_SESSION_ID)}\n`,
 		);
 
 		// Truncated session: a real first event, a real second event, then a torn
@@ -161,11 +161,11 @@ describe("Session API endpoints", () => {
 		const truncatedLines = [
 			makeEvent("SessionStart", 8000, { source: "cli" }, TRUNCATED_SESSION_ID),
 			makeEvent("Stop", 10000, { reason: "user" }, TRUNCATED_SESSION_ID),
-			'{"event":"PostToolUse","t":11000,"sid":"' + TRUNCATED_SESSION_ID + '","data":{"tool_nam', // torn line
+			`{"event":"PostToolUse","t":11000,"sid":"${TRUNCATED_SESSION_ID}","data":{"tool_nam`, // torn line
 		];
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${TRUNCATED_SESSION_ID}.jsonl`,
-			truncatedLines.join("\n") + "\n",
+			`${truncatedLines.join("\n")}\n`,
 		);
 
 		app = createApp({ token: TEST_TOKEN, mode: "development", projectDir: TEST_DIR });

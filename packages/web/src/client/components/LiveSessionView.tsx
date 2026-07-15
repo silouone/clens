@@ -186,7 +186,7 @@ const extractDetail = (event: StoredEvent): string => {
 		}
 		case "UserPromptSubmit": {
 			const text = typeof d.text === "string" ? d.text : "";
-			return text.length > 80 ? text.slice(0, 77) + "..." : text;
+			return text.length > 80 ? `${text.slice(0, 77)}...` : text;
 		}
 		case "SubagentStart":
 		case "SubagentStop": {

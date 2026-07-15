@@ -39,10 +39,10 @@ const flattenTypes = (nodes: readonly TreeAgent[]): readonly string[] =>
 
 // Count occurrences per type, sorted high→low (the agent-type "shape").
 const groupTypes = (types: readonly string[]): readonly AgentTypeCount[] => {
-	const counts = types.reduce<ReadonlyMap<string, number>>(
-		(acc, t) => new Map([...acc, [t, (acc.get(t) ?? 0) + 1]]),
-		new Map(),
-	);
+	const counts = types.reduce<Map<string, number>>((acc, t) => {
+		acc.set(t, (acc.get(t) ?? 0) + 1);
+		return acc;
+	}, new Map());
 	return [...counts.entries()]
 		.map(([type, count]) => ({ type, count }))
 		.sort((a, b) => b.count - a.count);

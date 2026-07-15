@@ -64,10 +64,10 @@ export const StackedArea = <T,>(props: StackedAreaProps<T>): ReturnType<Componen
 	const stacked = createMemo(() =>
 		props.data.map((d) => {
 			const values = props.series.map((s) => props.getValue(d, s.key));
-			const cumulative = values.reduce<readonly number[]>(
-				(acc, v) => [...acc, (acc[acc.length - 1] ?? 0) + v],
-				[],
-			);
+			const cumulative = values.reduce<number[]>((acc, v) => {
+				acc.push((acc[acc.length - 1] ?? 0) + v);
+				return acc;
+			}, []);
 			return { values, cumulative, total: cumulative[cumulative.length - 1] ?? 0 };
 		}),
 	);

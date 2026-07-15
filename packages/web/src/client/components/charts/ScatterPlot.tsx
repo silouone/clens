@@ -5,7 +5,6 @@ import type { BaseChartProps } from "./shared";
 import {
 	CHART_HAIRLINE,
 	CHART_PADDING,
-	CHART_SURFACE,
 	DRIFT_COLORS,
 	formatCompact,
 	formatShortDate,

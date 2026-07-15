@@ -1,5 +1,5 @@
 import { Clock, GitBranch, Layers, Users } from "lucide-solid";
-import { type Component, For, Match, Show, Switch } from "solid-js";
+import { type Component, For, Show } from "solid-js";
 import type { DecisionPoint } from "../../shared/types";
 import { Card } from "./ui/Card";
 

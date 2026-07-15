@@ -1,4 +1,4 @@
-import { createSignal, onCleanup } from "solid-js";
+import { createSignal } from "solid-js";
 import { getToken } from "./api";
 import { debounce } from "./debounce";
 import { refetchSessions } from "./stores";

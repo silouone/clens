@@ -38,7 +38,7 @@ describe("POST distill refreshes the analytics summary (web-distill-skips-analyt
 
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`,
-			[
+			`${[
 				makeEvent("SessionStart", 1000, { source: "cli" }),
 				makeEvent("PreToolUse", 1500, {
 					tool_name: "Read",
@@ -47,7 +47,7 @@ describe("POST distill refreshes the analytics summary (web-distill-skips-analyt
 				}),
 				makeEvent("PostToolUse", 1600, { tool_name: "Read", tool_use_id: "tu_1" }),
 				makeEvent("Stop", 2000, { reason: "done" }),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 
 		app = createApp({ token: "test-token", mode: "development", projectDir: TEST_DIR });

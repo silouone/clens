@@ -1,4 +1,4 @@
-import { type Component, createSignal, For, type JSX, Show } from "solid-js";
+import { type Component, createSignal, type JSX, Show } from "solid-js";
 import { TreeToggle } from "./ui/TreeToggle";
 
 // ── Types ────────────────────────────────────────────────────────────

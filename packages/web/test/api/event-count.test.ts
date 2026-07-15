@@ -32,7 +32,7 @@ describe("exact event counts (B1 regression)", () => {
 			),
 			makeEvent("SessionEnd", 99_000, BIG_ID),
 		];
-		const content = lines.join("\n") + "\n";
+		const content = `${lines.join("\n")}\n`;
 		expect(content.length).toBeGreaterThan(16_384); // must exceed the head-chunk size
 		writeFileSync(`${TEST_DIR}/.clens/sessions/${BIG_ID}.jsonl`, content);
 
@@ -78,7 +78,7 @@ describe("exact event counts (B1 regression)", () => {
 		expect(before.event_count).toBe(BIG_LINES);
 		appendFileSync(
 			`${TEST_DIR}/.clens/sessions/${BIG_ID}.jsonl`,
-			makeEvent("UserPromptSubmit", 100_000, BIG_ID) + "\n",
+			`${makeEvent("UserPromptSubmit", 100_000, BIG_ID)}\n`,
 		);
 		const after = await findSession(BIG_ID);
 		expect(after.event_count).toBe(BIG_LINES + 1);

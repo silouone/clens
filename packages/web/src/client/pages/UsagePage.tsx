@@ -230,26 +230,26 @@ export const UsagePage: Component = () => {
 	const cacheNa = createMemo(() => totals()?.cache_hit_rate == null);
 
 	// KPI deltas. value/paid track API-equivalent value (cost_usd === value_usd).
-	const valueDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline()
-			? computeDelta(totals()!.value_usd, prevTotals()!.value_usd)
-			: undefined,
-	);
-	const paidDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline()
-			? computeDelta(totals()!.paid_usd, prevTotals()!.paid_usd)
-			: undefined,
-	);
-	const roiDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline()
-			? computeDelta(totals()!.roi, prevTotals()!.roi)
-			: undefined,
-	);
-	const sessionDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline()
-			? computeDelta(totals()!.sessions, prevTotals()!.sessions)
-			: undefined,
-	);
+	const valueDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		return t && p && hasPrevBaseline() ? computeDelta(t.value_usd, p.value_usd) : undefined;
+	});
+	const paidDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		return t && p && hasPrevBaseline() ? computeDelta(t.paid_usd, p.paid_usd) : undefined;
+	});
+	const roiDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		return t && p && hasPrevBaseline() ? computeDelta(t.roi, p.roi) : undefined;
+	});
+	const sessionDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		return t && p && hasPrevBaseline() ? computeDelta(t.sessions, p.sessions) : undefined;
+	});
 	// Cache delta only when both windows have a real (non-null) reading.
 	const cacheDelta = createMemo(() => {
 		const t = totals();
@@ -258,11 +258,13 @@ export const UsagePage: Component = () => {
 		if (t.cache_hit_rate == null || p.cache_hit_rate == null) return undefined;
 		return computePpDelta(t.cache_hit_rate, p.cache_hit_rate);
 	});
-	const durationDelta = createMemo(() =>
-		totals() && prevTotals() && hasPrevBaseline()
-			? computeDelta(totals()!.avg_duration_ms, prevTotals()!.avg_duration_ms)
-			: undefined,
-	);
+	const durationDelta = createMemo(() => {
+		const t = totals();
+		const p = prevTotals();
+		return t && p && hasPrevBaseline()
+			? computeDelta(t.avg_duration_ms, p.avg_duration_ms)
+			: undefined;
+	});
 
 	// Estimated-fraction badge (AC12): only when the window is not fully measured.
 	const estimatedBadge = createMemo(() => {

@@ -54,8 +54,11 @@ const decisionLabel = (type: string): string => DECISION_LABELS[type] ?? type.re
 const buildDecisionRows = (decisions: readonly DecisionPoint[]): readonly DecisionRow[] => {
 	if (decisions.length === 0) return [];
 	const counts = decisions.reduce(
-		(acc, d) => ({ ...acc, [d.type]: (acc[d.type] ?? 0) + 1 }),
-		{} as Readonly<Record<string, number>>,
+		(acc, d) => {
+			acc[d.type] = (acc[d.type] ?? 0) + 1;
+			return acc;
+		},
+		{} as Record<string, number>,
 	);
 	const maxCount = Math.max(...Object.values(counts));
 	return Object.entries(counts)

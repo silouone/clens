@@ -652,11 +652,12 @@ const computeDailyInsights = (
 					"backtracks_by_type" | "reasoning_by_intent" | "decision_types"
 				>,
 			) =>
-				rows.reduce<Record<string, number>>(
-					(acc, r) =>
-						Object.entries(r[key]).reduce((a, [k, v]) => ({ ...a, [k]: (a[k] ?? 0) + v }), acc),
-					{},
-				);
+				rows.reduce<Record<string, number>>((acc, r) => {
+					for (const [k, v] of Object.entries(r[key])) {
+						acc[k] = (acc[k] ?? 0) + v;
+					}
+					return acc;
+				}, {});
 
 			return {
 				date,
@@ -708,19 +709,18 @@ const computeInsightsTotals = (rows: readonly AnalyticsSummaryRow[]): InsightsTo
 	const totalToolCalls = rows.reduce((s, r) => s + r.tool_call_count, 0);
 
 	// Merge distributions
-	const reasoningDist = rows.reduce<Record<string, number>>(
-		(acc, r) =>
-			Object.entries(r.reasoning_by_intent).reduce(
-				(a, [k, v]) => ({ ...a, [k]: (a[k] ?? 0) + v }),
-				acc,
-			),
-		{},
-	);
-	const decisionDist = rows.reduce<Record<string, number>>(
-		(acc, r) =>
-			Object.entries(r.decision_types).reduce((a, [k, v]) => ({ ...a, [k]: (a[k] ?? 0) + v }), acc),
-		{},
-	);
+	const reasoningDist = rows.reduce<Record<string, number>>((acc, r) => {
+		for (const [k, v] of Object.entries(r.reasoning_by_intent)) {
+			acc[k] = (acc[k] ?? 0) + v;
+		}
+		return acc;
+	}, {});
+	const decisionDist = rows.reduce<Record<string, number>>((acc, r) => {
+		for (const [k, v] of Object.entries(r.decision_types)) {
+			acc[k] = (acc[k] ?? 0) + v;
+		}
+		return acc;
+	}, {});
 
 	const backtrackRate = rows.length > 0 ? totalBacktracks / rows.length : 0;
 	const abandonedEditRate = editTotal > 0 ? totalAbandoned / editTotal : 0;

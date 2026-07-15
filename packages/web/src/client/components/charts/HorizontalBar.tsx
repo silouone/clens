@@ -14,20 +14,11 @@ interface HorizontalBarProps<T> extends BaseChartProps {
 }
 
 export const HorizontalBar = <T,>(props: HorizontalBarProps<T>): ReturnType<Component> => {
-	const barH = () => props.barHeight ?? 24;
-	const gap = 6;
-	const labelWidth = 120;
-	const valueWidth = 60;
 	const color = () => props.color ?? CHART_COLORS.blue;
 
 	const maxVal = createMemo(() =>
 		niceMax(props.data.reduce((m, d) => Math.max(m, props.value(d)), 0)),
 	);
-
-	const totalHeight = createMemo(() => {
-		const n = props.data.length;
-		return n > 0 ? n * (barH() + gap) + 8 : 40;
-	});
 
 	return (
 		<Show

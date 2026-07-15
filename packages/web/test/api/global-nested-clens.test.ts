@@ -24,10 +24,10 @@ const writeSession = (captureDir: string, sid: string, start: number, end: numbe
 	mkdirSync(join(captureDir, ".clens", "distilled"), { recursive: true });
 	writeFileSync(
 		join(captureDir, ".clens", "sessions", `${sid}.jsonl`),
-		[
+		`${[
 			makeEvent("SessionStart", start, sid, { source: "cli" }),
 			makeEvent("SessionEnd", end, sid, { reason: "done" }),
-		].join("\n") + "\n",
+		].join("\n")}\n`,
 	);
 };
 
