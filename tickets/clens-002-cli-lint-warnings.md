@@ -4,6 +4,7 @@ type: chore
 status: blocked
 priority: 2
 created: 2026-07-15
+caps: { minutes: 480, turns: 400 }
 attempts: [{"runId":"clens-002-cli-lint-warnings-1784140659034","branch":"adw/clens-002-cli-lint-warnings","workspace":"/Users/silouane/adw-factory/runs/clens-002-cli-lint-warnings-1784140659034/workspace","outcome":"blocked"}]
 ---
 # Biome-clean packages/cli (zero warnings and infos)

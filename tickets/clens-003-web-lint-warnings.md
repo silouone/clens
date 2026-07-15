@@ -4,6 +4,7 @@ type: chore
 status: queued
 priority: 2
 created: 2026-07-15
+caps: { minutes: 480, turns: 400 }
 attempts: []
 ---
 # Biome-clean packages/web (zero warnings and infos)
