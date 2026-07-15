@@ -1,7 +1,7 @@
 ---
 id: clens-004-dep-patch-bumps
 type: chore
-status: queued
+status: in-progress
 priority: 2
 created: 2026-07-15
 attempts: []
