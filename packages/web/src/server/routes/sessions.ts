@@ -375,7 +375,8 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 	const spawns = deduplicateSpawns(links.filter(isSpawnLink));
 	const spawnCountByParent = spawns.reduce((acc, s) => {
 		const prev = acc.get(s.parent_session) ?? 0;
-		return new Map([...acc, [s.parent_session, prev + 1]]);
+		acc.set(s.parent_session, prev + 1);
+		return acc;
 	}, new Map<string, number>());
 	const subagentIds = new Set(spawns.map((s) => s.agent_id));
 
@@ -386,7 +387,8 @@ const listSessionsLightweight = (projectDir: string): readonly SessionSummary[] 
 	const msgRecipientsBySession = msgSendEvents.reduce((acc, msg) => {
 		const sid = msg.session_id ?? msg.from;
 		const existing = acc.get(sid);
-		return new Map([...acc, [sid, existing ? new Set([...existing, msg.to]) : new Set([msg.to])]]);
+		acc.set(sid, existing ? new Set([...existing, msg.to]) : new Set([msg.to]));
+		return acc;
 	}, new Map<string, Set<string>>());
 
 	const rows = files

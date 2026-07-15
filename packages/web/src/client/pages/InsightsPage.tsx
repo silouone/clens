@@ -238,10 +238,10 @@ const bucketDecisions = (
 	if (!useWeekly) {
 		return daily.map((d) => ({
 			label: d.date,
-			timing_gap: d.decision_types["timing_gap"] ?? 0,
-			tool_pivot: d.decision_types["tool_pivot"] ?? 0,
-			phase_boundary: d.decision_types["phase_boundary"] ?? 0,
-			task_delegation: d.decision_types["task_delegation"] ?? 0,
+			timing_gap: d.decision_types.timing_gap ?? 0,
+			tool_pivot: d.decision_types.tool_pivot ?? 0,
+			phase_boundary: d.decision_types.phase_boundary ?? 0,
+			task_delegation: d.decision_types.task_delegation ?? 0,
 		}));
 	}
 
@@ -261,10 +261,10 @@ const bucketDecisions = (
 		};
 		weeks.set(key, {
 			label: key,
-			timing_gap: existing.timing_gap + (d.decision_types["timing_gap"] ?? 0),
-			tool_pivot: existing.tool_pivot + (d.decision_types["tool_pivot"] ?? 0),
-			phase_boundary: existing.phase_boundary + (d.decision_types["phase_boundary"] ?? 0),
-			task_delegation: existing.task_delegation + (d.decision_types["task_delegation"] ?? 0),
+			timing_gap: existing.timing_gap + (d.decision_types.timing_gap ?? 0),
+			tool_pivot: existing.tool_pivot + (d.decision_types.tool_pivot ?? 0),
+			phase_boundary: existing.phase_boundary + (d.decision_types.phase_boundary ?? 0),
+			task_delegation: existing.task_delegation + (d.decision_types.task_delegation ?? 0),
 		});
 	});
 

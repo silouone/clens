@@ -62,10 +62,11 @@ const STRIP_ORDER: readonly StepKind[] = ["success", "failure", "abandoned"] as 
 type StepCounts = Readonly<Record<StepKind, number>>;
 
 const countSteps = (steps: readonly EditStep[], abandoned: ReadonlySet<string>): StepCounts =>
-	steps.reduce<StepCounts>(
+	steps.reduce<Record<StepKind, number>>(
 		(acc, s) => {
 			const k = stepKind(s, abandoned);
-			return { ...acc, [k]: acc[k] + 1 };
+			acc[k] += 1;
+			return acc;
 		},
 		{ success: 0, failure: 0, info: 0, abandoned: 0 },
 	);
@@ -140,10 +141,10 @@ const ChurnSummary: Component<{ readonly chains: readonly EditChain[] }> = (prop
 	);
 
 	const topFiles = createMemo<readonly FileChurn[]>(() => {
-		const byPath = props.chains.reduce<Record<string, number>>(
-			(acc, c) => ({ ...acc, [c.file_path]: (acc[c.file_path] ?? 0) + c.total_edits }),
-			{},
-		);
+		const byPath = props.chains.reduce<Record<string, number>>((acc, c) => {
+			acc[c.file_path] = (acc[c.file_path] ?? 0) + c.total_edits;
+			return acc;
+		}, {});
 		return Object.entries(byPath)
 			.map(([file_path, edits]) => ({ file_path, edits }))
 			.sort((a, b) => b.edits - a.edits)

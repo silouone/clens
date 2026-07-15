@@ -1,7 +1,6 @@
 import { Keyboard } from "lucide-solid";
 import { type Component, createMemo, For, onCleanup, Show } from "solid-js";
 import { activeShortcuts, GLOBAL_SHORTCUTS, setShowHelp, showHelp } from "../lib/keyboard";
-import { KbdShortcut } from "./ui/KbdShortcut";
 
 // ── Group shortcuts by context ──────────────────────────────────────
 

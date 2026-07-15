@@ -53,10 +53,10 @@ export const EditsWidget: Component<WidgetProps> = (props) => {
 
 	// Most-churned FILES: aggregate chains by path (one file == one bar), top 5.
 	const topFiles = createMemo<readonly FileChurn[]>(() => {
-		const byPath = chains().reduce<Record<string, number>>(
-			(acc, c) => ({ ...acc, [c.file_path]: (acc[c.file_path] ?? 0) + c.total_edits }),
-			{},
-		);
+		const byPath = chains().reduce<Record<string, number>>((acc, c) => {
+			acc[c.file_path] = (acc[c.file_path] ?? 0) + c.total_edits;
+			return acc;
+		}, {});
 		return Object.entries(byPath)
 			.map(([file_path, edits]) => ({ file_path, edits }))
 			.sort((a, b) => b.edits - a.edits)

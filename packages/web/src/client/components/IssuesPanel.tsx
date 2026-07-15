@@ -34,18 +34,16 @@ const groupBacktracks = (
 		readonly error_message?: string;
 	}[],
 ): readonly GroupedBacktrack[] => {
-	const grouped = backtracks.reduce<ReadonlyMap<string, GroupedBacktrack>>((acc, bt) => {
+	const grouped = backtracks.reduce<Map<string, GroupedBacktrack>>((acc, bt) => {
 		const key = `${bt.type}::${bt.tool_name}`;
 		const existing = acc.get(key);
-		return new Map([
-			...acc,
-			[
-				key,
-				existing
-					? { ...existing, count: existing.count + 1 }
-					: { type: bt.type, tool_name: bt.tool_name, error_message: bt.error_message, count: 1 },
-			],
-		]);
+		acc.set(
+			key,
+			existing
+				? { ...existing, count: existing.count + 1 }
+				: { type: bt.type, tool_name: bt.tool_name, error_message: bt.error_message, count: 1 },
+		);
+		return acc;
 	}, new Map());
 	return [...grouped.values()].sort((a, b) => b.count - a.count);
 };

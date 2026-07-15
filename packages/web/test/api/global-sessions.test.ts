@@ -35,17 +35,17 @@ describe("web API — global sessions", () => {
 
 		writeFileSync(
 			join(projectA, ".clens", "sessions", `${SESSION_A}.jsonl`),
-			[
+			`${[
 				makeEvent("SessionStart", 1000, { source: "cli" }, SESSION_A),
 				makeEvent("SessionEnd", 2000, { reason: "done" }, SESSION_A),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 		writeFileSync(
 			join(projectB, ".clens", "sessions", `${SESSION_B}.jsonl`),
-			[
+			`${[
 				makeEvent("SessionStart", 3000, { source: "cli" }, SESSION_B),
 				makeEvent("SessionEnd", 4000, { reason: "done" }, SESSION_B),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 
 		projects = [

@@ -93,10 +93,10 @@ export const BacktracksTab: Component<TabProps> = (props) => {
 	);
 
 	const byTool = createMemo(() => {
-		const counts = backtracks().reduce<ReadonlyMap<string, number>>(
-			(acc, bt) => new Map([...acc, [bt.tool_name, (acc.get(bt.tool_name) ?? 0) + 1]]),
-			new Map(),
-		);
+		const counts = backtracks().reduce<Map<string, number>>((acc, bt) => {
+			acc.set(bt.tool_name, (acc.get(bt.tool_name) ?? 0) + 1);
+			return acc;
+		}, new Map());
 		return [...counts]
 			.map(([tool_name, count]) => ({ tool_name, count }))
 			.sort((a, b) => b.count - a.count)

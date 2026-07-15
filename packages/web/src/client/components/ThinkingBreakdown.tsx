@@ -41,12 +41,12 @@ const buildIntentRows = (session: DistilledSession): readonly IntentRow[] => {
 	const counts = reasoning.reduce(
 		(acc, r) => {
 			const intent = r.intent_hint ?? "general";
-			return { ...acc, [intent]: (acc[intent] ?? 0) + 1 };
+			acc[intent] = (acc[intent] ?? 0) + 1;
+			return acc;
 		},
-		{} as Readonly<Record<string, number>>,
+		{} as Record<string, number>,
 	);
 
-	const total = reasoning.length;
 	const maxCount = Math.max(...Object.values(counts));
 
 	return Object.entries(counts)

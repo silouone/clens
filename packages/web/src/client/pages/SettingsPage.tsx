@@ -20,7 +20,7 @@ import {
 	saveProjectConfig,
 	setPreference,
 } from "../lib/settings";
-import { setTheme, theme } from "../lib/theme";
+import { setTheme } from "../lib/theme";
 
 // ── Theme mode (3-way: light / dark / system) ───────────────────────
 

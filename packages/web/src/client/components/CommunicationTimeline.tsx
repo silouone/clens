@@ -127,7 +127,6 @@ export const CommunicationTimeline: Component<CommunicationTimelineProps> = (pro
 							const toLane = getLane(msg.to_name);
 							const leftLane = Math.min(fromLane, toLane);
 							const rightLane = Math.max(fromLane, toLane);
-							const isLeftToRight = fromLane < toLane;
 
 							return (
 								<div class="group relative flex items-center border-b border-clens transition hover:bg-surface-hover">

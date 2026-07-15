@@ -33,7 +33,7 @@ describe("Integration: Full server lifecycle", () => {
 			makeEvent("PostToolUse", 1800, { tool_name: "Edit", tool_use_id: "tu_002" }),
 			makeEvent("Stop", 2000, { reason: "user" }),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, events.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, `${events.join("\n")}\n`);
 
 		writeFileSync(
 			`${TEST_DIR}/.clens/distilled/${SESSION_ID}.json`,
@@ -186,7 +186,7 @@ describe("Integration: Full server lifecycle", () => {
 			makeEvent("PreToolUse", 1400, { tool_name: "Edit", tool_use_id: "s2" }),
 			makeEvent("PreToolUse", 1600, { tool_name: "Bash", tool_use_id: "s3" }),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${staleId}.jsonl`, staleEvents.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${staleId}.jsonl`, `${staleEvents.join("\n")}\n`);
 		writeFileSync(
 			`${TEST_DIR}/.clens/distilled/${staleId}.json`,
 			JSON.stringify({
@@ -233,7 +233,7 @@ describe("Integration: Full server lifecycle", () => {
 		// 4 well-formed events + one torn (partial JSON) trailing line, no final newline.
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${tornId}.jsonl`,
-			tornEvents.join("\n") + "\n" + '{"event":"PreToolUse","t":1800,',
+			`${tornEvents.join("\n")}\n{"event":"PreToolUse","t":1800,`,
 		);
 		writeFileSync(
 			`${TEST_DIR}/.clens/distilled/${tornId}.json`,
@@ -274,7 +274,7 @@ describe("Integration: Full server lifecycle", () => {
 			makeEvent("SessionStart", 1000, { source: "cli" }),
 			makeEvent("SessionEnd", 2000, {}),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${tierId}.jsonl`, tierEvents.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${tierId}.jsonl`, `${tierEvents.join("\n")}\n`);
 		writeFileSync(
 			`${TEST_DIR}/.clens/distilled/${tierId}.json`,
 			JSON.stringify({
@@ -334,7 +334,7 @@ describe("Integration: Full server lifecycle", () => {
 			makeEvent("SessionStart", 1000, { source: "cli" }),
 			makeEvent("SessionEnd", 2000, {}),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${matchId}.jsonl`, matchEvents.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${matchId}.jsonl`, `${matchEvents.join("\n")}\n`);
 		writeFileSync(
 			`${TEST_DIR}/.clens/distilled/${matchId}.json`,
 			JSON.stringify({
@@ -403,7 +403,7 @@ describe("Integration: Full server lifecycle", () => {
 				context: { git_branch: "main" },
 			}),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${liveId}.jsonl`, liveEvents.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${liveId}.jsonl`, `${liveEvents.join("\n")}\n`);
 
 		const res = await authFetch("/api/sessions");
 		expect(res.status).toBe(200);
@@ -442,7 +442,7 @@ describe("Integration: Full server lifecycle", () => {
 				context: { git_branch: "main" },
 			}),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${parentId}.jsonl`, parentEvents.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${parentId}.jsonl`, `${parentEvents.join("\n")}\n`);
 		// child-a spawned twice (resume) + child-b once → 2 distinct agents.
 		const links = [
 			JSON.stringify({
@@ -467,7 +467,7 @@ describe("Integration: Full server lifecycle", () => {
 				agent_type: "builder",
 			}),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, links.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/_links.jsonl`, `${links.join("\n")}\n`);
 
 		const res = await authFetch("/api/sessions?limit=5000");
 		expect(res.status).toBe(200);
@@ -548,7 +548,8 @@ describe("Integration: Full server lifecycle", () => {
 		expect(res.status).toBe(200);
 		expect(res.headers.get("content-type")).toContain("text/event-stream");
 
-		const reader = res.body!.getReader();
+		if (!res.body) throw new Error("SSE response has no body");
+		const reader = res.body.getReader();
 		const decoder = new TextDecoder();
 		const { value } = await reader.read();
 		const text = decoder.decode(value);

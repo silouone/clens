@@ -13,8 +13,6 @@ const TEST_DIR = "/tmp/clens-analytics-api-test";
 const SESSIONS_DIR = `${TEST_DIR}/.clens/sessions`;
 const DISTILLED_DIR = `${TEST_DIR}/.clens/distilled`;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 // Local-day key for a timestamp, mirroring the server's bucketing (B18).
 const localDay = (ms: number): string => {
 	const d = new Date(ms);
@@ -45,7 +43,7 @@ const writeRawSession = (id: string, startMs: number): void => {
 			context: {},
 		}),
 	];
-	writeFileSync(`${SESSIONS_DIR}/${id}.jsonl`, lines.join("\n") + "\n");
+	writeFileSync(`${SESSIONS_DIR}/${id}.jsonl`, `${lines.join("\n")}\n`);
 };
 
 type DistillOpts = {
@@ -111,7 +109,6 @@ const writeDistilled = (id: string, opts: DistillOpts): void => {
 const RAW_ONLY_ID = "00000000-0000-0000-0000-00000000raw1";
 const COST_ID = "11111111-1111-1111-1111-111111111111";
 const TOOLS_ID = "22222222-2222-2222-2222-222222222222";
-const PREV_ID = "33333333-3333-3333-3333-333333333333";
 
 describe("analytics API", () => {
 	let app: ReturnType<typeof createApp>;
@@ -225,7 +222,7 @@ describe("analytics API", () => {
 			const ms = noonDaysAgo(daysAgo);
 			writeFileSync(
 				`${dir}/.clens/sessions/${id}.jsonl`,
-				[
+				`${[
 					JSON.stringify({
 						event: "SessionStart",
 						t: ms,
@@ -240,7 +237,7 @@ describe("analytics API", () => {
 						data: { reason: "done" },
 						context: {},
 					}),
-				].join("\n") + "\n",
+				].join("\n")}\n`,
 			);
 			writeFileSync(
 				`${dir}/.clens/distilled/${id}.json`,
@@ -315,7 +312,7 @@ describe("global analytics — unknown project filter", () => {
 		// One priced, distilled session ONLY in project-alpha.
 		writeFileSync(
 			`${PROJ_A}/.clens/sessions/${A_ID}.jsonl`,
-			[
+			`${[
 				JSON.stringify({
 					event: "SessionStart",
 					t: ts,
@@ -330,7 +327,7 @@ describe("global analytics — unknown project filter", () => {
 					data: { reason: "done" },
 					context: {},
 				}),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 		writeFileSync(
 			`${PROJ_A}/.clens/distilled/${A_ID}.json`,

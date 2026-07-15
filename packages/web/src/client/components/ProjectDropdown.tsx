@@ -2,7 +2,6 @@ import { ChevronDown } from "lucide-solid";
 import { For, Show } from "solid-js";
 import {
 	isGlobalMode,
-	projectColor,
 	projectList,
 	selectedProjectId,
 	setSelectedProjectId,

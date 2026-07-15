@@ -41,11 +41,6 @@ const FilterDropdown = (props: {
 	readonly onChange: (value: string) => void;
 	readonly label?: string;
 }) => {
-	const selectedLabel = () => {
-		if (props.value === "all" && props.label) return props.label;
-		return props.options.find((o) => o.value === props.value)?.label ?? props.value;
-	};
-
 	return (
 		<div class="relative inline-flex">
 			<select

@@ -11,8 +11,6 @@ import {
 } from "solid-js";
 import type { SessionStatus, SessionSummary } from "../../shared/types";
 import { ConversationPanel } from "../components/ConversationPanel";
-import { DetailHeader } from "../components/DetailHeader";
-import { DetailNav } from "../components/DetailNav";
 import { LiveSessionView } from "../components/LiveSessionView";
 import { DetailPageLayout } from "../components/layouts/DetailPageLayout";
 import { LoadingSkeleton, PageShell } from "../components/PageShell";
@@ -31,7 +29,7 @@ import { useKeyboard } from "../lib/keyboard";
 import { createLiveSessionStore } from "../lib/live-store";
 import { isGlobalMode } from "../lib/project-store";
 import { preferences } from "../lib/settings";
-import { clearError, createSessionDetail, globalError, sessionList } from "../lib/stores";
+import { createSessionDetail, sessionList } from "../lib/stores";
 
 // ── Not distilled state ─────────────────────────────────────────────
 

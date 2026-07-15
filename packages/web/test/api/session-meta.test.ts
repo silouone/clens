@@ -33,7 +33,7 @@ describe("PATCH /api/sessions/:id/meta", () => {
 			}),
 			makeEvent("Stop", 2000, { reason: "done" }),
 		];
-		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, events.join("\n") + "\n");
+		writeFileSync(`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`, `${events.join("\n")}\n`);
 		app = createApp({ token: TEST_TOKEN, mode: "development", projectDir: TEST_DIR });
 	});
 

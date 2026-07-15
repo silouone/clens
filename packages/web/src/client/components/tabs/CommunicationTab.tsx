@@ -126,10 +126,10 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 
 	// Type "shape", high → low. Doubles as the stable color ranking + legend.
 	const typeBreakdown = createMemo(() => {
-		const counts = roster().reduce<ReadonlyMap<string, number>>(
-			(acc, r) => new Map([...acc, [r.type, (acc.get(r.type) ?? 0) + 1]]),
-			new Map(),
-		);
+		const counts = roster().reduce<Map<string, number>>((acc, r) => {
+			acc.set(r.type, (acc.get(r.type) ?? 0) + 1);
+			return acc;
+		}, new Map());
 		return [...counts.entries()]
 			.map(([type, count]) => ({ type, count }))
 			.sort((a, b) => b.count - a.count);
@@ -156,12 +156,13 @@ export const CommunicationTab: Component<TabProps> = (props) => {
 		const sid = session().session_id;
 		const isHub = (id: string, name: string) => id === sid || id === "leader" || name === "leader";
 		const resolve = (id: string, name: string) => (isHub(id, name) ? sid : id);
-		const counts = seq.reduce<ReadonlyMap<string, AgentGraphEdge>>((acc, e) => {
+		const counts = seq.reduce<Map<string, AgentGraphEdge>>((acc, e) => {
 			const from = resolve(e.from_id, e.from_name);
 			const to = resolve(e.to_id, e.to_name);
 			const key = `${from}\u0000${to}`;
 			const prev = acc.get(key);
-			return new Map([...acc, [key, { from, to, count: (prev?.count ?? 0) + 1 }]]);
+			acc.set(key, { from, to, count: (prev?.count ?? 0) + 1 });
+			return acc;
 		}, new Map());
 		return [...counts.values()];
 	});

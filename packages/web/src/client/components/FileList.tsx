@@ -186,11 +186,15 @@ export const FileList: Component<FileListProps> = (props) => {
 										<ChevronRight
 											class={`h-3 w-3 text-muted transition-transform ${expanded() ? "rotate-90" : ""}`}
 										/>
-										<Show when={row.riskLevel && row.riskLevel !== "low"}>
-											<span
-												class={`instrument-led shrink-0 ${riskBadgeClass(row.riskLevel!)}`}
-												title={`${row.riskLevel} risk`}
-											/>
+										<Show
+											when={row.riskLevel && row.riskLevel !== "low" ? row.riskLevel : undefined}
+										>
+											{(level) => (
+												<span
+													class={`instrument-led shrink-0 ${riskBadgeClass(level())}`}
+													title={`${level()} risk`}
+												/>
+											)}
 										</Show>
 										<span class="flex-1 truncate font-mono text-secondary" title={row.filePath}>
 											{truncatePath(row.filePath)}
