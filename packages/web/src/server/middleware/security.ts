@@ -102,5 +102,5 @@ const cors = (mode: "development" | "production") =>
 		await next();
 	});
 
-export { authToken, validateSessionId, cors };
 export type { ErrorResponse };
+export { authToken, cors, validateSessionId };

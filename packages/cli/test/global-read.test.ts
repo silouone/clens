@@ -1,14 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listGlobalSessions, resolveProjectForSession } from "../src/session/global-read";
-import {
-	globalConfigPath,
-	registerProject,
-	unregisterProject,
-	writeGlobalConfig,
-} from "../src/session/registry";
+import { registerProject, unregisterProject, writeGlobalConfig } from "../src/session/registry";
 
 const SESSION_A1 = "aaaaaaaa-1111-1111-1111-111111111111";
 const SESSION_A2 = "aaaaaaaa-2222-2222-2222-222222222222";
@@ -21,12 +16,24 @@ const makeEvent = (
 	sid: string = SESSION_A1,
 ) => JSON.stringify({ event, t, sid, data, context: { git_branch: "main" } });
 
+const makeTempDir = (prefix: string): string => {
+	const dir = join(tmpdir(), `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+	mkdirSync(dir, { recursive: true });
+	return dir;
+};
+
 describe("global-read", () => {
 	let tempDir: string;
 	let projectA: string;
 	let projectB: string;
+	let globalDir: string;
+	let previousGlobalDir: string | undefined;
 
 	beforeEach(() => {
+		globalDir = makeTempDir("clens-test-global-registry");
+		previousGlobalDir = process.env.CLENS_GLOBAL_DIR;
+		process.env.CLENS_GLOBAL_DIR = globalDir;
+
 		tempDir = join(
 			tmpdir(),
 			`clens-test-global-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -72,7 +79,10 @@ describe("global-read", () => {
 	afterEach(() => {
 		unregisterProject(projectA);
 		unregisterProject(projectB);
+		if (previousGlobalDir === undefined) delete process.env.CLENS_GLOBAL_DIR;
+		else process.env.CLENS_GLOBAL_DIR = previousGlobalDir;
 		rmSync(tempDir, { recursive: true, force: true });
+		rmSync(globalDir, { recursive: true, force: true });
 	});
 
 	describe("listGlobalSessions", () => {
@@ -160,12 +170,13 @@ describe("global-read capture_dir routing", () => {
 	let projModeDir: string;
 	let gitRootDir: string;
 	let nestedCaptureDir: string;
-	let savedConfig: string | undefined;
+	let globalDir: string;
+	let previousGlobalDir: string | undefined;
 
 	beforeEach(() => {
-		// Preserve the real global config so the mode override is non-destructive.
-		const cfgPath = globalConfigPath();
-		savedConfig = existsSync(cfgPath) ? readFileSync(cfgPath, "utf-8") : undefined;
+		globalDir = makeTempDir("clens-test-capdir-registry");
+		previousGlobalDir = process.env.CLENS_GLOBAL_DIR;
+		process.env.CLENS_GLOBAL_DIR = globalDir;
 
 		tempDir = join(
 			tmpdir(),
@@ -199,14 +210,10 @@ describe("global-read capture_dir routing", () => {
 	afterEach(() => {
 		unregisterProject(projModeDir);
 		unregisterProject(gitRootDir);
-		// Restore original global config.
-		const cfgPath = globalConfigPath();
-		if (savedConfig === undefined) {
-			rmSync(cfgPath, { force: true });
-		} else {
-			writeFileSync(cfgPath, savedConfig);
-		}
+		if (previousGlobalDir === undefined) delete process.env.CLENS_GLOBAL_DIR;
+		else process.env.CLENS_GLOBAL_DIR = previousGlobalDir;
 		rmSync(tempDir, { recursive: true, force: true });
+		rmSync(globalDir, { recursive: true, force: true });
 	});
 
 	test("project mode: capture_dir equals project.path", () => {

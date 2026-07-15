@@ -195,5 +195,5 @@ const eventsRoute = new Hono().get("/stream", (c) => {
 const getActiveConnectionCount = (): number => activeConnections.size;
 const getRingBufferSize = (): number => ring.buffer.length;
 
-export { eventsRoute, broadcastSSE, getActiveConnectionCount, getRingBufferSize, getEventsAfter };
 export type { SSEEvent, SSEEventType };
+export { broadcastSSE, eventsRoute, getActiveConnectionCount, getEventsAfter, getRingBufferSize };

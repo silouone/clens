@@ -6,7 +6,12 @@ import type { GlobalConfig, GlobalMode, ProjectEntry, ProjectRegistry } from "..
 
 // ── Paths ────────────────────────────────────────────────────────
 
-const globalDir = (): string => `${homedir()}/.clens`;
+/**
+ * Root of clens's global state. Honors `CLENS_GLOBAL_DIR` (absolute path) so
+ * tests can point it at a throwaway dir instead of the real `~/.clens` —
+ * unset, it resolves to exactly what it always did.
+ */
+const globalDir = (): string => process.env.CLENS_GLOBAL_DIR ?? `${homedir()}/.clens`;
 
 /** Path to the global project registry file. */
 export const registryPath = (): string => `${globalDir()}/projects.json`;
@@ -160,7 +165,7 @@ export const resolveProjectEntries = (): readonly ProjectEntry[] => {
 
 /** Scan home dir for directories containing `.clens/sessions/`. */
 const scanForClensDirs = (maxDepth = 3): readonly string[] => {
-	const home = homedir();
+	const home = process.env.CLENS_GLOBAL_DIR ?? homedir();
 	const discovered: string[] = [];
 
 	const scan = (dir: string, depth: number): void => {

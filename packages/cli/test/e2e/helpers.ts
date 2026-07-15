@@ -769,4 +769,4 @@ export const cleanupTestProject = (projectDir: string): void => {
 
 // ── Re-exports for convenience ──────────────────────────
 
-export { SESSION_1_ID, SESSION_2_ID, CHILD_SESSION_ID, BASE_TIME, TOOLS, FILES };
+export { BASE_TIME, CHILD_SESSION_ID, FILES, SESSION_1_ID, SESSION_2_ID, TOOLS };

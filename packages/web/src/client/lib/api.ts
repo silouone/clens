@@ -129,5 +129,5 @@ const patchSessionMeta = async (id: string, patch: SessionMetaPatch): Promise<Se
 	return (body as { data: SessionSummary }).data;
 };
 
-export { api, getToken, authHeaders, createApiClient, patchSessionMeta };
 export type { SessionMetaPatch };
+export { api, authHeaders, createApiClient, getToken, patchSessionMeta };

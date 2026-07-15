@@ -437,14 +437,14 @@ const createLiveSessionStore = (sessionId: () => string | undefined) => {
 	return { state, elapsed, isActive };
 };
 
-export {
-	createLiveSessionStore,
-	processEvent,
-	processLink,
-	createInitialState,
-	extractFilePath,
-	computeLiveElapsed,
-};
 // computeLiveElapsed is imported from ./live-duration and re-exported above for
 // backwards compatibility; new code should import it from ./live-duration.
-export type { LiveSessionState, LiveAgentState, PendingTool };
+export type { LiveAgentState, LiveSessionState, PendingTool };
+export {
+	computeLiveElapsed,
+	createInitialState,
+	createLiveSessionStore,
+	extractFilePath,
+	processEvent,
+	processLink,
+};

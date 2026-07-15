@@ -131,5 +131,5 @@ const createApp = (options: AppOptions) => {
 
 type AppType = ReturnType<typeof createApp>;
 
+export type { AppOptions, AppType };
 export { createApp };
-export type { AppType, AppOptions };

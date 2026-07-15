@@ -336,15 +336,15 @@ const createAgentConversationResource = (
 	return createResource(key, fetcher);
 };
 
-export {
-	globalError,
-	setGlobalError,
-	clearError,
-	sessionList,
-	refetchSessions,
-	setSessionMeta,
-	createSessionDetail,
-	createConversationStore,
-	createAgentConversationResource,
-};
 export type { ApiError, ConversationStore, SessionDetailResult };
+export {
+	clearError,
+	createAgentConversationResource,
+	createConversationStore,
+	createSessionDetail,
+	globalError,
+	refetchSessions,
+	sessionList,
+	setGlobalError,
+	setSessionMeta,
+};

@@ -116,13 +116,13 @@ const useKeyboard = (bindings: () => readonly KeyBinding[], context = "Navigatio
 	});
 };
 
+export type { KeyBinding, KeyboardContext, ShortcutEntry };
 export {
-	useKeyboard,
-	showHelp,
-	setShowHelp,
-	toggleHelp,
 	activeShortcuts,
 	GLOBAL_SHORTCUTS,
 	setKeyboardNavigate,
+	setShowHelp,
+	showHelp,
+	toggleHelp,
+	useKeyboard,
 };
-export type { KeyBinding, KeyboardContext, ShortcutEntry };
