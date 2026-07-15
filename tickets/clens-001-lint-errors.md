@@ -1,7 +1,7 @@
 ---
 id: clens-001-lint-errors
 type: chore
-status: queued
+status: in-progress
 priority: 1
 created: 2026-07-15
 attempts: []
