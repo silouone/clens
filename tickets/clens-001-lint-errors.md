@@ -1,7 +1,7 @@
 ---
 id: clens-001-lint-errors
 type: chore
-status: blocked
+status: done
 priority: 1
 created: 2026-07-15
 attempts: [{"runId":"clens-001-lint-errors-1784130060111","branch":"adw/clens-001-lint-errors","workspace":"/Users/silouane/adw-factory/runs/clens-001-lint-errors-1784130060111/workspace","outcome":"blocked"}]
@@ -27,3 +27,11 @@ and 17 errors in `packages/web`, all `assist/source/organizeImports`
 - `bun run lint` exits 0.
 - `bun run typecheck` and `bun run test` stay green.
 - No behavioral changes — import/export reordering only.
+
+## Resolution (operator, 2026-07-15)
+
+Retired as superseded: the full scope (all 19 biome errors, both packages)
+was delivered by PR #13 (clens-005, merged 2026-07-15) — the hermeticity
+fix un-masked the lint chain and the agent cleared the errors in its
+repair round. Attempt 1's blocked outcome stands as recorded data
+(non-hermetic global tests, the clens-005 root cause).
