@@ -1,7 +1,7 @@
 ---
 id: clens-002-cli-lint-warnings
 type: chore
-status: queued
+status: in-progress
 priority: 2
 created: 2026-07-15
 caps: { minutes: 480, turns: 400 }
