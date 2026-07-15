@@ -1,7 +1,7 @@
 ---
 id: clens-003-web-lint-warnings
 type: chore
-status: in-progress
+status: in-review
 priority: 2
 created: 2026-07-15
 caps: { minutes: 480, turns: 400 }
