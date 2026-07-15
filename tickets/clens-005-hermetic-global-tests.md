@@ -1,7 +1,7 @@
 ---
 id: clens-005-hermetic-global-tests
 type: chore
-status: queued
+status: in-progress
 priority: 1
 created: 2026-07-15
 attempts: [{"runId":"clens-005-hermetic-global-tests-1784136713704","branch":"adw/clens-005-hermetic-global-tests","workspace":"/Users/silouane/adw-factory/runs/clens-005-hermetic-global-tests-1784136713704/workspace","outcome":"blocked"}]
