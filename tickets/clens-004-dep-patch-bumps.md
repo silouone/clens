@@ -4,7 +4,7 @@ type: chore
 status: in-progress
 priority: 2
 created: 2026-07-15
-attempts: []
+attempts: [{"runId":"clens-004-dep-patch-bumps-1784144700507","branch":"adw/clens-004-dep-patch-bumps","workspace":"/Users/silouane/adw-factory/runs/clens-004-dep-patch-bumps-1784144700507/workspace","outcome":"in-review","pr":"https://github.com/silouone/clens/pull/16"}]
 ---
 # Patch-level dependency bumps (biome, autoprefixer)
 
