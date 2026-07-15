@@ -1,7 +1,7 @@
 ---
 id: clens-004-dep-patch-bumps
 type: chore
-status: in-review
+status: done
 priority: 2
 created: 2026-07-15
 attempts: [{"runId":"clens-004-dep-patch-bumps-1784144700507","branch":"adw/clens-004-dep-patch-bumps","workspace":"/Users/silouane/adw-factory/runs/clens-004-dep-patch-bumps-1784144700507/workspace","outcome":"in-review","pr":"https://github.com/silouone/clens/pull/16"}]
