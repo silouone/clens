@@ -118,47 +118,51 @@ const extractAgentBacktracks = (events: readonly StoredEvent[]): BacktrackResult
 		const MAX_GAP_MS = 5 * 60 * 1000;
 		const subsequent = bashEvents.slice(i + 1);
 		const walk = subsequent.reduce<{
-			readonly items: typeof subsequent;
-			readonly stopped: boolean;
-			readonly lastT: number;
-			readonly lastIndex: number;
+			items: typeof subsequent;
+			stopped: boolean;
+			lastT: number;
+			lastIndex: number;
 			// Timestamp of the most recent in-chain bash event (PreToolUse OR PostToolUseFailure),
 			// so a loop that ends in a failure reports its true extent rather than truncating
 			// at the last successful retry. (Real loops keep failing — see "requires no subsequent failures".)
-			readonly endT: number;
+			endT: number;
 			// Whether any in-chain bash event AFTER the initial failure was itself a
 			// PostToolUseFailure. A debugging loop is repeated *failure*; a single failure
 			// followed only by succeeding (non-failing) bash commands is recovery, not a loop.
-			readonly sawSubsequentFailure: boolean;
+			sawSubsequentFailure: boolean;
 		}>(
 			(acc, entry) => {
 				if (acc.stopped) return acc;
-				if (acc.items.length >= MAX_CHAIN) return { ...acc, stopped: true };
-				if (entry.event.t - acc.lastT > MAX_GAP_MS) return { ...acc, stopped: true };
+				if (acc.items.length >= MAX_CHAIN) {
+					acc.stopped = true;
+					return acc;
+				}
+				if (entry.event.t - acc.lastT > MAX_GAP_MS) {
+					acc.stopped = true;
+					return acc;
+				}
 
 				const hasNonBashInterleave = events
 					.slice(acc.lastIndex + 1, entry.index)
 					.some((e) => e.event === "PreToolUse" && e.data.tool_name !== "Bash");
-				if (hasNonBashInterleave) return { ...acc, stopped: true };
+				if (hasNonBashInterleave) {
+					acc.stopped = true;
+					return acc;
+				}
 
 				// Each retry is one attempt, counted from its PreToolUse. Subsequent
 				// PostToolUseFailure events still belong to the loop (they advance endT and
 				// tracking) but are not double-counted as separate attempts.
-				return entry.event.event === "PreToolUse"
-					? {
-							...acc,
-							items: [...acc.items, entry],
-							lastT: entry.event.t,
-							lastIndex: entry.index,
-							endT: entry.event.t,
-						}
-					: {
-							...acc,
-							lastT: entry.event.t,
-							lastIndex: entry.index,
-							endT: entry.event.t,
-							sawSubsequentFailure: true,
-						};
+				if (entry.event.event === "PreToolUse") {
+					acc.items.push(entry);
+				}
+				acc.lastT = entry.event.t;
+				acc.lastIndex = entry.index;
+				acc.endT = entry.event.t;
+				if (entry.event.event !== "PreToolUse") {
+					acc.sawSubsequentFailure = true;
+				}
+				return acc;
 			},
 			{
 				items: [],

@@ -325,7 +325,8 @@ describe("TUI State Machine with Fixture Data", () => {
 		expect(distilled1).toBeDefined();
 		expect(distilled1?.comm_sequence).toBeDefined();
 		expect(distilled1?.comm_sequence?.length).toBeGreaterThan(0);
-		const first = distilled1!.comm_sequence![0];
+		const first = distilled1?.comm_sequence?.[0];
+		if (!first) throw new Error("expected comm_sequence[0] to be defined");
 		expect(first.t).toBeGreaterThan(0);
 		expect(typeof first.from).toBe("string");
 		expect(typeof first.to).toBe("string");
@@ -340,7 +341,8 @@ describe("TUI State Machine with Fixture Data", () => {
 		expect(distilled1).toBeDefined();
 		expect(distilled1?.agent_lifetimes).toBeDefined();
 		expect(distilled1?.agent_lifetimes?.length).toBeGreaterThan(0);
-		const first = distilled1!.agent_lifetimes![0];
+		const first = distilled1?.agent_lifetimes?.[0];
+		if (!first) throw new Error("expected agent_lifetimes[0] to be defined");
 		expect(first.agent_id).toBeDefined();
 		expect(first.start_t).toBeGreaterThan(0);
 		expect(first.end_t).toBeGreaterThanOrEqual(first.start_t);

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { extractContextConsumption } from "../src/distill/context-consumption";
-import { getModelContextWindow, MODEL_CONTEXT_WINDOWS } from "../src/distill/stats";
+import { getModelContextWindow } from "../src/distill/stats";
 import type { TranscriptEntry } from "../src/types/transcript";
 
 const mockEntry = (overrides: Partial<TranscriptEntry> = {}): TranscriptEntry => ({

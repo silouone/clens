@@ -155,7 +155,6 @@ export const renderAgentReport = (
 	if ("error" in data) return data.error;
 
 	const agent = data;
-	const effectiveSessionId = sessionId ?? agent.session_id;
 
 	const lines: readonly string[] = [
 		`Agent: ${agent.agent_name ?? agent.agent_type} (${agent.agent_type})`,

@@ -97,11 +97,13 @@ export const attributeEventsToAgents = (
 		return match?.agentId ?? sessionId;
 	};
 
-	// Attribute each event — immutable reduce
-	return events.reduce<ReadonlyMap<string, readonly StoredEvent[]>>((acc, event) => {
+	// Attribute each event
+	return events.reduce<Map<string, StoredEvent[]>>((acc, event) => {
 		const agentId = findAgent(event.t);
-		const existing = acc.get(agentId) ?? [];
-		return new Map([...acc, [agentId, [...existing, event]]]);
+		const existing = acc.get(agentId);
+		if (existing) existing.push(event);
+		else acc.set(agentId, [event]);
+		return acc;
 	}, new Map());
 };
 

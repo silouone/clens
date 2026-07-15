@@ -67,9 +67,9 @@ describe("duration semantics (B2/B3/B9 regressions)", () => {
 		mkdirSync(`${TEST_DIR}/.clens/sessions`, { recursive: true });
 		writeFileSync(
 			`${TEST_DIR}/.clens/sessions/${SESSION_ID}.jsonl`,
-			makeEvents()
+			`${makeEvents()
 				.map((e) => JSON.stringify(e))
-				.join("\n") + "\n",
+				.join("\n")}\n`,
 		);
 	});
 

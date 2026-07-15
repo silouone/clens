@@ -110,10 +110,9 @@ export const groupFilesByDirectory = (
 				writes: f.writes,
 				file_path: f.file_path,
 			};
-			return {
-				...acc,
-				[dir]: [...(acc[dir] ?? []), entry],
-			};
+			if (!acc[dir]) acc[dir] = [];
+			acc[dir].push(entry);
+			return acc;
 		},
 		{} as Record<
 			string,
@@ -123,11 +122,10 @@ export const groupFilesByDirectory = (
 
 	// Pre-compute cumulative file index offset for each directory group
 	const groupEntries = Object.entries(grouped);
-	const groupOffsets = groupEntries.reduce<readonly number[]>(
-		(acc, [, entries], i) =>
-			i === 0 ? [0] : [...acc, (acc[acc.length - 1] ?? 0) + groupEntries[i - 1][1].length],
-		[0],
-	);
+	const groupOffsets = groupEntries.reduce<number[]>((acc, [, _entries], i) => {
+		acc.push(i === 0 ? 0 : (acc[acc.length - 1] ?? 0) + groupEntries[i - 1][1].length);
+		return acc;
+	}, []);
 
 	return groupEntries.flatMap(([dir, entries], groupIdx) => {
 		const baseIdx = groupOffsets[groupIdx] ?? 0;
@@ -171,7 +169,9 @@ export const groupFilesByAgent = (
 	const agentGroups = editChains.reduce(
 		(acc, chain) => {
 			const name = chain.agent_name ?? "session";
-			return { ...acc, [name]: [...(acc[name] ?? []), chain] };
+			if (!acc[name]) acc[name] = [];
+			acc[name].push(chain);
+			return acc;
 		},
 		{} as Record<string, EditChain[]>,
 	);
@@ -193,13 +193,10 @@ export const groupFilesByAgent = (
 		return { agentName, agentChains, agentFiles };
 	});
 
-	const agentGroupOffsets = agentGroupData.reduce<readonly number[]>(
-		(acc, _, i) =>
-			i === 0
-				? [0]
-				: [...acc, (acc[acc.length - 1] ?? 0) + agentGroupData[i - 1].agentFiles.length],
-		[0],
-	);
+	const agentGroupOffsets = agentGroupData.reduce<number[]>((acc, _, i) => {
+		acc.push(i === 0 ? 0 : (acc[acc.length - 1] ?? 0) + agentGroupData[i - 1].agentFiles.length);
+		return acc;
+	}, []);
 
 	return agentGroupData.flatMap(({ agentName, agentChains, agentFiles }, groupIdx) => {
 		const groupBaseIdx = agentGroupOffsets[groupIdx] ?? 0;
@@ -223,13 +220,15 @@ export const groupFilesByAgent = (
 				const rel = toRelative(f.file_path);
 				const dir = dirname(rel);
 				const name = rel.slice(dir === "." ? 0 : dir.length + 1);
-				return {
-					...acc,
-					[dir]: [
-						...(acc[dir] ?? []),
-						{ name, file_path: f.file_path, reads: f.reads, edits: f.edits, writes: f.writes },
-					],
-				};
+				if (!acc[dir]) acc[dir] = [];
+				acc[dir].push({
+					name,
+					file_path: f.file_path,
+					reads: f.reads,
+					edits: f.edits,
+					writes: f.writes,
+				});
+				return acc;
 			},
 			{} as Record<
 				string,
@@ -239,11 +238,10 @@ export const groupFilesByAgent = (
 
 		// Pre-compute cumulative file offsets within this agent group's directory subgroups
 		const dirEntries = Object.entries(grouped);
-		const dirOffsets = dirEntries.reduce<readonly number[]>(
-			(acc, _, i) =>
-				i === 0 ? [0] : [...acc, (acc[acc.length - 1] ?? 0) + dirEntries[i - 1][1].length],
-			[0],
-		);
+		const dirOffsets = dirEntries.reduce<number[]>((acc, _, i) => {
+			acc.push(i === 0 ? 0 : (acc[acc.length - 1] ?? 0) + dirEntries[i - 1][1].length);
+			return acc;
+		}, []);
 
 		const fileLines = dirEntries.flatMap(([dir, entries], dirIdx) => {
 			const dirBaseIdx = groupBaseIdx + (dirOffsets[dirIdx] ?? 0);
@@ -411,13 +409,10 @@ export const formatCommGraphSummary = (edges: readonly CommunicationEdge[]): rea
 export const formatDecisionsSection = (decisions: readonly DecisionPoint[]): readonly string[] => {
 	if (decisions.length === 0) return [];
 
-	const countByType = decisions.reduce<Readonly<Record<string, number>>>(
-		(acc, d) => ({
-			...acc,
-			[d.type]: (acc[d.type] ?? 0) + 1,
-		}),
-		{},
-	);
+	const countByType = decisions.reduce<Record<string, number>>((acc, d) => {
+		acc[d.type] = (acc[d.type] ?? 0) + 1;
+		return acc;
+	}, {});
 
 	const summaryParts = Object.entries(countByType)
 		.map(([type, count]) => `${count} ${pluralize(type.replace(/_/g, " "), count)}`)

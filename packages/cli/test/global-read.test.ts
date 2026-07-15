@@ -50,26 +50,26 @@ describe("global-read", () => {
 		// Project A: two sessions
 		writeFileSync(
 			join(projectA, ".clens", "sessions", `${SESSION_A1}.jsonl`),
-			[
+			`${[
 				makeEvent("SessionStart", 1000, { source: "cli" }, SESSION_A1),
 				makeEvent("SessionEnd", 2000, { reason: "done" }, SESSION_A1),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 		writeFileSync(
 			join(projectA, ".clens", "sessions", `${SESSION_A2}.jsonl`),
-			[
+			`${[
 				makeEvent("SessionStart", 3000, { source: "cli" }, SESSION_A2),
 				makeEvent("SessionEnd", 5000, { reason: "done" }, SESSION_A2),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 
 		// Project B: one session (most recent)
 		writeFileSync(
 			join(projectB, ".clens", "sessions", `${SESSION_B1}.jsonl`),
-			[
+			`${[
 				makeEvent("SessionStart", 6000, { source: "cli" }, SESSION_B1),
 				makeEvent("SessionEnd", 8000, { reason: "done" }, SESSION_B1),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 
 		registerProject(projectA);
@@ -188,10 +188,10 @@ describe("global-read capture_dir routing", () => {
 		mkdirSync(join(projModeDir, ".clens", "sessions"), { recursive: true });
 		writeFileSync(
 			join(projModeDir, ".clens", "sessions", `${SESSION_PROJ}.jsonl`),
-			[
+			`${[
 				makeEvent("SessionStart", 1000, { source: "cli" }, SESSION_PROJ),
 				makeEvent("SessionEnd", 2000, { reason: "done" }, SESSION_PROJ),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 
 		// Repository-mode source: `.clens/sessions/` nested below the git root.
@@ -200,10 +200,10 @@ describe("global-read capture_dir routing", () => {
 		mkdirSync(join(nestedCaptureDir, ".clens", "sessions"), { recursive: true });
 		writeFileSync(
 			join(nestedCaptureDir, ".clens", "sessions", `${SESSION_NESTED}.jsonl`),
-			[
+			`${[
 				makeEvent("SessionStart", 3000, { source: "cli" }, SESSION_NESTED),
 				makeEvent("SessionEnd", 4000, { reason: "done" }, SESSION_NESTED),
-			].join("\n") + "\n",
+			].join("\n")}\n`,
 		);
 	});
 

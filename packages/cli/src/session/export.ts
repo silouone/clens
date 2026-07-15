@@ -1,7 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { ExportManifest, SpawnLink } from "../types";
-import { BROADCAST_EVENTS } from "../types";
-import { computeEffectiveDuration, findLastMeaningfulEvent } from "../utils";
+import { computeEffectiveDuration } from "../utils";
 import { readLinks, readSessionEvents } from "./read";
 
 /** Safely extract a numeric timestamp from a parsed JSON object. */
@@ -24,7 +23,6 @@ export const exportSession = async (sessionId: string, projectDir: string): Prom
 	}
 
 	const firstEvent = events[0];
-	const lastEvent = events[events.length - 1];
 
 	// Read links if available
 	const links = readLinks(projectDir);

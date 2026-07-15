@@ -76,10 +76,11 @@ export const extractTaskList = (links: readonly LinkEvent[]): TaskListResult => 
 
 	// Build initial task records from create events
 	const createLinks = taskLinks.filter((l) => l.action === "create");
-	const seedMap = createLinks.reduce<ReadonlyMap<string, TaskRecord>>((acc, link, i) => {
+	const seedMap = createLinks.reduce<Map<string, TaskRecord>>((acc, link, i) => {
 		const ordinal = i + 1;
 		const record = buildTaskFromCreate(link, ordinal);
-		return new Map([...acc, [record.task_id, record]]);
+		acc.set(record.task_id, record);
+		return acc;
 	}, new Map());
 
 	// Apply updates (assign, status_change) — with ID reconciliation

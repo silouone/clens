@@ -347,9 +347,10 @@ const validateFlags = (cmd: string, rawArgs: readonly string[]): string | undefi
 	);
 	// Skip values after --intent and --port (they're not flags)
 	const VALUE_FLAGS = new Set(["--intent", "--port", "--pricing", "--global-mode", "--color"]);
-	const actualFlags = flagArgs.reduce<readonly string[]>((acc, arg, i) => {
+	const actualFlags = flagArgs.reduce<string[]>((acc, arg, i) => {
 		if (i > 0 && VALUE_FLAGS.has(rawArgs[rawArgs.indexOf(arg) - 1])) return acc;
-		return [...acc, arg];
+		acc.push(arg);
+		return acc;
 	}, []);
 
 	const invalid = actualFlags.filter((f) => !validSet.has(f) && !GLOBAL_FLAGS.has(f));

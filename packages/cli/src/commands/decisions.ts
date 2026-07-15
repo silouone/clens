@@ -31,10 +31,10 @@ const renderTimingGaps = (gaps: readonly TimingGapDecision[]): readonly string[]
 			`  ${fmtTime(g.t)}  ${colorClassification(g.classification)}  ${dim(fmtDuration(g.gap_ms))}`,
 	);
 
-	const countsByClassification = gaps.reduce<Record<string, number>>(
-		(acc, g) => ({ ...acc, [g.classification]: (acc[g.classification] ?? 0) + 1 }),
-		{},
-	);
+	const countsByClassification = gaps.reduce<Record<string, number>>((acc, g) => {
+		acc[g.classification] = (acc[g.classification] ?? 0) + 1;
+		return acc;
+	}, {});
 	const summaryParts = Object.entries(countsByClassification)
 		.map(([key, count]) => `${key}: ${count}`)
 		.join(", ");

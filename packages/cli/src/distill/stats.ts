@@ -1,5 +1,4 @@
 import type {
-	CostBasis,
 	CostEstimate,
 	PricingTier,
 	StatsResult,
@@ -7,7 +6,7 @@ import type {
 	TokenUsage,
 	TranscriptReasoning,
 } from "../types";
-import { computeEffectiveDuration, findLastMeaningfulEvent } from "../utils";
+import { computeEffectiveDuration } from "../utils";
 
 // Per-MTok API rates (platform.claude.com pricing, verified 2026-06-11).
 // Longest matching prefix wins, so version-specific entries override the
@@ -345,10 +344,10 @@ export const extractStats = (
 	}
 
 	const eventsByType = events.reduce(
-		(acc, event) => ({
-			...acc,
-			[event.event]: (acc[event.event] ?? 0) + 1,
-		}),
+		(acc, event) => {
+			acc[event.event] = (acc[event.event] ?? 0) + 1;
+			return acc;
+		},
 		{} as Record<string, number>,
 	);
 
@@ -364,7 +363,8 @@ export const extractStats = (
 		.reduce(
 			(acc, e) => {
 				const name = typeof e.data.tool_name === "string" ? e.data.tool_name : "";
-				return { ...acc, [name]: (acc[name] ?? 0) + 1 };
+				acc[name] = (acc[name] ?? 0) + 1;
+				return acc;
 			},
 			{} as Record<string, number>,
 		);
@@ -397,14 +397,11 @@ export const extractStats = (
 		.reduce(
 			(acc, e) => {
 				const name = typeof e.data.tool_name === "string" ? e.data.tool_name : "";
-				return { ...acc, [name]: (acc[name] ?? 0) + 1 };
+				acc[name] = (acc[name] ?? 0) + 1;
+				return acc;
 			},
 			{} as Record<string, number>,
 		);
-
-	const startTime = events[0].t;
-	const lastMeaningful = findLastMeaningfulEvent(events);
-	const endTime = lastMeaningful?.t ?? events[events.length - 1].t;
 
 	// 4-tier cost resolution: measured > transcript tokens > hook event tokens > heuristic.
 	// The stored cost is ALWAYS API-equivalent value at FULL LIST PRICE — token/heuristic

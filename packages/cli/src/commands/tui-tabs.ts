@@ -23,7 +23,7 @@ export const formatOverviewTab = (
 	session: SessionSummary,
 	distilled: DistilledSession | undefined,
 	journey?: Journey,
-	width: number = 120,
+	_width: number = 120,
 ): readonly string[] => {
 	const dateStr = formatSessionDateFull(session.start_time);
 	const sessionLabel = session.session_name
@@ -70,10 +70,10 @@ export const formatOverviewTab = (
 			distilled.backtracks.length > 0
 				? (() => {
 						const typeCounts = distilled.backtracks.reduce(
-							(acc, bt) => ({
-								...acc,
-								[bt.type]: (acc[bt.type] ?? 0) + 1,
-							}),
+							(acc, bt) => {
+								acc[bt.type] = (acc[bt.type] ?? 0) + 1;
+								return acc;
+							},
 							{} as Record<string, number>,
 						);
 						const btTypeSummary = Object.entries(typeCounts)
@@ -86,7 +86,8 @@ export const formatOverviewTab = (
 										distilled.reasoning.reduce(
 											(acc, r) => {
 												const intent = r.intent_hint ?? "general";
-												return { ...acc, [intent]: (acc[intent] ?? 0) + 1 };
+												acc[intent] = (acc[intent] ?? 0) + 1;
+												return acc;
 											},
 											{} as Record<string, number>,
 										),
@@ -380,7 +381,7 @@ export interface CollapsedEntry {
 }
 
 export const collapseConsecutive = (entries: readonly TimelineEntry[]): readonly CollapsedEntry[] =>
-	entries.reduce<readonly CollapsedEntry[]>((acc, entry) => {
+	entries.reduce<CollapsedEntry[]>((acc, entry) => {
 		const prev = acc[acc.length - 1];
 		if (
 			prev &&
@@ -389,9 +390,11 @@ export const collapseConsecutive = (entries: readonly TimelineEntry[]): readonly
 			prev.entry.tool_name === entry.tool_name &&
 			prev.entry.agent_name === entry.agent_name
 		) {
-			return [...acc.slice(0, -1), { entry: prev.entry, count: prev.count + 1 }];
+			acc[acc.length - 1] = { entry: prev.entry, count: prev.count + 1 };
+			return acc;
 		}
-		return [...acc, { entry, count: 1 }];
+		acc.push({ entry, count: 1 });
+		return acc;
 	}, []);
 
 // --- Timeline formatting ---
@@ -501,9 +504,10 @@ export const formatReasoningTab = (distilled: DistilledSession): readonly string
 			ansi.dim("No reasoning data. Run 'clens distill' to extract."),
 		];
 
-	const byIntent = reasoning.reduce<Readonly<Record<string, number>>>((acc, r) => {
+	const byIntent = reasoning.reduce<Record<string, number>>((acc, r) => {
 		const key = r.intent_hint ?? "general";
-		return { ...acc, [key]: (acc[key] ?? 0) + 1 };
+		acc[key] = (acc[key] ?? 0) + 1;
+		return acc;
 	}, {});
 
 	return [
@@ -609,13 +613,10 @@ export const formatDecisionsTabFull = (decisions: readonly DecisionPoint[]): rea
 	if (decisions.length === 0)
 		return [ansi.bold("Decisions:"), "", ansi.dim("No decision points detected.")];
 
-	const countByType = decisions.reduce<Readonly<Record<string, number>>>(
-		(acc, d) => ({
-			...acc,
-			[d.type]: (acc[d.type] ?? 0) + 1,
-		}),
-		{},
-	);
+	const countByType = decisions.reduce<Record<string, number>>((acc, d) => {
+		acc[d.type] = (acc[d.type] ?? 0) + 1;
+		return acc;
+	}, {});
 
 	const summaryParts = Object.entries(countByType)
 		.map(([type, count]) => `${count} ${pluralize(type.replace(/_/g, " "), count)}`)

@@ -19,7 +19,6 @@ import type {
 	FileMapResult,
 	StatsResult,
 	StoredEvent,
-	TokenUsage,
 	TranscriptReasoning,
 } from "../src/types";
 import { flattenAgents } from "../src/utils";

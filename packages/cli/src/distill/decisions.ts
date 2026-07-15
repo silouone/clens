@@ -65,7 +65,7 @@ const topToolInSlice = (
 	const toolCounts = slice.reduce(
 		(acc, ev) => {
 			const tool = getToolName(ev);
-			if (tool) return { ...acc, [tool]: (acc[tool] ?? 0) + 1 };
+			if (tool) acc[tool] = (acc[tool] ?? 0) + 1;
 			return acc;
 		},
 		{} as Record<string, number>,
@@ -193,7 +193,7 @@ const buildPhaseInfo = (
 	const toolCounts = phaseEvents.reduce(
 		(acc, ev) => {
 			const tool = getToolName(ev);
-			if (tool) return { ...acc, [tool]: (acc[tool] ?? 0) + 1 };
+			if (tool) acc[tool] = (acc[tool] ?? 0) + 1;
 			return acc;
 		},
 		{} as Record<string, number>,

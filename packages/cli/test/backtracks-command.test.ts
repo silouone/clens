@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { renderBacktracksDetail, renderBacktracksSummary } from "../src/commands/backtracks";
 import type { BacktrackResult, DistilledSession } from "../src/types";
 

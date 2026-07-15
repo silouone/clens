@@ -27,7 +27,7 @@ const writeSessionFile = (captureDir: string, sid: string): void => {
 	mkdirSync(join(captureDir, ".clens", "sessions"), { recursive: true });
 	writeFileSync(
 		join(captureDir, ".clens", "sessions", `${sid}.jsonl`),
-		[
+		`${[
 			makeEvent("SessionStart", 1000, sid, { source: "cli" }),
 			makeEvent("PreToolUse", 1500, sid, {
 				tool_name: "Read",
@@ -41,7 +41,7 @@ const writeSessionFile = (captureDir: string, sid: string): void => {
 				tool_response: "ok",
 			}),
 			makeEvent("SessionEnd", 2000, sid, { reason: "done" }),
-		].join("\n") + "\n",
+		].join("\n")}\n`,
 	);
 };
 

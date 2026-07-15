@@ -82,10 +82,10 @@ export const computeEffectiveDuration = (
 
 /** Deduplicate spawn links by agent_id (resumed agents create multiple spawn events). */
 export const deduplicateSpawns = (spawns: readonly SpawnLink[]): readonly SpawnLink[] =>
-	spawns.reduce<readonly SpawnLink[]>(
-		(acc, spawn) => (acc.some((s) => s.agent_id === spawn.agent_id) ? acc : [...acc, spawn]),
-		[],
-	);
+	spawns.reduce<SpawnLink[]>((acc, spawn) => {
+		if (!acc.some((s) => s.agent_id === spawn.agent_id)) acc.push(spawn);
+		return acc;
+	}, []);
 
 /**
  * Recursively flatten an agent tree into a flat array of AgentNode.

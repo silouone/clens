@@ -22,18 +22,18 @@ const hasStringField = (
 
 /** Extract file_path from tool_input data (PreToolUse). */
 const extractFilePath = (data: Readonly<Record<string, unknown>>): string | undefined => {
-	const toolInput = data["tool_input"];
+	const toolInput = data.tool_input;
 	if (toolInput && typeof toolInput === "object" && toolInput !== null) {
 		const input = toolInput as Readonly<Record<string, unknown>>;
-		if (typeof input["file_path"] === "string") return input["file_path"];
-		if (typeof input["path"] === "string") return input["path"];
+		if (typeof input.file_path === "string") return input.file_path;
+		if (typeof input.path === "string") return input.path;
 	}
 	return undefined;
 };
 
 /** Build args_preview from tool_input data. */
 const buildArgsPreview = (data: Readonly<Record<string, unknown>>): string =>
-	truncatePreview(data["tool_input"]);
+	truncatePreview(data.tool_input);
 
 /** Map user_messages from distilled session to UserPromptEntry[]. */
 const mapUserPrompts = (distilled: DistilledSession): readonly ConversationEntry[] =>
@@ -63,8 +63,8 @@ const mapToolCalls = (events: readonly StoredEvent[]): readonly ConversationEntr
 		.map((e) => ({
 			type: "tool_call" as const,
 			t: e.t,
-			tool_name: e.data["tool_name"] as string,
-			tool_use_id: e.data["tool_use_id"] as string,
+			tool_name: e.data.tool_name as string,
+			tool_use_id: e.data.tool_use_id as string,
 			file_path: extractFilePath(e.data),
 			args_preview: buildArgsPreview(e.data),
 		}));
@@ -77,11 +77,11 @@ const mapToolResults = (events: readonly StoredEvent[]): readonly ConversationEn
 		.map((e) => ({
 			type: "tool_result" as const,
 			t: e.t,
-			tool_use_id: e.data["tool_use_id"] as string,
-			tool_name: e.data["tool_name"] as string,
+			tool_use_id: e.data.tool_use_id as string,
+			tool_name: e.data.tool_name as string,
 			outcome: (e.event === "PostToolUseFailure" ? "failure" : "success") as "success" | "failure",
 			...(e.event === "PostToolUseFailure" && hasStringField(e.data, "error")
-				? { error: e.data["error"] as string }
+				? { error: e.data.error as string }
 				: {}),
 		}));
 
@@ -176,12 +176,11 @@ const mapTranscriptToolCalls = (
 					(b): b is Extract<TranscriptContentBlock, { type: "tool_use" }> => b.type === "tool_use",
 				)
 				.map((b) => {
-					// b.input is Record<string, unknown> — bracket access is required
 					const filePath =
-						typeof b.input["file_path"] === "string"
-							? b.input["file_path"]
-							: typeof b.input["path"] === "string"
-								? b.input["path"]
+						typeof b.input.file_path === "string"
+							? b.input.file_path
+							: typeof b.input.path === "string"
+								? b.input.path
 								: undefined;
 					return {
 						type: "tool_call" as const,

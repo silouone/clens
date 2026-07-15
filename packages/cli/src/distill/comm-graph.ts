@@ -132,11 +132,13 @@ export const buildCommGraph = (
 
 	if (allEdges.length === 0) return [];
 
-	// Group edges by (from_id, to_id, edge_type) — immutable reduce
-	const grouped = allEdges.reduce<ReadonlyMap<string, readonly RawEdge[]>>((acc, edge) => {
+	// Group edges by (from_id, to_id, edge_type)
+	const grouped = allEdges.reduce<Map<string, RawEdge[]>>((acc, edge) => {
 		const key = edgeKey(edge.from_id, edge.to_id, edge.edge_type);
-		const existing = acc.get(key) ?? [];
-		return new Map([...acc, [key, [...existing, edge]]]);
+		const existing = acc.get(key);
+		if (existing) existing.push(edge);
+		else acc.set(key, [edge]);
+		return acc;
 	}, new Map());
 
 	return [...grouped.values()]

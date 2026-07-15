@@ -24,10 +24,10 @@ const BACKTRACK_LABELS: Readonly<Record<BacktrackResult["type"], string>> = {
 
 /** Group backtracks by type and produce "N type_label" fragments. */
 const backtrackBreakdown = (backtracks: readonly BacktrackResult[]): string => {
-	const counts = backtracks.reduce<Readonly<Record<string, number>>>(
-		(acc, b) => ({ ...acc, [b.type]: (acc[b.type] ?? 0) + 1 }),
-		{},
-	);
+	const counts = backtracks.reduce<Record<string, number>>((acc, b) => {
+		acc[b.type] = (acc[b.type] ?? 0) + 1;
+		return acc;
+	}, {});
 	return Object.entries(counts)
 		.map(
 			([type, count]) =>
