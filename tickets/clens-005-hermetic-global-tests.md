@@ -4,7 +4,7 @@ type: chore
 status: in-progress
 priority: 1
 created: 2026-07-15
-attempts: [{"runId":"clens-005-hermetic-global-tests-1784136713704","branch":"adw/clens-005-hermetic-global-tests","workspace":"/Users/silouane/adw-factory/runs/clens-005-hermetic-global-tests-1784136713704/workspace","outcome":"blocked"}]
+attempts: [{"runId":"clens-005-hermetic-global-tests-1784136713704","branch":"adw/clens-005-hermetic-global-tests","workspace":"/Users/silouane/adw-factory/runs/clens-005-hermetic-global-tests-1784136713704/workspace","outcome":"blocked"},{"runId":"clens-005-hermetic-global-tests-1784138630555","branch":"adw/clens-005-hermetic-global-tests-2","workspace":"/Users/silouane/adw-factory/runs/clens-005-hermetic-global-tests-1784138630555/workspace","outcome":"in-review","pr":"https://github.com/silouone/clens/pull/13"}]
 ---
 # Make the global-registry tests hermetic (stop scanning the real ~/.clens)
 
