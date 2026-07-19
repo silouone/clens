@@ -1,3 +1,4 @@
+import { readTextFileOrUndefined } from "../session/read";
 import type { DistilledSession, SessionConfig } from "../types";
 import { classifySeverity, truncate } from "./format-helpers";
 import { bold, dim, green } from "./shared";
@@ -202,7 +203,10 @@ export const whatCommand = async (args: {
 	const distilled = args.pricingTier
 		? await (async () => {
 				const { distill } = await import("../distill/index");
-				return distill(args.sessionId, args.projectDir, { pricingTier: args.pricingTier });
+				return distill(args.sessionId, args.projectDir, {
+					pricingTier: args.pricingTier,
+					readTextFile: readTextFileOrUndefined,
+				});
 			})()
 		: readDistilled(args.sessionId, args.projectDir);
 

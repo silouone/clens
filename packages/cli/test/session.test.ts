@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { cleanAll, cleanSession } from "../src/session/clean";
-import { listSessions, readSessionEvents } from "../src/session/read";
+import { listSessions, readSessionEvents, readTextFileOrUndefined } from "../src/session/read";
 import type { SessionStartContext, StoredEvent } from "../src/types";
 
 const TEST_DIR = "/tmp/clens-test-session";
@@ -261,6 +261,17 @@ describe("readSessionEvents", () => {
 
 		const parsed = readSessionEvents("sess-ws", TEST_DIR);
 		expect(parsed).toEqual([]);
+	});
+});
+
+describe("readTextFileOrUndefined", () => {
+	test("returns file contents when the file exists", () => {
+		writeFileSync(`${TEST_DIR}/note.txt`, "hello world");
+		expect(readTextFileOrUndefined(`${TEST_DIR}/note.txt`)).toBe("hello world");
+	});
+
+	test("returns undefined when the file does not exist", () => {
+		expect(readTextFileOrUndefined(`${TEST_DIR}/missing.txt`)).toBeUndefined();
 	});
 });
 

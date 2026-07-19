@@ -1948,3 +1948,110 @@ describe("plan drift guard for trivial sessions", () => {
 		expect(result.plan_drift).toBeUndefined();
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Injected readTextFile reader: config.json + plan-drift spec, both via
+// in-memory fakes (no real files backing the two seams distill/index.ts reads).
+// ---------------------------------------------------------------------------
+
+describe("distill - injected readTextFile reader", () => {
+	const TEST_DIR = `/tmp/clens-test-distill-reader-${Date.now()}`;
+	const SESSION_ID = "session-reader-test";
+
+	beforeEach(() => {
+		rmSync(TEST_DIR, { recursive: true, force: true });
+		const sessionsDir = `${TEST_DIR}/.clens/sessions`;
+		mkdirSync(sessionsDir, { recursive: true });
+
+		// A spec ref in the prompt plus a real tool call, so both the config seam
+		// and the plan-drift seam are reachable (tool_call_count > 0).
+		const events: StoredEvent[] = [
+			{ t: 1000, event: "SessionStart", sid: SESSION_ID, data: {} },
+			{
+				t: 2000,
+				event: "UserPromptSubmit",
+				sid: SESSION_ID,
+				data: { prompt: "/build specs/plan.md" },
+			},
+			{
+				t: 3000,
+				event: "PreToolUse",
+				sid: SESSION_ID,
+				data: { tool_name: "Edit", tool_use_id: "t1", tool_input: { file_path: "src/a.ts" } },
+			},
+			{
+				t: 4000,
+				event: "PostToolUse",
+				sid: SESSION_ID,
+				data: { tool_name: "Edit", tool_use_id: "t1" },
+			},
+			{ t: 5000, event: "SessionEnd", sid: SESSION_ID, data: {} },
+		];
+		writeFileSync(
+			`${sessionsDir}/${SESSION_ID}.jsonl`,
+			events.map((e) => JSON.stringify(e)).join("\n"),
+		);
+		// Deliberately no `.clens/config.json` and no `specs/plan.md` on disk — every
+		// assertion below is driven entirely by the injected fake reader, proving the
+		// module no longer touches the real filesystem for these two seams.
+	});
+
+	afterEach(() => {
+		rmSync(TEST_DIR, { recursive: true, force: true });
+	});
+
+	test("reader returning undefined for everything: config falls back to api tier, no plan_drift", async () => {
+		const readTextFile = (_path: string): string | undefined => undefined;
+		const result = await distill(SESSION_ID, TEST_DIR, { readTextFile });
+		expect(result.pricing_tier).toBe("api");
+		expect(result.stats.tool_call_count).toBeGreaterThan(0);
+		expect(result.plan_drift).toBeUndefined();
+	});
+
+	test("malformed config JSON from the reader is treated as absent (falls back to api)", async () => {
+		const readTextFile = (path: string): string | undefined =>
+			path.endsWith(".clens/config.json") ? "{not valid json" : undefined;
+		const result = await distill(SESSION_ID, TEST_DIR, { readTextFile });
+		expect(result.pricing_tier).toBe("api");
+	});
+
+	test("config content missing the required `capture` field is treated as absent", async () => {
+		const readTextFile = (path: string): string | undefined =>
+			path.endsWith(".clens/config.json") ? JSON.stringify({ pricing: "max" }) : undefined;
+		const result = await distill(SESSION_ID, TEST_DIR, { readTextFile });
+		expect(result.pricing_tier).toBe("api");
+	});
+
+	test("valid config content from the reader resolves the pricing tier", async () => {
+		const readTextFile = (path: string): string | undefined =>
+			path.endsWith(".clens/config.json")
+				? JSON.stringify({ capture: true, pricing: "max" })
+				: undefined;
+		const result = await distill(SESSION_ID, TEST_DIR, { readTextFile });
+		expect(result.pricing_tier).toBe("max");
+	});
+
+	test("spec content from the reader drives plan_drift computation", async () => {
+		const specMd = ["## Files to Create", "- `src/a.ts`"].join("\n");
+		const readTextFile = (path: string): string | undefined =>
+			path.endsWith("specs/plan.md") ? specMd : undefined;
+		const result = await distill(SESSION_ID, TEST_DIR, { readTextFile });
+		expect(result.plan_drift).toBeDefined();
+		expect(result.plan_drift?.spec_path).toBe("specs/plan.md");
+		expect(result.plan_drift?.drift_score).toBe(0);
+	});
+
+	test("missing spec content (reader returns undefined) yields no plan_drift", async () => {
+		const readTextFile = (_path: string): string | undefined => undefined;
+		const result = await distill(SESSION_ID, TEST_DIR, { readTextFile });
+		expect(result.plan_drift).toBeUndefined();
+	});
+
+	test("omitting readTextFile falls back to the real fs reader (byte-identical default)", async () => {
+		// No `.clens/config.json` or `specs/plan.md` exist on disk in TEST_DIR, so the
+		// real fs-backed default reader must resolve both the same way the fakes above do.
+		const result = await distill(SESSION_ID, TEST_DIR);
+		expect(result.pricing_tier).toBe("api");
+		expect(result.plan_drift).toBeUndefined();
+	});
+});

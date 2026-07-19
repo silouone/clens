@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { ProjectEntry } from "@silou/clens";
 import { distill } from "@silou/clens/src/distill";
 import { writeAnalyticsSummary } from "@silou/clens/src/distill/analytics-summary";
+import { readTextFileOrUndefined } from "@silou/clens/src/session/read";
 import { Hono } from "hono";
 import { createLogger } from "../logger";
 import { invalidateAnalyticsCache } from "./analytics";
@@ -81,7 +82,7 @@ const createCommandsRoute = (projectDir: string, projects: readonly ProjectEntry
 			}
 
 			// Fire-and-forget: start deep distill, persist result, and broadcast when done
-			distill(sessionId, ownerDir, { deep: true })
+			distill(sessionId, ownerDir, { deep: true, readTextFile: readTextFileOrUndefined })
 				.then((result) => {
 					const distilledDir = `${ownerDir}/.clens/distilled`;
 					mkdirSync(distilledDir, { recursive: true });

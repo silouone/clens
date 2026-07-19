@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { readTextFileOrUndefined } from "../session/read";
 import type { PricingTier } from "../types";
 import type {
 	BacktrackResult,
@@ -164,6 +165,7 @@ export const distillCommand = async (args: {
 	const distilled = await distill(args.sessionId, args.projectDir, {
 		deep: args.deep,
 		pricingTier: args.pricingTier,
+		readTextFile: readTextFileOrUndefined,
 	});
 
 	// Stamp the schema version so a freshness check can detect shape drift independent of mtime.
