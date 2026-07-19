@@ -5,7 +5,7 @@ status: in-progress
 priority: 2
 created: 2026-07-19
 caps: { minutes: 45, turns: 300 }
-attempts: []
+attempts: [{"runId":"clens-006-distill-io-seam-1784470261685","branch":"adw/clens-006-distill-io-seam","workspace":"/work/remote","outcome":"in-review","pr":"https://github.com/silouone/clens/pull/17"}]
 ---
 # Lift the last fs reads out of the distill layer (injected readers)
 
