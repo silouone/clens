@@ -160,6 +160,21 @@ export const readLinks = (projectDir: string): readonly LinkEvent[] => {
 };
 
 /**
+ * Read an arbitrary UTF-8 text file, returning undefined when it is missing or
+ * unreadable. The fs-backed default for the distill layer's injected `readTextFile`
+ * seam (config + plan-drift spec reads) — callers that need in-memory fakes for
+ * tests supply their own function instead of this one.
+ */
+export const readTextFileOrUndefined = (path: string): string | undefined => {
+	if (!existsSync(path)) return undefined;
+	try {
+		return readFileSync(path, "utf-8");
+	} catch {
+		return undefined;
+	}
+};
+
+/**
  * Re-price an agent node (and its children) at the current pricing table.
  * `children` is typed non-optional, but the parse guard (parsers.ts) never
  * validates it, so a legacy/partial on-disk distill can omit it — guard with

@@ -1,8 +1,4 @@
-// TODO: existsSync + readFileSync remain for plan-drift spec reading (lines ~84-90).
-// This is the last I/O leak in the distill layer. Ideally the spec content should
-// be passed in from the CLI caller so this module stays pure.
-import { existsSync, readFileSync } from "node:fs";
-import { readLinks, readSessionEvents } from "../session/read";
+import { readLinks, readSessionEvents, readTextFileOrUndefined } from "../session/read";
 import { scanSessionFiles } from "../session/synthetic-scan";
 import {
 	readTranscript,
@@ -74,14 +70,21 @@ const isSpawnLink = (link: LinkEvent): link is SpawnLink => link.type === "spawn
 const VALID_TIERS: readonly string[] = ["api", "max", "auto"];
 const isValidPricingTier = (value: string): value is PricingTier => VALID_TIERS.includes(value);
 
-/** Read .clens/config.json from project dir. Returns undefined if file missing or malformed. */
-const readClensConfig = (projectDir: string): ClensConfig | undefined => {
+/**
+ * Read .clens/config.json from project dir via the injected `readTextFile` reader.
+ * Returns undefined if the file is missing (reader returns undefined) or malformed.
+ */
+const readClensConfig = (
+	projectDir: string,
+	readTextFile: (path: string) => string | undefined,
+): ClensConfig | undefined => {
 	const configPath = `${projectDir}/.clens/config.json`;
-	if (!existsSync(configPath)) return undefined;
+	const raw = readTextFile(configPath);
+	if (raw === undefined) return undefined;
 	try {
-		const raw: unknown = JSON.parse(readFileSync(configPath, "utf-8"));
-		if (typeof raw !== "object" || raw === null) return undefined;
-		const obj = raw as Record<string, unknown>;
+		const parsed: unknown = JSON.parse(raw);
+		if (typeof parsed !== "object" || parsed === null) return undefined;
+		const obj = parsed as Record<string, unknown>;
 		if (typeof obj.capture !== "boolean") return undefined;
 		const pricing =
 			typeof obj.pricing === "string" && isValidPricingTier(obj.pricing) ? obj.pricing : undefined;
@@ -200,6 +203,13 @@ const mergeSpawnAndInferredAgents = ({
 export interface DistillOptions {
 	readonly deep?: boolean;
 	readonly pricingTier?: PricingTier;
+	/**
+	 * Injected reader for the two remaining file reads in this layer (`.clens/config.json`
+	 * and the plan-drift spec, whose path is only known mid-distill via `detectSpecRef`).
+	 * Returns undefined for a missing file; read errors are swallowed the same way.
+	 * Defaults to the real fs-backed reader — tests can supply an in-memory fake.
+	 */
+	readonly readTextFile?: (path: string) => string | undefined;
 }
 
 export const distill = async (
@@ -207,6 +217,7 @@ export const distill = async (
 	projectDir: string,
 	options?: DistillOptions,
 ): Promise<DistilledSession> => {
+	const readTextFile = options?.readTextFile ?? readTextFileOrUndefined;
 	const events = readSessionEvents(sessionId, projectDir);
 
 	// `--deep` gates git enrichment. The default (shallow) distill is git-free: stats,
@@ -282,7 +293,8 @@ export const distill = async (
 	} = transcriptData;
 
 	// Resolve pricing tier: CLI override > config file > default "api"
-	const configTier = options?.pricingTier ?? readClensConfig(projectDir)?.pricing ?? "api";
+	const configTier =
+		options?.pricingTier ?? readClensConfig(projectDir, readTextFile)?.pricing ?? "api";
 	const resolvedTier = resolvePricingTier(configTier, transcriptData.user_type);
 
 	// Stored per-session cost is ALWAYS the API-equivalent value at full list price
@@ -344,8 +356,8 @@ export const distill = async (
 		if (!specRef) return undefined;
 		if (stats.tool_call_count === 0) return undefined;
 		const specPath = `${projectDir}/${specRef}`;
-		if (!existsSync(specPath)) return undefined;
-		const specContent = readFileSync(specPath, "utf-8");
+		const specContent = readTextFile(specPath);
+		if (specContent === undefined) return undefined;
 		return computePlanDrift(specRef, specContent, [file_map], projectDir);
 	})();
 
