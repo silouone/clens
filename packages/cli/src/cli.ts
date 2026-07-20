@@ -270,6 +270,17 @@ const commands: Readonly<Record<string, CommandDef>> = {
 			});
 		},
 	},
+	import: {
+		description: "Import sessions from another agent (codex)",
+		handler: async (ctx) => {
+			const { importCommand } = await import("./commands/import");
+			importCommand({
+				provider: ctx.positional[1],
+				inputPath: ctx.positional[2],
+				projectDir: ctx.projectDir,
+			});
+		},
+	},
 	web: {
 		description: "Launch web dashboard",
 		handler: async (ctx) => {
@@ -330,6 +341,7 @@ const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	// longer changes output but must not hard-error existing scripts.
 	export: new Set(["--last", "--otel"]),
 	what: new Set(["--last", "--json", "--pricing", "--global"]),
+	import: new Set([]),
 	web: new Set(["--port", "--no-open", "--global"]),
 };
 
@@ -391,6 +403,7 @@ ${bold("Sessions:")}
   ${cyan("clean <id>")}        Remove one session's data (or --last)
   ${cyan("clean --all")}       Remove every session in this project (prompts; --yes to skip)
   ${cyan("export")}            Export session as archive
+  ${cyan("import codex <path>")}  Import Codex rollout(s) (file or ~/.codex/sessions dir)
   ${cyan("config")}            View or update configuration
   ${cyan("config --global-mode <m>")}  Set global mode: repository or project
 
@@ -435,6 +448,7 @@ ${bold("Examples:")}
   clens name a288 "Auth refactor" --color amber  # Label + flag a session
   clens name a288 --clear             # Revert to computed name, unflag
   clens distill --last                # Distill latest session
+  clens import codex ~/.codex/sessions  # Import all Codex rollouts
   clens distill --global              # distill all sessions in every repo
   clens report --last                 # Summary of latest session
   clens report --last backtracks      # Backtrack analysis

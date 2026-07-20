@@ -46,6 +46,15 @@ describe("getPricing — per-tier published rates", () => {
 		expect(pricing?.cache_read).toBe(0.1);
 		expect(pricing?.cache_write).toBe(1.25);
 	});
+
+	test("Codex gpt-5.x slug resolves via the gpt-5 family fallback → $1.25 / $10", () => {
+		// The rollout model slug (e.g. `gpt-5.6-sol`) has no exact entry; longest
+		// prefix is `gpt-5`. Without this a Codex session would price at $0.
+		const pricing = getPricing("gpt-5.6-sol", "api");
+		expect(pricing).toBeDefined();
+		expect(pricing?.input).toBe(1.25);
+		expect(pricing?.output).toBe(10);
+	});
 });
 
 // ---------------------------------------------------------------------------

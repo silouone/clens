@@ -23,6 +23,11 @@ const API_PRICING = {
 	"claude-sonnet-4": { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
 	"claude-haiku-4-5": { input: 1, output: 5, cache_read: 0.1, cache_write: 1.25 },
 	"claude-haiku-4": { input: 0.8, output: 4, cache_read: 0.08, cache_write: 1.0 },
+	// OpenAI / Codex (gpt-5.x class). Per-MTok list rates (platform.openai.com,
+	// gpt-5 family). Codex has no cache-write analog (cache_creation_tokens = 0
+	// from the importer), so `cache_write` is present for shape only. Longest-
+	// prefix match means `gpt-5.6-sol` etc. resolve via the `gpt-5` fallback.
+	"gpt-5": { input: 1.25, output: 10, cache_read: 0.125, cache_write: 1.25 },
 } as const;
 
 export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
@@ -35,6 +40,8 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
 	"claude-sonnet-4": 200_000,
 	"claude-haiku-4-5": 200_000,
 	"claude-haiku-4": 200_000,
+	// gpt-5.x class — the rollout's model_context_window was 258_400.
+	"gpt-5": 258_400,
 };
 
 /** Longest prefix first so version-specific entries beat family fallbacks. */
