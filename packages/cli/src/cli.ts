@@ -403,7 +403,7 @@ ${bold("Sessions:")}
   ${cyan("clean <id>")}        Remove one session's data (or --last)
   ${cyan("clean --all")}       Remove every session in this project (prompts; --yes to skip)
   ${cyan("export")}            Export session as archive
-  ${cyan("import codex <path>")}  Import Codex rollout(s) (file or ~/.codex/sessions dir)
+  ${cyan("import codex [path]")}  Import Codex rollout(s) (file or dir; defaults to $CODEX_HOME/sessions or ~/.codex/sessions)
   ${cyan("config")}            View or update configuration
   ${cyan("config --global-mode <m>")}  Set global mode: repository or project
 
@@ -449,6 +449,7 @@ ${bold("Examples:")}
   clens name a288 --clear             # Revert to computed name, unflag
   clens distill --last                # Distill latest session
   clens import codex ~/.codex/sessions  # Import all Codex rollouts
+  clens import codex                  # Import from $CODEX_HOME/sessions or ~/.codex/sessions
   clens distill --global              # distill all sessions in every repo
   clens report --last                 # Summary of latest session
   clens report --last backtracks      # Backtrack analysis

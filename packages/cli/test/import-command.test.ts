@@ -1,7 +1,8 @@
 /**
  * Command-level coverage for `clens import codex` (clens-007): a rollout file is
  * mapped and written to `.clens/sessions/{sid}.jsonl`, a directory imports every
- * rollout under it, and re-import OVERWRITES (never appends).
+ * rollout under it, and re-import OVERWRITES (never appends). Also covers the
+ * no-arg auto-discover default (clens-010): `CODEX_HOME`/`~/.codex/sessions`.
  *
  * GUARDRAIL: runs entirely against a throwaway temp dir under os.tmpdir(); never
  * touches a real `.clens/`.
@@ -86,10 +87,111 @@ describe("importCommand", () => {
 			/Unknown import provider/,
 		);
 	});
+});
 
-	test("errors when the rollout path is missing", () => {
+describe("importCommand auto-discover (no path arg)", () => {
+	let previousCodexHome: string | undefined;
+	let previousHome: string | undefined;
+	let previousUserProfile: string | undefined;
+
+	beforeEach(() => {
+		previousCodexHome = process.env.CODEX_HOME;
+		previousHome = process.env.HOME;
+		previousUserProfile = process.env.USERPROFILE;
+	});
+	afterEach(() => {
+		if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+		else process.env.CODEX_HOME = previousCodexHome;
+		if (previousHome === undefined) delete process.env.HOME;
+		else process.env.HOME = previousHome;
+		if (previousUserProfile === undefined) delete process.env.USERPROFILE;
+		else process.env.USERPROFILE = previousUserProfile;
+	});
+
+	test("imports from $CODEX_HOME/sessions when CODEX_HOME is set", () => {
+		process.env.CODEX_HOME = dir;
+		const nested = join(dir, "sessions/2026/07/20");
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(join(nested, "rollout-a.jsonl"), ROLLOUT);
+
+		importCommand({ provider: "codex", inputPath: undefined, projectDir: dir });
+
+		expect(existsSync(sessionFile())).toBe(true);
+		const lines = readFileSync(sessionFile(), "utf-8").trim().split("\n");
+		expect(JSON.parse(lines[0]).event).toBe("SessionStart");
+	});
+
+	test("falls back to ~/.codex/sessions when CODEX_HOME is unset", () => {
+		delete process.env.CODEX_HOME;
+		process.env.HOME = dir;
+		const nested = join(dir, ".codex/sessions");
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(join(nested, "rollout-a.jsonl"), ROLLOUT);
+
+		importCommand({ provider: "codex", inputPath: undefined, projectDir: dir });
+
+		expect(existsSync(sessionFile())).toBe(true);
+	});
+
+	test("falls back to $USERPROFILE/.codex/sessions when neither CODEX_HOME nor HOME is set", () => {
+		delete process.env.CODEX_HOME;
+		delete process.env.HOME;
+		process.env.USERPROFILE = dir;
+		const nested = join(dir, ".codex/sessions");
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(join(nested, "rollout-a.jsonl"), ROLLOUT);
+
+		importCommand({ provider: "codex", inputPath: undefined, projectDir: dir });
+
+		expect(existsSync(sessionFile())).toBe(true);
+	});
+
+	test("an empty-string CODEX_HOME is treated as unset and falls back to HOME", () => {
+		process.env.CODEX_HOME = "";
+		process.env.HOME = dir;
+		const nested = join(dir, ".codex/sessions");
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(join(nested, "rollout-a.jsonl"), ROLLOUT);
+
+		importCommand({ provider: "codex", inputPath: undefined, projectDir: dir });
+
+		expect(existsSync(sessionFile())).toBe(true);
+	});
+
+	test("absent default dir → friendly message, no crash, no .clens created", () => {
+		process.env.CODEX_HOME = join(dir, "does-not-exist");
+
 		expect(() =>
 			importCommand({ provider: "codex", inputPath: undefined, projectDir: dir }),
-		).toThrow(/Missing rollout path/);
+		).not.toThrow();
+		expect(existsSync(join(dir, ".clens"))).toBe(false);
+	});
+
+	test("default dir exists but is empty → reuses the existing 'no files found' message, no crash", () => {
+		process.env.CODEX_HOME = dir;
+		mkdirSync(join(dir, "sessions"), { recursive: true });
+
+		expect(() =>
+			importCommand({ provider: "codex", inputPath: undefined, projectDir: dir }),
+		).not.toThrow();
+		expect(existsSync(join(dir, ".clens"))).toBe(false);
+	});
+
+	test("explicit path is unaffected by CODEX_HOME (regression)", () => {
+		// A different session lives under CODEX_HOME than the one passed explicitly.
+		process.env.CODEX_HOME = dir;
+		const codexNested = join(dir, "sessions/2026/07/20");
+		mkdirSync(codexNested, { recursive: true });
+		const OTHER_ROLLOUT = ROLLOUT.replace("sid-abc", "sid-other");
+		writeFileSync(join(codexNested, "rollout-other.jsonl"), OTHER_ROLLOUT);
+
+		const explicitDir = join(dir, "explicit");
+		mkdirSync(explicitDir, { recursive: true });
+		writeFileSync(join(explicitDir, "rollout-x.jsonl"), ROLLOUT);
+
+		importCommand({ provider: "codex", inputPath: explicitDir, projectDir: dir });
+
+		expect(existsSync(sessionFile())).toBe(true);
+		expect(existsSync(join(dir, ".clens/sessions/sid-other.jsonl"))).toBe(false);
 	});
 });

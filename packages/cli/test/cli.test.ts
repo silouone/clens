@@ -439,6 +439,11 @@ describe("cli agents command", () => {
 		const { stdout } = await runCli("--help");
 		expect(stdout).toContain("agents");
 	});
+
+	test("help text mentions the import codex no-arg default", async () => {
+		const { stdout } = await runCli("--help");
+		expect(stdout).toContain("CODEX_HOME");
+	});
 });
 
 describe("cli missing session", () => {
