@@ -1,7 +1,7 @@
 ---
 id: clens-009-edits-highlight-mismatch
 type: bug
-status: in-progress
+status: in-review
 priority: 2
 created: 2026-07-23
 attempts: [{"runId":"clens-009-edits-highlight-mismatch-1784800379163","branch":"adw/clens-009-edits-highlight-mismatch","workspace":"/Users/silouane/adw-factory/runs/clens-009-edits-highlight-mismatch-1784800379163/workspace","outcome":"in-review","pr":"https://github.com/silouone/clens/pull/18","provider":"claude","model":"sonnet"}]
