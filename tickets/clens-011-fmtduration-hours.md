@@ -1,7 +1,7 @@
 ---
 id: clens-011-fmtduration-hours
 type: bug
-status: queued
+status: in-progress
 priority: 2
 created: 2026-07-23
 caps: { minutes: 45, turns: 300 }
