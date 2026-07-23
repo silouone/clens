@@ -1,11 +1,11 @@
 ---
 id: clens-013-list-reverse-flag
 type: feat
-status: in-progress
+status: blocked
 priority: 2
 created: 2026-07-23
 caps: { minutes: 40, turns: 250 }
-attempts: []
+attempts: [{"runId":"clens-013-list-reverse-flag-1784809271182","branch":"adw/clens-013-list-reverse-flag","workspace":"/work/remote","outcome":"blocked","provider":"claude","model":"sonnet"}]
 ---
 # `clens list --reverse`: list sessions oldest-first
 
