@@ -1,10 +1,10 @@
 ---
 id: clens-010-import-codex-autodiscover
 type: feat
-status: in-progress
+status: blocked
 priority: 2
 created: 2026-07-23
-attempts: []
+attempts: [{"runId":"clens-010-import-codex-autodiscover-1784800353334","branch":"adw/clens-010-import-codex-autodiscover","workspace":"/Users/silouane/adw-factory/runs/clens-010-import-codex-autodiscover-1784800353334/workspace","outcome":"blocked","provider":"claude","model":"sonnet"}]
 ---
 # `clens import codex` with no path: auto-discover `~/.codex/sessions/`
 
