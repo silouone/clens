@@ -1,7 +1,7 @@
 ---
 id: clens-010-import-codex-autodiscover
 type: feat
-status: blocked
+status: queued
 priority: 2
 created: 2026-07-23
 attempts: [{"runId":"clens-010-import-codex-autodiscover-1784800353334","branch":"adw/clens-010-import-codex-autodiscover","workspace":"/Users/silouane/adw-factory/runs/clens-010-import-codex-autodiscover-1784800353334/workspace","outcome":"blocked","provider":"claude","model":"sonnet"}]
