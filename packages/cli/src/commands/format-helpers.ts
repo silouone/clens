@@ -7,6 +7,11 @@ export const fmtDuration = (ms: number): string => {
 	const totalSeconds = Math.floor(ms / 1000);
 	const minutes = Math.floor(totalSeconds / 60);
 	const seconds = totalSeconds % 60;
+	if (minutes >= 60) {
+		const hours = Math.floor(minutes / 60);
+		const remainMin = minutes % 60;
+		return `${hours}h${remainMin}m`;
+	}
 	return minutes > 0
 		? `${minutes}m${seconds > 0 ? `${String(seconds).padStart(2, "0")}s` : ""}`
 		: `${seconds}s`;
