@@ -8,13 +8,16 @@ attempts: [{"runId":"clens-010-import-codex-autodiscover-1784800353334","branch"
 ---
 # `clens import codex` with no path: auto-discover `~/.codex/sessions/`
 
-## Spec pointer
+## Grounding (read the existing importer in-repo)
 
-`specs/codex-rollout-import.md` — the "Scope → MVP" section (around lines
-127-128) lists: *"`clens import codex <rollout-file|dir>` command (+ maybe
-auto-discover `~/.codex/sessions/`)."* The explicit-path half shipped
-(clens-007); this ticket ships the **auto-discover half**. Read that spec (and the
-existing importer it describes) before planning.
+The explicit-path importer already shipped (clens-007): `clens import codex
+<rollout-file|dir>`. This ticket ships the **auto-discover half** — the codex
+sessions live at `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`. Read the existing
+implementation before planning: `packages/cli/src/commands/import.ts` (the
+subcommand + the `Missing rollout path` guard), the recursive discovery it uses
+(`resolveRolloutFiles` / `collectRollouts`), and `packages/cli/test/import-command.test.ts`.
+(The design note `specs/codex-rollout-import.md` is a local, gitignored doc — not
+in this checkout; everything you need is in the code above and this ticket.)
 
 ## Feature
 
