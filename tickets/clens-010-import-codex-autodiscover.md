@@ -1,7 +1,7 @@
 ---
 id: clens-010-import-codex-autodiscover
 type: feat
-status: queued
+status: in-progress
 priority: 2
 created: 2026-07-23
 attempts: []
