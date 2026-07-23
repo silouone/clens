@@ -4,7 +4,7 @@ type: bug
 status: in-progress
 priority: 2
 created: 2026-07-23
-attempts: []
+attempts: [{"runId":"clens-009-edits-highlight-mismatch-1784800379163","branch":"adw/clens-009-edits-highlight-mismatch","workspace":"/Users/silouane/adw-factory/runs/clens-009-edits-highlight-mismatch-1784800379163/workspace","outcome":"in-review","pr":"https://github.com/silouone/clens/pull/18","provider":"claude","model":"sonnet"}]
 ---
 # TUI Edits tab: the highlighted file is not the file Enter opens
 
