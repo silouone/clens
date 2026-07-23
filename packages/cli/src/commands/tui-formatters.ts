@@ -94,6 +94,11 @@ export const groupFilesByDirectory = (
 	const toRelative = (p: string): string =>
 		p.startsWith(projectDir) ? p.slice(projectDir.length + 1) : p;
 
+	// Resolve the highlighted file by identity (selection order), not by a
+	// position recomputed after re-sorting/grouping for display.
+	const highlightedPath =
+		highlightIndex !== undefined ? files[highlightIndex]?.file_path : undefined;
+
 	const sorted = files
 		.slice()
 		.sort((a, b) => toRelative(a.file_path).localeCompare(toRelative(b.file_path)));
@@ -120,21 +125,14 @@ export const groupFilesByDirectory = (
 		>,
 	);
 
-	// Pre-compute cumulative file index offset for each directory group
 	const groupEntries = Object.entries(grouped);
-	const groupOffsets = groupEntries.reduce<number[]>((acc, [, _entries], i) => {
-		acc.push(i === 0 ? 0 : (acc[acc.length - 1] ?? 0) + groupEntries[i - 1][1].length);
-		return acc;
-	}, []);
 
-	return groupEntries.flatMap(([dir, entries], groupIdx) => {
-		const baseIdx = groupOffsets[groupIdx] ?? 0;
+	return groupEntries.flatMap(([dir, entries]) => {
 		const displayDir =
 			dir === "." ? "./" : dir.length > 60 ? `\u2026${dir.slice(-59)}/` : `${dir}/`;
 		const dirHeader = ansi.dim(displayDir);
-		const fileLines = entries.map((f, i) => {
-			const fileIdx = baseIdx + i;
-			const isHighlighted = highlightIndex !== undefined && fileIdx === highlightIndex;
+		const fileLines = entries.map((f) => {
+			const isHighlighted = highlightedPath !== undefined && f.file_path === highlightedPath;
 			const parts = [
 				...(f.reads > 0 ? [`${f.reads}R`] : []),
 				...(f.edits > 0 ? [`${f.edits}E`] : []),
@@ -165,6 +163,11 @@ export const groupFilesByAgent = (
 	const toRelative = (p: string): string =>
 		p.startsWith(projectDir) ? p.slice(projectDir.length + 1) : p;
 
+	// Resolve the highlighted file by identity (selection order), not by a
+	// position recomputed after re-sorting/grouping for display.
+	const highlightedPath =
+		highlightIndex !== undefined ? files[highlightIndex]?.file_path : undefined;
+
 	// Group editChains by agent_name (default to "session")
 	const agentGroups = editChains.reduce(
 		(acc, chain) => {
@@ -185,22 +188,13 @@ export const groupFilesByAgent = (
 		return minTA - minTB;
 	});
 
-	// Pre-compute file counts per agent group for functional index tracking
-	// Each agent group contributes N files; we need cumulative offsets
 	const agentGroupData = sortedGroups.map(([agentName, agentChains]) => {
 		const agentFilePaths = new Set(agentChains.map((c) => c.file_path));
 		const agentFiles = files.filter((f) => agentFilePaths.has(f.file_path));
 		return { agentName, agentChains, agentFiles };
 	});
 
-	const agentGroupOffsets = agentGroupData.reduce<number[]>((acc, _, i) => {
-		acc.push(i === 0 ? 0 : (acc[acc.length - 1] ?? 0) + agentGroupData[i - 1].agentFiles.length);
-		return acc;
-	}, []);
-
-	return agentGroupData.flatMap(({ agentName, agentChains, agentFiles }, groupIdx) => {
-		const groupBaseIdx = agentGroupOffsets[groupIdx] ?? 0;
-
+	return agentGroupData.flatMap(({ agentName, agentChains, agentFiles }) => {
 		const totalEdits = agentChains.reduce((sum, c) => sum + c.total_edits, 0);
 		const fileCount = agentChains.length;
 		const coloredName =
@@ -236,19 +230,12 @@ export const groupFilesByAgent = (
 			>,
 		);
 
-		// Pre-compute cumulative file offsets within this agent group's directory subgroups
 		const dirEntries = Object.entries(grouped);
-		const dirOffsets = dirEntries.reduce<number[]>((acc, _, i) => {
-			acc.push(i === 0 ? 0 : (acc[acc.length - 1] ?? 0) + dirEntries[i - 1][1].length);
-			return acc;
-		}, []);
 
-		const fileLines = dirEntries.flatMap(([dir, entries], dirIdx) => {
-			const dirBaseIdx = groupBaseIdx + (dirOffsets[dirIdx] ?? 0);
+		const fileLines = dirEntries.flatMap(([dir, entries]) => {
 			const displayDir = dir === "." ? "./" : `${dir}/`;
 			const dirLine = `    ${ansi.dim(displayDir)}`;
-			const entryLines = entries.map((f, i) => {
-				const fileIdx = dirBaseIdx + i;
+			const entryLines = entries.map((f) => {
 				const parts = [
 					...(f.reads > 0 ? [`${f.reads}R`] : []),
 					...(f.edits > 0 ? [`${f.edits}E`] : []),
@@ -257,7 +244,7 @@ export const groupFilesByAgent = (
 				const chainSuffix = editChainMap
 					? formatEditChainSuffix(editChainMap.get(f.file_path))
 					: "";
-				const isHighlighted = highlightIndex !== undefined && fileIdx === highlightIndex;
+				const isHighlighted = highlightedPath !== undefined && f.file_path === highlightedPath;
 				const line = `        ${f.name.padEnd(28)} ${parts.join(" ")}${chainSuffix}`;
 				return isHighlighted ? ansi.inverse(line) : line;
 			});
