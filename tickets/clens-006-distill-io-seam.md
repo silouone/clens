@@ -1,7 +1,7 @@
 ---
 id: clens-006-distill-io-seam
 type: chore
-status: in-review
+status: done
 priority: 2
 created: 2026-07-19
 caps: { minutes: 45, turns: 300 }
