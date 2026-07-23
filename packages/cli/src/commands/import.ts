@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { readRollout } from "../session/rollout";
 import { green, red, yellow } from "./shared";
 
@@ -22,10 +22,23 @@ const resolveRolloutFiles = (inputPath: string): string[] => {
 };
 
 /**
- * `clens import codex <rollout-file|dir>` — read Codex rollout JSONL, normalize
+ * Default Codex sessions dir when no path is given: `$CODEX_HOME/sessions` if
+ * `CODEX_HOME` is set, else `~/.codex/sessions` (read via `HOME`/`USERPROFILE`
+ * so tests can override both branches hermetically, without touching `os.homedir()`).
+ */
+const defaultCodexSessionsDir = (): string => {
+	const codexHome =
+		process.env.CODEX_HOME || `${process.env.HOME || process.env.USERPROFILE || ""}/.codex`;
+	return `${codexHome}/sessions`;
+};
+
+/**
+ * `clens import codex [rollout-file|dir]` — read Codex rollout JSONL, normalize
  * to Claude-hook-shaped StoredEvents, and OVERWRITE `.clens/sessions/{sid}.jsonl`
  * (the importer emits the full event set at once; re-import replaces, never
  * appends). Everything downstream — distill, TUI, web — then works unchanged.
+ * With no path given, auto-discovers the default Codex sessions dir (see
+ * `defaultCodexSessionsDir`).
  */
 export const importCommand = (args: {
 	provider: string | undefined;
@@ -38,13 +51,23 @@ export const importCommand = (args: {
 				"Usage: clens import codex <rollout-file|dir>",
 		);
 	}
-	if (!args.inputPath) {
-		throw new Error("Missing rollout path.\nUsage: clens import codex <rollout-file|dir>");
+
+	const usingDefault = !args.inputPath;
+	const inputPath = args.inputPath || defaultCodexSessionsDir();
+
+	if (usingDefault && !existsSync(inputPath)) {
+		console.log(
+			yellow(
+				`No Codex sessions directory found at ${inputPath}.\n` +
+					"Nothing to import yet — pass a path explicitly, or run Codex first.",
+			),
+		);
+		return;
 	}
 
-	const files = resolveRolloutFiles(args.inputPath);
+	const files = resolveRolloutFiles(inputPath);
 	if (files.length === 0) {
-		console.log(yellow(`No rollout-*.jsonl files found under ${args.inputPath}`));
+		console.log(yellow(`No rollout-*.jsonl files found under ${inputPath}`));
 		return;
 	}
 
