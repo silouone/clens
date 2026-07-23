@@ -1,7 +1,7 @@
 ---
 id: clens-009-edits-highlight-mismatch
 type: bug
-status: queued
+status: in-progress
 priority: 2
 created: 2026-07-23
 attempts: []
