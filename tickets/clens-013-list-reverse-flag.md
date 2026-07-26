@@ -1,7 +1,7 @@
 ---
 id: clens-013-list-reverse-flag
 type: feat
-status: blocked
+status: queued
 priority: 2
 created: 2026-07-23
 caps: { minutes: 40, turns: 250 }
