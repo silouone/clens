@@ -12,8 +12,9 @@ export const listCommand = async (args: {
 	projectDir: string;
 	json: boolean;
 	global: boolean;
+	reverse: boolean;
 }): Promise<void> => {
-	const sessions: readonly SessionSummary[] = args.global
+	const fetchedSessions: readonly SessionSummary[] = args.global
 		? await (async () => {
 				const { listGlobalSessions } = await import("../session/global-read");
 				return listGlobalSessions();
@@ -23,6 +24,10 @@ export const listCommand = async (args: {
 				const raw = listSessions(args.projectDir);
 				return enrichSessionSummaries(raw, args.projectDir);
 			})();
+
+	const sessions: readonly SessionSummary[] = args.reverse
+		? [...fetchedSessions].reverse()
+		: fetchedSessions;
 
 	if (args.json) {
 		console.log(JSON.stringify(sessions, null, 2));

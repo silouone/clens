@@ -78,6 +78,7 @@ const commands: Readonly<Record<string, CommandDef>> = {
 				projectDir: ctx.projectDir,
 				json: ctx.flags.json,
 				global: ctx.flags.global,
+				reverse: ctx.flags.reverse,
 			});
 		},
 	},
@@ -329,7 +330,7 @@ const GLOBAL_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
 
 const VALID_FLAGS_BY_COMMAND: Readonly<Record<string, ReadonlySet<string>>> = {
 	init: new Set(["--remove", "--status", "--dev", "--global", "--legacy"]),
-	list: new Set(["--json", "--global"]),
+	list: new Set(["--json", "--global", "--reverse"]),
 	distill: new Set(["--last", "--all", "--global", "--force", "--deep", "--json", "--pricing"]),
 	report: new Set(["--last", "--json", "--detail", "--full", "--intent"]),
 	agents: new Set(["--last", "--json", "--comms"]),
@@ -397,6 +398,7 @@ ${bold("Setup:")}
 ${bold("Sessions:")}
   ${cyan("list")}              List captured sessions
   ${cyan("list --global")}     List sessions across all registered projects
+  ${cyan("list --reverse")}    List sessions oldest-first
   ${cyan("name")}              Set/clear a session's label & color flag
   ${cyan("distill")}           Extract insights from session data
   ${cyan("distill --global")}  Distill every session across all registered projects
@@ -488,6 +490,7 @@ const flags: Flags = {
 	comms: args.includes("--comms"),
 	global: args.includes("--global"),
 	legacy: args.includes("--legacy"),
+	reverse: args.includes("--reverse"),
 	...(pricingValue ? { pricing: pricingValue } : {}),
 };
 
