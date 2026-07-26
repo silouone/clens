@@ -70,6 +70,11 @@ describe("cli --help", () => {
 		expect(stdout).toContain("Usage:");
 		expect(stdout).toContain("Analysis:");
 	});
+
+	test("documents list --reverse", async () => {
+		const { stdout } = await runCli("--help");
+		expect(stdout).toContain("list --reverse");
+	});
 });
 
 describe("cli init", () => {
@@ -155,6 +160,127 @@ describe("cli list", () => {
 		const { stdout } = await runCli("list");
 		expect(stdout).toContain("Total:");
 		expect(stdout).toContain("session(s)");
+	});
+
+	test("--reverse reorders the table oldest-first, footer count unchanged", async () => {
+		const idA = "aaaa1111-0000-0000-0000-000000000000";
+		const idB = "bbbb2222-0000-0000-0000-000000000000";
+		writeSession(idA, [
+			makeStoredEvent({ t: 1000, event: "SessionStart", sid: idA }),
+			makeStoredEvent({ t: 2000, event: "SessionEnd", sid: idA }),
+		]);
+		writeSession(idB, [
+			makeStoredEvent({ t: 50000, event: "SessionStart", sid: idB }),
+			makeStoredEvent({ t: 60000, event: "SessionEnd", sid: idB }),
+		]);
+
+		const reversed = await runCli("list", "--reverse");
+		expect(reversed.exitCode).toBe(0);
+		expect(reversed.stdout.indexOf("aaaa1111")).toBeGreaterThanOrEqual(0);
+		expect(reversed.stdout.indexOf("bbbb2222")).toBeGreaterThanOrEqual(0);
+		expect(reversed.stdout.indexOf("aaaa1111")).toBeLessThan(reversed.stdout.indexOf("bbbb2222"));
+		expect(reversed.stdout).toContain("Total:");
+		expect(reversed.stdout).toContain("across 2 session(s)");
+
+		// Mirror image: without --reverse, newest (B) comes first.
+		const forward = await runCli("list");
+		expect(forward.stdout.indexOf("bbbb2222")).toBeLessThan(forward.stdout.indexOf("aaaa1111"));
+	});
+
+	test("--json --reverse reverses the JSON array (oldest first)", async () => {
+		const idA = "aaaa1111-0000-0000-0000-000000000000";
+		const idB = "bbbb2222-0000-0000-0000-000000000000";
+		writeSession(idA, [
+			makeStoredEvent({ t: 1000, event: "SessionStart", sid: idA }),
+			makeStoredEvent({ t: 2000, event: "SessionEnd", sid: idA }),
+		]);
+		writeSession(idB, [
+			makeStoredEvent({ t: 50000, event: "SessionStart", sid: idB }),
+			makeStoredEvent({ t: 60000, event: "SessionEnd", sid: idB }),
+		]);
+
+		const { exitCode, stdout } = await runCli("list", "--json", "--reverse");
+		expect(exitCode).toBe(0);
+		const parsed = JSON.parse(stdout);
+		expect(parsed).toHaveLength(2);
+		expect(parsed[0].session_id).toBe(idA);
+		expect(parsed[parsed.length - 1].session_id).toBe(idB);
+
+		// Cross-check: exact reverse of the plain --json order.
+		const forward = await runCli("list", "--json");
+		const forwardParsed = JSON.parse(forward.stdout);
+		expect(parsed).toEqual([...forwardParsed].reverse());
+	});
+
+	test("no --reverse flag is byte-identical to today (newest-first)", async () => {
+		const idA = "aaaa1111-0000-0000-0000-000000000000";
+		const idB = "bbbb2222-0000-0000-0000-000000000000";
+		writeSession(idA, [
+			makeStoredEvent({ t: 1000, event: "SessionStart", sid: idA }),
+			makeStoredEvent({ t: 2000, event: "SessionEnd", sid: idA }),
+		]);
+		writeSession(idB, [
+			makeStoredEvent({ t: 50000, event: "SessionStart", sid: idB }),
+			makeStoredEvent({ t: 60000, event: "SessionEnd", sid: idB }),
+		]);
+
+		const { exitCode, stdout } = await runCli("list");
+		expect(exitCode).toBe(0);
+		expect(stdout.indexOf("bbbb2222")).toBeLessThan(stdout.indexOf("aaaa1111"));
+	});
+
+	test("empty session list with --reverse still prints 'No sessions found.'", async () => {
+		const { exitCode, stdout } = await runCli("list", "--reverse");
+		expect(exitCode).toBe(0);
+		expect(stdout.trim()).toBe("No sessions found.");
+	});
+
+	test("empty session list with --json --reverse prints an empty JSON array", async () => {
+		const { exitCode, stdout } = await runCli("list", "--json", "--reverse");
+		expect(exitCode).toBe(0);
+		expect(JSON.parse(stdout)).toEqual([]);
+	});
+
+	test("--reverse with a single session is a no-op (same output as forward)", async () => {
+		const id = "cccc3333-0000-0000-0000-000000000000";
+		writeSession(id, [
+			makeStoredEvent({ t: 1000, event: "SessionStart", sid: id }),
+			makeStoredEvent({ t: 2000, event: "SessionEnd", sid: id }),
+		]);
+
+		const forward = await runCli("list");
+		const reversed = await runCli("list", "--reverse");
+		expect(reversed.exitCode).toBe(0);
+		expect(reversed.stdout).toBe(forward.stdout);
+	});
+
+	test("--reverse fully reverses three sessions, not just the endpoints", async () => {
+		const idOldest = "aaaa1111-0000-0000-0000-000000000000";
+		const idMiddle = "bbbb2222-0000-0000-0000-000000000000";
+		const idNewest = "cccc3333-0000-0000-0000-000000000000";
+		writeSession(idOldest, [
+			makeStoredEvent({ t: 1000, event: "SessionStart", sid: idOldest }),
+			makeStoredEvent({ t: 2000, event: "SessionEnd", sid: idOldest }),
+		]);
+		writeSession(idMiddle, [
+			makeStoredEvent({ t: 30000, event: "SessionStart", sid: idMiddle }),
+			makeStoredEvent({ t: 40000, event: "SessionEnd", sid: idMiddle }),
+		]);
+		writeSession(idNewest, [
+			makeStoredEvent({ t: 50000, event: "SessionStart", sid: idNewest }),
+			makeStoredEvent({ t: 60000, event: "SessionEnd", sid: idNewest }),
+		]);
+
+		const { exitCode, stdout } = await runCli("list", "--json", "--reverse");
+		expect(exitCode).toBe(0);
+		const parsed = JSON.parse(stdout) as Array<{ session_id: string }>;
+		expect(parsed.map((s) => s.session_id)).toEqual([idOldest, idMiddle, idNewest]);
+	});
+
+	test("--reverse with an unknown flag still rejects the unknown flag", async () => {
+		const { exitCode, stderr } = await runCli("list", "--reverse", "--bogus");
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain("Unknown flag --bogus");
 	});
 });
 

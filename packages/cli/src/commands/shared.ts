@@ -17,6 +17,7 @@ export type Flags = {
 	readonly comms: boolean;
 	readonly global: boolean;
 	readonly legacy: boolean;
+	readonly reverse: boolean;
 	readonly pricing?: string;
 };
 
