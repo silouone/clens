@@ -24,10 +24,16 @@ export const IDLE_THRESHOLD_MS = 300_000;
  *
  * Performance: a few `existsSync` checks per level, no spawning — stays within
  * the ~2ms hook budget.
+ *
+ * @param exists - marker-existence predicate; injectable for tests, defaults to `existsSync`.
  */
-export const resolveProjectRoot = (start: string): string => {
+// @adw clens-014#R2: injectable predicate lets tests pin the fallbacks without a real parent walk.
+export const resolveProjectRoot = (
+	start: string,
+	exists: (path: string) => boolean = existsSync,
+): string => {
 	const walkUp = (dir: string, marker: string): string | undefined => {
-		if (existsSync(resolve(dir, marker))) return dir;
+		if (exists(resolve(dir, marker))) return dir;
 		const parent = dirname(dir);
 		return parent === dir ? undefined : walkUp(parent, marker);
 	};

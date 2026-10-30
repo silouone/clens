@@ -1,16 +1,25 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { StoredEvent } from "../src/types";
 
-const TEST_DIR = "/tmp/clens-test-hook";
+const ROOT_PREFIX = join(tmpdir(), "clens-test-hook-");
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HOOK_SCRIPT = resolve(PKG_ROOT, "src/hook.ts");
 
+const markersIn = (dir: string) => [".clens", ".git"].filter((m) => existsSync(join(dir, m)));
+
+// @adw clens-014#R1,R2: each test owns a mkdtemp root seeded with its own `.clens` marker, so
+// the nearest marker wins and a stray `.clens` in a shared parent cannot capture the walk.
+const seenRoots: string[] = [];
+let TEST_DIR: string;
+
 beforeEach(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true });
-	mkdirSync(TEST_DIR, { recursive: true });
+	TEST_DIR = mkdtempSync(ROOT_PREFIX);
+	seenRoots.push(TEST_DIR);
+	mkdirSync(`${TEST_DIR}/.clens`);
 });
 
 afterEach(() => {
@@ -184,36 +193,6 @@ describe("hook handler", () => {
 		expect(stored.event).toBe("PreToolUse");
 	});
 
-	test("nested cwd falls back to .git root when no .clens exists yet", async () => {
-		// Project root has a .git but no .clens yet (first event of a session).
-		mkdirSync(`${TEST_DIR}/.git`, { recursive: true });
-		const nestedCwd = `${TEST_DIR}/packages/cli/src`;
-		mkdirSync(nestedCwd, { recursive: true });
-
-		const payload = JSON.stringify({
-			session_id: "git-root-session",
-			cwd: nestedCwd,
-			hook_event_name: "PreToolUse",
-			tool_name: "Read",
-			tool_input: { file_path: "/bar.ts" },
-			tool_use_id: "t-git",
-			transcript_path: "/tmp/t.jsonl",
-			permission_mode: "default",
-		});
-
-		const proc = Bun.spawn(["bun", "run", HOOK_SCRIPT, "PreToolUse"], {
-			stdin: new Response(payload),
-			stdout: "pipe",
-			stderr: "pipe",
-			cwd: PKG_ROOT,
-		});
-
-		await proc.exited;
-
-		expect(existsSync(`${TEST_DIR}/.clens/sessions/git-root-session.jsonl`)).toBe(true);
-		expect(existsSync(`${nestedCwd}/.clens`)).toBe(false);
-	});
-
 	// Regression: a resolved root nested under `.clens/` produced a recursive
 	// `.clens/sessions/.clens/sessions` capture dir that self-perpetuated. The hook
 	// must refuse to write any path nested under a `.clens/` segment.
@@ -245,5 +224,78 @@ describe("hook handler", () => {
 		// No event written anywhere under the nested `.clens/`.
 		expect(existsSync(`${nestedRoot}/.clens/sessions/recursive-session.jsonl`)).toBe(false);
 		expect(existsSync(`${TEST_DIR}/.clens/sessions/recursive-session.jsonl`)).toBe(false);
+	});
+
+	// @adw clens-014#R2: a `.clens` in the parent of the project root must not capture the event.
+	test("ignores a .clens in the parent of the project root", async () => {
+		const outer = mkdtempSync(ROOT_PREFIX);
+		try {
+			mkdirSync(`${outer}/.clens`);
+			const project = `${outer}/proj`;
+			const cwd = `${project}/src`;
+			mkdirSync(`${project}/.clens`, { recursive: true });
+			mkdirSync(cwd, { recursive: true });
+
+			const payload = JSON.stringify({
+				session_id: "parent-marker-session",
+				cwd,
+				hook_event_name: "PreToolUse",
+				tool_name: "Read",
+				tool_input: { file_path: "/qux.ts" },
+				tool_use_id: "t-parent",
+				transcript_path: "/tmp/t.jsonl",
+				permission_mode: "default",
+			});
+
+			const proc = Bun.spawn(["bun", "run", HOOK_SCRIPT, "PreToolUse"], {
+				stdin: new Response(payload),
+				stdout: "pipe",
+				stderr: "pipe",
+				cwd: PKG_ROOT,
+			});
+
+			await proc.exited;
+
+			expect(existsSync(`${project}/.clens/sessions/parent-marker-session.jsonl`)).toBe(true);
+			expect(existsSync(`${outer}/.clens/sessions`)).toBe(false);
+		} finally {
+			rmSync(outer, { recursive: true, force: true });
+		}
+	});
+
+	// @adw clens-014#R1: the run writes nothing outside its private mkdtemp root.
+	test("R1: hook run stays inside its private root", async () => {
+		const parentBefore = markersIn(dirname(TEST_DIR));
+		const payload = JSON.stringify({
+			session_id: "private-root-session",
+			cwd: TEST_DIR,
+			hook_event_name: "PreToolUse",
+			tool_name: "Bash",
+			tool_input: { command: "ls" },
+			tool_use_id: "t-private",
+			transcript_path: "/tmp/t.jsonl",
+			permission_mode: "default",
+		});
+
+		const proc = Bun.spawn(["bun", "run", HOOK_SCRIPT, "PreToolUse"], {
+			stdin: new Response(payload),
+			stdout: "pipe",
+			stderr: "pipe",
+			cwd: PKG_ROOT,
+		});
+
+		await proc.exited;
+
+		expect(TEST_DIR.startsWith(ROOT_PREFIX)).toBe(true);
+		expect(markersIn(dirname(TEST_DIR))).toEqual(parentBefore);
+		expect(existsSync(`${TEST_DIR}/.clens/sessions/private-root-session.jsonl`)).toBe(true);
+	});
+
+	// @adw clens-014#R1: roots from earlier tests are distinct and gone.
+	test("R1: previous hook test roots were removed by afterEach", () => {
+		expect(new Set(seenRoots).size).toBe(seenRoots.length);
+		const previous = seenRoots.filter((root) => root !== TEST_DIR);
+		expect(previous.length).toBeGreaterThan(0);
+		expect(previous.filter((root) => existsSync(root))).toEqual([]);
 	});
 });

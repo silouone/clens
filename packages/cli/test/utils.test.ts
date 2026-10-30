@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import {
 	formatBytes,
 	formatDuration,
@@ -104,11 +106,18 @@ describe("sanitizeAgentName", () => {
 	});
 });
 
+const markersIn = (dir: string) => [".clens", ".git"].filter((m) => existsSync(join(dir, m)));
+
+// @adw clens-014#R1,R2: every root is a private mkdtemp dir; fallback cases use an injected
+// fake `exists` so no parent marker on the host can change the result.
 describe("resolveProjectRoot", () => {
-	const ROOT = `/tmp/clens-test-resolve-root-${process.pid}`;
+	const ROOT_PREFIX = join(tmpdir(), "clens-test-resolve-root-");
+	const seenRoots: string[] = [];
+	let ROOT: string;
 
 	beforeEach(() => {
-		rmSync(ROOT, { recursive: true, force: true });
+		ROOT = mkdtempSync(ROOT_PREFIX);
+		seenRoots.push(ROOT);
 		mkdirSync(`${ROOT}/.clens/sessions`, { recursive: true });
 		mkdirSync(`${ROOT}/packages/web/src/client/assets`, { recursive: true });
 	});
@@ -133,14 +142,85 @@ describe("resolveProjectRoot", () => {
 	});
 
 	test("falls back to .git when no .clens exists on the path", () => {
-		rmSync(`${ROOT}/.clens`, { recursive: true, force: true });
-		mkdirSync(`${ROOT}/.git`, { recursive: true });
-		expect(resolveProjectRoot(`${ROOT}/packages/web/src/client/assets`)).toBe(ROOT);
+		const markers = new Set(["/p/.git"]);
+		expect(resolveProjectRoot("/p/a/b/c", (path) => markers.has(path))).toBe("/p");
 	});
 
 	test("falls back to the start dir when neither .clens nor .git is found", () => {
-		const orphan = `${ROOT}/packages/web/src/client/assets`;
-		rmSync(`${ROOT}/.clens`, { recursive: true, force: true });
-		expect(resolveProjectRoot(orphan)).toBe(orphan);
+		expect(resolveProjectRoot("/p/a/b/c", () => false)).toBe("/p/a/b/c");
+	});
+
+	test("prefers .clens over a nearer .git", () => {
+		const markers = new Set(["/p/.clens", "/p/a/.git"]);
+		expect(resolveProjectRoot("/p/a/b", (path) => markers.has(path))).toBe("/p");
+	});
+
+	// @adw clens-014#R2: boundary cases of the injected predicate — no real fs, so host-immune.
+	test("returns the start dir when it contains the .git marker itself", () => {
+		const markers = new Set(["/p/a/b/.git"]);
+		expect(resolveProjectRoot("/p/a/b", (path) => markers.has(path))).toBe("/p/a/b");
+	});
+
+	test("finds a .clens at the filesystem root", () => {
+		const markers = new Set(["/.clens"]);
+		expect(resolveProjectRoot("/p/a", (path) => markers.has(path))).toBe("/");
+	});
+
+	test("terminates at the filesystem root when started there with no markers", () => {
+		expect(resolveProjectRoot("/", () => false)).toBe("/");
+	});
+
+	test("probes every .clens level before any .git level, nearest first", () => {
+		const probed: string[] = [];
+		const result = resolveProjectRoot("/p/a", (path) => {
+			probed.push(path);
+			return false;
+		});
+		expect(result).toBe("/p/a");
+		expect(probed).toEqual([
+			"/p/a/.clens",
+			"/p/.clens",
+			"/.clens",
+			"/p/a/.git",
+			"/p/.git",
+			"/.git",
+		]);
+	});
+
+	test("stops probing at the first .clens hit", () => {
+		const probed: string[] = [];
+		const result = resolveProjectRoot("/p/a/b", (path) => {
+			probed.push(path);
+			return path === "/p/a/.clens";
+		});
+		expect(result).toBe("/p/a");
+		expect(probed).toEqual(["/p/a/b/.clens", "/p/a/.clens"]);
+	});
+
+	test("ignores a .clens in the parent of the project root", () => {
+		const outer = mkdtempSync(ROOT_PREFIX);
+		try {
+			mkdirSync(`${outer}/.clens`, { recursive: true });
+			mkdirSync(`${outer}/proj/.clens`, { recursive: true });
+			mkdirSync(`${outer}/proj/sub`, { recursive: true });
+			expect(resolveProjectRoot(`${outer}/proj/sub`)).toBe(`${outer}/proj`);
+		} finally {
+			rmSync(outer, { recursive: true, force: true });
+		}
+	});
+
+	test("R1: owns a private mkdtemp root and writes no marker to its parent", () => {
+		expect(ROOT.startsWith(ROOT_PREFIX)).toBe(true);
+		expect(ROOT).not.toBe(`/tmp/clens-test-resolve-root-${process.pid}`);
+		const before = markersIn(dirname(ROOT));
+		resolveProjectRoot(join(ROOT, "packages/web/src/client/assets"));
+		expect(markersIn(dirname(ROOT))).toEqual(before);
+	});
+
+	test("R1: previous test roots were removed by afterEach", () => {
+		expect(new Set(seenRoots).size).toBe(seenRoots.length);
+		const previous = seenRoots.filter((root) => root !== ROOT);
+		expect(previous.length).toBeGreaterThan(0);
+		expect(previous.filter((root) => existsSync(root))).toEqual([]);
 	});
 });
